@@ -1,4 +1,7 @@
 'use strict';
+// These tests describe the image-only build (no FFmpeg, LibreOffice, ...), so they turn off
+// detection of system tools. test/conversions.test.js and test/seo.test.js cover the full build.
+process.env.SQUISH_DETECT = '0';
 // Runs the live image conversions for real with Sharp. Skipped if Sharp isn't installed.
 // BMP input (Jimp) and ICO output (png-to-ico) need those packages and are not covered here.
 const test = require('node:test');

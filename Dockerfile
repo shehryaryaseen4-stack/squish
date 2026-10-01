@@ -1,14 +1,45 @@
-FROM node:20-bookworm-slim
+# Squish with every conversion engine installed.
+# Ubuntu 24.04 is used because its package names are the ones the conversion tests were run
+# against; Node comes from the official Node image. The result is large (~2 GB) because of
+# LibreOffice and Calibre. To leave an engine out, delete its packages below: the site
+# detects what is installed at startup and only offers those conversions.
+FROM node:20-bookworm-slim AS node
 
-# Fonts so Sharp can draw text into the Open Graph share images (/og/*.png).
-RUN apt-get update && apt-get install -y --no-install-recommends fonts-dejavu-core fontconfig \
+FROM ubuntu:24.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # audio + video
+    ffmpeg \
+    # office documents, spreadsheets, presentations (headless LibreOffice)
+    libreoffice-core-nogui libreoffice-writer-nogui libreoffice-calc-nogui libreoffice-impress-nogui libreoffice-draw-nogui \
+    # markup documents, ebooks
+    pandoc calibre \
+    # PDF, PostScript, vector graphics
+    ghostscript poppler-utils inkscape \
+    # extra image formats (PSD, ICO, PPM, BMP/PSD/EPS output; HEIC/HEIF)
+    imagemagick libheif-examples libheif-plugin-libde265 \
+    # archives
+    libarchive-tools p7zip-full xz-utils lzip lzop ncompress \
+    # DjVu
+    djvulibre-bin \
+    # fonts: text in share images and faithful office/PDF rendering
+    fontconfig fonts-dejavu-core fonts-liberation2 fonts-crosextra-carlito fonts-crosextra-caladea \
+    ca-certificates \
   && rm -rf /var/lib/apt/lists/*
+
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
 
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
 COPY . .
+
+# Conversions run as an unprivileged user; their temp folders live in /tmp.
+RUN useradd --create-home --shell /usr/sbin/nologin squish
+USER squish
 
 ENV PORT=3000
 EXPOSE 3000

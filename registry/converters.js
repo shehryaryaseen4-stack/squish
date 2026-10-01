@@ -65,6 +65,24 @@ const ARCHIVE_ALL_IN = [...ARCHIVE_IN, 'ace', 'alz', 'arc', 'arj', 'cab', 'cpio'
   'rpm', 'rz', 'xz', 'z', 'tar-7z', 'tar-xz', 'tar-lzo', 'tar-z'];
 const ARCHIVE_ALL_OUT = [...ARCHIVE_OUT, 'xz', 'tar-xz', 'tar-7z'];
 
+// Formats verified end to end with real files (test/conversions.test.js).
+const VIDEO_LIVE = ['mp4', 'm4v', 'mov', 'mkv', 'webm', 'avi', 'flv', 'wmv', 'mpeg', 'mpg', 'mod', 'vob', '3gp', '3gpp', '3g2', 'ogv',
+  'ts', 'mts', 'm2ts', 'mxf', 'dv', 'rm', 'rmvb', 'swf', 'wtv'];
+const AUDIO_LIVE = ['mp3', 'wav', 'aac', 'flac', 'ogg', 'oga', 'm4a', 'm4b', 'wma', 'aiff', 'aifc', 'opus', 'ac3', 'alac', 'au', 'caf', 'voc', 'weba'];
+const DOC_LIVE_IN = ['doc', 'docx', 'docm', 'dot', 'dotx', 'odt', 'rtf', 'txt', 'html'];
+const DOC_LIVE_OUT = ['doc', 'docx', 'docm', 'dot', 'dotx', 'odt', 'rtf', 'txt', 'html', 'pdf'];
+const SHEETS_LIVE = ['xls', 'xlsx', 'xlsm', 'ods', 'csv', 'tsv'];
+const SLIDES_LIVE = ['ppt', 'pptx', 'pptm', 'pps', 'ppsx', 'pot', 'potx', 'odp'];
+const VECTOR_LIVE_IN = ['svg', 'svgz', 'eps', 'ps', 'ai', 'emf', 'wmf'];
+const VECTOR_LIVE_OUT = ['svg', 'svgz', 'eps', 'ps', 'pdf', 'emf', 'wmf'];
+const IMG_IM_OUT = ['bmp', 'psd', 'eps', 'ps'];
+const EBOOK_LIVE_IN = ['epub', 'mobi', 'azw', 'azw3', 'prc', 'fb2', 'htmlz', 'lit', 'lrf', 'pdb', 'rb', 'tcr', 'txtz', 'cbz',
+  'docx', 'odt', 'rtf', 'txt', 'html', 'pdf'];
+const EBOOK_LIVE_OUT = ['epub', 'mobi', 'azw3', 'fb2', 'htmlz', 'lit', 'lrf', 'oeb', 'pdb', 'rb', 'tcr', 'txtz', 'docx', 'rtf', 'txt', 'pdf'];
+const ARCHIVE_LIVE_IN = ['zip', 'jar', '7z', 'tar', 'tar-gz', 'tar-bz2', 'tar-xz', 'tar-7z', 'tar-z', 'tar-lzo', 'gz', 'bz2', 'xz', 'lz', 'lzma', 'lzo', 'z',
+  'cpio', 'iso', 'deb'];
+const ARCHIVE_LIVE_OUT = ['zip', '7z', 'tar', 'tar-gz', 'tar-bz2', 'tar-xz', 'tar-7z', 'gz', 'bz2', 'xz'];
+
 const CONVERSION_RULES = [
   // ===================================================================== LIVE ==
   // Everything below "live" is what the server does today (POST /api/compress).
@@ -89,6 +107,71 @@ const CONVERSION_RULES = [
     notes: 'Works only if the libvips build includes HEVC decoding (prebuilt Sharp usually does not). ' +
       'Verify with a real iPhone photo, then change status to "live" to publish landing pages.',
   },
+
+  // ===================================================== LIVE (system tools) ==
+  // These run command-line tools (FFmpeg, LibreOffice, ...). Each one is live only when its
+  // engine is installed on the server (registry/index.js checks), otherwise it counts as planned.
+  // Every format listed here was converted for real in test/conversions.test.js.
+  // Rule order matters: when two live rules cover the same pair, the first one wins.
+
+  // ---- audio + video (FFmpeg)
+  { id: 'media-video', status: 'live', engine: 'ffmpeg', handler: 'media', from: VIDEO_LIVE, to: VIDEO_LIVE, quality: 'good',
+    notes: 'Re-encoded with widely compatible codecs (H.264/AAC for MP4, MOV, MKV; VP9/Opus for WebM).' },
+  { id: 'media-video-to-audio', status: 'live', engine: 'ffmpeg', handler: 'media', from: VIDEO_LIVE, to: AUDIO_LIVE,
+    notes: 'Extracts the audio track.' },
+  { id: 'media-video-to-animation', status: 'live', engine: 'ffmpeg', handler: 'media', from: VIDEO_LIVE, to: ['gif', 'webp'], quality: 'limited',
+    notes: 'Animated output is scaled to at most 480px wide at 12 frames per second to keep files small.' },
+  { id: 'media-gif-to-video', status: 'live', engine: 'ffmpeg', handler: 'media', from: ['gif'], to: VIDEO_LIVE },
+  { id: 'media-audio', status: 'live', engine: 'ffmpeg', handler: 'media', from: AUDIO_LIVE, to: AUDIO_LIVE },
+
+  // ---- office documents, spreadsheets, presentations (LibreOffice)
+  { id: 'office-documents', status: 'live', engine: 'libreoffice', handler: 'office', from: DOC_LIVE_IN, to: DOC_LIVE_OUT, quality: 'good',
+    notes: 'Layout fidelity depends on the fonts installed on the server.' },
+  { id: 'office-spreadsheets', status: 'live', engine: 'libreoffice', handler: 'office', from: SHEETS_LIVE, to: [...SHEETS_LIVE, 'html', 'pdf'],
+    notes: 'CSV and TSV keep only the first sheet and no formatting.' },
+  { id: 'office-presentations', status: 'live', engine: 'libreoffice', handler: 'office', from: SLIDES_LIVE, to: [...SLIDES_LIVE, 'pdf'] },
+  { id: 'office-slides-to-image', status: 'live', engine: 'libreoffice', requires: ['poppler'], handler: 'office', from: SLIDES_LIVE, to: ['jpg', 'png'],
+    notes: 'One image per slide; decks with several slides are downloaded as a ZIP.' },
+
+  // ---- markup documents (Pandoc)
+  { id: 'markup-from', status: 'live', engine: 'pandoc', handler: 'markup', from: ['md', 'rst', 'tex'],
+    to: ['md', 'rst', 'tex', 'html', 'docx', 'odt', 'txt', 'rtf', 'epub'] },
+  { id: 'markup-to-pdf', status: 'live', engine: 'pandoc', requires: ['libreoffice'], handler: 'markup', from: ['md', 'rst', 'tex'], to: ['pdf'] },
+  { id: 'markup-to', status: 'live', engine: 'pandoc', handler: 'markup', from: ['html', 'docx', 'odt', 'txt', 'rtf', 'epub'], to: ['md', 'rst', 'tex'] },
+
+  // ---- PDF (Poppler, Ghostscript, pdf-lib)
+  { id: 'pdf-out', status: 'live', engine: 'poppler', handler: 'pdf', from: ['pdf'], to: ['jpg', 'png', 'webp', 'tiff', 'txt', 'html', 'svg', 'eps', 'ps'],
+    notes: 'Images: one per page, several pages are downloaded as a ZIP.' },
+  { id: 'image-to-pdf-live', status: 'live', engine: 'pdf-lib', handler: 'pdf', from: ['jpg', 'jfif', 'png', 'webp', 'avif', 'tiff', 'gif', 'bmp', 'svg'], to: ['pdf'],
+    notes: 'One page per image, at the image\'s own size.' },
+
+  // ---- vector graphics (Inkscape)
+  { id: 'vector-live', status: 'live', engine: 'inkscape', requires: ['ghostscript'], handler: 'vector', from: VECTOR_LIVE_IN, to: VECTOR_LIVE_OUT, quality: 'good' },
+  { id: 'vector-live-to-raster', status: 'live', engine: 'inkscape', requires: ['ghostscript'], handler: 'vector', from: VECTOR_LIVE_IN, to: ['jpg', 'png', 'webp', 'avif', 'tiff', 'gif'] },
+  { id: 'pdf-to-vector-live', status: 'live', engine: 'inkscape', handler: 'vector', from: ['pdf'], to: ['svgz', 'emf', 'wmf'] },
+
+  // ---- more image formats (libheif, ImageMagick, Ghostscript)
+  { id: 'image-heif', status: 'live', engine: 'libheif', handler: 'imagex', from: ['heic', 'heif'], to: [...IMG_OUT, 'pdf'], quality: 'high' },
+  { id: 'image-heif-more', status: 'live', engine: 'libheif', requires: ['imagemagick'], handler: 'imagex', from: ['heic', 'heif'], to: IMG_IM_OUT },
+  { id: 'image-im-input', status: 'live', engine: 'imagemagick', handler: 'imagex', from: ['psd', 'ico', 'ppm'], to: [...IMG_OUT, ...IMG_IM_OUT, 'pdf'],
+    notes: 'Layered files are flattened; for icons the largest size is used.' },
+  { id: 'image-ps-input', status: 'live', engine: 'ghostscript', handler: 'imagex', from: ['eps', 'ps'], to: IMG_OUT, notes: 'The first page is rendered at 150 dpi.' },
+  { id: 'image-im-output', status: 'live', engine: 'imagemagick', handler: 'imagex', from: ['jpg', 'jfif', 'png', 'webp', 'avif', 'tiff', 'gif', 'bmp', 'svg'], to: IMG_IM_OUT },
+
+  // ---- ebooks (Calibre)
+  { id: 'ebook-live', status: 'live', engine: 'calibre', handler: 'ebook', from: EBOOK_LIVE_IN, to: EBOOK_LIVE_OUT, quality: 'good',
+    notes: 'DRM-protected books cannot be converted. PDF input works best for text-based PDFs.' },
+
+  // ---- DjVu (DjVuLibre)
+  { id: 'djvu-live', status: 'live', engine: 'djvulibre', handler: 'djvu', from: ['djvu'], to: ['pdf', 'tiff', 'txt', 'jpg', 'png'] },
+
+  // ---- archives (bsdtar, 7-Zip, gzip, bzip2, xz, lzip, lzop)
+  { id: 'archive-live', status: 'live', engine: 'libarchive', handler: 'archive', from: ARCHIVE_LIVE_IN, to: ARCHIVE_LIVE_OUT,
+    notes: 'GZ, BZ2 and XZ hold a single file. Unpacked size is limited to protect the server.' },
+
+  // ---- fonts (pure JS)
+  { id: 'font-woff', status: 'live', engine: 'woff', handler: 'font', from: ['ttf', 'otf', 'woff', 'woff2'], to: ['ttf', 'otf', 'woff', 'woff2'],
+    except: [['ttf', 'otf'], ['otf', 'ttf']], notes: 'Wraps or unwraps fonts; outlines are not changed, so a WOFF unwraps to the TTF or OTF it was made from.' },
 
   // =============================================================== PLANNED ==
   // ---- images
@@ -187,7 +270,7 @@ const CONVERSION_RULES = [
 const COMPRESS_RULES = [
   { id: 'compress-image', status: 'live', engine: 'sharp', handler: 'image',
     formats: ['jpg', 'png', 'webp', 'avif', 'tiff', 'gif'] },
-  { id: 'compress-pdf', status: 'planned', engine: 'ghostscript', formats: ['pdf'] },
+  { id: 'compress-pdf', status: 'live', engine: 'ghostscript', handler: 'pdf', formats: ['pdf'] },
 ];
 
 // Conversions promoted in footers, the home page and 404 page (in this order).
@@ -196,6 +279,8 @@ const POPULAR = [
   ['png', 'webp'], ['jpg', 'webp'], ['webp', 'png'], ['webp', 'jpg'], ['png', 'jpg'], ['jpg', 'png'],
   ['avif', 'jpg'], ['gif', 'webp'], ['svg', 'png'], ['png', 'ico'], ['tiff', 'jpg'], ['bmp', 'jpg'],
   ['heic', 'jpg'], ['pdf', 'docx'], ['docx', 'pdf'], ['mp4', 'mp3'], ['mp4', 'gif'], ['ttf', 'woff'],
+  ['jpg', 'pdf'], ['pdf', 'jpg'], ['mov', 'mp4'], ['wav', 'mp3'], ['mkv', 'mp4'], ['webm', 'mp4'], ['xlsx', 'pdf'], ['pptx', 'pdf'],
+  ['epub', 'pdf'], ['m4a', 'mp3'], ['png', 'pdf'], ['heic', 'png'],
 ];
 
 module.exports = { CONVERSION_RULES, COMPRESS_RULES, POPULAR };

@@ -1,25 +1,18 @@
-# Squish — Server-Side Image Compressor
+# Squish: free online file converter
 
-Upload images, get them back compressed/converted. Built with free, open-source
-libraries only — no paid API keys required.
+Convert video, audio, images, documents, spreadsheets, presentations, ebooks, archives and
+fonts. Built only on free, open-source engines, with no paid API keys.
 
-## What changed from the browser-only version
-
-A browser can only *encode* images to JPEG, PNG or WebP — that's a platform
-limit, not a code limit. This server uses [Sharp](https://sharp.pixelplumbing.com/)
-(built on libvips) plus a couple of small helpers, so it can genuinely read and
-write far more formats. See the **Format support** table below for exactly
-what's guaranteed vs. conditional — please read it before promising customers
-"every format" works, because two formats (true HEIC decoding, and .ico as an
-*input*) depend on things outside this project's control.
+With every engine installed (see the Dockerfile) the server performs **2,420 conversions**
+plus 7 compressors, across 129 input formats. Every one of those formats was converted for
+real in `test/conversions.test.js`. Without the system tools it still does images, image to
+PDF and web fonts.
 
 ## Requirements
 
-- Node.js 18 or newer
-- A Linux/macOS/Windows server or VM. Sharp ships prebuilt binaries for common
-  platforms, so `npm install` alone is normally enough — no separate libvips
-  install needed on the common hosting platforms (Debian/Ubuntu, Alpine via
-  the musl build, macOS, Windows).
+- Node.js 18 or newer.
+- For anything beyond images, the command-line engines below. The easiest route is the
+  Dockerfile, which installs them all on Ubuntu 24.04.
 
 ## Local setup
 
@@ -29,30 +22,72 @@ cp .env.example .env    # adjust PORT / limits if you want
 npm start
 ```
 
-Then open `http://localhost:3000`.
+Then open `http://localhost:3000`. On startup the server checks which engines are installed
+and only offers those conversions; everything else stays in the menus as "coming soon".
 
-## Format support
+## Conversion engines
 
-| Format | Input | Output | Notes |
-|---|---|---|---|
-| JPEG | Yes | Yes | Universal. |
-| PNG | Yes | Yes | Lossless — best for screenshots, logos, transparency. |
-| WebP | Yes | Yes | Usually the smallest at a given visual quality. Animated WebP is produced when the source is an animated GIF. |
-| AVIF | Yes | Yes | Smallest files of all, but slower to encode — expect more CPU time per image. |
-| TIFF | Yes | Yes | Common in scanning/print workflows. |
-| GIF | Yes | Yes | Animation is **kept** only when the output format is GIF or WebP. Any other output format uses a single frame. |
-| JFIF | Yes | — | Ordinary JPEG data with a `.jfif` extension; Sharp reads it directly. |
-| BMP | Yes | — | Decoded via a Jimp fallback (libvips can't read BMP at all); always converted to another format on the way out. |
-| SVG | Yes | — | Rasterized (turned into pixels) on input. Vector data is not preserved — if you need small vector files, minify with a tool like SVGO instead of running them through here. |
-| ICO | — | Yes | Real multi-resolution favicons are generated from any input using `png-to-ico`. Reading an existing `.ico` as input is **not implemented** — legacy `.ico` parsing is a project of its own and wasn't worth the complexity for what is usually a one-off favicon-generation need. |
-| HEIC / HEIF | Not verified | — | HEIC decoding depends on how libvips/libheif was built on your machine and I could not verify it here, so HEIC pages are shown as "coming soon" (noindex) and the upload box does not advertise it. If you want it, install a libvips build with HEIC support, test with a real iPhone photo, then set the `image-heic` rule in `registry/converters.js` to `live`. |
-| RAW camera formats (.cr2, .nef, .arw, etc.) | No | — | Out of scope. These need a dedicated RAW decoder (e.g. `libraw`), which is a much heavier dependency than this project pulls in. |
+| Engine | Ubuntu/Debian packages | Converts |
+|---|---|---|
+| Sharp (libvips), Jimp, png-to-ico | npm, always installed | JPG, PNG, WebP, AVIF, TIFF, GIF, BMP, SVG, JFIF, ICO |
+| pdf-lib | npm, always installed | images to PDF |
+| wawoff2 + built-in WOFF | npm, always installed | TTF/OTF to and from WOFF/WOFF2 |
+| FFmpeg | `ffmpeg` | 25 video and 18 audio formats, video to audio, video to GIF/WebP, GIF to video |
+| LibreOffice | `libreoffice-*-nogui` (core, writer, calc, impress, draw) | DOC, DOCX, DOCM, DOT, DOTX, ODT, RTF, TXT, HTML, PDF; XLS, XLSX, XLSM, ODS, CSV, TSV; PPT, PPTX, PPTM, PPS, PPSX, POT, POTX, ODP; slides to JPG/PNG |
+| Pandoc | `pandoc` | Markdown, reStructuredText, LaTeX to and from HTML, DOCX, ODT, RTF, TXT, EPUB (PDF via LibreOffice) |
+| Calibre | `calibre` | EPUB, MOBI, AZW, AZW3, PRC, FB2, HTMLZ, LIT, LRF, PDB, RB, TCR, TXTZ, CBZ, PDF, DOCX and more |
+| Poppler + Ghostscript | `poppler-utils ghostscript` | PDF to JPG/PNG/WebP/TIFF/TXT/HTML/SVG/EPS/PS, PDF compression, EPS/PS to images |
+| Inkscape | `inkscape` | SVG, SVGZ, EPS, PS, AI, EMF, WMF to each other, to PDF and to images |
+| ImageMagick | `imagemagick` | PSD, ICO, PPM input; BMP, PSD, EPS, PS output |
+| libheif | `libheif-examples libheif-plugin-libde265` | HEIC/HEIF (iPhone photos) to every image format and PDF |
+| DjVuLibre | `djvulibre-bin` | DjVu to PDF, TIFF, TXT, JPG, PNG |
+| libarchive + 7-Zip | `libarchive-tools p7zip-full xz-utils lzip lzop ncompress` | ZIP, JAR, 7Z, TAR, TAR.GZ/BZ2/XZ/7Z/Z/LZO, GZ, BZ2, XZ, LZ, LZMA, LZO, Z, CPIO, ISO, DEB to ZIP, 7Z, TAR (+GZ/BZ2/XZ/7Z), GZ, BZ2, XZ |
+
+How it is wired:
+
+- `registry/engines.js` lists each engine and the binaries it needs. `engines/detect.js`
+  checks them at startup. LibreOffice also checks that Writer, Calc and Impress are installed,
+  because `soffice` alone cannot open documents.
+- `registry/converters.js` marks a rule `live` only for formats that were tested end to end.
+  If its engine is missing on a server, the rule counts as planned there.
+- `engines/<name>.js` does the work. Command-line jobs run without a shell, in a private
+  temp folder that is always deleted, with a timeout (`JOB_TIMEOUT_S`) and a limit on parallel
+  jobs (`MAX_JOBS`). Archives are checked against zip bombs (`MAX_EXTRACT_MB`) and paths that
+  escape the folder.
+- Conversions that produce several files (PDF pages, slides) return a ZIP.
+
+Still planned, because they could not be tested here: camera RAW files, XCF, ICNS, DXF/DWG,
+CDR, VSD, CGM, XPS, Apple Pages/Numbers/Keynote, HWP/LWP/WPD/WPS, RAR/CAB/LHA/ARJ/DMG input,
+AMR output, TTF to OTF outlines, EOT, PDF to DOCX via LibreOffice (Calibre handles PDF to DOCX).
+
+### Tests
+
+```bash
+npm test                  # everything, with one real conversion per engine rule
+npm run test:conversions  # every input and output format of every live rule (~3 minutes)
+```
+
+Tests for the image-only build switch detection off (`SQUISH_DETECT=0`) so they give the same
+result on any machine; the conversion and SEO tests use whatever is installed.
+
+## Image format notes
+
+| Format | Notes |
+|---|---|
+| GIF | Animation is **kept** only when the output format is GIF or WebP (or a video format). |
+| SVG | Rasterized at its declared size for image outputs; Inkscape keeps it as vectors for EPS/PDF/EMF/WMF. |
+| ICO | Output is a real multi-resolution favicon (16-256px). As input, the largest size is used. |
+| BMP | Read via Jimp (libvips can't read BMP); written via ImageMagick. |
+| HEIC / HEIF | Decoded with libheif. Prebuilt Sharp cannot read HEIC, so this needs `libheif-plugin-libde265`. |
 
 ## Site layout (CloudConvert-style)
 
-The site is laid out like CloudConvert: a white header with a **Tools** mega menu, a
-"File Converter" hero with a `convert [X] to [Y]` box and a red **Select File** button,
+The site is laid out like CloudConvert: a dark grey header and hero with a **Tools** mega menu,
+a "File Converter" heading with a `convert [X] to [Y]` box and a red **Select File** button,
 then the upload tool, feature blocks, popular conversions and every converter category.
+Every format has a file-type icon coloured by category, and while nothing is chosen the
+`convert [X] to [Y]` box cycles through popular conversions (switched off for visitors who
+prefer reduced motion).
 
 - **Tools** menu: search box, every category on the left (Archive ... Video, plus Popular and
   Compress), every format on the right. **Convert** and **Compress** menus list the category
@@ -60,13 +95,14 @@ then the upload tool, feature blocks, popular conversions and every converter ca
   marked *soon*.
 - The **convert [X] to [Y]** box: choose an input and the output list fills with every
   format it can become (grouped by category). Choosing an output opens that conversion's page.
+- The upload tool on the home and category pages takes any supported file: images use the
+  "Convert images to" setting, and every other file gets its own "to [format]" list.
 
 ### Catalogue vs. what actually works
 
-The registry (`registry/`) now holds the full CloudConvert-style catalogue: **194 formats in
-12 categories and about 3,400 conversions**. Only the image conversions are `live` (57 pairs
-plus 6 compressors); HEIC is `experimental`; everything else is `planned` and needs its engine
-installed first (FFmpeg, LibreOffice, Calibre, ... see `registry/engines.js`).
+The registry (`registry/`) holds the full CloudConvert-style catalogue: **194 formats in
+12 categories and about 3,450 conversions**. With every engine installed, 2,420 of them are
+`live`; the rest are `planned` (see "Conversion engines" above).
 
 Every conversion gets a page and appears in the menus, but:
 
@@ -78,7 +114,8 @@ Every conversion gets a page and appears in the menus, but:
 | `POST /api/compress` | Accepted | Rejected (HEIC is attempted) |
 
 To switch a conversion on: install its engine, add a handler in `engines/`, set the rule's
-status to `live` in `registry/converters.js`. Pages, menus, sitemap and API follow automatically.
+status to `live` in `registry/converters.js`, and add a sample maker in `test/samples.js` so
+`npm run test:conversions` proves it works. Pages, menus, sitemap and API follow automatically.
 
 ## Pages (one per conversion)
 
@@ -150,7 +187,12 @@ and earning links from other sites.
 | Variable | Default | Purpose |
 |---|---|---|
 | `PORT` | `3000` | Port the server listens on. |
-| `MAX_FILE_MB` | `40` | Largest single upload accepted. Raise/lower to match your server's memory — every upload is held in memory during processing. |
+| `MAX_FILE_MB` | `40` | Largest single upload accepted. Uploads are held in memory while they arrive, so match this to your server's memory; raise it if you expect long videos. |
+| `MAX_JOBS` | `2` | Command-line conversions (video, documents, ...) that run at once; the rest wait in a queue. |
+| `JOB_TIMEOUT_S` | `180` | A conversion that runs longer is stopped. |
+| `MAX_OUTPUT_MB` | `500` | Largest converted file the server sends back. |
+| `MAX_EXTRACT_MB` | `500` | Largest total size an archive may unpack to (zip-bomb protection). |
+| `SQUISH_DISABLE` | unset | Comma-separated binaries to treat as missing, e.g. `ffmpeg` to switch video off. |
 | `BASE_URL` | derived from request | Public site URL used in canonical tags, sitemap and robots.txt. Set this in production. |
 | `SITE_NAME` | `Squish` | Brand name used in page titles and footer. |
 | `TRUST_PROXY` | unset | Number of reverse proxies in front of the app (usually `1`). Needed for correct visitor IPs behind a proxy. |
@@ -184,11 +226,16 @@ npm start              # or use pm2 / systemd to keep it running
 ```
 Put Nginx or Caddy in front for TLS and to proxy port 80/443 → `PORT`.
 
-Docker:
+Docker (recommended: it installs every conversion engine):
 ```bash
 docker build -t squish .
 docker run -p 3000:3000 --env-file .env squish
 ```
+The image is about 2 GB because of LibreOffice and Calibre, and needs a host with at least
+2 GB of RAM for document and video work. Its package list was checked against Ubuntu 24.04
+(the same packages the conversion tests ran with), but the image itself has not been built
+in this repository's CI yet, so build it once and run `npm run test:conversions` inside it
+before going live.
 
 ## AdSense
 
@@ -199,6 +246,10 @@ Content-Security-Policy only allows its own scripts, so you also need to add the
 AdSense hosts in `server.js` (there is a comment where).
 
 ## Cost/abuse notes
+
+Video and document conversions are far heavier than image work: one long video can keep a
+CPU core busy for minutes. `MAX_JOBS`, `JOB_TIMEOUT_S` and `MAX_FILE_MB` are the knobs, and
+`SQUISH_DISABLE=ffmpeg` turns video off entirely if your plan cannot take it.
 
 Unlike the old client-side-only version, compression now runs on **your**
 server's CPU and uses **your** bandwidth for every upload/download. A public

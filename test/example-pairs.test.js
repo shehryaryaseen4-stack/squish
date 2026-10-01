@@ -1,4 +1,7 @@
 'use strict';
+// These tests describe the image-only build (no FFmpeg, LibreOffice, ...), so they turn off
+// detection of system tools. test/conversions.test.js and test/seo.test.js cover the full build.
+process.env.SQUISH_DETECT = '0';
 // The twelve candidate pairs from the brief: what the registry says about each.
 // "live" is only allowed where a working engine is installed (and see image-engine.test.js,
 // which runs those conversions for real).
@@ -18,8 +21,8 @@ const EXPECTED = [
   ['wav',  'mp3',  'ffmpeg',      'planned', true],
   ['mp4',  'gif',  'ffmpeg',      'planned', true],
   ['docx', 'pdf',  'libreoffice', 'planned', true],
-  ['csv',  'xlsx', 'sheetjs',     'planned', false], // SheetJS runs in the browser too
-  ['ttf',  'woff', 'fonttools',   'planned', true],
+  ['csv',  'xlsx', 'libreoffice', 'planned', true],  // live when LibreOffice is installed
+  ['ttf',  'woff', 'woff',        'live',    false], // pure JS, works everywhere
 ];
 
 for (const [from, to, engine, status, backend] of EXPECTED) {

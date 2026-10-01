@@ -112,60 +112,73 @@ function pickAutoFormat(inputExt) {
 }
 
 // ------------------------------------------------------------------ route --
+// One file in, one file out (or a ZIP when a conversion makes several files, e.g. PDF pages).
+// `format` is the target format's id ("mp3", "docx", "tar-gz") or its legacy image key ("jpeg").
+const MIME_ZIP = 'application/zip';
+// "backup.tar.gz" -> "backup" (drops the input format's full extension, not just ".gz")
+function safeName(name, inFormat) {
+  let base = String(name || 'file');
+  const ext = inFormat && inFormat.extensions.find((e) => base.toLowerCase().endsWith(`.${e}`));
+  base = ext ? base.slice(0, -(ext.length + 1)) : base.replace(/\.[^.]*$/, '');
+  return base.replace(/[^\w.-]+/g, '_').slice(0, 80) || 'file';
+}
+
 app.post('/api/compress', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file received.' });
 
-    const originalName = req.file.originalname || 'image';
-    const inputExt = extOf(originalName);
+    const originalName = req.file.originalname || 'file';
+    const inFormat = registry.getFormatByFilename(originalName);
+    const inputExt = inFormat ? inFormat.id : extOf(originalName);
     const originalSize = req.file.size;
 
     const quality = Math.min(100, Math.max(1, parseInt(req.body.quality, 10) || 75));
     const maxDim = Math.max(0, parseInt(req.body.maxDim, 10) || 0);
-    let format = (req.body.format || 'auto').toLowerCase();
+    let format = String(req.body.format || 'auto').toLowerCase();
 
-    if (format === 'auto') format = pickAutoFormat(inputExt);
-    if (!ACCEPTED_OUTPUT_KEYS.has(format)) {
+    if (!inFormat) {
+      return res.status(415).json({ error: `".${extOf(originalName) || '?'}" isn't a file type this server can read.` });
+    }
+    if (format === 'auto') {
+      if (!inFormat.categories.includes('image')) return res.status(400).json({ error: 'Choose the format you want to convert to.' });
+      format = pickAutoFormat(inputExt);
+    }
+    const outFormat = registry.getFormatByApiFormat(format) || registry.getFormat(format);
+    if (!outFormat || !ACCEPTED_OUTPUT_KEYS.has(outFormat.apiFormat)) {
       return res.status(400).json({ error: `Unsupported output format requested: ${format}` });
     }
-    const outFormat = registry.getFormatByApiFormat(format);
 
     // Ask the registry whether this input -> output is something we can do.
     // Same format in and out means "compress".
-    const inFormat = registry.getFormatByExtension(inputExt);
-    const converter = !inFormat ? null
-      : inFormat.id === outFormat.id ? registry.getCompressor(inFormat, ACCEPT)
-        : registry.getConverter(inFormat, outFormat, ACCEPT);
+    const converter = inFormat.id === outFormat.id ? registry.getCompressor(inFormat, ACCEPT)
+      : registry.getConverter(inFormat, outFormat, ACCEPT);
     if (!converter) {
-      const err = new Error(`".${inputExt}" isn't a format this server can read.`);
-      err.statusCode = 415;
-      throw err;
+      return res.status(415).json({ error: `${inFormat.label} to ${outFormat.label} isn't available on this server yet.` });
     }
 
-    const outBuffer = await getHandler(converter.handler)(
-      { buffer: req.file.buffer, inputExt, format, quality, maxDim },
+    const result = await getHandler(converter.handler)(
+      { buffer: req.file.buffer, inputExt, format: outFormat.apiFormat, quality, maxDim, from: inFormat, to: outFormat, filename: originalName },
       converter
     );
+    const out = Buffer.isBuffer(result) ? { buffer: result, ext: outFormat.extension } : result;
+    const ext = out.ext || outFormat.extension;
+    const mime = ext === 'zip' && outFormat.id !== 'zip' ? MIME_ZIP : (out.mime || outFormat.mimeType);
 
     res.set({
-      'Content-Type': outFormat.mimeType,
-      'Content-Disposition': `attachment; filename="compressed.${outFormat.extension}"`,
+      'Content-Type': mime,
+      'Content-Disposition': `attachment; filename="${safeName(originalName, inFormat)}.${ext}"`,
       'X-Original-Size': String(originalSize),
-      'X-Compressed-Size': String(outBuffer.length),
-      'X-Output-Ext': outFormat.extension,
+      'X-Compressed-Size': String(out.buffer.length),
+      'X-Output-Ext': ext,
     });
-    res.send(outBuffer);
+    res.send(out.buffer);
   } catch (err) {
-    const statusCode = err.statusCode || (/unsupported image format|Input buffer contains unsupported/i.test(err.message) ? 415 : 500);
-    if (statusCode === 415) {
-      res.status(415).json({
-        error: err.message.includes('read') ? err.message :
-          `This server's image library couldn't decode that file. HEIC/HEIF support in particular depends on how libvips was built on this machine — see README "Format support" table.`,
-      });
-    } else {
-      console.error('Compression error:', err);
-      res.status(500).json({ error: 'Something went wrong compressing that file.' });
+    if (err.userMessage) return res.status(err.statusCode || 422).json({ error: err.userMessage });
+    if (/unsupported image format|Input buffer contains unsupported/i.test(err.message || '')) {
+      return res.status(415).json({ error: 'This file could not be read. It may be damaged, or use a variant of the format this server does not support.' });
     }
+    console.error('Conversion error:', err);
+    res.status(500).json({ error: 'This file could not be converted. It may be damaged or use an unusual variant of the format.' });
   }
 });
 

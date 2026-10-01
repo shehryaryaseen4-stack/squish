@@ -1,4 +1,7 @@
 'use strict';
+// These tests describe the image-only build (no FFmpeg, LibreOffice, ...), so they turn off
+// detection of system tools. test/conversions.test.js and test/seo.test.js cover the full build.
+process.env.SQUISH_DETECT = '0';
 // Page behaviour: every registered conversion has a page and is in the menus, but only live
 // ones show the upload tool and get indexed. Planned ones say "coming soon" and are noindex.
 const test = require('node:test');

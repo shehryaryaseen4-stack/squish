@@ -74,7 +74,7 @@ const formats = FORMATS.map((f, order) => {
     description: f.description,
     icon: f.icon || (categoryById.get(f.category) || {}).icon || 'file',
     browserSupport: { read: BROWSER_LEVEL[code[0]], write: BROWSER_LEVEL[code[1]] },
-    apiFormat: f.apiFormat || null,
+    apiFormat: f.apiFormat || f.id, // the value POST /api/compress accepts as `format`
     traits: { sizeRank: null, alpha: false, ...(f.traits || {}) },
     notes: f.notes || null,
     order,
@@ -112,7 +112,14 @@ formats.forEach((f) => {
 });
 
 // ------------------------------------------------------------------ engines --
-const engines = ENGINES.map((e) => ({ ...e }));
+// 'system' engines are command-line tools: available only when their binaries are installed.
+const { hasBin, hasFilesNextTo } = require('../engines/detect');
+const engines = ENGINES.map((e) => {
+  if (e.status !== 'system') return { ...e, available: e.status === 'installed' };
+  const missing = (e.bins || []).filter((b) => !hasBin(b) || (e.binFiles && e.binFiles[b] && !hasFilesNextTo(b, e.binFiles[b])));
+  return { ...e, available: missing.length === 0, missingBins: missing };
+});
+const engineAvailable = (id) => !!(engineById.get(id) || {}).available;
 const engineById = new Map();
 engines.forEach((e) => {
   if (engineById.has(e.id)) problem(`duplicate engine id "${e.id}"`);
@@ -125,17 +132,26 @@ const converterIndex = new Map(); // "from>to" -> converter
 const compressors = [];      // type 'compress'
 const compressorIndex = new Map();
 
-function checkEngine(id, where, needInstalled) {
+function checkEngine(id, where, needUsable) {
   const e = engineById.get(id);
   if (!e) { problem(`${where}: unknown engine "${id}"`); return; }
-  if (needInstalled && e.status !== 'installed') problem(`${where}: engine "${id}" is not installed, so it cannot power a live/experimental converter`);
+  if (needUsable && e.status === 'planned') problem(`${where}: engine "${id}" is only planned, so it cannot power a live/experimental converter`);
+}
+
+// A live/experimental rule whose engine is not installed on this machine is treated as planned:
+// the conversion stays in the catalogue but is not offered until the tool is installed.
+function effectiveStatus(rule) {
+  if (rule.status === 'planned') return 'planned';
+  const ids = [rule.engine, ...Object.values(rule.decoders || {}), ...Object.values(rule.encoders || {}), ...(rule.requires || [])];
+  return ids.every(engineAvailable) ? rule.status : 'planned';
 }
 
 function checkRule(rule) {
   if (!STATUS_RANK[rule.status]) problem(`rule "${rule.id}": bad status "${rule.status}"`);
   const active = rule.status !== 'planned';
   checkEngine(rule.engine, `rule "${rule.id}"`, active);
-  Object.values(rule.decoders || {}).concat(Object.values(rule.encoders || {})).forEach((e) => checkEngine(e, `rule "${rule.id}"`, active));
+  Object.values(rule.decoders || {}).concat(Object.values(rule.encoders || {})).concat(rule.requires || [])
+    .forEach((e) => checkEngine(e, `rule "${rule.id}"`, active));
   if (active && !rule.handler) problem(`rule "${rule.id}": live/experimental rules need a handler`);
 }
 
@@ -163,14 +179,13 @@ CONVERSION_RULES.forEach((rule) => {
     const tf = formatById.get(to);
     if (!ff) { problem(`rule "${rule.id}": unknown from-format "${from}"`); return; }
     if (!tf) { problem(`rule "${rule.id}": unknown to-format "${to}"`); return; }
-    if (rule.status !== 'planned' && !tf.apiFormat) problem(`rule "${rule.id}": live/experimental output "${to}" needs an apiFormat`);
 
     const engine = rule.engine;
     const record = {
       id: `${from}>${to}`,
       type: 'convert',
       from, to,
-      status: rule.status,
+      status: effectiveStatus(rule),
       group: rule.id,
       engine,
       pipeline: { decode: (rule.decoders || {})[from] || engine, encode: (rule.encoders || {})[to] || engine },
@@ -204,9 +219,8 @@ COMPRESS_RULES.forEach((rule) => {
   rule.formats.forEach((id) => {
     const f = formatById.get(id);
     if (!f) { problem(`compress rule "${rule.id}": unknown format "${id}"`); return; }
-    if (rule.status !== 'planned' && !f.apiFormat) problem(`compress rule "${rule.id}": "${id}" needs an apiFormat`);
     const record = {
-      id: `compress:${id}`, type: 'compress', from: id, to: id, status: rule.status, group: rule.id,
+      id: `compress:${id}`, type: 'compress', from: id, to: id, status: effectiveStatus(rule), group: rule.id,
       engine: rule.engine, pipeline: { decode: rule.engine, encode: rule.engine }, handler: rule.handler || null,
       quality: rule.quality || 'good', notes: rule.notes || null,
       route: `/compress-${id}`, popularRank: null, toIndex: 0,

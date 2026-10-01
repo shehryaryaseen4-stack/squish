@@ -62,7 +62,9 @@ const outputsFor = (slug, opts) => registry.getCompatibleOutputFormats(slug, opt
 const inputsFor = (slug, opts) => registry.getCompatibleInputFormats(slug, opts).map((f) => f.id);
 
 const LIVE_INPUTS = registry.getInputFormats().map((f) => f.id);
-const LIVE_OUTPUTS = registry.getOutputFormats().map((f) => f.id);
+// Image tool lists (quality/size options only make sense for images).
+const isImageFmt = (id) => registry.getFormat(id).category === 'image' || id === 'svg';
+const IMAGE_OUTPUTS = registry.getOutputFormats({ category: 'image' }).filter((f) => f.category === 'image').map((f) => f.id);
 const ALL_INPUTS = registry.getInputFormats(ANY).map((f) => f.id);
 const COMPRESSIBLE = registry.getCompressibleFormats().map((f) => f.id);
 const ALL_COMPRESSORS = registry.getConverters({ ...ANY, type: 'compress' });
@@ -76,6 +78,9 @@ const formatIsLive = (id) => { const f = registry.getFormat(id); return f.input 
 // category it is (GIF is also listed under Video, but that does not make video conversion live).
 const LIVE_CATS = new Set(registry.getConverters({ type: 'all' }).map((c) => registry.getFormat(c.from).category));
 const categoryIsLive = (id) => LIVE_CATS.has(id);
+const LIVE_CAT_NAMES = CATS.filter((c) => categoryIsLive(c.id)).map((c) => c.name.toLowerCase());
+const listWords = (a) => (a.length < 2 ? a.join('') : `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}`);
+const LIVE_SUMMARY = `${LIVE_COUNT.toLocaleString('en-US')} conversions (${listWords(LIVE_CAT_NAMES)})`;
 
 // ---------------------------------------------------------------- helpers --
 const render = (tpl, map) => tpl.replace(/\{\{([A-Z0-9_]+)\}\}/g, (m, k) => (k in map ? map[k] : m));
@@ -112,6 +117,13 @@ const ICON_PATHS = {
 };
 const icon = (name, cls = 'ico') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[name] || ICON_PATHS.file}</svg>`;
 
+// File-type icon: a coloured page with the extension on it (colour = category), drawn in CSS.
+//   size 'xs' (no text, for picker buttons), 'sm', 'md', 'lg'
+const ficon = (id, size = 'sm') => {
+  const f = registry.getFormat(id);
+  return `<i class="ficon ficon-${size} fi-${f.category}" aria-hidden="true">${size === 'xs' ? '' : `<b>${f.label}</b>`}</i>`;
+};
+
 const SEARCH_ICON = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="2"/><path d="M13 13l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 
 // --------------------------------------------------------- format pickers --
@@ -129,7 +141,7 @@ function fmtButton({ id, href, text, live, current, dataFmt }) {
   const name = `${(text || f.label)} ${f.name} ${f.full}`.toLowerCase();
   return `<a class="fmt-btn${live ? ' is-live' : ''}" href="${href}" data-name="${esc(name)}"`
     + `${dataFmt ? ` data-fmt="${id}"` : ''}${current ? ' aria-current="true"' : ''}`
-    + `${live ? '' : ' title="Coming soon"'}>${text || f.label}</a>`;
+    + `${live ? '' : ' title="Coming soon"'}>${ficon(id, 'xs')}${text || f.label}</a>`;
 }
 
 function pickerPanel(groups, { current, extraClass = '', dataFmt = false, heads = false } = {}) {
@@ -148,8 +160,9 @@ function pickerPanel(groups, { current, extraClass = '', dataFmt = false, heads 
 }
 
 function picker(label, groups, { current, align = '', role = '', dataFmt = false, placeholder = false } = {}) {
+  const chipIcon = current && !placeholder ? ficon(current, 'xs') : '<i class="ficon ficon-xs fi-none" aria-hidden="true"></i>';
   return `<details class="chip-menu" data-menu${role ? ` data-role="${role}"` : ''}>`
-    + `<summary class="chip${placeholder ? ' chip-empty' : ''}" aria-label="Choose format${placeholder ? '' : ` (currently ${label})`}"><span class="chip-label">${label}</span><span class="caret" aria-hidden="true"></span></summary>`
+    + `<summary class="chip${placeholder ? ' chip-empty' : ''}" aria-label="Choose format${placeholder ? '' : ` (currently ${label})`}">${chipIcon}<span class="chip-label">${label}</span><span class="caret" aria-hidden="true"></span></summary>`
     + pickerPanel(groups, { current, extraClass: align, dataFmt }) + '</details>';
 }
 
@@ -195,12 +208,12 @@ function footer() {
   const comp = COMPRESSIBLE.map((s) => `<li>${link(compressPath(s), `Compress ${F(s).label}`)}</li>`).join('');
   return `<footer class="site-footer"><div class="footer-inner">
     <div class="footer-brand"><a class="brand" href="/">${BRAND_SVG}<span>${SITE}</span></a>
-      <p>Free online file converter. ${FORMAT_COUNT} formats in the catalogue; image conversion and compression work today.</p></div>
+      <p>Free online file converter. ${LIVE_COUNT.toLocaleString('en-US')} conversions across ${LIVE_CAT_NAMES.length} categories, free and without sign-up.</p></div>
     <div><h4>Converters</h4><ul>${cats}</ul></div>
     <div><h4>Popular</h4><ul>${pop}</ul></div>
     <div><h4>Tools</h4><ul>${comp}<li>${link('/converters', 'All formats')}</li></ul></div>
     <div><h4>Company</h4><ul><li>${link('/about', 'About')}</li><li>${link('/privacy', 'Privacy Policy')}</li><li>${link('/terms', 'Terms of Use')}</li><li>${link('/contact', 'Contact')}</li></ul></div>
-  </div><div class="footer-bottom">&copy; ${new Date().getFullYear()} ${SITE}. Files are processed in memory and never stored.</div></footer>`;
+  </div><div class="footer-bottom">&copy; ${new Date().getFullYear()} ${SITE}. Files are deleted as soon as they are converted.</div></footer>`;
 }
 
 // ------------------------------------------------------------------ hero --
@@ -250,7 +263,7 @@ function anyInputPicker(ids, current) {
 }
 
 const emptyToPicker = () =>
-  `<details class="chip-menu" data-menu data-role="to"><summary class="chip chip-empty" aria-label="Choose output format"><span class="chip-label">...</span><span class="caret" aria-hidden="true"></span></summary>`
+  `<details class="chip-menu" data-menu data-role="to"><summary class="chip chip-empty" aria-label="Choose output format"><i class="ficon ficon-xs fi-none" aria-hidden="true"></i><span class="chip-label">...</span><span class="caret" aria-hidden="true"></span></summary>`
   + `<div class="fmt-panel fmt-right"><label class="fmt-search">${SEARCH_ICON}<input type="search" class="fmt-q" placeholder="Search Format" autocomplete="off" aria-label="Search format"></label>`
   + '<div class="fmt-body"><ul class="fmt-cats"></ul><div class="fmt-grids"><p class="fmt-hint">Choose the input format first.</p><p class="fmt-none">No format found</p></div></div></div></details>';
 
@@ -269,36 +282,49 @@ function buildConversionMap(fromIds) {
   fromIds.forEach((f) => {
     const outs = outputsFor(f, ANY);
     pairs[f] = outs.join(' ');
-    [f, ...outs].forEach((id) => { if (!fmts[id]) fmts[id] = [F(id).label, F(id).categories, `${F(id).name} ${F(id).full}`.toLowerCase()]; });
+    [f, ...outs].forEach((id) => { if (!fmts[id]) fmts[id] = [F(id).label, F(id).categories, `${F(id).name} ${F(id).full}`.toLowerCase(), registry.getFormat(id).apiFormat]; });
     outs.forEach((o) => { if (isLivePair(f, o)) live.push(`${f}>${o}`); });
   });
   const cats = CATS.map((c) => [c.id, c.name]);
-  return `<script type="application/json" id="convMap">${jsonLd({ cats, fmts, pairs, live })}</script>`;
+  // file extension -> format id, so the upload tool can tell what a dropped file is
+  const ext = {};
+  registry.getInputFormats().forEach((f) => f.extensions.forEach((e) => { ext[e] = f.id; }));
+  // pairs the hero cycles through (CloudConvert-style "convert PNG to JPG" animation)
+  const rotate = POPULAR;
+  return `<script type="application/json" id="convMap">${jsonLd({ cats, fmts, pairs, live, ext, rotate })}</script>`;
 }
 
 // ----------------------------------------------------------------- tool --
 // The working upload tool. Only rendered where at least one conversion is live.
-function toolHtml({ inputs, outputs, dropTitle, dropSub }) {
+//   inputs   formats this tool accepts
+//   outputs  choices for the Output format select
+//   any      true on home/category/format pages: files of any accepted type can be dropped, and
+//            non-image files get their own "convert to" select in the results list
+function toolHtml({ inputs, outputs, dropTitle, dropSub, any = false }) {
   const exts = [...new Set(inputs.flatMap((id) => registry.getFormat(id).extensions))];
-  const mimes = [...new Set(inputs.flatMap((id) => registry.getFormat(id).mimeTypes))];
-  const accept = [...mimes, ...exts.map((e) => `.${e}`)].join(',');
+  const imageOnly = inputs.every(isImageFmt) && outputs.every(isImageFmt);
+  const showImageOptions = any || imageOnly;
   const opts = outputs.map((id) => {
     const f = registry.getFormat(id);
     return `<option value="${f.apiFormat}">${f.label}${id === 'ico' ? ' (favicon, multi-size)' : id === 'gif' ? ' (keeps animation)' : ''}</option>`;
   }).join('');
-  return `<section class="tool-card" id="convert" aria-label="Upload and convert">
+  const auto = any || imageOnly ? '<option value="auto">Automatic (recommended)</option>' : '';
+  // extension -> category, so result rows get the right icon colour on pages without the full map
+  const cats = {};
+  [...inputs, ...outputs].forEach((id) => { const f = registry.getFormat(id); f.extensions.forEach((e) => { cats[e] = f.category; }); });
+  return `<section class="tool-card" id="convert" aria-label="Upload and convert"${any ? ' data-any="1"' : ''} data-cats="${esc(JSON.stringify(cats))}">
   <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose files" data-exts="${exts.join(',')}">
     ${icon('upload', 'drop-ico')}
     <div class="cta">${dropTitle}</div>
     <div class="sub">${dropSub} &middot; up to ${MAX_MB}MB each</div>
-    <input type="file" id="fileInput" accept="${accept}" multiple>
+    <input type="file" id="fileInput" accept="${exts.map((e) => `.${e}`).join(',')}" multiple>
   </div>
   <div class="controls">
     <div class="control">
-      <label for="formatSel">Output format</label>
-      <select id="formatSel"><option value="auto">Automatic (recommended)</option>${opts}</select>
+      <label for="formatSel">${any ? 'Convert images to' : 'Output format'}</label>
+      <select id="formatSel">${auto}${opts}</select>
     </div>
-    <div class="control">
+    ${showImageOptions ? `<div class="control">
       <label for="qualityRange">Quality</label>
       <div class="slider-row">
         <input type="range" id="qualityRange" min="10" max="95" value="75">
@@ -314,7 +340,7 @@ function toolHtml({ inputs, outputs, dropTitle, dropSub }) {
         <option value="1280">1280px</option>
         <option value="800">800px</option>
       </select>
-    </div>
+    </div>` : ''}
   </div>
   <div class="results">
     <div class="results-head">
@@ -330,9 +356,10 @@ function toolHtml({ inputs, outputs, dropTitle, dropSub }) {
 </section>`;
 }
 
-const imageTool = (extra = {}) => toolHtml({
-  inputs: LIVE_INPUTS, outputs: LIVE_OUTPUTS,
-  dropTitle: 'Drop your images here', dropSub: `${LIVE_INPUTS.map((i) => F(i).label).join(', ')}`, ...extra,
+// Accepts every live input; images use the select above, other files get a per-file target.
+const anyTool = (inputs = LIVE_INPUTS) => toolHtml({
+  inputs, outputs: IMAGE_OUTPUTS.filter((o) => inputs.some((i) => isLivePair(i, o) || i === o)), any: true,
+  dropTitle: 'Drop your files here', dropSub: `${inputs.length} file types, including ${inputs.slice(0, 6).map((i) => F(i).label).join(', ')}`,
 });
 
 function soonBox(title, text, alternatives) {
@@ -348,7 +375,7 @@ function soonBox(title, text, alternatives) {
 // ------------------------------------------------------------- content --
 const cardHtml = (slug) => {
   const f = F(slug);
-  return `<article class="fcard"><div class="fcard-icon">${f.label}</div><div>
+  return `<article class="fcard">${ficon(slug, 'lg')}<div>
     <h3>${f.label} <span>&ndash; ${esc(f.full)}</span></h3><p>${esc(f.about)}</p>
     ${link(formatPath(slug), `More ${f.label} conversions`)}</div></article>`;
 };
@@ -362,14 +389,14 @@ const FAQ_COMMON = [
   ['Is it really free?',
     `Yes. There is no sign-up and no watermark. To keep the service available for everyone there is a ${MAX_MB}MB limit per file and a cap on how many files one connection can process in a short period.`],
   ['Are my files stored?',
-    'Your upload is held in the server’s memory only while it is being processed and is not written to disk. Once the result has been sent back, nothing is kept.'],
+    'Your upload is used only to make the converted file. Images are processed in memory; other files are written to a private temporary folder that is deleted as soon as the conversion finishes. Nothing is kept after the result has been sent back.'],
   ['Will quality drop?',
-    'A little, by design. To make files smaller the image is re-encoded at the Quality you choose (default 75%). Move the slider up for more detail or down for smaller files. Converting never restores detail that is already missing from the original.'],
+    'For images, a little, by design: the image is re-encoded at the Quality you choose (default 75%). Audio and video are re-encoded with high-quality settings; documents keep their text and layout as far as the target format allows. Converting never restores detail that is already missing from the original.'],
 ];
 
 const FAQ_CATALOG = [
   ['Which conversions work today?',
-    `Image conversion and compression (${LIVE_INPUTS.map((i) => F(i).label).join(', ')} to ${LIVE_OUTPUTS.map((i) => F(i).label).join(', ')}) run on this server right now. The rest of the ${FORMAT_COUNT} formats in the menus are on the roadmap and are clearly marked “coming soon” until they work.`],
+    `${LIVE_SUMMARY} work on this server right now. The rest of the ${TOTAL_COUNT.toLocaleString('en-US')} conversions in the menus are on the roadmap and are clearly marked \u201ccoming soon\u201d until they work.`],
 ];
 
 function pairNotes(from, to) {
@@ -395,10 +422,10 @@ function pairNotes(from, to) {
   return n;
 }
 
-function pairFaq(from, to) {
+function pairFaq(from, to, imagePair = true) {
   return [
     [`How do I convert ${from.label} to ${to.label}?`,
-      `Click Select File or drop your ${from.name} file onto the upload box. Pick the quality and maximum size, and the converted ${to.name} appears in the list below with a download button. You can add many files at once and download them together as a ZIP.`],
+      `Click Select File or drop your ${from.name} file onto the upload box.${imagePair ? ' Pick the quality and maximum size, and the' : ' The'} converted ${to.name} appears in the list below with a download button. You can add many files at once and download them together as a ZIP.`],
     ...FAQ_COMMON,
   ];
 }
@@ -421,9 +448,9 @@ function conversionLists(slug, dir) {
 }
 
 const FEATURES = () => [
-  ['layers', `${FORMAT_COUNT}+ formats`, `${TOTAL_COUNT.toLocaleString('en-US')} conversions across ${CATS.length} categories are in the catalogue. Image conversion and compression work today; the others are marked and being added.`],
-  ['shield', 'Data security', 'Files are processed in memory and never written to disk. Nothing is kept once your download is ready.'],
-  ['star', 'High-quality conversions', 'Built on libvips (Sharp), the same engine professional image pipelines use. You control quality and size.'],
+  ['layers', `${FORMAT_COUNT}+ formats`, `${LIVE_COUNT.toLocaleString('en-US')} conversions work today across ${listWords(LIVE_CAT_NAMES)} files. The rest of the catalogue is marked and being added.`],
+  ['shield', 'Data security', 'Files are used only to make your conversion and are deleted as soon as it is finished. Nothing is kept, shared or looked at.'],
+  ['star', 'High-quality conversions', 'Built on trusted open-source engines: libvips, FFmpeg, LibreOffice, Pandoc, Calibre, Ghostscript and Inkscape.'],
   ['gift', 'Free, no sign-up', 'No account, no watermark, no email. Convert many files at once and download them together as a ZIP.'],
 ];
 
@@ -446,7 +473,7 @@ function categoryCards() {
 
 function popularCards() {
   return `<section class="pop-section"><h2 class="section-title">Popular conversions</h2><div class="pop-grid">${POPULAR.map(([f, t]) =>
-    `<a class="pop-card" href="${pairPath(f, t)}"><span class="pop-fmt">${F(f).label}</span><span class="pop-arrow" aria-hidden="true">&rarr;</span><span class="pop-fmt pop-to">${F(t).label}</span></a>`).join('')}</div></section>`;
+    `<a class="pop-card" href="${pairPath(f, t)}"><span class="pop-icons">${ficon(f, 'md')}<span class="pop-arrow" aria-hidden="true">&rarr;</span>${ficon(t, 'md')}</span><span class="pop-text">${F(f).label} to ${F(t).label}</span></a>`).join('')}</div></section>`;
 }
 
 // ------------------------------------------------------------- page makers --
@@ -500,10 +527,10 @@ function graph(base, urlPath, name, desc, faq, crumbs, { type = 'WebApplication'
 const TOOL_FEATURES = ['Batch conversion', 'Download all as ZIP', 'Adjustable quality', 'Resize to a maximum dimension', 'No sign-up', 'Files are not stored'];
 
 // "How to convert" steps: visible on the page.
-function howToSteps(fromLabel, toLabel, verb = 'convert') {
+function howToSteps(fromLabel, toLabel, verb = 'convert', image = true) {
   return `<section class="howto"><h2>How to ${verb} ${fromLabel}${toLabel ? ` to ${toLabel}` : ''}</h2><ol class="steps">
     <li><strong>Choose your files.</strong> Click <em>Select File</em> or drag your ${fromLabel} files into the upload box. You can add many at once.</li>
-    <li><strong>Pick the settings.</strong> ${toLabel ? `${toLabel} is already selected as the output format.` : 'Choose the output format.'} Adjust Quality and Max dimension if you want smaller files.</li>
+    <li><strong>Pick the settings.</strong> ${toLabel ? `${toLabel} is already selected as the output format.` : 'Choose the output format.'}${image ? ' Adjust Quality and Max dimension if you want smaller files.' : ' The conversion starts as soon as a file is added.'}</li>
     <li><strong>Download.</strong> Each file appears in the list with its new size. Download them one by one, or all together as a ZIP.</li>
   </ol></section>`;
 }
@@ -548,16 +575,21 @@ function pairPage(fromSlug, toSlug, base) {
     })));
   }
 
-  const faq = pairFaq(from, to);
+  const imagePair = isImageFmt(fromSlug) && isImageFmt(toSlug);
+  const faq = pairFaq(from, to, imagePair);
   const notes = pairNotes(from, to);
+  if (!imagePair && meta.converter.notes) notes.push(esc(meta.converter.notes));
+  if (!notes.length) notes.push(`Your ${from.name} file is converted on our server and the ${to.name} result can be downloaded straight away.`);
   return renderPage(PAGE_TPL, baseFields(base, p, meta.title, meta.description, {
     JSONLD: graph(base, p, meta.schemaName, meta.description, faq, meta.breadcrumbs, { features: TOOL_FEATURES }),
     DEFAULT_FORMAT: to.select,
     HERO: hero({ h1: meta.h1, crumbs: meta.breadcrumbs,
-      intro: `Convert ${from.name} images to ${to.name} online for free. Upload one file or many, choose the quality and maximum size, then download the ${to.name} results one by one or all together in a ZIP. No sign-up needed.`,
+      intro: imagePair
+        ? `Convert ${from.name} images to ${to.name} online for free. Upload one file or many, choose the quality and maximum size, then download the ${to.name} results one by one or all together in a ZIP. No sign-up needed.`
+        : `Convert ${from.name} files to ${to.name} online for free. Upload one file or many and download the ${to.name} results one by one or all together in a ZIP. No sign-up needed.`,
       widget, withSelect: true }),
-    TOOL: toolHtml({ inputs: [fromSlug], outputs: LIVE_OUTPUTS, dropTitle: `Drop your ${from.label} files here`, dropSub: `or click to choose ${from.label} files` }),
-    CONTENT: howToSteps(from.label, to.label) + cards + compareTable([fromSlug, toSlug])
+    TOOL: toolHtml({ inputs: [fromSlug], outputs: outputsFor(fromSlug), dropTitle: `Drop your ${from.label} files here`, dropSub: `or click to choose ${from.label} files` }),
+    CONTENT: howToSteps(from.label, to.label, 'convert', imagePair) + cards + compareTable([fromSlug, toSlug])
       + `<section class="notes"><h2>Converting ${from.name} to ${to.name}</h2><ul>${notes.map((x) => `<li>${x}</li>`).join('')}</ul></section>` + faqHtml(faq),
     RELATED: relatedForPair(from, to),
   }));
@@ -591,10 +623,12 @@ function compressPage(slug, base) {
     JSONLD: graph(base, p, meta.schemaName, meta.description, faq, meta.breadcrumbs, { features: TOOL_FEATURES }),
     DEFAULT_FORMAT: f.select,
     HERO: hero({ h1: meta.h1, crumbs: meta.breadcrumbs,
-      intro: `Make your ${f.name} images smaller without fuss. Upload one file or many, set the quality and maximum size, and download the compressed versions individually or as a ZIP. No sign-up needed.`,
+      intro: isImageFmt(slug)
+        ? `Make your ${f.name} images smaller without fuss. Upload one file or many, set the quality and maximum size, and download the compressed versions individually or as a ZIP. No sign-up needed.`
+        : `Make your ${f.name} files smaller without fuss. Upload one file or many and download the compressed versions individually or as a ZIP. Images inside are downsampled to 150 dpi. No sign-up needed.`,
       widget, withSelect: true }),
-    TOOL: toolHtml({ inputs: [slug], outputs: LIVE_OUTPUTS, dropTitle: `Drop your ${f.label} files here`, dropSub: `or click to choose ${f.label} files` }),
-    CONTENT: howToSteps(f.label, '', 'compress') + `<section class="fcards" aria-label="About the format">${cardHtml(slug)}</section>` + faqHtml(faq),
+    TOOL: toolHtml({ inputs: [slug], outputs: [slug, ...outputsFor(slug)], dropTitle: `Drop your ${f.label} files here`, dropSub: `or click to choose ${f.label} files` }),
+    CONTENT: howToSteps(f.label, '', 'compress', isImageFmt(slug)) + `<section class="fcards" aria-label="About the format">${cardHtml(slug)}</section>` + faqHtml(faq),
     RELATED: `<section class="related"><h2>Related tools</h2>${chips([...others, ...conv])}</section>`,
   }));
 }
@@ -638,12 +672,12 @@ function categoryPage(catId, base) {
   const fmts = registry.getFormatsByCategory(catId);
   const live = categoryIsLive(catId);
   const ins = registry.getInputFormats({ ...ANY, category: catId }).map((x) => x.id);
-  const title = `${c.converterName} - Free Online ${c.name} Converter | ${SITE}`;
+  const title = `${c.converterName} - Free Online | ${SITE}`;
   const desc = `${c.description} ${fmts.length} formats. Free, no sign-up.`;
   const widget = convertRow(anyInputPicker(ins, null), emptyToPicker());
   const liveIns = LIVE_INPUTS.filter((i) => F(i).category === catId); // primary category only (GIF is not a video tool)
   const fmtGrid = `<section class="conv-section"><h2>Supported ${c.name.toLowerCase()} formats</h2><div class="fmt-cards">${fmts.map((f) =>
-    `<a class="fmt-card" href="${formatPath(f.id)}"><strong>${f.label}</strong><span>${esc(f.fullName)}</span>${formatIsLive(f.id) ? '<em class="badge badge-live">Live</em>' : '<em class="badge badge-soon">Soon</em>'}</a>`).join('')}</div></section>`;
+    `<a class="fmt-card" href="${formatPath(f.id)}">${ficon(f.id, 'md')}<strong>${f.label}</strong><span>${esc(f.fullName)}</span>${formatIsLive(f.id) ? '<em class="badge badge-live">Live</em>' : '<em class="badge badge-soon">Soon</em>'}</a>`).join('')}</div></section>`;
   const livePairs = registry.getConverters({ fromCategory: catId });
   const liveSection = livePairs.length
     ? `<section class="conv-section"><h2>Available right now</h2>${chips(livePairs.map((x) => [x.route, pairLabel(x.from, x.to), true]))}</section>` : '';
@@ -652,22 +686,22 @@ function categoryPage(catId, base) {
   const fields = baseFields(base, p, title, desc, {
     JSONLD: live ? graph(base, p, c.converterName, desc, faq, crumbs, { features: TOOL_FEATURES }) : '{}',
     HERO: hero({ h1: c.converterName, crumbs, intro: `${esc(c.description)}${live ? '' : ' These conversions are on our roadmap and coming soon.'}`, widget, withSelect: liveIns.length > 0 }),
-    TOOL: liveIns.length ? toolHtml({ inputs: liveIns, outputs: LIVE_OUTPUTS, dropTitle: 'Drop your files here', dropSub: liveIns.map((i) => F(i).label).join(', ') }) : '',
+    TOOL: liveIns.length ? anyTool(liveIns) : '',
     CONTENT: conversionMap(ins) + fmtGrid + liveSection + faqHtml(faq),
   });
   return renderPage(PAGE_TPL, live ? fields : noindex(fields));
 }
 
 function homePage(base) {
-  const title = `File Converter - Free Online Image Converter | ${SITE}`;
-  const desc = `Convert files online for free. ${FORMAT_COUNT} formats across ${CATS.length} categories; compress and convert JPG, PNG, WebP, AVIF, TIFF, GIF, BMP, SVG and ICO today. No sign-up.`;
+  const title = `File Converter - Convert Any File Online Free | ${SITE}`;
+  const desc = `Convert video, audio, images, documents, ebooks, archives and fonts online for free. ${LIVE_COUNT.toLocaleString('en-US')} conversions, batch upload, no sign-up.`;
   const faq = [...FAQ_CATALOG, ...FAQ_COMMON];
   return renderPage(PAGE_TPL, baseFields(base, '/', title, desc, {
     JSONLD: graph(base, '/', `${SITE} File Converter`, desc, faq, [['Home', '/']], { features: TOOL_FEATURES }),
     HERO: hero({ h1: 'File Converter',
-      intro: `${SITE} is an online file converter. Our catalogue covers ${FORMAT_COUNT} audio, video, document, ebook, archive, image, spreadsheet and presentation formats. To get started, choose your formats or use the button below to select files from your computer.`,
+      intro: `${SITE} is an online file converter. We support ${LIVE_COUNT.toLocaleString('en-US')} conversions between audio, video, document, ebook, archive, image, spreadsheet, presentation and font formats. To get started, choose your formats or use the button below to select files from your computer.`,
       widget: convertRow(anyInputPicker(ALL_INPUTS, null), emptyToPicker()), withSelect: true }),
-    TOOL: imageTool(),
+    TOOL: anyTool(),
     CONTENT: conversionMap(ALL_INPUTS) + featuresHtml() + popularCards() + categoryCards() + faqHtml(faq),
   }));
 }
@@ -677,8 +711,8 @@ function hubPage(base) {
     const items = registry.getFormatsByCategory(c.id).map((f) => [formatPath(f.id), `${f.label} <small>${esc(f.fullName)}</small>`, formatIsLive(f.id)]);
     return `<section id="cat-${c.id}" class="hub-section"><h2>${icon(c.icon)}${link(categoryPath(c.id), c.converterName)}</h2>${chips(items)}</section>`;
   }).join('');
-  const liveSection = `<section id="available" class="hub-section"><h2>Available right now</h2>${LIVE_INPUTS.map((i) =>
-    `<div class="conv-group" id="from-${i}"><h3>Convert ${F(i).label}</h3>${chips(outputsFor(i).map((o) => [pairPath(i, o), pairLabel(i, o), true]))}</div>`).join('')}</section>`;
+  const liveSection = `<section id="available" class="hub-section"><h2>Available right now</h2><p class="section-note">${LIVE_SUMMARY}. Pick a format to see everything it converts to.</p>${chips(LIVE_INPUTS.map((i) =>
+    [formatPath(i), `${F(i).label} <small>${outputsFor(i).length} conversions</small>`, true]))}</section>`;
   const comp = `<section id="compress" class="hub-section"><h2>${icon('compress')}Compress</h2>${chips(ALL_COMPRESSORS.map((x) => [x.route, `Compress ${F(x.from).label}`, x.status === 'live']))}</section>`;
   const jump = `<nav class="jump" aria-label="Categories">${CATS.map((c) => `<a href="#cat-${c.id}">${c.name}</a>`).join('')}<a href="#available">Available now</a></nav>`;
   const title = `All File Formats and Converters | ${SITE}`;
@@ -686,7 +720,7 @@ function hubPage(base) {
   const crumbs = [['Home', '/'], ['Converters', '/converters']];
   return renderPage(HUB_TPL, baseFields(base, '/converters', title, desc, {
     JSONLD: graph(base, '/converters', 'All file formats', desc, null, crumbs, { type: 'CollectionPage' }),
-    HERO: hero({ h1: 'All formats', crumbs, intro: `${FORMAT_COUNT} formats and ${TOTAL_COUNT.toLocaleString('en-US')} conversions. ${LIVE_COUNT} image conversions work today; formats marked <span class="soon-tag">soon</span> are on the roadmap.`, short: true }),
+    HERO: hero({ h1: 'All formats', crumbs, intro: `${FORMAT_COUNT} formats and ${TOTAL_COUNT.toLocaleString('en-US')} conversions. ${LIVE_COUNT.toLocaleString('en-US')} conversions work today; formats marked <span class="soon-tag">soon</span> are on the roadmap.`, short: true }),
     BODY: jump + liveSection + comp + sections,
   }));
 }
@@ -713,20 +747,20 @@ const INFO_PAGES = {
     title: `About ${SITE} - Free Online File Converter`, h1: `About ${SITE}`,
     desc: `${SITE} is a free online file converter and image compressor. Learn how it works and what it can convert.`,
     body: () => `<section class="prose">
-      <p>${SITE} is a free online file converter. It started as an image compressor and now converts and compresses ${LIVE_INPUTS.map((i) => F(i).label).join(', ')} images, with ${LIVE_COUNT} conversions working today.</p>
+      <p>${SITE} is a free online file converter. It started as an image compressor and now handles ${LIVE_SUMMARY}.</p>
       <h2>How it works</h2>
-      <p>Your file is uploaded over an encrypted connection, converted on our server with <a href="https://sharp.pixelplumbing.com/" rel="noopener">Sharp</a> (libvips), and sent straight back to your browser. Files are held in memory only while they are processed and are never written to disk.</p>
+      <p>Your file is uploaded over an encrypted connection, converted on our server with open-source engines (<a href="https://sharp.pixelplumbing.com/" rel="noopener">libvips</a>, <a href="https://ffmpeg.org/" rel="noopener">FFmpeg</a>, <a href="https://www.libreoffice.org/" rel="noopener">LibreOffice</a>, <a href="https://pandoc.org/" rel="noopener">Pandoc</a>, <a href="https://calibre-ebook.com/" rel="noopener">Calibre</a>, Ghostscript and Inkscape), and sent straight back to your browser. Nothing is kept afterwards.</p>
       <h2>What we are adding</h2>
-      <p>Our catalogue lists ${FORMAT_COUNT} formats across ${CATS.length} categories, including video, audio, documents, ebooks and archives. Conversions that are not ready yet are clearly marked <span class="soon-tag">soon</span>; we only switch one on once it really works.</p>
+      <p>Our catalogue lists ${FORMAT_COUNT} formats across ${CATS.length} categories. Conversions that are not ready yet are clearly marked <span class="soon-tag">soon</span>; we only switch one on once it really works.</p>
       <h2>Contact</h2>
       <p>Questions or suggestions? ${link('/contact', 'Get in touch')}.</p></section>`,
   },
   privacy: {
     title: `Privacy Policy | ${SITE}`, h1: 'Privacy Policy',
-    desc: `How ${SITE} handles your files and data: uploads are processed in memory and never stored.`,
+    desc: `How ${SITE} handles your files and data: uploads are used only for the conversion and deleted straight away.`,
     body: () => `<section class="prose"><p class="muted">Last updated: ${LEGAL_UPDATED}</p>
       <h2>Files you upload</h2>
-      <p>Files are sent to our server only to be converted. They are held in memory while they are processed and are not written to disk, logged or kept after the result has been returned to you. We do not look at, copy or share your files.</p>
+      <p>Files are sent to our server only to be converted. Images are processed in memory. Other files (video, audio, documents, ebooks, archives) are written to a private temporary folder for the conversion, and that folder is deleted as soon as the conversion finishes, whether it succeeds or not. Files are never logged or kept after the result has been returned to you. We do not look at, copy or share your files.</p>
       <h2>Data we process</h2>
       <p>Like every website, our server receives your IP address and basic request information (browser type, the page requested). We use your IP address only to apply a rate limit that protects the service from abuse; it is held in memory for up to 15 minutes.</p>
       <h2>Cookies and local storage</h2>
@@ -778,7 +812,7 @@ const resolveInfo = (key, base) => (Object.prototype.hasOwnProperty.call(INFO_PA
 // ------------------------------------------------------------ share images --
 /** What to draw on /og/<key>.png, or null for an unknown key (so nobody can make us render arbitrary text). */
 function ogSpec(key) {
-  if (key === 'home') return { title: 'Free Online File Converter', subtitle: `${FORMAT_COUNT} formats \u00b7 Image conversion and compression` };
+  if (key === 'home') return { title: 'Free Online File Converter', subtitle: `${LIVE_COUNT.toLocaleString('en-US')} conversions \u00b7 Video, audio, documents, images` };
   if (key === 'converters') return { title: 'All File Formats', subtitle: `${FORMAT_COUNT} formats in ${CATS.length} categories` };
   if (INFO_PAGES[key]) return { title: INFO_PAGES[key].h1, subtitle: 'Free online file converter' };
   const conv = /^(.+)-converter$/.exec(key);

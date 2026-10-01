@@ -1,4 +1,7 @@
 'use strict';
+// These tests describe the image-only build (no FFmpeg, LibreOffice, ...), so they turn off
+// detection of system tools. test/conversions.test.js and test/seo.test.js cover the full build.
+process.env.SQUISH_DETECT = '0';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -12,7 +15,8 @@ const ids = (list) => list.map((f) => f.id);
 // ------------------------------------------------------------------ integrity --
 test('registry loads and passes its own validation', () => {
   const stats = registry.getStats();
-  assert.equal(stats.converters.live, 57); // 50 original image pairs + JFIF input
+  // Without system tools: 57 image pairs (50 original + JFIF), 9 images to PDF (pdf-lib), 10 font pairs
+  assert.equal(stats.converters.live, 76);
   assert.equal(stats.compressors.live, 6);
   assert.ok(stats.formats >= 190); // full CloudConvert-style catalogue
 });
@@ -93,7 +97,7 @@ test('live/experimental converters only use installed engines, handlers and depe
     }
   }
   for (const e of registry.getEngines({ status: 'installed' })) {
-    assert.ok(pkg.dependencies[e.id], `installed engine "${e.id}" is not in package.json dependencies`);
+    assert.ok(pkg.dependencies[e.npm || e.id], `installed engine "${e.id}" is not in package.json dependencies`);
   }
 });
 
@@ -155,7 +159,7 @@ test('the catalogue covers the CloudConvert-style format list', () => {
   assert.equal(registry.getConversionStatus('cr2', 'jpg'), 'planned');
   assert.equal(registry.getConversionStatus('jfif', 'png'), 'live');
   assert.equal(registry.getConversionStatus('mkv', 'mp4'), 'planned');
-  assert.equal(registry.getConversionEngine('csv', 'xlsx').id, 'sheetjs'); // earlier rule keeps its engine
+  assert.equal(registry.getConversionEngine('csv', 'xlsx').id, 'libreoffice'); // the first rule for a pair decides its engine
 });
 
 test('formats appear under every category they belong to', () => {
@@ -172,7 +176,9 @@ test('example conversions from the brief are registered with the right status', 
   for (const [a, b] of [['png', 'jpg'], ['png', 'webp'], ['jpg', 'png']]) {
     assert.ok(registry.isConversionSupported(a, b), `${a}->${b} should be live`);
   }
-  for (const [a, b] of [['mp4', 'mp3'], ['mp4', 'gif'], ['pdf', 'docx'], ['docx', 'pdf'], ['ttf', 'woff']]) {
+  assert.ok(registry.isConversionSupported('ttf', 'woff'), 'pure-JS font wrapping is always live');
+  // These need FFmpeg/LibreOffice/Calibre, which these tests switch off:
+  for (const [a, b] of [['mp4', 'mp3'], ['mp4', 'gif'], ['pdf', 'docx'], ['docx', 'pdf']]) {
     assert.equal(registry.isConversionSupported(a, b), false, `${a}->${b} must not look live`);
     const c = registry.getConverter(a, b, { minStatus: 'planned' });
     assert.ok(c, `${a}->${b} should exist as planned`);
@@ -180,8 +186,8 @@ test('example conversions from the brief are registered with the right status', 
   }
 });
 
-test('the live pairs are the original 50 plus JFIF input, and 6 compressors', () => {
-  const pairs = registry.getConverters().map((c) => c.id);
+test('the live image pairs are the original 50 plus JFIF input, and 6 compressors', () => {
+  const pairs = registry.getConverters().filter((c) => c.handler === 'image').map((c) => c.id);
   assert.equal(pairs.length, 57);
   assert.equal(pairs[0], 'jpg>png');
   assert.equal(pairs[49], 'svg>ico');
@@ -213,8 +219,8 @@ test('HEIC is accepted as experimental but never published', () => {
 });
 
 test('compatible output/input formats', () => {
-  assert.deepEqual(ids(registry.getCompatibleOutputFormats('png')), ['jpg', 'webp', 'avif', 'tiff', 'gif', 'ico']);
-  assert.deepEqual(ids(registry.getCompatibleOutputFormats('jpeg')), ['png', 'webp', 'avif', 'tiff', 'gif', 'ico']);
+  assert.deepEqual(ids(registry.getCompatibleOutputFormats('png')), ['jpg', 'webp', 'avif', 'tiff', 'gif', 'ico', 'pdf']);
+  assert.deepEqual(ids(registry.getCompatibleOutputFormats('jpeg')), ['png', 'webp', 'avif', 'tiff', 'gif', 'ico', 'pdf']);
   assert.deepEqual(ids(registry.getCompatibleInputFormats('ico')), ['jpg', 'png', 'webp', 'avif', 'tiff', 'gif', 'bmp', 'svg', 'jfif']);
   assert.deepEqual(registry.getCompatibleOutputFormats('nope'), []);
   const all = ids(registry.getCompatibleOutputFormats('png', { minStatus: 'planned' }));
@@ -229,15 +235,16 @@ test('outputs grouped by category for an ANY dropdown', () => {
   assert.ok(byCat.pdf.includes('pdf') && byCat.document.includes('pdf'), 'PDF listed under both PDF and Document');
   assert.deepEqual(Object.keys(byCat), [...Object.keys(byCat)].sort((a, b) =>
     registry.getCategory(a).order - registry.getCategory(b).order));
-  assert.deepEqual(registry.getOutputFormatsByCategory('png').map((g) => g.category.id), ['image', 'video']); // GIF is listed under both
+  // GIF is also listed under Video, PDF also under Document and Ebook
+  assert.deepEqual(registry.getOutputFormatsByCategory('png').map((g) => g.category.id), ['document', 'ebook', 'image', 'pdf', 'video']);
 });
 
 test('popular conversions skip anything not live', () => {
   const pop = registry.getPopularConversions().map((c) => c.id);
   assert.equal(pop[0], 'png>webp');
-  assert.equal(pop.length, 12);
-  assert.ok(!pop.includes('mp4>mp3'));
-  assert.ok(registry.getPopularConversions({ minStatus: 'planned' }).length > 12);
+  assert.equal(pop.length, 15); // 12 image pairs + TTF to WOFF, JPG to PDF, PNG to PDF (pure JS)
+  assert.ok(!pop.includes('mp4>mp3')); // needs FFmpeg, which these tests switch off
+  assert.ok(registry.getPopularConversions({ minStatus: 'planned' }).length > 15);
 });
 
 // ------------------------------------------------------------------ search --

@@ -66,7 +66,7 @@
   {{RELATED}}
 
   <div class="privacy-note">
-    <strong>How this works:</strong> your file is uploaded to this server, decoded, resized and re-encoded with Sharp (libvips), with a Jimp fallback for BMP and png-to-ico for favicon output. Uploads are held in memory only while they are processed and are not written to disk.
+    <strong>How this works:</strong> your file is uploaded over HTTPS and converted on this server with open-source engines (libvips for images, FFmpeg for audio and video, LibreOffice and Pandoc for documents, Calibre for ebooks, Ghostscript and Inkscape for PDF and vector files). Images are processed in memory; other files use a private temporary folder that is deleted as soon as the conversion finishes.
   </div>
 </main>
 
