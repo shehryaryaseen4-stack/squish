@@ -21,6 +21,12 @@ const ENGINES = [
   // ---- planned (server)
   { id: 'imagemagick', name: 'ImageMagick', status: 'planned', runtime: 'server', license: 'ImageMagick License',
     handles: ['image', 'pdf'], notes: 'ICO reading, PSD, and fallbacks for odd raster formats.' },
+  { id: 'libraw', name: 'LibRaw', status: 'planned', runtime: 'server', license: 'LGPL-2.1 / CDDL-1.0',
+    handles: ['image'], notes: 'Camera RAW decoding (CR2, CR3, NEF, ARW, DNG, ...).' },
+  { id: 'djvulibre', name: 'DjVuLibre', status: 'planned', runtime: 'server', license: 'GPL-2.0',
+    handles: ['document'], notes: 'DjVu rendering and text extraction.' },
+  { id: 'libredwg', name: 'LibreDWG / ODA File Converter', status: 'planned', runtime: 'server', license: 'GPL-3.0 / proprietary freeware',
+    handles: ['cad'], notes: 'DWG reading/writing and DWG<->DXF. Check licensing before choosing between them.' },
   { id: 'libheif', name: 'libheif', status: 'planned', runtime: 'server', license: 'LGPL-3.0',
     handles: ['image'], notes: 'Reliable HEIC/HEIF decoding when the Sharp build lacks it.' },
   { id: 'ffmpeg', name: 'FFmpeg', status: 'planned', runtime: 'server', license: 'LGPL/GPL depending on build',

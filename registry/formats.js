@@ -277,7 +277,7 @@ const FORMATS = [
 
   // ------------------------------------------------------- Document and PDF --
   {
-    id: 'pdf', name: 'PDF', fullName: 'Portable Document Format', category: 'pdf', alsoIn: ['document'],
+    id: 'pdf', name: 'PDF', fullName: 'Portable Document Format', category: 'pdf', alsoIn: ['document', 'ebook'],
     mimeType: 'application/pdf', browser: 'LL',
     description: 'PDF is the standard format for documents that must look the same on every device. It preserves layout, fonts and images, but is difficult to edit.',
     notes: 'Converting PDF to editable formats is lossy for complex layouts, and scanned PDFs need OCR.',
@@ -288,28 +288,28 @@ const FORMATS = [
     description: 'DOC is the legacy binary Word format used before 2007. Many old documents still use it, and it is usually converted to DOCX or PDF.',
   },
   {
-    id: 'docx', name: 'DOCX', fullName: 'Microsoft Word Document', category: 'document',
+    id: 'docx', name: 'DOCX', fullName: 'Microsoft Word Document', category: 'document', alsoIn: ['ebook'],
     mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', browser: 'XX',
     description: 'DOCX is the standard Microsoft Word format. It stores text, styles, images and tables in a zipped XML package.',
     notes: 'Faithful rendering needs a server-side office engine (LibreOffice).',
   },
   {
-    id: 'txt', name: 'TXT', fullName: 'Plain Text', category: 'document',
+    id: 'txt', name: 'TXT', fullName: 'Plain Text', category: 'document', alsoIn: ['ebook'],
     mimeType: 'text/plain', browser: 'NN',
     description: 'TXT holds plain unformatted text. Every device can open it, but it cannot store fonts, images or layout.',
   },
   {
-    id: 'rtf', name: 'RTF', fullName: 'Rich Text Format', category: 'document',
+    id: 'rtf', name: 'RTF', fullName: 'Rich Text Format', category: 'document', alsoIn: ['ebook'],
     mimeType: 'application/rtf', mimeTypes: ['text/rtf'], browser: 'XX',
     description: 'RTF is a cross-platform text format that keeps basic formatting such as bold, fonts and lists. It can be opened by most word processors.',
   },
   {
-    id: 'odt', name: 'ODT', fullName: 'OpenDocument Text', category: 'document',
+    id: 'odt', name: 'ODT', fullName: 'OpenDocument Text', category: 'document', alsoIn: ['ebook'],
     mimeType: 'application/vnd.oasis.opendocument.text', browser: 'XX',
     description: 'ODT is the open standard word-processing format used by LibreOffice and OpenOffice.',
   },
   {
-    id: 'html', name: 'HTML', fullName: 'HyperText Markup Language', category: 'document',
+    id: 'html', name: 'HTML', fullName: 'HyperText Markup Language', category: 'document', alsoIn: ['ebook'],
     aliases: ['htm'], mimeType: 'text/html', browser: 'NN',
     description: 'HTML is the markup language of web pages. It can be opened in any browser and converted to documents such as PDF.',
   },
@@ -437,7 +437,7 @@ const FORMATS = [
     description: 'SVG describes an image with shapes and paths written in XML instead of pixels, so it can scale to any size without losing sharpness. It is widely used for logos and icons on websites. To convert an SVG into a pixel format, it is drawn at its own declared size.',
   },
   {
-    id: 'eps', name: 'EPS', fullName: 'Encapsulated PostScript', category: 'vector',
+    id: 'eps', name: 'EPS', fullName: 'Encapsulated PostScript', category: 'vector', alsoIn: ['image'],
     mimeType: 'application/postscript', mimeTypes: ['application/eps', 'image/x-eps'], browser: 'XX',
     description: 'EPS is a print-industry vector format based on PostScript. It is still requested by printers and publishers but is not displayed by browsers.',
     notes: 'Needs a server-side renderer (Ghostscript or Inkscape).',
@@ -454,5 +454,168 @@ const FORMATS = [
     description: 'DXF is an open CAD exchange format from Autodesk. It carries 2D and 3D drawings between CAD programs, laser cutters and CNC machines.',
   },
 ];
+
+// --------------------------------------------------------- extended catalog --
+// The rest of the catalog (the full CloudConvert-style format list). These are compact
+// rows because they share defaults: browser 'XX' unless given, no traits.
+//   [id, name, fullName, mimeType, description, extra?]
+function more(category, rows, browser = 'XX') {
+  rows.forEach(([id, name, fullName, mimeType, description, extra]) => {
+    FORMATS.push({ id, name, fullName, category, mimeType, browser, description, ...(extra || {}) });
+  });
+}
+
+const RAW = (maker) => `Camera RAW image from ${maker} cameras. It keeps the unprocessed sensor data for maximum editing latitude, so files are large and need a RAW decoder before they can be viewed or shared.`;
+
+more('image', [
+  ['jfif', 'JFIF', 'JPEG File Interchange Format', 'image/jpeg',
+    'JFIF is a JPEG image with a .jfif extension, often produced when saving pictures from a browser. The image data is ordinary JPEG, so it converts to any other image format without extra loss.',
+    { browser: 'NN', traits: { sizeRank: 3, alpha: false } }],
+  ['3fr', '3FR', 'Hasselblad RAW', 'image/x-hasselblad-3fr', RAW('Hasselblad')],
+  ['arw', 'ARW', 'Sony Alpha RAW', 'image/x-sony-arw', RAW('Sony')],
+  ['cr2', 'CR2', 'Canon RAW 2', 'image/x-canon-cr2', RAW('Canon')],
+  ['cr3', 'CR3', 'Canon RAW 3', 'image/x-canon-cr3', RAW('recent Canon')],
+  ['crw', 'CRW', 'Canon RAW', 'image/x-canon-crw', RAW('older Canon')],
+  ['dcr', 'DCR', 'Kodak Digital Camera RAW', 'image/x-kodak-dcr', RAW('Kodak')],
+  ['dng', 'DNG', 'Digital Negative', 'image/x-adobe-dng', 'DNG is Adobe\'s open RAW image format. Many phones and cameras can save it, and it keeps the unprocessed sensor data for editing.'],
+  ['erf', 'ERF', 'Epson RAW', 'image/x-epson-erf', RAW('Epson')],
+  ['mos', 'MOS', 'Leaf RAW', 'image/x-leaf-mos', RAW('Leaf')],
+  ['mrw', 'MRW', 'Minolta RAW', 'image/x-minolta-mrw', RAW('Minolta')],
+  ['nef', 'NEF', 'Nikon Electronic Format', 'image/x-nikon-nef', RAW('Nikon')],
+  ['orf', 'ORF', 'Olympus RAW', 'image/x-olympus-orf', RAW('Olympus')],
+  ['pef', 'PEF', 'Pentax Electronic File', 'image/x-pentax-pef', RAW('Pentax')],
+  ['raf', 'RAF', 'Fujifilm RAW', 'image/x-fuji-raf', RAW('Fujifilm')],
+  ['raw', 'RAW', 'Generic RAW image', 'image/x-panasonic-raw', RAW('Panasonic, Leica and other')],
+  ['rw2', 'RW2', 'Panasonic RAW 2', 'image/x-panasonic-rw2', RAW('Panasonic')],
+  ['x3f', 'X3F', 'Sigma RAW', 'image/x-sigma-x3f', RAW('Sigma')],
+  ['icns', 'ICNS', 'Apple Icon Image', 'image/icns', 'ICNS is the macOS application icon format. One file holds several sizes of the same icon.'],
+  ['ppm', 'PPM', 'Portable Pixmap', 'image/x-portable-pixmap', 'PPM is a very simple uncompressed image format from the Netpbm toolkit, mostly used as an intermediate format in image-processing pipelines.'],
+  ['xcf', 'XCF', 'GIMP Image', 'image/x-xcf', 'XCF is the native layered file format of the GIMP image editor. Only the flattened image can be converted to other formats.'],
+  ['odd', 'ODD', 'OpenDocument Drawing', 'application/vnd.oasis.opendocument.graphics', 'ODD is an OpenDocument drawing file created by LibreOffice Draw and similar programs.', { aliases: ['odg'] }],
+  ['xps', 'XPS', 'XML Paper Specification', 'application/oxps', 'XPS is Microsoft\'s fixed-layout document format, similar in purpose to PDF. Windows can print to it, but few other programs open it.', { mimeTypes: ['application/vnd.ms-xpsdocument'] }],
+]);
+
+more('audio', [
+  ['aifc', 'AIFC', 'Compressed Audio Interchange File', 'audio/x-aifc', 'AIFC is a variant of Apple\'s AIFF format that allows compressed audio.'],
+  ['ape', 'APE', "Monkey's Audio", 'audio/ape', "APE (Monkey's Audio) is a lossless audio format with high compression. Few players support it, so it is usually converted to FLAC or MP3."],
+  ['au', 'AU', 'Sun Audio', 'audio/basic', 'AU is a simple audio format introduced by Sun Microsystems, still found on Unix systems and in Java applications.'],
+  ['caf', 'CAF', 'Core Audio Format', 'audio/x-caf', 'CAF is Apple\'s Core Audio container. It has no practical file-size limit and can hold many audio codecs.'],
+  ['dss', 'DSS', 'Digital Speech Standard', 'audio/x-dss', 'DSS is a compressed speech format used by Olympus and Philips dictation recorders.'],
+  ['m4b', 'M4B', 'MPEG-4 Audiobook', 'audio/x-m4b', 'M4B is an MPEG-4 audio file for audiobooks. It supports chapters and remembers where you stopped listening.'],
+  ['oga', 'OGA', 'Ogg Audio', 'audio/ogg', 'OGA is an Ogg container that holds audio only, usually Vorbis, Opus or FLAC.'],
+  ['shn', 'SHN', 'Shorten', 'audio/x-shn', 'SHN (Shorten) is an old lossless audio format, mostly found in live concert recording archives.'],
+  ['voc', 'VOC', 'Creative Voice', 'audio/x-voc', 'VOC is an audio format created by Creative Labs for Sound Blaster cards, common in old DOS games.'],
+  ['weba', 'WEBA', 'WebM Audio', 'audio/webm', 'WEBA is a WebM file that contains only audio, usually Opus or Vorbis. Browsers play it natively.'],
+]);
+
+more('cad', [
+  ['dwg', 'DWG', 'AutoCAD Drawing', 'image/vnd.dwg', 'DWG is the native drawing format of AutoCAD. It stores 2D and 3D design data and is the most common CAD file format.',
+    { mimeTypes: ['application/acad'] }],
+]);
+
+more('document', [
+  ['abw', 'ABW', 'AbiWord Document', 'application/x-abiword', 'ABW is the native document format of the AbiWord word processor.'],
+  ['zabw', 'ZABW', 'Compressed AbiWord Document', 'application/x-abiword-compressed', 'ZABW is a gzip-compressed AbiWord document.'],
+  ['djvu', 'DJVU', 'DjVu Document', 'image/vnd.djvu', 'DjVu is a format for scanned documents and books. It keeps high-resolution scans much smaller than PDF.', { aliases: ['djv'] }],
+  ['docm', 'DOCM', 'Word Macro-Enabled Document', 'application/vnd.ms-word.document.macroenabled.12', 'DOCM is a Word document that can contain macros. Apart from the macros it is the same as DOCX.'],
+  ['dot', 'DOT', 'Word 97-2003 Template', 'application/msword', 'DOT is a legacy Microsoft Word template file used to create new documents with preset styles.'],
+  ['dotx', 'DOTX', 'Word Template', 'application/vnd.openxmlformats-officedocument.wordprocessingml.template', 'DOTX is the modern Microsoft Word template format.'],
+  ['hwp', 'HWP', 'Hangul Word Processor Document', 'application/x-hwp', 'HWP is the document format of the Hangul word processor, widely used in South Korea.'],
+  ['lwp', 'LWP', 'Lotus Word Pro Document', 'application/vnd.lotus-wordpro', 'LWP is the document format of Lotus Word Pro, a discontinued word processor.'],
+  ['md', 'MD', 'Markdown', 'text/markdown', 'Markdown is a plain-text format with simple symbols for headings, lists and links. It is popular for README files, notes and documentation.', { aliases: ['markdown'] }],
+  ['pages', 'PAGES', 'Apple Pages Document', 'application/vnd.apple.pages', 'PAGES is the document format of Apple Pages. Outside Apple devices it usually has to be converted to DOCX or PDF.'],
+  ['rst', 'RST', 'reStructuredText', 'text/x-rst', 'reStructuredText is a plain-text markup format used for Python documentation and Sphinx sites.'],
+  ['sdw', 'SDW', 'StarOffice Writer Document', 'application/vnd.stardivision.writer', 'SDW is the document format of StarOffice Writer, the predecessor of OpenOffice and LibreOffice.'],
+  ['tex', 'TEX', 'LaTeX Document', 'application/x-tex', 'TEX is a LaTeX source file. LaTeX is the standard typesetting system for scientific papers and maths.'],
+  ['wpd', 'WPD', 'WordPerfect Document', 'application/vnd.wordperfect', 'WPD is the document format of Corel WordPerfect, still used in some legal offices.'],
+  ['wps', 'WPS', 'Microsoft Works Document', 'application/vnd.ms-works', 'WPS is the word-processor format of Microsoft Works, a discontinued home office suite.'],
+]);
+
+more('ebook', [
+  ['azw4', 'AZW4', 'Kindle Print Replica', 'application/vnd.amazon.ebook', 'AZW4 (Print Replica) is a Kindle format that wraps a PDF to keep the exact print layout of textbooks.'],
+  ['cbc', 'CBC', 'Comic Book Collection', 'application/x-cbc', 'CBC is a collection of comic book archives packaged in one file.'],
+  ['cbr', 'CBR', 'Comic Book RAR', 'application/vnd.comicbook-rar', 'CBR is a comic book: a RAR archive of page images, read with comic viewers.'],
+  ['cbz', 'CBZ', 'Comic Book ZIP', 'application/vnd.comicbook+zip', 'CBZ is a comic book: a ZIP archive of page images, read with comic viewers.'],
+  ['chm', 'CHM', 'Compiled HTML Help', 'application/vnd.ms-htmlhelp', 'CHM is Microsoft\'s compiled help format, also used for some ebooks.'],
+  ['fb2', 'FB2', 'FictionBook', 'application/x-fictionbook+xml', 'FB2 (FictionBook) is an XML ebook format popular in Russia and Eastern Europe.'],
+  ['htmlz', 'HTMLZ', 'Zipped HTML Ebook', 'application/x-htmlz', 'HTMLZ is a ZIP file with an HTML ebook and its images, as produced by Calibre.'],
+  ['lit', 'LIT', 'Microsoft Reader eBook', 'application/x-ms-reader', 'LIT is the ebook format of the discontinued Microsoft Reader app.'],
+  ['lrf', 'LRF', 'Sony BroadBand eBook', 'application/x-sony-bbeb', 'LRF is the ebook format of older Sony Reader devices.'],
+  ['oeb', 'OEB', 'Open eBook', 'application/oebps-package+xml', 'OEB (Open eBook) is the predecessor of EPUB.'],
+  ['pdb', 'PDB', 'Palm eReader Database', 'application/vnd.palm', 'PDB is an ebook format used by Palm OS readers such as eReader.'],
+  ['pml', 'PML', 'Palm Markup Language', 'application/x-pml', 'PML is the markup format behind Palm eReader books.'],
+  ['prc', 'PRC', 'Mobipocket Book', 'application/x-mobipocket-ebook', 'PRC is a Mobipocket ebook, closely related to MOBI and readable on older Kindles.'],
+  ['rb', 'RB', 'Rocket eBook', 'application/x-rocketbook', 'RB is the format of the Rocket eBook reader from the late 1990s.'],
+  ['snb', 'SNB', 'Shanda Bambook eBook', 'application/x-snb', 'SNB is the ebook format of the Shanda Bambook reader.'],
+  ['tcr', 'TCR', 'Psion eBook', 'application/x-tcr', 'TCR is a compressed text ebook format from Psion handhelds.'],
+  ['txtz', 'TXTZ', 'Zipped Text Ebook', 'application/x-txtz', 'TXTZ is a ZIP file containing a text or Markdown ebook and its images, as produced by Calibre.'],
+]);
+
+more('presentation', [
+  ['pptm', 'PPTM', 'PowerPoint Macro-Enabled Presentation', 'application/vnd.ms-powerpoint.presentation.macroenabled.12', 'PPTM is a PowerPoint presentation that can contain macros.'],
+  ['pps', 'PPS', 'PowerPoint 97-2003 Slide Show', 'application/vnd.ms-powerpoint', 'PPS is a legacy PowerPoint file that opens directly as a slide show.'],
+  ['ppsx', 'PPSX', 'PowerPoint Slide Show', 'application/vnd.openxmlformats-officedocument.presentationml.slideshow', 'PPSX is a modern PowerPoint file that opens directly as a slide show.'],
+  ['pot', 'POT', 'PowerPoint 97-2003 Template', 'application/vnd.ms-powerpoint', 'POT is a legacy PowerPoint template.'],
+  ['potx', 'POTX', 'PowerPoint Template', 'application/vnd.openxmlformats-officedocument.presentationml.template', 'POTX is the modern PowerPoint template format.'],
+  ['dps', 'DPS', 'Kingsoft Presentation', 'application/kswps', 'DPS is the presentation format of WPS Office (Kingsoft).'],
+  ['key', 'KEY', 'Apple Keynote Presentation', 'application/vnd.apple.keynote', 'KEY is the presentation format of Apple Keynote. Outside Apple devices it usually has to be converted to PPTX or PDF.'],
+]);
+
+more('spreadsheet', [
+  ['xlsm', 'XLSM', 'Excel Macro-Enabled Workbook', 'application/vnd.ms-excel.sheet.macroenabled.12', 'XLSM is an Excel workbook that can contain macros. Apart from the macros it is the same as XLSX.'],
+  ['et', 'ET', 'Kingsoft Spreadsheet', 'application/kset', 'ET is the spreadsheet format of WPS Office (Kingsoft).'],
+  ['numbers', 'NUMBERS', 'Apple Numbers Spreadsheet', 'application/vnd.apple.numbers', 'NUMBERS is the spreadsheet format of Apple Numbers. Outside Apple devices it usually has to be converted to XLSX or CSV.'],
+]);
+
+more('vector', [
+  ['ps', 'PS', 'PostScript', 'application/postscript', 'PostScript is a page description language for printers. PS files describe pages as vector graphics and text.', { alsoIn: ['image'] }],
+  ['svgz', 'SVGZ', 'Compressed SVG', 'image/svg+xml-compressed', 'SVGZ is an SVG image compressed with gzip, typically 50-80% smaller than the plain SVG.'],
+  ['cdr', 'CDR', 'CorelDRAW Drawing', 'application/vnd.corel-draw', 'CDR is the native vector format of CorelDRAW.'],
+  ['cgm', 'CGM', 'Computer Graphics Metafile', 'image/cgm', 'CGM is an ISO standard vector format used in technical illustration, aviation and engineering documentation.'],
+  ['emf', 'EMF', 'Enhanced Metafile', 'image/emf', 'EMF is a Windows vector graphics format used by Microsoft Office for clip art and charts.'],
+  ['wmf', 'WMF', 'Windows Metafile', 'image/wmf', 'WMF is the older 16-bit predecessor of EMF, still common in old Office documents.'],
+  ['sk', 'SK', 'Sketch Drawing', 'image/x-sk', 'SK is the drawing format of the Sketch/Skencil vector editor for Linux.'],
+  ['sk1', 'SK1', 'sK1 Drawing', 'image/x-sk1', 'SK1 is the drawing format of the sK1 vector editor, a successor to Skencil.'],
+  ['vsd', 'VSD', 'Microsoft Visio Drawing', 'application/vnd.visio', 'VSD is the diagram format of Microsoft Visio, used for flowcharts, floor plans and network diagrams.'],
+]);
+
+more('video', [
+  ['3g2', '3G2', '3GPP2 Multimedia', 'video/3gpp2', '3G2 is a video container for CDMA mobile phones, closely related to 3GP.'],
+  ['3gpp', '3GPP', '3GPP Multimedia', 'video/3gpp', '3GPP is the same mobile video container as 3GP, saved with a longer extension.'],
+  ['cavs', 'CAVS', 'Chinese AVS Video', 'video/x-cavs', 'CAVS is video encoded with China\'s AVS standard.'],
+  ['dv', 'DV', 'Digital Video', 'video/x-dv', 'DV is the format recorded by MiniDV camcorders. It keeps high quality with simple intra-frame compression.'],
+  ['dvr', 'DVR', 'Microsoft Digital Video Recording', 'video/x-ms-dvr', 'DVR-MS is the TV recording format of Windows Media Center.'],
+  ['mod', 'MOD', 'Camcorder MPEG-2 Video', 'video/x-mod', 'MOD is MPEG-2 video recorded by JVC, Panasonic and Canon tapeless camcorders.'],
+  ['rm', 'RM', 'RealMedia', 'application/vnd.rn-realmedia', 'RM is the RealMedia streaming format from RealNetworks, common on the early web.'],
+  ['rmvb', 'RMVB', 'RealMedia Variable Bitrate', 'application/vnd.rn-realmedia-vbr', 'RMVB is RealMedia with variable bitrate, once popular for sharing movies online.'],
+  ['swf', 'SWF', 'Shockwave Flash', 'application/x-shockwave-flash', 'SWF is an Adobe Flash animation or video. Browsers no longer play Flash, so old SWF videos are converted to MP4.'],
+  ['wtv', 'WTV', 'Windows Recorded TV Show', 'video/x-ms-wtv', 'WTV is the TV recording format of newer Windows Media Center versions.'],
+]);
+
+more('archive', [
+  ['ace', 'ACE', 'ACE Archive', 'application/x-ace-compressed', 'ACE is an old proprietary archive format. It can be extracted, not created.'],
+  ['alz', 'ALZ', 'ALZip Archive', 'application/x-alz-compressed', 'ALZ is the archive format of ALZip, popular in South Korea.'],
+  ['arc', 'ARC', 'ARC Archive', 'application/x-arc', 'ARC is one of the earliest archive formats, from the DOS era.'],
+  ['arj', 'ARJ', 'ARJ Archive', 'application/x-arj', 'ARJ is a DOS-era archive format that supported multi-volume archives.'],
+  ['cab', 'CAB', 'Windows Cabinet', 'application/vnd.ms-cab-compressed', 'CAB is the Windows installer archive format used for drivers and system files.'],
+  ['cpio', 'CPIO', 'CPIO Archive', 'application/x-cpio', 'CPIO is a Unix archive format used inside RPM packages and Linux initramfs images.'],
+  ['deb', 'DEB', 'Debian Package', 'application/vnd.debian.binary-package', 'DEB is the software package format of Debian and Ubuntu Linux.'],
+  ['dmg', 'DMG', 'Apple Disk Image', 'application/x-apple-diskimage', 'DMG is the macOS disk image format, used to distribute Mac apps.'],
+  ['img', 'IMG', 'Disk Image', 'application/x-raw-disk-image', 'IMG is a raw copy of a disk or floppy, sector by sector.'],
+  ['iso', 'ISO', 'ISO Disc Image', 'application/x-iso9660-image', 'ISO is an exact image of a CD, DVD or Blu-ray disc, used to distribute operating systems.'],
+  ['jar', 'JAR', 'Java Archive', 'application/java-archive', 'JAR is a ZIP-based archive that packages Java classes and resources.'],
+  ['lha', 'LHA', 'LHA Archive', 'application/x-lzh-compressed', 'LHA (also LZH) is an archive format popular in Japan and on the Amiga.', { aliases: ['lzh'] }],
+  ['lz', 'LZ', 'Lzip Compressed File', 'application/x-lzip', 'LZ is a single file compressed with lzip, an LZMA-based compressor.'],
+  ['lzma', 'LZMA', 'LZMA Compressed File', 'application/x-lzma', 'LZMA is a single file compressed with the LZMA algorithm used by 7-Zip.'],
+  ['lzo', 'LZO', 'LZO Compressed File', 'application/x-lzop', 'LZO is a single file compressed with lzop, which favours speed over size.'],
+  ['rpm', 'RPM', 'RPM Package', 'application/x-rpm', 'RPM is the software package format of Red Hat, Fedora and SUSE Linux.'],
+  ['rz', 'RZ', 'Rzip Compressed File', 'application/x-rzip', 'RZ is a single file compressed with rzip, which works well on very large files.'],
+  ['xz', 'XZ', 'XZ Compressed File', 'application/x-xz', 'XZ is a single file compressed with LZMA2. It gives very small files and is common on Linux.'],
+  ['z', 'Z', 'Unix Compressed File', 'application/x-compress', 'Z is a single file compressed with the classic Unix compress tool.'],
+  ['tar-7z', 'TAR.7Z', '7-Zip-compressed TAR Archive', 'application/x-7z-compressed', 'TAR.7Z is a TAR archive compressed with 7-Zip.', { extension: 'tar.7z' }],
+  ['tar-xz', 'TAR.XZ', 'XZ-compressed TAR Archive', 'application/x-xz', 'TAR.XZ is a TAR archive compressed with xz. It is used for Linux kernel and source releases.', { extension: 'tar.xz', aliases: ['txz'] }],
+  ['tar-lzo', 'TAR.LZO', 'LZO-compressed TAR Archive', 'application/x-lzop', 'TAR.LZO is a TAR archive compressed with lzop for fast compression.', { extension: 'tar.lzo', aliases: ['tzo'] }],
+  ['tar-z', 'TAR.Z', 'Unix-compressed TAR Archive', 'application/x-compress', 'TAR.Z is a TAR archive compressed with the classic Unix compress tool.', { extension: 'tar.z', aliases: ['tz', 'taz'] }],
+]);
 
 module.exports = { FORMATS };

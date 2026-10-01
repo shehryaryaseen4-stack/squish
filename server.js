@@ -33,7 +33,15 @@ const baseOf = (req) => BASE_URL || `${req.protocol}://${req.get('host')}`;
 //  - rate limiting: caps requests per IP per window. Tune MAX_FILES_PER_WINDOW
 //    via env var to match what your server/hosting plan can actually afford —
 //    this is the knob that keeps "unlimited free" from becoming a cost spiral.
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+// Helmet's default CSP allows scripts from this site only, which is why JSZip is served
+// from node_modules below rather than a CDN. When you switch AdSense on, add
+// https://pagead2.googlesyndication.com and the other hosts Google lists for AdSense to
+// script-src / img-src / frame-src / connect-src.
+// img-src adds blob: for the result thumbnails, which are object URLs of the converted files.
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: { directives: { 'img-src': ["'self'", 'data:', 'blob:'] } },
+}));
 app.use(compression());
 app.use('/api/', rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -44,6 +52,8 @@ app.use('/api/', rateLimit({
 }));
 
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+app.get('/vendor/jszip.min.js', (_req, res) => res.set('Cache-Control', 'public, max-age=604800')
+  .sendFile(require.resolve('jszip/dist/jszip.min.js')));
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -139,19 +149,30 @@ const sendHtml = (res, html) => res.set('Cache-Control', 'public, max-age=3600')
 app.get('/', (req, res) => sendHtml(res, pages.homePage(baseOf(req))));
 app.get('/converters', (req, res) => sendHtml(res, pages.hubPage(baseOf(req))));
 
-app.get(/^\/([a-z0-9]+)-to-([a-z0-9]+)$/, (req, res, next) => {
+// Format ids can contain hyphens (tar-gz), so the split happens in the registry, not here.
+app.get(/^\/([a-z0-9-]+?)-to-([a-z0-9-]+)$/, (req, res, next) => {
   const r = pages.resolvePair(req.params[0], req.params[1], baseOf(req));
   if (!r) return next();
   if (r.redirect) return res.redirect(301, r.redirect);
   sendHtml(res, r.html);
 });
 
-app.get(/^\/compress-([a-z0-9]+)$/, (req, res, next) => {
+app.get(/^\/compress-([a-z0-9-]+)$/, (req, res, next) => {
   const r = pages.resolveCompress(req.params[0], baseOf(req));
   if (!r) return next();
   if (r.redirect) return res.redirect(301, r.redirect);
   sendHtml(res, r.html);
 });
+
+// /png-converter (format page) and /image-converter (category page)
+app.get(/^\/([a-z0-9-]+)-converter$/, (req, res, next) => {
+  const r = pages.resolveConverter(req.params[0], baseOf(req));
+  if (!r) return next();
+  if (r.redirect) return res.redirect(301, r.redirect);
+  sendHtml(res, r.html);
+});
+
+app.get('/formats', (_req, res) => res.redirect(301, '/converters'));
 
 app.get('/sitemap.xml', (req, res) => res.type('application/xml').send(pages.sitemap(baseOf(req))));
 app.get('/robots.txt', (req, res) => res.type('text/plain').send(pages.robots(baseOf(req))));

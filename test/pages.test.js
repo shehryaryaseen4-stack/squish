@@ -1,0 +1,111 @@
+'use strict';
+// Page behaviour: every registered conversion has a page and is in the menus, but only live
+// ones show the upload tool and get indexed. Planned ones say "coming soon" and are noindex.
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const pages = require('../pages');
+const registry = require('../registry');
+
+const BASE = 'https://example.test';
+const ANY = { minStatus: 'planned' };
+const hasTool = (html) => html.includes('id="dropzone"');
+const isNoindex = (html) => html.includes('<meta name="robots" content="noindex');
+
+test('every live conversion page shows the tool, is indexable and keeps its wording', () => {
+  for (const c of registry.getConverters()) {
+    const r = pages.resolvePair(c.from, c.to, BASE);
+    assert.ok(r && r.html, c.route);
+    assert.ok(hasTool(r.html), `${c.route} has no upload tool`);
+    assert.ok(!isNoindex(r.html), `${c.route} should be indexable`);
+    assert.ok(r.html.includes(`<link rel="canonical" href="${BASE}${c.route}">`), `${c.route} canonical`);
+    assert.ok(r.html.includes('id="selectBtn"'), `${c.route} Select File button`);
+  }
+  const html = pages.resolvePair('jpg', 'png', BASE).html;
+  assert.match(html, /<title>JPG to PNG Converter \(JPEG to PNG\) - Free Online \| Squish<\/title>/);
+  assert.match(html, /<h1>JPG to PNG Converter<\/h1>/);
+  assert.match(html, /data-default-format="png"/);
+});
+
+test('planned conversions get a noindex "coming soon" page without the tool', () => {
+  for (const [f, t] of [['mp4', 'mp3'], ['pdf', 'docx'], ['docx', 'pdf'], ['cr2', 'jpg'], ['tar-gz', 'zip'], ['heic', 'jpg']]) {
+    const r = pages.resolvePair(f, t, BASE);
+    assert.ok(r && r.html, `${f}->${t}`);
+    assert.ok(!hasTool(r.html), `${f}->${t} must not show the tool`);
+    assert.ok(isNoindex(r.html), `${f}->${t} must be noindex`);
+    assert.match(r.html, /Coming soon/);
+  }
+  assert.equal(pages.resolveCompress('pdf', BASE).html.includes('Coming soon'), true);
+});
+
+test('redirects and misses', () => {
+  assert.deepEqual(pages.resolvePair('jpeg', 'png', BASE), { redirect: '/jpg-to-png' });
+  assert.deepEqual(pages.resolvePair('tif', 'jpeg', BASE), { redirect: '/tiff-to-jpg' });
+  assert.deepEqual(pages.resolvePair('tgz', 'zip', BASE), { redirect: '/tar-gz-to-zip' });
+  assert.deepEqual(pages.resolveCompress('jpeg', BASE), { redirect: '/compress-jpg' });
+  assert.deepEqual(pages.resolveConverter('jpeg', BASE), { redirect: '/jpg-converter' });
+  assert.equal(pages.resolvePair('png', 'png', BASE), null);
+  assert.equal(pages.resolvePair('zip', 'rar', BASE), null); // RAR can never be created
+  assert.equal(pages.resolvePair('png', 'nope', BASE), null);
+  assert.equal(pages.resolveCompress('svg', BASE), null);
+  assert.equal(pages.resolveConverter('nope', BASE), null);
+});
+
+test('category and format pages exist for everything in the catalogue', () => {
+  for (const c of registry.getCategories()) assert.ok(pages.resolveConverter(c.id, BASE).html, c.id);
+  for (const f of registry.getFormats()) {
+    const html = pages.resolveConverter(f.id, BASE).html;
+    assert.match(html, new RegExp(`<h1>${f.label.replace('.', '\\.')} Converter</h1>`), f.id);
+  }
+  assert.ok(hasTool(pages.resolveConverter('image', BASE).html));
+  assert.ok(!hasTool(pages.resolveConverter('video', BASE).html));
+  assert.ok(isNoindex(pages.resolveConverter('video', BASE).html));
+  // /pdf-converter is the PDF format page, which lists PDF conversions
+  assert.match(pages.resolveConverter('pdf', BASE).html, /Convert PDF to&hellip;/);
+});
+
+test('the Tools menu lists every category and links every format', () => {
+  const html = pages.homePage(BASE);
+  for (const c of registry.getCategories()) assert.ok(html.includes(`>${c.converterName}<`), c.converterName);
+  for (const f of registry.getFormats()) assert.ok(html.includes(`href="/${f.id}-converter"`), f.id);
+  for (const c of registry.getConverters({ ...ANY, type: 'compress' })) assert.ok(html.includes(`href="${c.route}"`), c.route);
+});
+
+test('format pages link every conversion the registry knows for that format', () => {
+  for (const id of ['png', 'mp4', 'docx', 'zip']) {
+    const html = pages.resolveConverter(id, BASE).html;
+    for (const o of registry.getCompatibleOutputFormats(id, ANY)) assert.ok(html.includes(`href="/${id}-to-${o.id}"`), `${id} -> ${o.id}`);
+    for (const i of registry.getCompatibleInputFormats(id, ANY)) assert.ok(html.includes(`href="/${i.id}-to-${id}"`), `${i.id} -> ${id}`);
+  }
+});
+
+test('home page conversion map covers every input format', () => {
+  const html = pages.homePage(BASE);
+  const map = JSON.parse(/<script type="application\/json" id="convMap">(.*?)<\/script>/s.exec(html)[1]);
+  for (const f of registry.getInputFormats(ANY)) assert.ok(map.pairs[f.id], f.id);
+  assert.ok(map.live.includes('png>webp'));
+  assert.ok(!map.live.includes('mp4>mp3'));
+});
+
+test('sitemap only lists pages that are indexable', () => {
+  const paths = pages.allPaths();
+  assert.equal(new Set(paths).size, paths.length, 'no duplicates');
+  for (const c of registry.getConverters({ type: 'all' })) assert.ok(paths.includes(c.route), c.route);
+  assert.ok(paths.includes('/image-converter') && paths.includes('/png-converter') && paths.includes('/jfif-to-png'));
+  assert.ok(!paths.includes('/mp4-to-mp3') && !paths.includes('/video-converter') && !paths.includes('/mp4-converter'));
+  for (const p of paths.filter((x) => x !== '/' && x !== '/converters')) {
+    const m = /^\/(.+)-converter$/.exec(p);
+    const r = m ? null : registry.parseConverterRoute(p);
+    const html = m ? pages.resolveConverter(m[1], BASE).html
+      : r.type === 'compress' ? pages.resolveCompress(r.from, BASE).html
+        : pages.resolvePair(r.from, r.to, BASE).html;
+    assert.ok(!isNoindex(html), `${p} is in the sitemap but noindex`);
+  }
+  assert.match(pages.sitemap(BASE), /<loc>https:\/\/example\.test\/png-to-webp<\/loc>/);
+  assert.match(pages.robots(BASE), /Sitemap: https:\/\/example\.test\/sitemap\.xml/);
+});
+
+test('hub and 404', () => {
+  const hub = pages.hubPage(BASE);
+  for (const c of registry.getCategories()) assert.ok(hub.includes(`id="cat-${c.id}"`), c.id);
+  assert.ok(pages.notFoundPage().includes('<meta name="robots" content="noindex">'));
+});

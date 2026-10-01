@@ -41,28 +41,62 @@ Then open `http://localhost:3000`.
 | AVIF | Yes | Yes | Smallest files of all, but slower to encode — expect more CPU time per image. |
 | TIFF | Yes | Yes | Common in scanning/print workflows. |
 | GIF | Yes | Yes | Animation is **kept** only when the output format is GIF or WebP. Any other output format uses a single frame. |
+| JFIF | Yes | — | Ordinary JPEG data with a `.jfif` extension; Sharp reads it directly. |
 | BMP | Yes | — | Decoded via a Jimp fallback (libvips can't read BMP at all); always converted to another format on the way out. |
 | SVG | Yes | — | Rasterized (turned into pixels) on input. Vector data is not preserved — if you need small vector files, minify with a tool like SVGO instead of running them through here. |
 | ICO | — | Yes | Real multi-resolution favicons are generated from any input using `png-to-ico`. Reading an existing `.ico` as input is **not implemented** — legacy `.ico` parsing is a project of its own and wasn't worth the complexity for what is usually a one-off favicon-generation need. |
-| HEIC / HEIF | Not verified | — | HEIC decoding depends on how libvips/libheif was built on your machine and I could not verify it here, so **no HEIC landing pages are generated** and the upload box does not advertise it. If you want it, install a libvips build with HEIC support, test with a real iPhone photo, then add `heic` to `INPUTS` in `pages.js`. |
+| HEIC / HEIF | Not verified | — | HEIC decoding depends on how libvips/libheif was built on your machine and I could not verify it here, so HEIC pages are shown as "coming soon" (noindex) and the upload box does not advertise it. If you want it, install a libvips build with HEIC support, test with a real iPhone photo, then set the `image-heic` rule in `registry/converters.js` to `live`. |
 | RAW camera formats (.cr2, .nef, .arw, etc.) | No | — | Out of scope. These need a dedicated RAW decoder (e.g. `libraw`), which is a much heavier dependency than this project pulls in. |
 
-## SEO landing pages (one page per conversion)
+## Site layout (CloudConvert-style)
 
-The server generates a crawlable page for every conversion it can really perform:
+The site is laid out like CloudConvert: a white header with a **Tools** mega menu, a
+"File Converter" hero with a `convert [X] to [Y]` box and a red **Select File** button,
+then the upload tool, feature blocks, popular conversions and every converter category.
 
-- `/png-to-webp`, `/jpg-to-png`, `/svg-to-ico` ... (50 pairs, from `INPUTS` x `OUTPUTS` in `pages.js`)
-- `/compress-png`, `/compress-jpg` ... (6 compressor pages)
-- `/converters` (hub linking to all of them), `/sitemap.xml`, `/robots.txt`
+- **Tools** menu: search box, every category on the left (Archive ... Video, plus Popular and
+  Compress), every format on the right. **Convert** and **Compress** menus list the category
+  pages and compressors. Formats with a working conversion have a green dot; the rest are
+  marked *soon*.
+- The **convert [X] to [Y]** box: choose an input and the output list fills with every
+  format it can become (grouped by category). Choosing an output opens that conversion's page.
 
-Each page gets its own title, meta description, canonical URL, H1, intro text, format
+### Catalogue vs. what actually works
+
+The registry (`registry/`) now holds the full CloudConvert-style catalogue: **194 formats in
+12 categories and about 3,400 conversions**. Only the image conversions are `live` (57 pairs
+plus 6 compressors); HEIC is `experimental`; everything else is `planned` and needs its engine
+installed first (FFmpeg, LibreOffice, Calibre, ... see `registry/engines.js`).
+
+Every conversion gets a page and appears in the menus, but:
+
+| | Live | Planned / experimental |
+|---|---|---|
+| Upload tool | Yes | No: a "Coming soon" box with working alternatives |
+| `robots` | `index, follow` + canonical | `noindex, follow` |
+| In `sitemap.xml` | Yes | No |
+| `POST /api/compress` | Accepted | Rejected (HEIC is attempted) |
+
+To switch a conversion on: install its engine, add a handler in `engines/`, set the rule's
+status to `live` in `registry/converters.js`. Pages, menus, sitemap and API follow automatically.
+
+## Pages (one per conversion)
+
+- `/` home, `/converters` every format grouped by category
+- `/image-converter`, `/video-converter` ... one page per category
+- `/png-converter`, `/mp4-converter` ... one page per format, listing every conversion to and from it
+- `/png-to-webp`, `/mp4-to-mp3`, `/tar-gz-to-zip` ... one page per conversion
+- `/compress-png` ... compressor pages
+- `/sitemap.xml`, `/robots.txt`
+
+Live pages get their own title, meta description, canonical URL, H1, intro text, format
 description cards, pair-specific notes, FAQ and JSON-LD structured data, and the
 output-format dropdown is pre-selected (e.g. `/png-to-webp` opens with WebP chosen).
-`/jpeg-to-png` style aliases 301-redirect to the canonical `/jpg-to-png`.
+Alias spellings 301-redirect to the canonical URL (`/jpeg-to-png` to `/jpg-to-png`,
+`/jpeg-converter` to `/jpg-converter`).
 
-To add or remove a format, edit the `FORMATS`, `INPUTS`, `OUTPUTS` tables at the top of
-`pages.js` — pages, sitemap and hub update automatically. Only add pairs the server can
-actually perform.
+To add or remove a format, edit `registry/formats.js` and `registry/converters.js`; pages,
+menus, sitemap and hub update automatically.
 
 **Before going live:**
 1. Set `BASE_URL` (e.g. `https://yourdomain.com`) so canonical tags and the sitemap use your real domain.
@@ -117,9 +151,11 @@ docker run -p 3000:3000 --env-file .env squish
 
 ## AdSense
 
-The ad slots in `public/index.html` are placeholders — see the comment at the
+The ad slots in `views/page.html` are placeholders — see the comment at the
 top of that file for the exact steps (get a live URL first, apply, wait for
-review, then swap in your real `ca-pub-...` ID and ad slot IDs).
+review, then swap in your real `ca-pub-...` ID and ad slot IDs). The site's
+Content-Security-Policy only allows its own scripts, so you also need to add the
+AdSense hosts in `server.js` (there is a comment where).
 
 ## Cost/abuse notes
 

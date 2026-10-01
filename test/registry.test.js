@@ -12,9 +12,9 @@ const ids = (list) => list.map((f) => f.id);
 // ------------------------------------------------------------------ integrity --
 test('registry loads and passes its own validation', () => {
   const stats = registry.getStats();
-  assert.equal(stats.converters.live, 50);
+  assert.equal(stats.converters.live, 57); // 50 original image pairs + JFIF input
   assert.equal(stats.compressors.live, 6);
-  assert.ok(stats.formats >= 76);
+  assert.ok(stats.formats >= 190); // full CloudConvert-style catalogue
 });
 
 test('categories: ordered, empty ones hidden', () => {
@@ -70,7 +70,7 @@ test('input/output support is derived from converters, not declared twice', () =
   assert.equal(registry.getFormat('heic').input, 'experimental');
   assert.equal(registry.getFormat('heic').output, false);
   assert.equal(registry.getFormat('rar').output, false);   // RAR can never be created
-  assert.equal(registry.getFormat('bmp').output, false);
+  assert.equal(registry.getFormat('bmp').output, 'planned'); // read live, written only by planned ImageMagick
   assert.equal(registry.getFormat('mp4').input, 'planned');
 });
 
@@ -133,6 +133,31 @@ test('MIME lookups', () => {
   assert.equal(registry.getFormatByMimeType('application/x-nothing'), null);
 });
 
+test('the catalogue covers the CloudConvert-style format list', () => {
+  const expected = {
+    archive: ['7z', 'ace', 'arj', 'cab', 'cpio', 'deb', 'dmg', 'iso', 'jar', 'lha', 'lz', 'rpm', 'xz', 'z', 'tar-xz', 'tar-7z'],
+    audio: ['aifc', 'ape', 'au', 'caf', 'dss', 'm4b', 'oga', 'shn', 'voc', 'weba'],
+    cad: ['dwg', 'dxf'],
+    document: ['abw', 'djvu', 'docm', 'dotx', 'hwp', 'md', 'pages', 'rst', 'tex', 'wpd', 'wps'],
+    ebook: ['azw4', 'cbr', 'cbz', 'chm', 'fb2', 'lit', 'lrf', 'pdb', 'docx', 'pdf'],
+    image: ['jfif', 'cr2', 'cr3', 'nef', 'arw', 'dng', 'raf', 'icns', 'xcf', 'eps', 'ps'],
+    presentation: ['pptm', 'pps', 'ppsx', 'pot', 'potx', 'key'],
+    spreadsheet: ['xlsm', 'numbers', 'et'],
+    vector: ['cdr', 'emf', 'wmf', 'svgz', 'vsd', 'ps'],
+    video: ['3g2', 'dv', 'mod', 'rm', 'rmvb', 'swf', 'wtv'],
+  };
+  for (const [cat, list] of Object.entries(expected)) {
+    const have = new Set(ids(registry.getFormatsByCategory(cat)));
+    for (const id of list) assert.ok(have.has(id), `${id} missing from ${cat}`);
+  }
+  assert.equal(registry.getFormat('txz').id, 'tar-xz');
+  assert.equal(registry.getFormatByFilename('kernel.tar.xz').id, 'tar-xz');
+  assert.equal(registry.getConversionStatus('cr2', 'jpg'), 'planned');
+  assert.equal(registry.getConversionStatus('jfif', 'png'), 'live');
+  assert.equal(registry.getConversionStatus('mkv', 'mp4'), 'planned');
+  assert.equal(registry.getConversionEngine('csv', 'xlsx').id, 'sheetjs'); // earlier rule keeps its engine
+});
+
 test('formats appear under every category they belong to', () => {
   assert.ok(ids(registry.getFormatsByCategory('image')).includes('svg'));
   assert.ok(ids(registry.getFormatsByCategory('vector')).includes('svg'));
@@ -155,12 +180,13 @@ test('example conversions from the brief are registered with the right status', 
   }
 });
 
-test('the 50 live pairs and 6 compressors are exactly what existed before', () => {
+test('the live pairs are the original 50 plus JFIF input, and 6 compressors', () => {
   const pairs = registry.getConverters().map((c) => c.id);
-  assert.equal(pairs.length, 50);
+  assert.equal(pairs.length, 57);
   assert.equal(pairs[0], 'jpg>png');
-  assert.equal(pairs.at(-1), 'svg>ico');
-  assert.deepEqual(ids(registry.getInputFormats({ category: 'image' })), ['jpg', 'png', 'webp', 'avif', 'tiff', 'gif', 'bmp', 'svg']);
+  assert.equal(pairs[49], 'svg>ico');
+  assert.deepEqual(pairs.slice(50), ['jfif>jpg', 'jfif>png', 'jfif>webp', 'jfif>avif', 'jfif>tiff', 'jfif>gif', 'jfif>ico']);
+  assert.deepEqual(ids(registry.getInputFormats({ category: 'image' })), ['jpg', 'png', 'webp', 'avif', 'tiff', 'gif', 'bmp', 'svg', 'jfif']);
   assert.deepEqual(ids(registry.getOutputFormats({ category: 'image' })), ['jpg', 'png', 'webp', 'avif', 'tiff', 'gif', 'ico']);
   assert.deepEqual(ids(registry.getCompressibleFormats()), ['jpg', 'png', 'webp', 'avif', 'tiff', 'gif']);
 });
@@ -189,7 +215,7 @@ test('HEIC is accepted as experimental but never published', () => {
 test('compatible output/input formats', () => {
   assert.deepEqual(ids(registry.getCompatibleOutputFormats('png')), ['jpg', 'webp', 'avif', 'tiff', 'gif', 'ico']);
   assert.deepEqual(ids(registry.getCompatibleOutputFormats('jpeg')), ['png', 'webp', 'avif', 'tiff', 'gif', 'ico']);
-  assert.deepEqual(ids(registry.getCompatibleInputFormats('ico')), ['jpg', 'png', 'webp', 'avif', 'tiff', 'gif', 'bmp', 'svg']);
+  assert.deepEqual(ids(registry.getCompatibleInputFormats('ico')), ['jpg', 'png', 'webp', 'avif', 'tiff', 'gif', 'bmp', 'svg', 'jfif']);
   assert.deepEqual(registry.getCompatibleOutputFormats('nope'), []);
   const all = ids(registry.getCompatibleOutputFormats('png', { minStatus: 'planned' }));
   assert.ok(all.includes('pdf') && all.includes('psd'));
