@@ -1,0 +1,24 @@
+{
+  "name": "squish-server",
+  "version": "1.0.0",
+  "description": "Server-side image compressor - supports far more formats than a browser can (JPEG, PNG, WebP, AVIF, TIFF, GIF including animated, SVG rasterization, BMP via fallback, ICO output). All dependencies are free/open source.",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "multer": "^2.0.1",
+    "sharp": "^0.35.4",
+    "jimp": "^1.6.1",
+    "png-to-ico": "^2.1.8",
+    "helmet": "^7.1.0",
+    "express-rate-limit": "^7.4.0",
+    "compression": "^1.7.4"
+  }
+}

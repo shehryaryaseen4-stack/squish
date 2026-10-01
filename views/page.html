@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<meta name="description" content="{{META_DESC}}">
+<meta name="robots" content="{{ROBOTS}}">
+{{CANONICAL_TAG}}
+<meta property="og:type" content="website">
+<meta property="og:title" content="{{TITLE}}">
+<meta property="og:description" content="{{META_DESC}}">
+<meta property="og:url" content="{{URL}}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+<script type="application/ld+json">{{JSONLD}}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<!--
+  GOOGLE ADSENSE - SETUP STEPS
+  1. Serve this from your live domain first (Google reviews the live URL).
+  2. Apply at adsense.google.com. Manual review, not guaranteed.
+  3. Replace all FOUR "ca-pub-XXXXXXXXXXXXXXXX" placeholders in views/page.html
+     with your real publisher ID, and YOUR_AD_SLOT_ID_1..4 with real ad unit IDs.
+  4. Uncomment the script tag below.
+
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script>
+-->
+</head>
+<body data-default-format="{{DEFAULT_FORMAT}}">
+
+<div class="side-ad left">
+  <span class="ad-label">Advertisement</span>
+  <ins class="adsbygoogle" style="display:block; width:160px; height:600px;"
+       data-ad-client="ca-pub-XXXXXXXXXXXXXXXX" data-ad-slot="YOUR_AD_SLOT_ID_3" data-ad-format="vertical"></ins>
+  <script>(window.adsbygoogle = window.adsbygoogle || []).push({});</script>
+</div>
+<div class="side-ad right">
+  <span class="ad-label">Advertisement</span>
+  <ins class="adsbygoogle" style="display:block; width:160px; height:600px;"
+       data-ad-client="ca-pub-XXXXXXXXXXXXXXXX" data-ad-slot="YOUR_AD_SLOT_ID_4" data-ad-format="vertical"></ins>
+  <script>(window.adsbygoogle = window.adsbygoogle || []).push({});</script>
+</div>
+
+{{TOPBAR}}
+
+<header class="hero">
+  <div class="hero-inner">
+    <div>
+      <h1>{{H1}}</h1>
+      <p class="hero-text">{{INTRO}}</p>
+    </div>
+    {{HERO_VISUAL}}
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose images">
+    <svg width="46" height="46" viewBox="0 0 46 46" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect x="4" y="4" width="38" height="38" rx="6" stroke="#E8A33D" stroke-width="2.5"/>
+      <path d="M14 23h18M23 14v18" stroke="#E8A33D" stroke-width="2.5" stroke-linecap="round"/>
+    </svg>
+    <div class="cta">{{DROP_TITLE}}</div>
+    <div class="sub">{{DROP_SUB}} &middot; up to {{MAX_MB}}MB each</div>
+    <input type="file" id="fileInput"
+      accept="image/jpeg,image/png,image/webp,image/avif,image/tiff,image/gif,image/bmp,image/svg+xml,.jpg,.jpeg,.png,.webp,.avif,.tif,.tiff,.gif,.bmp,.svg"
+      multiple>
+  </div>
+
+  <div class="controls">
+    <div class="control">
+      <label for="formatSel">Output format</label>
+      <select id="formatSel">
+        <option value="auto">Keep original type (recommended)</option>
+        <option value="webp">WebP (smallest, modern)</option>
+        <option value="jpeg">JPEG</option>
+        <option value="png">PNG</option>
+        <option value="avif">AVIF (smallest, slower)</option>
+        <option value="tiff">TIFF</option>
+        <option value="gif">GIF (keeps animation)</option>
+        <option value="ico">ICO (favicon, multi-size)</option>
+      </select>
+    </div>
+    <div class="control">
+      <label for="qualityRange">Quality</label>
+      <div class="slider-row">
+        <input type="range" id="qualityRange" min="10" max="95" value="75">
+        <span class="quality-val mono" id="qualityVal">75%</span>
+      </div>
+    </div>
+    <div class="control">
+      <label for="maxDimSel">Max dimension</label>
+      <select id="maxDimSel">
+        <option value="0">No resize</option>
+        <option value="2560">2560px</option>
+        <option value="1920" selected>1920px</option>
+        <option value="1280">1280px</option>
+        <option value="800">800px</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="results">
+    <div class="results-head">
+      <h2 id="resultsTitle">No images yet</h2>
+      <div style="display:flex; align-items:center; gap:14px;">
+        <span class="savings-total" id="savingsTotal"></span>
+        <button class="zip-btn" id="zipBtn" disabled type="button">Download all as .zip</button>
+      </div>
+    </div>
+    <div id="fileList"></div>
+    <div class="empty-note" id="emptyNote">Converted files will show up here with their new size and a download button.</div>
+  </div>
+
+  <div class="ad-slot">
+    <span class="ad-label">Advertisement</span>
+    <ins class="adsbygoogle" style="display:block; width:100%;"
+         data-ad-client="ca-pub-XXXXXXXXXXXXXXXX" data-ad-slot="YOUR_AD_SLOT_ID_1" data-ad-format="auto" data-full-width-responsive="true"></ins>
+    <script>(window.adsbygoogle = window.adsbygoogle || []).push({});</script>
+  </div>
+
+  <section class="fcards" aria-label="About the formats">
+    {{CARDS}}
+  </section>
+
+  {{NOTES_SECTION}}
+
+  {{FAQ_SECTION}}
+
+  <div class="ad-slot">
+    <span class="ad-label">Advertisement</span>
+    <ins class="adsbygoogle" style="display:block; width:100%;"
+         data-ad-client="ca-pub-XXXXXXXXXXXXXXXX" data-ad-slot="YOUR_AD_SLOT_ID_2" data-ad-format="auto" data-full-width-responsive="true"></ins>
+    <script>(window.adsbygoogle = window.adsbygoogle || []).push({});</script>
+  </div>
+
+  {{RELATED_SECTION}}
+
+  <div class="privacy-note">
+    <strong>How this works:</strong> your file is uploaded to this server, decoded, resized and re-encoded with Sharp (libvips), with a Jimp fallback for BMP and png-to-ico for favicon output. Uploads are held in memory only while they are processed and are not written to disk.
+  </div>
+</main>
+
+{{FOOTER}}
+
+<script src="/script.js"></script>
+</body>
+</html>
