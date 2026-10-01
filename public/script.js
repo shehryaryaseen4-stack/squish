@@ -157,124 +157,153 @@
   const dropzone = document.getElementById("dropzone");
   if (!dropzone) return; // hub / 404 pages have no upload tool
 
+  // ---------------------------------------------------------------- upload tool --
+  // CloudConvert-style flow:
+  //   1. files are added -> one card each: icon, name, "71 KB · JPEG Image",
+  //      "Convert [JPEG] -> [PNG v]", Options (images), remove
+  //   2. Convert -> cards show WAITING / UPLOADING 40% / CONVERTING
+  //   3. done -> FINISHED + output name + size + Download; "Download all" zips every result
   const tool = document.getElementById("convert");
-  const anyMode = tool && tool.dataset.any === "1"; // home/category: per-file targets for non-images
+  const anyMode = tool.dataset.any === "1"; // home/category pages: any file type
   const fileInput = document.getElementById("fileInput");
-  const formatSel = document.getElementById("formatSel");
-  const qualityRange = document.getElementById("qualityRange");
-  const qualityVal = document.getElementById("qualityVal");
-  const maxDimSel = document.getElementById("maxDimSel");
   const fileList = document.getElementById("fileList");
-  const resultsTitle = document.getElementById("resultsTitle");
-  const savingsTotal = document.getElementById("savingsTotal");
+  const toolBar = document.getElementById("toolBar");
+  const barStatus = document.getElementById("barStatus");
+  const addMoreBtn = document.getElementById("addMoreBtn");
+  const convertAllBtn = document.getElementById("convertAllBtn");
   const zipBtn = document.getElementById("zipBtn");
-  const emptyNote = document.getElementById("emptyNote");
-  const results = [];
-  let seq = 0;
-  const CONCURRENCY = 3; // keep server load predictable when many files are dropped at once
+  const CONCURRENCY = 3; // the server queues further work itself
 
-  if (qualityRange) qualityRange.addEventListener("input", () => { qualityVal.textContent = qualityRange.value + "%"; });
+  let CATS = {}, OUTS = [];
+  try { CATS = JSON.parse(tool.dataset.cats || "{}"); } catch (e) { CATS = {}; }
+  try { OUTS = JSON.parse(tool.dataset.outputs || "[]"); } catch (e) { OUTS = []; }
+  const KIND = { image: "Image", video: "Video", audio: "Audio", document: "Document", pdf: "Document", spreadsheet: "Spreadsheet",
+    presentation: "Presentation", ebook: "Ebook", archive: "Archive", font: "Font", vector: "Vector Image", cad: "Drawing" };
+  const catOfExt = ext => CATS[ext] || (MAP && MAP.ext[ext] ? primaryCat(MAP.ext[ext]) : "none");
+  const exts = (dropzone.dataset.exts || "").split(",").filter(Boolean);
+  const isImageTarget = id => id === "svg" || (MAP && MAP.fmts[id] ? primaryCat(id) === "image" : (OUTS.find(o => o[0] === id) || [])[3] === "image");
 
   // Which format is this file? Longest matching extension wins ("backup.tar.gz" -> tar-gz).
-  const exts = (dropzone.dataset.exts || "").split(",").filter(Boolean);
   function formatOf(name){
     const parts = String(name).toLowerCase().split(".");
     for (let k = 1; k < parts.length; k++){
       const ext = parts.slice(k).join(".");
-      if (exts.includes(ext)) return MAP && MAP.ext[ext] ? MAP.ext[ext] : ext;
+      if (exts.includes(ext)) return { ext, id: MAP && MAP.ext[ext] ? MAP.ext[ext] : ext };
     }
     return null;
   }
-  const isImage = id => !!MAP && (primaryCat(id) === "image" || id === "svg");
-  let CATS = {};
-  try { CATS = JSON.parse(tool.dataset.cats || "{}"); } catch (e) { CATS = {}; }
-  const catOfExt = ext => CATS[ext] || (MAP && MAP.ext[ext] ? primaryCat(MAP.ext[ext]) : "none");
 
-  ["dragenter","dragover"].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add("drag"); }));
-  ["dragleave","drop"].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove("drag"); }));
-  dropzone.addEventListener("drop", e => handleFiles(Array.from(e.dataTransfer.files)));
-  const selectBtn = document.getElementById("selectBtn");
-  if (selectBtn) selectBtn.addEventListener("click", () => fileInput.click());
-  dropzone.addEventListener("click", () => fileInput.click());
-  dropzone.addEventListener("keydown", e => { if (e.key==="Enter" || e.key===" ") fileInput.click(); });
-  fileInput.addEventListener("change", () => {
-    if (fileInput.files.length) handleFiles(Array.from(fileInput.files));
-    fileInput.value = "";
-  });
+  // Targets for a file: [id, label, apiFormat, category]
+  function targetsFor(fromId){
+    if (anyMode && MAP){
+      return (MAP.pairs[fromId] || "").split(" ").filter(o => o && LIVE.has(fromId + ">" + o))
+        .map(o => [o, MAP.fmts[o][0], MAP.fmts[o][3] || o, primaryCat(o)]);
+    }
+    return OUTS;
+  }
+  const defFmt = document.body.dataset.defaultFormat; // apiFormat of this page's target, e.g. "png"
+  // What most people want from each kind of file, when the page doesn't say (home/category pages).
+  const PREFERRED = { image: ["png", "jpg"], video: ["mp4", "mp3"], audio: ["mp3", "wav"], document: ["pdf", "docx"], pdf: ["docx", "jpg"],
+    spreadsheet: ["xlsx", "pdf"], presentation: ["pdf", "pptx"], ebook: ["epub", "pdf"], archive: ["zip", "7z"], font: ["woff2", "woff"], vector: ["png", "svg", "pdf"] };
 
+  const fsvgHtml = (cat, cls) => `<svg class="fsvg fi-${esc(cat)}${cls ? " " + cls : ""}" aria-hidden="true"><use href="#fi-${esc(cat)}"/></svg>`;
   function fmtBytes(n){
     if (n < 1024) return n + " B";
-    if (n < 1024*1024) return (n/1024).toFixed(1) + " KB";
-    return (n/(1024*1024)).toFixed(2) + " MB";
+    if (n < 1024*1024) return Math.round(n/1024) + " KB";
+    return (n/(1024*1024)).toFixed(1) + " MB";
   }
 
-  // Live targets for a non-image file on home/category pages.
-  const targetsFor = id => (MAP && MAP.pairs[id] ? MAP.pairs[id].split(" ").filter(o => LIVE.has(id + ">" + o)) : []);
+  const rows = [];
+  let seq = 0;
+
+  function addFiles(files){
+    files.forEach(file => {
+      const fmt = formatOf(file.name);
+      const row = { id: ++seq, file, name: file.name, size: file.size, fmt, state: "ready", quality: 75, maxDim: 0, optionsOpen: false };
+      if (!fmt){ row.state = "error"; row.error = "This file type isn't supported here."; }
+      else {
+        row.targets = targetsFor(fmt.id);
+        if (!row.targets.length){ row.state = "error"; row.error = "This file type can't be converted yet."; }
+        else {
+          const pref = (PREFERRED[catOfExt(fmt.ext)] || []).map(id => row.targets.find(t => t[0] === id && id !== fmt.id)).find(Boolean);
+          const pick = row.targets.find(t => t[2] === defFmt) || pref || row.targets.find(t => t[0] !== fmt.id) || row.targets[0];
+          row.target = pick[0];
+        }
+      }
+      rows.push(row);
+    });
+    render();
+  }
+
+  ["dragenter","dragover"].forEach(ev => tool.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add("drag"); }));
+  ["dragleave","drop"].forEach(ev => tool.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove("drag"); }));
+  tool.addEventListener("drop", e => addFiles(Array.from(e.dataTransfer.files)));
+  const selectBtn = document.getElementById("selectBtn");
+  if (selectBtn) selectBtn.addEventListener("click", () => fileInput.click());
+  addMoreBtn.addEventListener("click", () => fileInput.click());
+  dropzone.addEventListener("click", () => fileInput.click());
+  dropzone.addEventListener("keydown", e => { if (e.key==="Enter" || e.key===" ") { e.preventDefault(); fileInput.click(); } });
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files.length) addFiles(Array.from(fileInput.files));
+    fileInput.value = "";
+    if (rows.length) tool.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+  });
+
+  // One upload + conversion. XHR (not fetch) so the card can show upload progress.
+  function requestConversion(row, onProgress){
+    return new Promise((resolve, reject) => {
+      const t = row.targets.find(x => x[0] === row.target);
+      const form = new FormData();
+      form.append("file", row.file);
+      form.append("format", t ? t[2] : row.target);
+      form.append("quality", String(row.quality));
+      form.append("maxDim", String(row.maxDim));
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/compress");
+      xhr.responseType = "blob";
+      xhr.upload.onprogress = e => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+      xhr.upload.onload = () => onProgress(1);
+      xhr.onerror = () => reject(new Error("Network error. Check your connection and try again."));
+      xhr.onload = async () => {
+        if (xhr.status !== 200){
+          let msg = "The server couldn't convert this file.";
+          try { const data = JSON.parse(await xhr.response.text()); if (data.error) msg = data.error; } catch (e) {}
+          return reject(new Error(msg));
+        }
+        const cd = xhr.getResponseHeader("Content-Disposition") || "";
+        const ext = xhr.getResponseHeader("X-Output-Ext") || (t ? t[0] : "bin");
+        let name = row.name.replace(/\.[^.]+$/, "") + "." + ext;
+        const star = /filename\*=UTF-8''([^;]+)/i.exec(cd), plain = /filename="([^"]+)"/.exec(cd);
+        try { if (star) name = decodeURIComponent(star[1]); else if (plain) name = plain[1]; } catch (e) {}
+        resolve({ blob: xhr.response, ext, name });
+      };
+      xhr.send(form);
+    });
+  }
 
   const queue = [];
   let active = 0;
   function pump(){
     while (active < CONCURRENCY && queue.length){
-      const { file, row } = queue.shift();
+      const row = queue.shift();
       active++;
-      row.status = "Converting…"; renderList();
-      convertOne(file, row).catch(err => { row.status = err.message || "Couldn't convert this file"; row.error = true; })
-        .finally(() => { active--; renderList(); pump(); });
+      row.state = "uploading"; row.progress = 0; render();
+      requestConversion(row, p => {
+        row.progress = p;
+        if (p >= 1) row.state = "converting";
+        updateRow(row);
+      }).then(res => {
+        row.state = "finished"; row.blob = res.blob; row.outExt = res.ext; row.outName = res.name; row.outSize = res.blob.size;
+      }).catch(err => {
+        row.state = "error"; row.error = err.message;
+      }).finally(() => { active--; render(); pump(); });
     }
   }
-  const enqueue = (file, row) => { row.status = "Queued…"; row.error = false; queue.push({ file, row }); pump(); };
 
-  function handleFiles(files){
-    files.forEach(file => {
-      const row = { id: ++seq, name: file.name, originalSize: file.size, blob: null, outSize: null, status: "", ext: null, file };
-      row.from = formatOf(file.name);
-      results.push(row);
-      if (!row.from){ row.status = "This file type isn't supported here."; row.error = true; return; }
-      if (anyMode && !isImage(row.from)){
-        // Non-image on a general page: use the picker's choice if it fits, else ask for a target.
-        const targets = targetsFor(row.from);
-        if (!targets.length){ row.status = "This file type can't be converted yet."; row.error = true; return; }
-        row.targets = targets;
-        row.target = targets[0];
-        row.needsTarget = true;
-        row.status = "";
-        return;
-      }
-      row.format = formatSel ? formatSel.value : "auto";
-      enqueue(file, row);
-    });
-    renderList();
-  }
-
-  function filenameFrom(resp, row){
-    const cd = resp.headers.get("Content-Disposition") || "";
-    const m = /filename="([^"]+)"/.exec(cd);
-    return m ? m[1] : row.name.replace(/\.[^.]+$/, "") + "." + row.ext;
-  }
-
-  async function convertOne(file, row){
-    const form = new FormData();
-    form.append("file", file);
-    form.append("format", row.format);
-    if (qualityRange) form.append("quality", qualityRange.value);
-    if (maxDimSel) form.append("maxDim", maxDimSel.value);
-
-    const resp = await fetch("/api/compress", { method: "POST", body: form });
-    if (!resp.ok){
-      let message = "The server couldn't convert this file.";
-      try { const data = await resp.json(); if (data.error) message = data.error; } catch(e){}
-      throw new Error(message);
-    }
-    const blob = await resp.blob();
-    row.blob = blob;
-    row.outSize = Number(resp.headers.get("X-Compressed-Size")) || blob.size;
-    row.ext = resp.headers.get("X-Output-Ext") || "bin";
-    row.outName = filenameFrom(resp, row);
-    row.status = "done";
-    row.needsTarget = false;
-    if (row.thumb){ URL.revokeObjectURL(row.thumb); row.thumb = null; }
-    if (/^(png|jpe?g|webp|gif|avif|bmp|ico)$/.test(row.ext)) row.thumb = URL.createObjectURL(blob);
-  }
+  convertAllBtn.addEventListener("click", () => {
+    rows.filter(r => r.state === "ready").forEach(r => { r.state = "waiting"; r.optionsOpen = false; queue.push(r); });
+    render(); pump();
+  });
 
   function save(blob, name){
     const url = URL.createObjectURL(blob);
@@ -284,88 +313,132 @@
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   }
 
-  async function downloadZip(){
-    const done = results.filter(r => r.blob);
-    if (!done.length || typeof JSZip === "undefined") return;
+  // Download all: one ZIP with every finished file (names made unique).
+  zipBtn.addEventListener("click", async () => {
+    const done = rows.filter(r => r.state === "finished");
+    if (!done.length) return;
+    if (done.length === 1) return save(done[0].blob, done[0].outName);
+    if (typeof JSZip === "undefined") return;
     zipBtn.disabled = true;
-    zipBtn.textContent = "Zipping…";
+    const label = zipBtn.lastChild.textContent;
+    zipBtn.lastChild.textContent = "Zipping…";
     const zip = new JSZip();
     const used = new Set();
     done.forEach(r => {
       let name = r.outName, n = 1;
-      while (used.has(name)) name = r.outName.replace(/(\.[^.]+)?$/, m => "-" + (++n) + m);
+      while (used.has(name)) name = r.outName.replace(/(\.[^.]+)?$/, m => " (" + (++n) + ")" + m);
       used.add(name);
       zip.file(name, r.blob);
     });
     save(await zip.generateAsync({ type: "blob" }), "converted-files.zip");
     zipBtn.disabled = false;
-    zipBtn.textContent = "Download all as .zip";
+    zipBtn.lastChild.textContent = label;
+  });
+
+  // ------------------------------------------------------------------ rendering --
+  const BADGE = { waiting: ["WAITING", "st-wait"], uploading: ["UPLOADING", "st-busy"], converting: ["CONVERTING", "st-busy"],
+    finished: ["FINISHED", "st-ok"], error: ["ERROR", "st-err"] };
+
+  function statusHtml(row){
+    if (row.state === "ready") return "";
+    const [label, cls] = BADGE[row.state];
+    let text = "";
+    if (row.state === "uploading") text = `<span class="row-progress"><span style="width:${Math.round((row.progress || 0) * 100)}%"></span></span><span class="muted">${Math.round((row.progress || 0) * 100)}%</span>`;
+    else if (row.state === "converting") text = `<span class="spinner" aria-hidden="true"></span><span class="muted">Converting to ${esc(labelOf(row.target))}…</span>`;
+    else if (row.state === "waiting") text = `<span class="muted">Waiting in queue…</span>`;
+    else if (row.state === "finished") text = `<span class="out-name">${esc(row.outName)}</span><span class="muted"> · ${fmtBytes(row.outSize)}</span>`;
+    else if (row.state === "error") text = `<span class="err-text">${esc(row.error)}</span>`;
+    const action = row.state === "finished" ? `<button class="btn btn-success btn-sm dl-btn" type="button">${DL_ICON}Download</button>` : "";
+    return `<div class="file-status"><span class="badge-state ${cls}">${label}</span><div class="status-text">${text}</div>${action}</div>`;
   }
-  zipBtn.addEventListener("click", downloadZip);
+  const DL_ICON = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>';
+  const catOf = id => (MAP && MAP.fmts[id] ? primaryCat(id) : ((OUTS.find(o => o[0] === id) || [])[3] || "none"));
+  const labelOf = id => { for (const r of rows) { const t = (r.targets || []).find(x => x[0] === id); if (t) return t[1]; } return String(id).toUpperCase(); };
 
-  function renderList(){
-    if (results.length === 0){
-      resultsTitle.textContent = "No files yet";
-      emptyNote.style.display = "block";
-      fileList.innerHTML = "";
-      zipBtn.disabled = true;
-      savingsTotal.textContent = "";
-      return;
+  function rowHtml(row){
+    const inCat = row.fmt ? catOfExt(row.fmt.ext) : "none";
+    const inLabel = row.fmt ? row.fmt.ext.toUpperCase() : "?";
+    const meta = `${fmtBytes(row.size)}${row.fmt ? " · " + esc(inLabel) + " " + (KIND[inCat] || "File") : ""}`;
+    let convert = "";
+    if (row.fmt && row.targets && row.targets.length){
+      const locked = row.state !== "ready";
+      const opts = row.targets.map(t => `<option value="${esc(t[0])}"${t[0] === row.target ? " selected" : ""}>${esc(t[1])}</option>`).join("");
+      const showOptions = isImageTarget(row.target);
+      convert = `<div class="file-convert">
+          <span class="convert-label">${CONVERT_ICON}Convert</span>
+          <span class="fmt-pill">${fsvgHtml(inCat)}${esc(inLabel)}</span>
+          <span class="arrow" aria-hidden="true">&rarr;</span>
+          ${locked ? `<span class="fmt-pill">${fsvgHtml(catOf(row.target))}${esc(labelOf(row.target))}</span>`
+            : `<select class="target-sel" aria-label="Convert ${esc(row.name)} to">${opts}</select>`}
+          ${showOptions && !locked ? `<button class="btn btn-ghost btn-sm opt-btn" type="button" aria-expanded="${row.optionsOpen}">${OPT_ICON}Options</button>` : ""}
+        </div>`;
     }
-    emptyNote.style.display = "none";
-    resultsTitle.textContent = results.length + (results.length===1 ? " file" : " files");
+    const removable = !["waiting", "uploading", "converting"].includes(row.state);
+    const options = row.optionsOpen && row.state === "ready" ? `<div class="file-options">
+        <label>Quality <input type="range" class="q-range" min="10" max="95" value="${row.quality}"><span class="q-val">${row.quality}%</span></label>
+        <label>Resize <select class="dim-sel">${[[0, "Keep original size"], [2560, "Max 2560px"], [1920, "Max 1920px"], [1280, "Max 1280px"], [800, "Max 800px"]]
+          .map(([v, l]) => `<option value="${v}"${v === row.maxDim ? " selected" : ""}>${l}</option>`).join("")}</select></label>
+      </div>` : "";
+    return `<div class="file-main">
+        <span class="file-icon">${fsvgHtml(inCat)}</span>
+        <div class="file-info"><div class="fname">${esc(row.name)}</div><div class="fmeta">${meta}</div></div>
+        ${convert}
+        <button class="remove-btn" type="button" aria-label="Remove ${esc(row.name)}"${removable ? "" : " disabled"}>&times;</button>
+      </div>${options}${statusHtml(row)}`;
+  }
+  const CONVERT_ICON = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2"/><path d="M21 4v5h-5M3 20v-5h5"/></svg>';
+  const OPT_ICON = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>';
 
-    const done = results.filter(r => r.outSize != null && catOfExt(r.ext) === catOfExt((r.name.toLowerCase().match(/\.([a-z0-9]+)$/) || [])[1]));
-    zipBtn.disabled = results.filter(r => r.blob).length < 2;
-    const origTotal = done.reduce((s,r)=>s+r.originalSize,0);
-    const newTotal = done.reduce((s,r)=>s+r.outSize,0);
-    const pctAll = origTotal ? Math.round((1 - newTotal/origTotal) * 100) : 0;
-    savingsTotal.textContent = done.length && pctAll > 0 ? pctAll + "% smaller overall" : "";
+  function wireRow(el, row){
+    const sel = el.querySelector(".target-sel");
+    if (sel) sel.addEventListener("change", () => { row.target = sel.value; render(); });
+    const opt = el.querySelector(".opt-btn");
+    if (opt) opt.addEventListener("click", () => { row.optionsOpen = !row.optionsOpen; render(); });
+    const q = el.querySelector(".q-range");
+    if (q) q.addEventListener("input", () => { row.quality = Number(q.value); el.querySelector(".q-val").textContent = q.value + "%"; });
+    const dim = el.querySelector(".dim-sel");
+    if (dim) dim.addEventListener("change", () => { row.maxDim = Number(dim.value); });
+    el.querySelector(".remove-btn").addEventListener("click", () => { rows.splice(rows.indexOf(row), 1); render(); });
+    const dl = el.querySelector(".dl-btn");
+    if (dl) dl.addEventListener("click", () => save(row.blob, row.outName));
+  }
 
+  function updateRow(row){
+    const el = fileList.querySelector(`[data-row="${row.id}"]`);
+    if (!el) return render();
+    const old = el.querySelector(".file-status");
+    const tmp = document.createElement("div");
+    tmp.innerHTML = statusHtml(row);
+    if (old) old.replaceWith(tmp.firstElementChild || ""); else if (tmp.firstElementChild) el.appendChild(tmp.firstElementChild);
+  }
+
+  function render(){
     fileList.innerHTML = "";
-    results.slice().reverse().forEach(row => {
+    rows.forEach(row => {
       const el = document.createElement("div");
-      el.className = "file-row";
-      // Size change is only meaningful between files of the same kind (image to image, PDF compression...).
-      const inExt = (row.name.toLowerCase().match(/\.([a-z0-9]+)$/) || [])[1];
-      const sameKind = row.outSize != null && catOfExt(row.ext) === catOfExt(inExt);
-      const pct = sameKind ? Math.round((1 - row.outSize/row.originalSize)*100) : null;
-      const icon = row.thumb ? `<img class="thumb" src="${row.thumb}" alt="">`
-        : `<i class="ficon ficon-md fi-${esc(catOfExt(row.ext || inExt))}" aria-hidden="true"><b>${esc((row.ext || inExt || "?").toUpperCase().slice(0, 5))}</b></i>`;
-      let action = "";
-      if (row.blob) action = '<button class="dl-btn" type="button">Download</button>';
-      else if (row.needsTarget){
-        action = `<label class="row-target">to <select aria-label="Convert ${esc(row.name)} to">${row.targets.map(t =>
-          `<option value="${esc(t)}"${t === row.target ? " selected" : ""}>${esc(MAP.fmts[t][0])}</option>`).join("")}</select></label>
-          <button class="convert-btn" type="button">Convert</button>`;
-      }
-      el.innerHTML = `
-        ${icon}
-        <div>
-          <div class="fname">${esc(row.name)}</div>
-          <div class="fsize mono">${fmtBytes(row.originalSize)}${row.outSize!=null ? ' → ' + fmtBytes(row.outSize) : ''}</div>
-        </div>
-        <div class="fsave mono ${pct!=null && pct<0 ? 'worse' : ''}">${pct!=null ? (pct>=0? '-'+pct+'%' : '+'+(-pct)+'%') : ''}</div>
-        <div class="fstatus${row.error ? ' err' : ''}">${row.outSize!=null ? '' : esc(row.status)}</div>
-        <div class="row-actions">${action}</div>
-      `;
-      if (row.blob) el.querySelector(".dl-btn").addEventListener("click", () => save(row.blob, row.outName));
-      if (row.needsTarget){
-        const sel = el.querySelector("select");
-        sel.addEventListener("change", () => { row.target = sel.value; });
-        el.querySelector(".convert-btn").addEventListener("click", () => {
-          row.needsTarget = false;
-          row.format = MAP.fmts[row.target][3] || row.target;
-          enqueue(row.file, row);
-        });
-      }
+      el.className = "file-card is-" + row.state;
+      el.dataset.row = row.id;
+      el.innerHTML = rowHtml(row);
+      wireRow(el, row);
       fileList.appendChild(el);
     });
+    const ready = rows.filter(r => r.state === "ready").length;
+    const busy = rows.filter(r => ["waiting", "uploading", "converting"].includes(r.state)).length;
+    const done = rows.filter(r => r.state === "finished").length;
+    const failed = rows.filter(r => r.state === "error").length;
+    dropzone.hidden = rows.length > 0;
+    toolBar.hidden = rows.length === 0;
+    convertAllBtn.hidden = ready === 0;
+    convertAllBtn.disabled = busy > 0 && ready === 0;
+    zipBtn.hidden = done === 0;
+    zipBtn.lastChild.textContent = done > 1 ? `Download all (${done})` : "Download";
+    let status;
+    if (busy) status = `<span class="spinner" aria-hidden="true"></span> Converting ${busy} file${busy > 1 ? "s" : ""}…`;
+    else if (ready) status = `${ready} file${ready > 1 ? "s" : ""} ready`;
+    else if (done) status = `<span class="done-check" aria-hidden="true">&#10003;</span> Done${failed ? ` &middot; ${failed} failed` : ""}`;
+    else status = failed ? `${failed} file${failed > 1 ? "s" : ""} could not be converted` : "";
+    barStatus.innerHTML = status;
   }
 
-  // Landing pages preselect their target format (e.g. /png-to-webp -> WebP).
-  const defFmt = document.body.dataset.defaultFormat;
-  if (formatSel && defFmt && Array.from(formatSel.options).some(o => o.value === defFmt)) formatSel.value = defFmt;
-
-  renderList();
+  render();
 })();

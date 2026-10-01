@@ -120,8 +120,11 @@ function safeName(name, inFormat) {
   let base = String(name || 'file');
   const ext = inFormat && inFormat.extensions.find((e) => base.toLowerCase().endsWith(`.${e}`));
   base = ext ? base.slice(0, -(ext.length + 1)) : base.replace(/\.[^.]*$/, '');
-  return base.replace(/[^\w.-]+/g, '_').slice(0, 80) || 'file';
+  // keep the visitor's own name (spaces, accents); drop only characters unsafe in file names/headers
+  return base.replace(/[\u0000-\u001f\u007f"\\/:*?<>|]+/g, '_').trim().slice(0, 120) || 'file';
 }
+// Content-Disposition with an ASCII fallback plus the exact UTF-8 name (RFC 6266 / 5987).
+const disposition = (name) => `attachment; filename="${name.replace(/[^\x20-\x7e]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(name)}`;
 
 app.post('/api/compress', upload.single('file'), async (req, res) => {
   try {
@@ -166,7 +169,7 @@ app.post('/api/compress', upload.single('file'), async (req, res) => {
 
     res.set({
       'Content-Type': mime,
-      'Content-Disposition': `attachment; filename="${safeName(originalName, inFormat)}.${ext}"`,
+      'Content-Disposition': disposition(`${safeName(originalName, inFormat)}.${ext}`),
       'X-Original-Size': String(originalSize),
       'X-Compressed-Size': String(out.buffer.length),
       'X-Output-Ext': ext,

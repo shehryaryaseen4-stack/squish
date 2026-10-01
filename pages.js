@@ -64,7 +64,6 @@ const inputsFor = (slug, opts) => registry.getCompatibleInputFormats(slug, opts)
 const LIVE_INPUTS = registry.getInputFormats().map((f) => f.id);
 // Image tool lists (quality/size options only make sense for images).
 const isImageFmt = (id) => registry.getFormat(id).category === 'image' || id === 'svg';
-const IMAGE_OUTPUTS = registry.getOutputFormats({ category: 'image' }).filter((f) => f.category === 'image').map((f) => f.id);
 const ALL_INPUTS = registry.getInputFormats(ANY).map((f) => f.id);
 const COMPRESSIBLE = registry.getCompressibleFormats().map((f) => f.id);
 const ALL_COMPRESSORS = registry.getConverters({ ...ANY, type: 'compress' });
@@ -114,6 +113,8 @@ const ICON_PATHS = {
   layers: '<path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/>',
   compress: '<path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/>',
   upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>',
+  download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
+  convert: '<path d="M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2"/><path d="M21 4v5h-5M3 20v-5h5"/>',
 };
 const icon = (name, cls = 'ico') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[name] || ICON_PATHS.file}</svg>`;
 
@@ -326,63 +327,35 @@ function buildConversionMap(fromIds) {
 //            non-image files get their own "convert to" select in the results list
 function toolHtml({ inputs, outputs, dropTitle, dropSub, any = false }) {
   const exts = [...new Set(inputs.flatMap((id) => registry.getFormat(id).extensions))];
-  const imageOnly = inputs.every(isImageFmt) && outputs.every(isImageFmt);
-  const showImageOptions = any || imageOnly;
-  const opts = outputs.map((id) => {
-    const f = registry.getFormat(id);
-    return `<option value="${f.apiFormat}">${f.label}${id === 'ico' ? ' (favicon, multi-size)' : id === 'gif' ? ' (keeps animation)' : ''}</option>`;
-  }).join('');
-  const auto = any || imageOnly ? '<option value="auto">Automatic (recommended)</option>' : '';
-  // extension -> category, so result rows get the right icon colour on pages without the full map
+  // extension -> category, so each file gets the right icon and "JPEG Image" / "MP4 Video" label
   const cats = {};
   [...inputs, ...outputs].forEach((id) => { const f = registry.getFormat(id); f.extensions.forEach((e) => { cats[e] = f.category; }); });
-  return `<section class="tool-card" id="convert" aria-label="Upload and convert"${any ? ' data-any="1"' : ''} data-cats="${esc(JSON.stringify(cats))}">
+  // Targets offered in each file's "to" select on single-conversion pages: [id, label, apiFormat, category]
+  const outs = outputs.map((id) => { const f = registry.getFormat(id); return [f.id, f.label, f.apiFormat, f.category]; });
+  // CloudConvert-style flow: drop files -> one card per file ("Convert JPEG -> [PNG]", Options, x)
+  // -> Convert -> each card shows FINISHED + Download; "Download all" zips every result.
+  return `<section class="tool-card" id="convert" aria-label="Upload and convert"${any ? ' data-any="1"' : ''} data-cats="${esc(JSON.stringify(cats))}" data-outputs="${esc(JSON.stringify(outs))}">
   <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose files" data-exts="${exts.join(',')}">
     ${icon('upload', 'drop-ico')}
     <div class="cta">${dropTitle}</div>
     <div class="sub">${dropSub} &middot; up to ${MAX_MB}MB each</div>
     <input type="file" id="fileInput" accept="${exts.map((e) => `.${e}`).join(',')}" multiple>
   </div>
-  <div class="controls">
-    <div class="control">
-      <label for="formatSel">${any ? 'Convert images to' : 'Output format'}</label>
-      <select id="formatSel">${auto}${opts}</select>
+  <div class="file-list" id="fileList" aria-live="polite"></div>
+  <div class="tool-bar" id="toolBar" hidden>
+    <div class="bar-status" id="barStatus"></div>
+    <div class="bar-actions">
+      <button class="btn btn-ghost" id="addMoreBtn" type="button">${icon('upload')}Add more files</button>
+      <button class="btn btn-success" id="zipBtn" type="button" hidden>${icon('download')}Download all</button>
+      <button class="btn btn-brand btn-convert" id="convertAllBtn" type="button">${icon('convert')}Convert</button>
     </div>
-    ${showImageOptions ? `<div class="control">
-      <label for="qualityRange">Quality</label>
-      <div class="slider-row">
-        <input type="range" id="qualityRange" min="10" max="95" value="75">
-        <span class="quality-val mono" id="qualityVal">75%</span>
-      </div>
-    </div>
-    <div class="control">
-      <label for="maxDimSel">Max dimension</label>
-      <select id="maxDimSel">
-        <option value="0">No resize</option>
-        <option value="2560">2560px</option>
-        <option value="1920" selected>1920px</option>
-        <option value="1280">1280px</option>
-        <option value="800">800px</option>
-      </select>
-    </div>` : ''}
-  </div>
-  <div class="results">
-    <div class="results-head">
-      <h2 id="resultsTitle">No files yet</h2>
-      <div class="results-actions">
-        <span class="savings-total" id="savingsTotal"></span>
-        <button class="btn btn-dark" id="zipBtn" disabled type="button">Download all as .zip</button>
-      </div>
-    </div>
-    <div id="fileList"></div>
-    <div class="empty-note" id="emptyNote">Converted files will show up here with their new size and a download button.</div>
   </div>
 </section>`;
 }
 
-// Accepts every live input; images use the select above, other files get a per-file target.
+// Accepts every live input; each file gets its own "to" list of live targets.
 const anyTool = (inputs = LIVE_INPUTS) => toolHtml({
-  inputs, outputs: IMAGE_OUTPUTS.filter((o) => inputs.some((i) => isLivePair(i, o) || i === o)), any: true,
+  inputs, outputs: [], any: true,
   dropTitle: 'Drop your files here', dropSub: `${inputs.length} file types, including ${inputs.slice(0, 6).map((i) => F(i).label).join(', ')}`,
 });
 
