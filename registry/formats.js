@@ -23,7 +23,8 @@
 //                  N native browser API   L needs a JS/WASM library   X not realistic in a browser
 //                These are planning hints, not commitments. Registry derives backendRequired from them.
 //   apiFormat    the value POST /api/compress accepts for this format as an OUTPUT (only where it differs from id)
-//   traits       small facts used by existing page copy: sizeRank (higher = usually smaller), alpha
+//   traits       small facts used by page copy: sizeRank (higher = usually smaller), alpha, and for
+//                live formats the comparison-table facts: compression, animation, year, developer, bestFor
 //   notes        caveats worth surfacing to users or future developers
 
 const FORMATS = [
@@ -31,49 +32,49 @@ const FORMATS = [
   {
     id: 'jpg', name: 'JPG', fullName: 'Joint Photographic Experts Group', category: 'image',
     aliases: ['jpeg'], altLabel: 'JPEG', mimeType: 'image/jpeg', browser: 'NN', apiFormat: 'jpeg',
-    traits: { sizeRank: 3, alpha: false },
+    traits: { sizeRank: 3, alpha: false, compression: 'Lossy', animation: false, year: 1992, developer: 'Joint Photographic Experts Group', bestFor: 'Photographs and images shared anywhere' },
     description: 'JPG (also written JPEG) is the most widely used format for photographs. It uses lossy compression, which keeps files small by discarding fine detail the eye is unlikely to miss. It does not support transparency or animation, and virtually every device, browser and app can open it.',
   },
   {
     id: 'png', name: 'PNG', fullName: 'Portable Network Graphics', category: 'image',
     mimeType: 'image/png', browser: 'NN', apiFormat: 'png',
-    traits: { sizeRank: 2, alpha: true },
+    traits: { sizeRank: 2, alpha: true, compression: 'Lossless', animation: false, year: 1996, developer: 'PNG Development Group (W3C)', bestFor: 'Logos, screenshots and graphics with transparency' },
     description: 'PNG stores images with lossless compression and supports full transparency, which makes it the usual choice for logos, screenshots and graphics with sharp edges. The trade-off is size: a photograph saved as PNG is normally far larger than the same photo saved as JPG or WebP.',
   },
   {
     id: 'webp', name: 'WebP', fullName: 'WebP', category: 'image',
     mimeType: 'image/webp', browser: 'NL', apiFormat: 'webp',
-    traits: { sizeRank: 4, alpha: true },
+    traits: { sizeRank: 4, alpha: true, compression: 'Lossy and lossless', animation: true, year: 2010, developer: 'Google', bestFor: 'Fast-loading website images' },
     description: 'WebP is an image format developed by Google. It supports lossy and lossless compression, transparency and animation, and at comparable visual quality its files are usually smaller than JPG or PNG. That is why it is popular for websites, and current versions of all major browsers can display it.',
   },
   {
     id: 'avif', name: 'AVIF', fullName: 'AV1 Image File Format', category: 'image',
     mimeType: 'image/avif', browser: 'NL', apiFormat: 'avif',
-    traits: { sizeRank: 5, alpha: true },
+    traits: { sizeRank: 5, alpha: true, compression: 'Lossy and lossless', animation: true, year: 2019, developer: 'Alliance for Open Media', bestFor: 'The smallest web images in modern browsers' },
     description: 'AVIF is a modern image format built on the AV1 video codec. It supports transparency and high dynamic range, and it often produces the smallest files of any web image format at a given quality. Encoding is slower than for JPG or WebP, and older browsers and some apps cannot open it.',
   },
   {
     id: 'tiff', name: 'TIFF', fullName: 'Tagged Image File Format', category: 'image',
     aliases: ['tif'], mimeType: 'image/tiff', browser: 'LL', apiFormat: 'tiff',
-    traits: { sizeRank: 1, alpha: true },
+    traits: { sizeRank: 1, alpha: true, compression: 'Lossless or uncompressed', animation: false, year: 1986, developer: 'Aldus (now Adobe)', bestFor: 'Printing, scanning and archiving' },
     description: 'TIFF is a flexible, high-quality format used in scanning, print production and professional photography. Files are usually large, and many web browsers cannot display TIFF at all, so images are normally converted before they are published online.',
   },
   {
     id: 'gif', name: 'GIF', fullName: 'Graphics Interchange Format', category: 'image', alsoIn: ['video'],
     mimeType: 'image/gif', browser: 'NL', apiFormat: 'gif',
-    traits: { sizeRank: 2, alpha: true },
+    traits: { sizeRank: 2, alpha: true, compression: 'Lossless, 256 colours', animation: true, year: 1987, developer: 'CompuServe', bestFor: 'Short animations and simple graphics' },
     description: 'GIF dates from 1987 and is best known for short looping animations. Each frame is limited to 256 colours and transparency is on or off only, so photographs often look banded. It is still handy for simple graphics and animations that need to work everywhere.',
   },
   {
     id: 'bmp', name: 'BMP', fullName: 'Bitmap', category: 'image',
     mimeType: 'image/bmp', mimeTypes: ['image/x-ms-bmp'], browser: 'NL',
-    traits: { sizeRank: 0, alpha: false },
+    traits: { sizeRank: 0, alpha: false, compression: 'Usually uncompressed', animation: false, year: 1990, developer: 'Microsoft', bestFor: 'Legacy Windows software' },
     description: 'BMP is a simple image format from Windows that usually stores pixels with little or no compression, so files are large compared with JPG, PNG or WebP. It is rarely used on the web, and converting a BMP is the easiest way to make it small enough to share.',
   },
   {
     id: 'ico', name: 'ICO', fullName: 'Windows Icon', category: 'image',
     mimeType: 'image/x-icon', mimeTypes: ['image/vnd.microsoft.icon'], browser: 'NL', apiFormat: 'ico',
-    traits: { sizeRank: null, alpha: true },
+    traits: { sizeRank: null, alpha: true, compression: 'PNG or BMP images inside', animation: false, year: 1985, developer: 'Microsoft', bestFor: 'Favicons and Windows icons' },
     description: 'ICO is the Windows icon format, and browsers also use it for favicons. A single .ico file can hold several sizes of the same icon, from 16x16 up to 256x256, so the right one is shown wherever it is needed.',
     notes: 'Output is a real multi-size .ico (16-256px). Reading an existing .ico is not implemented yet.',
   },
@@ -433,7 +434,7 @@ const FORMATS = [
   {
     id: 'svg', name: 'SVG', fullName: 'Scalable Vector Graphics', category: 'vector', alsoIn: ['image'],
     mimeType: 'image/svg+xml', browser: 'NX',
-    traits: { sizeRank: null, alpha: true },
+    traits: { sizeRank: null, alpha: true, compression: 'Vector (XML text)', animation: true, year: 2001, developer: 'W3C', bestFor: 'Logos and icons that scale to any size' },
     description: 'SVG describes an image with shapes and paths written in XML instead of pixels, so it can scale to any size without losing sharpness. It is widely used for logos and icons on websites. To convert an SVG into a pixel format, it is drawn at its own declared size.',
   },
   {
@@ -470,7 +471,7 @@ const RAW = (maker) => `Camera RAW image from ${maker} cameras. It keeps the unp
 more('image', [
   ['jfif', 'JFIF', 'JPEG File Interchange Format', 'image/jpeg',
     'JFIF is a JPEG image with a .jfif extension, often produced when saving pictures from a browser. The image data is ordinary JPEG, so it converts to any other image format without extra loss.',
-    { browser: 'NN', traits: { sizeRank: 3, alpha: false } }],
+    { browser: 'NN', traits: { sizeRank: 3, alpha: false, compression: 'Lossy', animation: false, year: 1992, developer: 'Joint Photographic Experts Group', bestFor: 'Photographs (same data as JPG)' } }],
   ['3fr', '3FR', 'Hasselblad RAW', 'image/x-hasselblad-3fr', RAW('Hasselblad')],
   ['arw', 'ARW', 'Sony Alpha RAW', 'image/x-sony-arw', RAW('Sony')],
   ['cr2', 'CR2', 'Canon RAW 2', 'image/x-canon-cr2', RAW('Canon')],

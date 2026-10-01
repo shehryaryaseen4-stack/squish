@@ -7,7 +7,13 @@
 //   /<format>-converter   format page (/png-converter): every conversion to and from it
 //   /<from>-to-<to>       one page per registered conversion
 //   /compress-<format>    compressor pages
+//   /about, /privacy, /terms, /contact   trust pages (also required by AdSense)
 //   /sitemap.xml, /robots.txt
+//
+// SEO: every page gets a unique title/description, canonical URL, Open Graph + Twitter tags
+// with a generated share image (/og/<page>.png), visible breadcrumbs that match the
+// BreadcrumbList JSON-LD, and Organization/WebSite/WebApplication/FAQPage structured data.
+// Only pages with real, working content are indexable (see allPaths()).
 //
 // Every conversion in the registry gets a page and appears in the menus, but only 'live'
 // ones show the upload tool and are indexed. The rest render a clear "coming soon"
@@ -17,8 +23,10 @@
 const fs = require('fs');
 const path = require('path');
 const registry = require('./registry');
+const seo = require('./seo');
 
 const SITE = process.env.SITE_NAME || 'Squish';
+const CONTACT_EMAIL = process.env.CONTACT_EMAIL || '';
 const MAX_MB = Number(process.env.MAX_FILE_MB || 40);
 
 const PAGE_TPL = fs.readFileSync(path.join(__dirname, 'views', 'page.html'), 'utf8');
@@ -36,7 +44,7 @@ function F(slug) {
     const f = registry.getFormat(slug);
     formatCache.set(slug, f && {
       slug: f.id, label: f.label, name: f.name, select: f.apiFormat, rank: f.traits.sizeRank, alpha: f.traits.alpha,
-      full: f.fullName, about: f.description, category: f.category, categories: f.categories,
+      full: f.fullName, about: f.description, category: f.category, categories: f.categories, traits: f.traits,
     });
   }
   return formatCache.get(slug);
@@ -190,16 +198,25 @@ function footer() {
     <div><h4>Converters</h4><ul>${cats}</ul></div>
     <div><h4>Popular</h4><ul>${pop}</ul></div>
     <div><h4>Tools</h4><ul>${comp}<li>${link('/converters', 'All formats')}</li></ul></div>
+    <div><h4>Company</h4><ul><li>${link('/about', 'About')}</li><li>${link('/privacy', 'Privacy Policy')}</li><li>${link('/terms', 'Terms of Use')}</li><li>${link('/contact', 'Contact')}</li></ul></div>
   </div><div class="footer-bottom">&copy; ${new Date().getFullYear()} ${SITE}. Files are processed in memory and never stored.</div></footer>`;
 }
 
 // ------------------------------------------------------------------ hero --
 // CloudConvert-style hero: centred title, text, then "convert [X] to [Y]" + Select File.
-function hero({ h1, intro, widget, withSelect, short }) {
+// crumbs: [[name, path], ...] rendered as a visible breadcrumb trail (matches the JSON-LD).
+function breadcrumbs(crumbs) {
+  if (!crumbs || crumbs.length < 2) return '';
+  return `<nav class="crumbs" aria-label="Breadcrumb"><ol>${crumbs.map(([n, p], i) => i === crumbs.length - 1
+    ? `<li aria-current="page">${n}</li>` : `<li>${link(p, n)}</li>`).join('')}</ol></nav>`;
+}
+
+function hero({ h1, intro, widget, withSelect, short, crumbs }) {
   const select = withSelect
     ? `<button class="btn btn-brand btn-select" id="selectBtn" type="button">${icon('upload')}Select File</button>`
     : '';
   return `<section class="hero${short ? ' hero-short' : ''}"><div class="hero-inner">
+    ${breadcrumbs(crumbs)}
     <h1>${h1}</h1>
     <p class="hero-text">${intro}</p>
     ${widget || select ? `<div class="converter-box">${widget || ''}${select}</div>` : ''}
@@ -432,28 +449,83 @@ function popularCards() {
 }
 
 // ------------------------------------------------------------- page makers --
+// Share-image key for a URL path: '/' -> 'home', '/png-to-webp' -> 'png-to-webp'.
+const ogKey = (urlPath) => (urlPath === '/' ? 'home' : urlPath.slice(1));
+
 function baseFields(base, urlPath, title, desc, extra) {
   const url = base + urlPath;
   return {
-    TITLE: esc(title), META_DESC: esc(desc), ROBOTS: 'index, follow', URL: url,
+    TITLE: esc(title), META_DESC: esc(desc), ROBOTS: 'index, follow, max-image-preview:large, max-snippet:-1', URL: url,
     CANONICAL_TAG: `<link rel="canonical" href="${url}">`,
-    TOPBAR: topbar(), FOOTER: footer(), DEFAULT_FORMAT: 'auto', JSONLD: '{}', TOOL: '', CONTENT: '', RELATED: '', ...extra,
+    TOPBAR: topbar(), FOOTER: footer(), DEFAULT_FORMAT: 'auto', JSONLD: '{}', TOOL: '', CONTENT: '', RELATED: '', BODY: '',
+    CSS_V: seo.ASSET_V.css, JS_V: seo.ASSET_V.js,
+    _url: url, _title: esc(title), _desc: esc(desc), _image: `${base}/og/${ogKey(urlPath)}.png`, _noindex: false,
+    ...extra,
   };
 }
 
-const noindex = (fields) => ({ ...fields, ROBOTS: 'noindex, follow', CANONICAL_TAG: '' });
+// Planned/experimental pages: visible and linked, but kept out of the index.
+const noindex = (fields) => ({ ...fields, ROBOTS: 'noindex, follow', CANONICAL_TAG: '', JSONLD: '{}', _noindex: true });
 
-function graph(base, urlPath, name, desc, faq, crumbs) {
+function renderPage(tpl, fields) {
+  return render(tpl, { ...fields, HEAD_TAGS: seo.headTags({ url: fields._url, title: fields._title, desc: fields._desc, image: fields._image, noindex: fields._noindex }) });
+}
+
+// Structured data. Organization + WebSite are the same on every page (linked by @id);
+// the page itself is a WebApplication (tools) or WebPage (lists, legal pages).
+function graph(base, urlPath, name, desc, faq, crumbs, { type = 'WebApplication', features } = {}) {
+  const url = base + urlPath;
+  const org = { '@type': 'Organization', '@id': `${base}/#organization`, name: SITE, url: `${base}/`,
+    logo: { '@type': 'ImageObject', url: `${base}/icon-512.png`, width: 512, height: 512 },
+    ...(CONTACT_EMAIL ? { email: CONTACT_EMAIL } : {}) };
+  const site = { '@type': 'WebSite', '@id': `${base}/#website`, name: SITE, url: `${base}/`, inLanguage: 'en', publisher: { '@id': `${base}/#organization` } };
+  const pageNode = type === 'WebApplication'
+    ? { '@type': 'WebApplication', '@id': `${url}#app`, name, url, description: desc, inLanguage: 'en',
+      applicationCategory: 'MultimediaApplication', operatingSystem: 'Any', browserRequirements: 'Requires JavaScript and a modern browser.',
+      isAccessibleForFree: true, image: `${base}/og/${ogKey(urlPath)}.png`, publisher: { '@id': `${base}/#organization` },
+      isPartOf: { '@id': `${base}/#website` }, dateModified: seo.LASTMOD,
+      offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }, ...(features ? { featureList: features } : {}) }
+    : { '@type': type, '@id': `${url}#webpage`, name, url, description: desc, inLanguage: 'en', isPartOf: { '@id': `${base}/#website` }, dateModified: seo.LASTMOD };
   return jsonLd({
     '@context': 'https://schema.org',
     '@graph': [
-      { '@type': 'WebApplication', name, url: base + urlPath, description: desc,
-        applicationCategory: 'MultimediaApplication', operatingSystem: 'Any',
-        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' } },
-      { '@type': 'FAQPage', mainEntity: faq.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })) },
-      { '@type': 'BreadcrumbList', itemListElement: crumbs.map(([n, p], i) => ({ '@type': 'ListItem', position: i + 1, name: n, item: base + p })) },
+      org, site, pageNode,
+      ...(faq && faq.length ? [{ '@type': 'FAQPage', '@id': `${url}#faq`, mainEntity: faq.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })) }] : []),
+      ...(crumbs && crumbs.length > 1 ? [{ '@type': 'BreadcrumbList', '@id': `${url}#breadcrumb`, itemListElement: crumbs.map(([n, p], i) => ({ '@type': 'ListItem', position: i + 1, name: n, item: base + p })) }] : []),
     ],
   });
+}
+
+const TOOL_FEATURES = ['Batch conversion', 'Download all as ZIP', 'Adjustable quality', 'Resize to a maximum dimension', 'No sign-up', 'Files are not stored'];
+
+// "How to convert" steps: visible on the page.
+function howToSteps(fromLabel, toLabel, verb = 'convert') {
+  return `<section class="howto"><h2>How to ${verb} ${fromLabel}${toLabel ? ` to ${toLabel}` : ''}</h2><ol class="steps">
+    <li><strong>Choose your files.</strong> Click <em>Select File</em> or drag your ${fromLabel} files into the upload box. You can add many at once.</li>
+    <li><strong>Pick the settings.</strong> ${toLabel ? `${toLabel} is already selected as the output format.` : 'Choose the output format.'} Adjust Quality and Max dimension if you want smaller files.</li>
+    <li><strong>Download.</strong> Each file appears in the list with its new size. Download them one by one, or all together as a ZIP.</li>
+  </ol></section>`;
+}
+
+// Side-by-side facts for two live formats (uses the comparison traits in registry/formats.js).
+const yesNo = (v) => (v ? 'Yes' : 'No');
+function compareTable(slugs) {
+  const fs_ = slugs.map(F).filter((f) => f.traits && f.traits.compression);
+  if (!fs_.length) return '';
+  const rows = [
+    ['Full name', (f) => esc(f.full)],
+    ['Compression', (f) => f.traits.compression],
+    ['Transparency', (f) => yesNo(f.traits.alpha)],
+    ['Animation', (f) => yesNo(f.traits.animation)],
+    ['Introduced', (f) => f.traits.year || '&ndash;'],
+    ['Developed by', (f) => f.traits.developer || '&ndash;'],
+    ['Best for', (f) => f.traits.bestFor || '&ndash;'],
+  ];
+  const heading = fs_.length === 2 ? `${fs_[0].label} vs ${fs_[1].label}` : `${fs_[0].label} at a glance`;
+  return `<section class="compare"><h2>${heading}</h2><div class="table-wrap"><table>
+    <thead><tr><th scope="col">Feature</th>${fs_.map((f) => `<th scope="col">${f.label}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(([k, fn]) => `<tr><th scope="row">${k}</th>${fs_.map((f) => `<td>${fn(f)}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table></div></section>`;
 }
 
 function pairPage(fromSlug, toSlug, base) {
@@ -466,8 +538,8 @@ function pairPage(fromSlug, toSlug, base) {
   if (!live) {
     const alts = outputsFor(fromSlug).map((o) => [pairPath(fromSlug, o), pairLabel(fromSlug, o), true]);
     const note = meta.converter.notes ? ` ${esc(meta.converter.notes)}` : '';
-    return render(PAGE_TPL, noindex(baseFields(base, p, meta.title, meta.description, {
-      HERO: hero({ h1: meta.h1, intro: `Convert ${from.name} files to ${to.name}. This conversion is on our roadmap and not available on this server yet.`, widget }),
+    return renderPage(PAGE_TPL, noindex(baseFields(base, p, meta.title, meta.description, {
+      HERO: hero({ h1: meta.h1, crumbs: meta.breadcrumbs, intro: `Convert ${from.name} files to ${to.name}. This conversion is on our roadmap and not available on this server yet.`, widget }),
       TOOL: soonBox(`${from.label} to ${to.label} is coming soon`,
         `We list every conversion we plan to support so you can find it later, but we only switch one on once it really works.${note}`, alts),
       CONTENT: cards,
@@ -477,14 +549,15 @@ function pairPage(fromSlug, toSlug, base) {
 
   const faq = pairFaq(from, to);
   const notes = pairNotes(from, to);
-  return render(PAGE_TPL, baseFields(base, p, meta.title, meta.description, {
-    JSONLD: graph(base, p, meta.schemaName, meta.description, faq, meta.breadcrumbs),
+  return renderPage(PAGE_TPL, baseFields(base, p, meta.title, meta.description, {
+    JSONLD: graph(base, p, meta.schemaName, meta.description, faq, meta.breadcrumbs, { features: TOOL_FEATURES }),
     DEFAULT_FORMAT: to.select,
-    HERO: hero({ h1: meta.h1,
+    HERO: hero({ h1: meta.h1, crumbs: meta.breadcrumbs,
       intro: `Convert ${from.name} images to ${to.name} online for free. Upload one file or many, choose the quality and maximum size, then download the ${to.name} results one by one or all together in a ZIP. No sign-up needed.`,
       widget, withSelect: true }),
     TOOL: toolHtml({ inputs: [fromSlug], outputs: LIVE_OUTPUTS, dropTitle: `Drop your ${from.label} files here`, dropSub: `or click to choose ${from.label} files` }),
-    CONTENT: cards + `<section class="notes"><h2>Converting ${from.name} to ${to.name}</h2><ul>${notes.map((x) => `<li>${x}</li>`).join('')}</ul></section>` + faqHtml(faq),
+    CONTENT: howToSteps(from.label, to.label) + cards + compareTable([fromSlug, toSlug])
+      + `<section class="notes"><h2>Converting ${from.name} to ${to.name}</h2><ul>${notes.map((x) => `<li>${x}</li>`).join('')}</ul></section>` + faqHtml(faq),
     RELATED: relatedForPair(from, to),
   }));
 }
@@ -498,8 +571,8 @@ function compressPage(slug, base) {
 
   if (c.status !== 'live') {
     const title = `Compress ${f.label} - Free Online ${f.label} Compressor | ${SITE}`;
-    return render(PAGE_TPL, noindex(baseFields(base, p, title, `Reduce the file size of ${f.label} files online.`, {
-      HERO: hero({ h1: `Compress ${f.label} Files Online`, intro: `Make ${f.name} files smaller. This tool is on our roadmap and not available on this server yet.`, widget }),
+    return renderPage(PAGE_TPL, noindex(baseFields(base, p, title, `Reduce the file size of ${f.label} files online.`, {
+      HERO: hero({ h1: `Compress ${f.label} Files Online`, crumbs: [['Home', '/'], ['Converters', '/converters'], [`Compress ${f.label}`, p]], intro: `Make ${f.name} files smaller. This tool is on our roadmap and not available on this server yet.`, widget }),
       TOOL: soonBox(`${f.label} compression is coming soon`, 'We only switch a tool on once it really works.', COMPRESSIBLE.map((s) => [compressPath(s), `Compress ${F(s).label}`, true])),
       CONTENT: `<section class="fcards" aria-label="About the format">${cardHtml(slug)}</section>`,
       RELATED: `<section class="related"><h2>Related tools</h2>${chips(others)}</section>`,
@@ -513,14 +586,14 @@ function compressPage(slug, base) {
     ...FAQ_COMMON,
   ];
   const conv = outputsFor(slug).slice(0, 6).map((o) => [pairPath(slug, o), pairLabel(slug, o), true]);
-  return render(PAGE_TPL, baseFields(base, p, meta.title, meta.description, {
-    JSONLD: graph(base, p, meta.schemaName, meta.description, faq, meta.breadcrumbs),
+  return renderPage(PAGE_TPL, baseFields(base, p, meta.title, meta.description, {
+    JSONLD: graph(base, p, meta.schemaName, meta.description, faq, meta.breadcrumbs, { features: TOOL_FEATURES }),
     DEFAULT_FORMAT: f.select,
-    HERO: hero({ h1: meta.h1,
+    HERO: hero({ h1: meta.h1, crumbs: meta.breadcrumbs,
       intro: `Make your ${f.name} images smaller without fuss. Upload one file or many, set the quality and maximum size, and download the compressed versions individually or as a ZIP. No sign-up needed.`,
       widget, withSelect: true }),
     TOOL: toolHtml({ inputs: [slug], outputs: LIVE_OUTPUTS, dropTitle: `Drop your ${f.label} files here`, dropSub: `or click to choose ${f.label} files` }),
-    CONTENT: `<section class="fcards" aria-label="About the format">${cardHtml(slug)}</section>` + faqHtml(faq),
+    CONTENT: howToSteps(f.label, '', 'compress') + `<section class="fcards" aria-label="About the format">${cardHtml(slug)}</section>` + faqHtml(faq),
     RELATED: `<section class="related"><h2>Related tools</h2>${chips([...others, ...conv])}</section>`,
   }));
 }
@@ -539,14 +612,15 @@ function formatPage(slug, base) {
 
   const sections = [
     `<section class="fcards" aria-label="About the format">${cardHtml(slug)}</section>`,
+    live ? compareTable([slug]) : '',
     outs.length ? `<section class="conv-section"><h2>Convert ${f.label} to&hellip;</h2>${conversionLists(slug, 'out')}</section>` : '',
     ins.length ? `<section class="conv-section"><h2>Convert to ${f.label} from&hellip;</h2>${conversionLists(slug, 'in')}</section>` : '',
   ].join('');
   const crumbs = [['Home', '/'], ['Converters', '/converters'], [`${f.label} Converter`, p]];
   const faq = live ? FAQ_COMMON : FAQ_CATALOG;
   const fields = baseFields(base, p, title, desc, {
-    JSONLD: live ? graph(base, p, `${f.label} Converter`, desc, faq, crumbs) : '{}',
-    HERO: hero({ h1: `${f.label} Converter`,
+    JSONLD: live ? graph(base, p, `${f.label} Converter`, desc, faq, crumbs, { features: TOOL_FEATURES }) : '{}',
+    HERO: hero({ h1: `${f.label} Converter`, crumbs,
       intro: `${esc(fmt.fullName)} &mdash; convert ${f.label} files to and from other formats.${live ? '' : ' Conversions for this format are coming soon.'}`,
       widget, withSelect: liveOuts.length > 0 }),
     TOOL: liveOuts.length
@@ -555,7 +629,7 @@ function formatPage(slug, base) {
     CONTENT: conversionMap(ALL_INPUTS) + sections + faqHtml(faq),
     RELATED: canCompress ? `<section class="related"><h2>Related tools</h2>${chips([[compressPath(slug), `Compress ${f.label}`, true]])}</section>` : '',
   });
-  return render(PAGE_TPL, live ? fields : noindex(fields));
+  return renderPage(PAGE_TPL, live ? fields : noindex(fields));
 }
 
 function categoryPage(catId, base) {
@@ -563,7 +637,7 @@ function categoryPage(catId, base) {
   const fmts = registry.getFormatsByCategory(catId);
   const live = categoryIsLive(catId);
   const ins = registry.getInputFormats({ ...ANY, category: catId }).map((x) => x.id);
-  const title = `${c.converterName} - Free Online ${c.name} File Converter | ${SITE}`;
+  const title = `${c.converterName} - Free Online ${c.name} Converter | ${SITE}`;
   const desc = `${c.description} ${fmts.length} formats. Free, no sign-up.`;
   const widget = convertRow(anyInputPicker(ins, null), emptyToPicker());
   const liveIns = LIVE_INPUTS.filter((i) => F(i).category === catId); // primary category only (GIF is not a video tool)
@@ -575,20 +649,20 @@ function categoryPage(catId, base) {
   const crumbs = [['Home', '/'], ['Converters', '/converters'], [c.converterName, p]];
   const faq = live ? FAQ_COMMON : FAQ_CATALOG;
   const fields = baseFields(base, p, title, desc, {
-    JSONLD: live ? graph(base, p, c.converterName, desc, faq, crumbs) : '{}',
-    HERO: hero({ h1: c.converterName, intro: `${esc(c.description)}${live ? '' : ' These conversions are on our roadmap and coming soon.'}`, widget, withSelect: liveIns.length > 0 }),
+    JSONLD: live ? graph(base, p, c.converterName, desc, faq, crumbs, { features: TOOL_FEATURES }) : '{}',
+    HERO: hero({ h1: c.converterName, crumbs, intro: `${esc(c.description)}${live ? '' : ' These conversions are on our roadmap and coming soon.'}`, widget, withSelect: liveIns.length > 0 }),
     TOOL: liveIns.length ? toolHtml({ inputs: liveIns, outputs: LIVE_OUTPUTS, dropTitle: 'Drop your files here', dropSub: liveIns.map((i) => F(i).label).join(', ') }) : '',
     CONTENT: conversionMap(ins) + fmtGrid + liveSection + faqHtml(faq),
   });
-  return render(PAGE_TPL, live ? fields : noindex(fields));
+  return renderPage(PAGE_TPL, live ? fields : noindex(fields));
 }
 
 function homePage(base) {
-  const title = `File Converter - Free Online Image Converter and Compressor | ${SITE}`;
+  const title = `File Converter - Free Online Image Converter | ${SITE}`;
   const desc = `Convert files online for free. ${FORMAT_COUNT} formats across ${CATS.length} categories; compress and convert JPG, PNG, WebP, AVIF, TIFF, GIF, BMP, SVG and ICO today. No sign-up.`;
   const faq = [...FAQ_CATALOG, ...FAQ_COMMON];
-  return render(PAGE_TPL, baseFields(base, '/', title, desc, {
-    JSONLD: graph(base, '/', `${SITE} File Converter`, desc, faq, [['Home', '/']]),
+  return renderPage(PAGE_TPL, baseFields(base, '/', title, desc, {
+    JSONLD: graph(base, '/', `${SITE} File Converter`, desc, faq, [['Home', '/']], { features: TOOL_FEATURES }),
     HERO: hero({ h1: 'File Converter',
       intro: `${SITE} is an online file converter. Our catalogue covers ${FORMAT_COUNT} audio, video, document, ebook, archive, image, spreadsheet and presentation formats. To get started, choose your formats or use the button below to select files from your computer.`,
       widget: convertRow(anyInputPicker(ALL_INPUTS, null), emptyToPicker()), withSelect: true }),
@@ -606,23 +680,117 @@ function hubPage(base) {
     `<div class="conv-group" id="from-${i}"><h3>Convert ${F(i).label}</h3>${chips(outputsFor(i).map((o) => [pairPath(i, o), pairLabel(i, o), true]))}</div>`).join('')}</section>`;
   const comp = `<section id="compress" class="hub-section"><h2>${icon('compress')}Compress</h2>${chips(ALL_COMPRESSORS.map((x) => [x.route, `Compress ${F(x.from).label}`, x.status === 'live']))}</section>`;
   const jump = `<nav class="jump" aria-label="Categories">${CATS.map((c) => `<a href="#cat-${c.id}">${c.name}</a>`).join('')}<a href="#available">Available now</a></nav>`;
-  return render(HUB_TPL, {
-    TITLE: `All File Formats and Converters | ${SITE}`,
-    META_DESC: `Every format we convert or plan to convert, grouped by category: ${FORMAT_COUNT} formats and ${TOTAL_COUNT.toLocaleString('en-US')} conversions.`,
-    ROBOTS: 'index, follow', CANONICAL_TAG: `<link rel="canonical" href="${base}/converters">`,
-    TOPBAR: topbar(), FOOTER: footer(),
-    HERO: hero({ h1: 'All formats', intro: `${FORMAT_COUNT} formats and ${TOTAL_COUNT.toLocaleString('en-US')} conversions. ${LIVE_COUNT} image conversions work today; formats marked <span class="soon-tag">soon</span> are on the roadmap.`, short: true }),
+  const title = `All File Formats and Converters | ${SITE}`;
+  const desc = `Every format we convert or plan to convert, grouped by category: ${FORMAT_COUNT} formats and ${TOTAL_COUNT.toLocaleString('en-US')} conversions.`;
+  const crumbs = [['Home', '/'], ['Converters', '/converters']];
+  return renderPage(HUB_TPL, baseFields(base, '/converters', title, desc, {
+    JSONLD: graph(base, '/converters', 'All file formats', desc, null, crumbs, { type: 'CollectionPage' }),
+    HERO: hero({ h1: 'All formats', crumbs, intro: `${FORMAT_COUNT} formats and ${TOTAL_COUNT.toLocaleString('en-US')} conversions. ${LIVE_COUNT} image conversions work today; formats marked <span class="soon-tag">soon</span> are on the roadmap.`, short: true }),
     BODY: jump + liveSection + comp + sections,
-  });
+  }));
 }
 
-function notFoundPage() {
-  return render(HUB_TPL, {
-    TITLE: `Page not found | ${SITE}`, META_DESC: 'This page does not exist.', ROBOTS: 'noindex', CANONICAL_TAG: '',
-    TOPBAR: topbar(), FOOTER: footer(),
+function notFoundPage(base = '') {
+  return renderPage(HUB_TPL, {
+    ...noindex(baseFields(base, '/', `Page not found | ${SITE}`, 'This page does not exist.', {})), ROBOTS: 'noindex',
     HERO: hero({ h1: 'Page not found', intro: 'That converter is not available. Here are the ones that are.', short: true }),
     BODY: `<section class="hub-section"><h2>Popular tools</h2>${chips(POPULAR.map(([f, t]) => [pairPath(f, t), pairLabel(f, t), true]))}<p class="more-link">${link('/converters', 'See all formats')}</p></section>`,
   });
+}
+
+// ------------------------------------------------------------ trust pages --
+// About / Privacy / Terms / Contact. Google's quality guidelines and AdSense both expect a
+// site to say who runs it and how it treats data. The privacy text describes what this
+// code actually does; review it (and add your company details) before going live.
+const LEGAL_UPDATED = seo.LASTMOD;
+const contactLine = CONTACT_EMAIL
+  ? `email <a href="mailto:${esc(CONTACT_EMAIL)}">${esc(CONTACT_EMAIL)}</a>`
+  : 'use the contact details published on this page once the site owner adds them (set CONTACT_EMAIL)';
+
+const INFO_PAGES = {
+  about: {
+    title: `About ${SITE} - Free Online File Converter`, h1: `About ${SITE}`,
+    desc: `${SITE} is a free online file converter and image compressor. Learn how it works and what it can convert.`,
+    body: () => `<section class="prose">
+      <p>${SITE} is a free online file converter. It started as an image compressor and now converts and compresses ${LIVE_INPUTS.map((i) => F(i).label).join(', ')} images, with ${LIVE_COUNT} conversions working today.</p>
+      <h2>How it works</h2>
+      <p>Your file is uploaded over an encrypted connection, converted on our server with <a href="https://sharp.pixelplumbing.com/" rel="noopener">Sharp</a> (libvips), and sent straight back to your browser. Files are held in memory only while they are processed and are never written to disk.</p>
+      <h2>What we are adding</h2>
+      <p>Our catalogue lists ${FORMAT_COUNT} formats across ${CATS.length} categories, including video, audio, documents, ebooks and archives. Conversions that are not ready yet are clearly marked <span class="soon-tag">soon</span>; we only switch one on once it really works.</p>
+      <h2>Contact</h2>
+      <p>Questions or suggestions? ${link('/contact', 'Get in touch')}.</p></section>`,
+  },
+  privacy: {
+    title: `Privacy Policy | ${SITE}`, h1: 'Privacy Policy',
+    desc: `How ${SITE} handles your files and data: uploads are processed in memory and never stored.`,
+    body: () => `<section class="prose"><p class="muted">Last updated: ${LEGAL_UPDATED}</p>
+      <h2>Files you upload</h2>
+      <p>Files are sent to our server only to be converted. They are held in memory while they are processed and are not written to disk, logged or kept after the result has been returned to you. We do not look at, copy or share your files.</p>
+      <h2>Data we process</h2>
+      <p>Like every website, our server receives your IP address and basic request information (browser type, the page requested). We use your IP address only to apply a rate limit that protects the service from abuse; it is held in memory for up to 15 minutes.</p>
+      <h2>Cookies and local storage</h2>
+      <p>${SITE} itself sets no cookies. Your light/dark theme choice is stored in your browser's local storage and never sent to us.</p>
+      <h2>Advertising</h2>
+      <p>If advertising is shown, it is provided by Google AdSense. Google and its partners may use cookies to show ads based on your visits to this and other websites. You can opt out of personalised advertising at <a href="https://adssettings.google.com/" rel="noopener">Google Ads Settings</a>. See <a href="https://policies.google.com/technologies/partner-sites" rel="noopener">how Google uses information from sites that use its services</a>.</p>
+      <h2>Third-party services</h2>
+      <p>Pages load fonts from Google Fonts. No other third-party scripts are loaded unless advertising is enabled.</p>
+      <h2>Your rights</h2>
+      <p>Because we do not store your files or create accounts, we hold no personal data about you beyond the short-lived rate-limit record. For any privacy question, ${contactLine}.</p></section>`,
+  },
+  terms: {
+    title: `Terms of Use | ${SITE}`, h1: 'Terms of Use',
+    desc: `The terms for using the free ${SITE} online file converter.`,
+    body: () => `<section class="prose"><p class="muted">Last updated: ${LEGAL_UPDATED}</p>
+      <h2>Using the service</h2>
+      <p>${SITE} is free to use. You may convert files that you own or have the right to convert. Do not upload unlawful content or use the service to infringe anyone's rights.</p>
+      <h2>Fair use</h2>
+      <p>To keep the service available for everyone, there is a ${MAX_MB}MB limit per file and a limit on how many files one connection can process in a short period. Automated bulk use may be blocked.</p>
+      <h2>No warranty</h2>
+      <p>The service is provided &ldquo;as is&rdquo;. We work to make conversions accurate, but we cannot guarantee that every file converts perfectly. Keep a copy of your originals.</p>
+      <h2>Liability</h2>
+      <p>To the extent permitted by law, ${SITE} is not liable for any loss resulting from the use of the service.</p>
+      <h2>Changes</h2>
+      <p>We may update these terms; the date above shows the latest version. Questions: ${link('/contact', 'contact us')}.</p></section>`,
+  },
+  contact: {
+    title: `Contact | ${SITE}`, h1: `Contact ${SITE}`,
+    desc: `Get in touch with the ${SITE} team about the file converter, a missing format or a problem.`,
+    body: () => `<section class="prose">
+      <p>Found a file that will not convert, want a format added, or have a question about privacy?</p>
+      <p>${CONTACT_EMAIL ? `Email us at <a href="mailto:${esc(CONTACT_EMAIL)}">${esc(CONTACT_EMAIL)}</a>. We read every message.` : 'Contact details have not been published yet.'}</p>
+      <p>When reporting a conversion problem, tell us the file type, its size and the page you used. Please do not send confidential files.</p></section>`,
+  },
+};
+
+function infoPage(key, base) {
+  const pg = INFO_PAGES[key];
+  const p = `/${key}`;
+  const crumbs = [['Home', '/'], [pg.h1, p]];
+  return renderPage(HUB_TPL, baseFields(base, p, pg.title, pg.desc, {
+    JSONLD: graph(base, p, pg.h1, pg.desc, null, crumbs, { type: key === 'about' ? 'AboutPage' : key === 'contact' ? 'ContactPage' : 'WebPage' }),
+    HERO: hero({ h1: pg.h1, crumbs, intro: pg.desc, short: true }),
+    BODY: pg.body(),
+  }));
+}
+const resolveInfo = (key, base) => (Object.prototype.hasOwnProperty.call(INFO_PAGES, key) ? { html: infoPage(key, base) } : null);
+
+// ------------------------------------------------------------ share images --
+/** What to draw on /og/<key>.png, or null for an unknown key (so nobody can make us render arbitrary text). */
+function ogSpec(key) {
+  if (key === 'home') return { title: 'Free Online File Converter', subtitle: `${FORMAT_COUNT} formats \u00b7 Image conversion and compression` };
+  if (key === 'converters') return { title: 'All File Formats', subtitle: `${FORMAT_COUNT} formats in ${CATS.length} categories` };
+  if (INFO_PAGES[key]) return { title: INFO_PAGES[key].h1, subtitle: 'Free online file converter' };
+  const conv = /^(.+)-converter$/.exec(key);
+  if (conv) {
+    const f = registry.getFormat(conv[1]);
+    if (f && f.id === conv[1]) return { title: `${f.label} Converter`, subtitle: f.fullName };
+    const c = CATS.find((x) => x.id === conv[1]);
+    return c ? { title: c.converterName, subtitle: `${registry.getFormatsByCategory(c.id).length} formats` } : null;
+  }
+  const r = registry.resolveRoute(`/${key}`, ANY);
+  if (!r || r.redirect) return null;
+  if (r.type === 'compress') return { title: `Compress ${r.from.label}`, subtitle: `Make ${r.from.name} files smaller online for free` };
+  return { title: `${r.from.label} to ${r.to.label} Converter`, subtitle: `Convert ${r.from.name} to ${r.to.name} online for free`, from: r.from.label, to: r.to.label };
 }
 
 // ---------------------------------------------------------------- routing --
@@ -660,14 +828,24 @@ function allPaths() {
     ...registry.getFormats().filter((f) => formatIsLive(f.id)).map((f) => formatPath(f.id)),
     ...registry.getConverters().map((c) => c.route),
     ...COMPRESSIBLE.map((s) => compressPath(s)),
+    ...Object.keys(INFO_PAGES).map((k) => `/${k}`),
   ];
 }
 
+// Higher priority for the home page and the live tools than for lists and legal pages.
+// (Google ignores priority/changefreq; Bing and others still read them.)
+function sitemapPriority(p) {
+  if (p === '/') return '1.0';
+  if (/-to-|^\/compress-/.test(p)) return '0.9';
+  if (/-converter$/.test(p) || p === '/converters') return '0.8';
+  return '0.3';
+}
+
 function sitemap(base) {
-  const urls = allPaths().map((p) => `  <url><loc>${base}${p}</loc></url>`).join('\n');
+  const urls = allPaths().map((p) => `  <url><loc>${base}${p}</loc><lastmod>${seo.LASTMOD}</lastmod><priority>${sitemapPriority(p)}</priority></url>`).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`;
 }
 
 const robots = (base) => `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${base}/sitemap.xml\n`;
 
-module.exports = { homePage, hubPage, notFoundPage, resolvePair, resolveCompress, resolveConverter, sitemap, robots, allPaths };
+module.exports = { homePage, hubPage, notFoundPage, resolvePair, resolveCompress, resolveConverter, resolveInfo, ogSpec, sitemap, robots, allPaths };

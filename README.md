@@ -98,6 +98,41 @@ Alias spellings 301-redirect to the canonical URL (`/jpeg-to-png` to `/jpg-to-pn
 To add or remove a format, edit `registry/formats.js` and `registry/converters.js`; pages,
 menus, sitemap and hub update automatically.
 
+## SEO
+
+### What the code already does
+
+| Area | What is in place |
+|---|---|
+| Indexing | Only pages with a working tool or real content are indexable and in `sitemap.xml`. "Coming soon" pages are `noindex, follow`, so they never count as thin content. |
+| One URL per page | Canonical tags; 301s for upper case, trailing slashes, `//`, `/index.html` and alias spellings (`/jpeg-to-png` to `/jpg-to-png`). Set `FORCE_CANONICAL_HOST=1` to also 301 http to https and www to non-www (or the reverse, whatever `BASE_URL` says). |
+| Titles and snippets | Unique title (65 chars max) and meta description (165 max) on every indexable page. `max-image-preview:large` and `max-snippet:-1` robots directives. |
+| Structured data | Organization, WebSite, WebApplication (free offer, feature list), FAQPage and BreadcrumbList as one linked JSON-LD graph; AboutPage/ContactPage/CollectionPage where they fit. |
+| Social sharing | Open Graph and Twitter card tags, plus a generated 1200x630 share image per page (`/og/<page>.png`). |
+| Icons and app | `favicon.ico`, `favicon.svg`, Apple touch icon, 192/512 icons, a maskable icon and `site.webmanifest`, all generated from the brand mark. |
+| Content | Visible breadcrumbs, a "How to convert X to Y" section, an X vs Y comparison table, format descriptions, conversion notes, FAQ and related links on every live conversion page. |
+| Trust (E-E-A-T, AdSense) | `/about`, `/privacy`, `/terms` and `/contact` pages, linked from the footer. Review the wording and set `CONTACT_EMAIL`. |
+| Speed (Core Web Vitals) | Server-rendered HTML (about 5 ms), gzip, pages of 9-23 KB over the wire, versioned CSS/JS cached for a year, deferred scripts, `font-display: swap`. |
+| Verification | `GOOGLE_SITE_VERIFICATION`, `BING_SITE_VERIFICATION`, `YANDEX_VERIFICATION`, `PINTEREST_VERIFICATION`, and `INDEXNOW_KEY` for Bing/Yandex IndexNow. |
+| Guard rails | `test/seo.test.js` fails the build on duplicate or over-long titles/descriptions, a missing or extra H1, a missing canonical or OG tag, invalid JSON-LD, breadcrumbs that do not match, or any broken internal link. |
+
+### What was left out on purpose
+
+- **`<meta name="keywords">`**: Google ignores it, and Bing treats a stuffed one as a spam signal.
+- **Fake star ratings or review counts**: Google penalises self-made `aggregateRating` markup.
+- **Indexable pages for conversions that do not work**: hundreds of near-identical pages that fail for visitors is exactly what Google's spam policies call doorway or thin content. They stay `noindex` until they are live.
+- **Keyword stuffing, hidden text, bought links, cloaking**: these get sites penalised or removed from the index.
+
+### What only you can do
+
+No code can guarantee a #1 ranking, or keep one forever. Rankings depend on competition, links from other sites and how useful visitors find the pages, and Google changes its algorithm several times a year. What moves rankings most:
+
+1. **Deploy on your own domain with HTTPS**, set `BASE_URL` and `FORCE_CANONICAL_HOST=1`.
+2. **Google Search Console**: verify (set `GOOGLE_SITE_VERIFICATION`), submit `/sitemap.xml`, then check *Pages* and *Core Web Vitals* every few weeks. Do the same in **Bing Webmaster Tools**.
+3. **Make more conversions live.** Each one becomes a new indexable page with real search demand. JPG to PDF, HEIC to JPG, MP4 to MP3, PDF to Word and WebP to GIF are among the most searched conversions.
+4. **Earn links**: list the tool on directories such as AlternativeTo and Product Hunt, answer questions on Reddit and Stack Exchange where it genuinely helps, and write useful guides (for example "WebP vs AVIF").
+5. **Keep it fast and reliable.** Downtime and slow pages cost rankings quickly.
+
 **Before going live:**
 1. Set `BASE_URL` (e.g. `https://yourdomain.com`) so canonical tags and the sitemap use your real domain.
 2. Set `SITE_NAME` to your brand (default `Squish`).
@@ -119,6 +154,12 @@ and earning links from other sites.
 | `BASE_URL` | derived from request | Public site URL used in canonical tags, sitemap and robots.txt. Set this in production. |
 | `SITE_NAME` | `Squish` | Brand name used in page titles and footer. |
 | `TRUST_PROXY` | unset | Number of reverse proxies in front of the app (usually `1`). Needed for correct visitor IPs behind a proxy. |
+| `FORCE_CANONICAL_HOST` | unset | `1` = 301 every request to `BASE_URL`'s exact protocol and host. |
+| `CONTACT_EMAIL` | unset | Shown on `/contact` and `/privacy` and in structured data. |
+| `GOOGLE_SITE_VERIFICATION`, `BING_SITE_VERIFICATION`, `YANDEX_VERIFICATION`, `PINTEREST_VERIFICATION` | unset | Ownership verification meta tags. |
+| `INDEXNOW_KEY` | unset | Serves `/<key>.txt` for IndexNow. |
+| `TWITTER_SITE` | unset | `twitter:site` handle on share cards. |
+| `SITE_UPDATED` | content file dates | Sitemap `lastmod` override (YYYY-MM-DD). |
 | `RATE_LIMIT_MAX` | `120` | Compress requests allowed per IP per 15-minute window (applies to `/api/` only, so search-engine crawlers are never rate-limited). This is the main safety valve against a runaway hosting bill on a public "unlimited free" tool — tune it to what your hosting plan can actually absorb. |
 
 ## Deploying live

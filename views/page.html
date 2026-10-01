@@ -7,13 +7,11 @@
 <meta name="description" content="{{META_DESC}}">
 <meta name="robots" content="{{ROBOTS}}">
 {{CANONICAL_TAG}}
-<meta property="og:type" content="website">
-<meta property="og:title" content="{{TITLE}}">
-<meta property="og:description" content="{{META_DESC}}">
-<meta property="og:url" content="{{URL}}">
+{{HEAD_TAGS}}
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/style.css?v={{CSS_V}}">
 <script type="application/ld+json">{{JSONLD}}</script>
 <script src="/vendor/jszip.min.js" defer></script>
 
@@ -31,6 +29,7 @@
 -->
 </head>
 <body data-default-format="{{DEFAULT_FORMAT}}">
+<a class="skip-link" href="#main">Skip to content</a>
 
 <div class="side-ad left">
   <span class="ad-label">Advertisement</span>
@@ -47,7 +46,7 @@
 
 {{HERO}}
 
-<main class="wrap">
+<main class="wrap" id="main">
   {{TOOL}}
 
   <div class="ad-slot">
@@ -73,6 +72,6 @@
 
 {{FOOTER}}
 
-<script src="/script.js"></script>
+<script src="/script.js?v={{JS_V}}" defer></script>
 </body>
 </html>

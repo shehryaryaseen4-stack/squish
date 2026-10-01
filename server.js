@@ -12,6 +12,7 @@ const rateLimit = require('express-rate-limit');
 const pages = require('./pages');
 const registry = require('./registry');
 const { getHandler } = require('./engines');
+const seo = require('./seo');
 
 const PORT = process.env.PORT || 3000;
 const MAX_FILE_MB = Number(process.env.MAX_FILE_MB || 40);
@@ -43,6 +44,31 @@ app.use(helmet({
   contentSecurityPolicy: { directives: { 'img-src': ["'self'", 'data:', 'blob:'] } },
 }));
 app.use(compression());
+
+// ------------------------------------------------------ URL normalisation --
+// One URL per page: duplicates (upper case, trailing slash, //, /index.html, http vs https,
+// www vs bare domain) 301 to the canonical form so ranking signals are never split.
+// Host/protocol redirects only run when BASE_URL is set and FORCE_CANONICAL_HOST=1,
+// so local development and preview deployments are not redirected.
+const CANON = (() => { try { return BASE_URL ? new URL(BASE_URL) : null; } catch { return null; } })();
+const FORCE_HOST = process.env.FORCE_CANONICAL_HOST === '1' && CANON;
+app.use((req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+  if (req.path.startsWith('/api/')) return next();
+  const q = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+  let p = req.path;
+  if (p !== '/' && !/\.[a-z0-9]+$/i.test(p)) p = p.toLowerCase(); // never touch static file names
+  p = p.replace(/\/{2,}/g, '/').replace(/\/index\.html?$/i, '/');
+  if (p.length > 1 && p.endsWith('/')) p = p.replace(/\/+$/, '');
+  const wrongHost = FORCE_HOST && (req.hostname !== CANON.hostname || req.protocol !== CANON.protocol.replace(':', ''));
+  if (p !== req.path || wrongHost) {
+    return res.redirect(301, (wrongHost ? CANON.origin : '') + (p || '/') + q);
+  }
+  next();
+});
+
+// API responses and generated images should never show up as search results themselves.
+app.use('/api/', (_req, res, next) => { res.set('X-Robots-Tag', 'noindex, nofollow'); next(); });
 app.use('/api/', rateLimit({
   windowMs: 15 * 60 * 1000,
   max: MAX_FILES_PER_WINDOW,
@@ -51,7 +77,11 @@ app.use('/api/', rateLimit({
   message: { error: 'Too many requests from this connection. Please wait a few minutes and try again.' },
 }));
 
-app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+// Static files are referenced as /style.css?v=<hash>, so they can be cached for a year.
+app.use(express.static(path.join(__dirname, 'public'), {
+  index: false,
+  setHeaders: (res, _p) => res.set('Cache-Control', 'public, max-age=31536000, immutable'),
+}));
 app.get('/vendor/jszip.min.js', (_req, res) => res.set('Cache-Control', 'public, max-age=604800')
   .sendFile(require.resolve('jszip/dist/jszip.min.js')));
 
@@ -146,6 +176,31 @@ app.get('/api/health', (_req, res) => res.json({ ok: true }));
 // Every supported conversion gets its own crawlable landing page.
 const sendHtml = (res, html) => res.set('Cache-Control', 'public, max-age=3600').type('html').send(html);
 
+// --------------------------------------------------- icons, manifest, OG --
+const DAY = 86400;
+const sendPng = (res, buf, maxAge = 7 * DAY) => res.set('Cache-Control', `public, max-age=${maxAge}`).type('png').send(buf);
+app.get('/favicon.svg', (_req, res) => res.set('Cache-Control', `public, max-age=${30 * DAY}`).type('image/svg+xml').send(seo.FAVICON_SVG));
+app.get('/favicon.ico', async (_req, res, next) => {
+  try { res.set('Cache-Control', `public, max-age=${30 * DAY}`).type('image/x-icon').send(await seo.faviconIco()); } catch (e) { next(e); }
+});
+const ICONS = { '/apple-touch-icon.png': [180, 3], '/icon-192.png': [192, 0], '/icon-512.png': [512, 0], '/icon-maskable-512.png': [512, 6] };
+app.get(Object.keys(ICONS), async (req, res, next) => {
+  try { sendPng(res, await seo.iconPng(...ICONS[req.path]), 30 * DAY); } catch (e) { next(e); }
+});
+app.get('/site.webmanifest', (_req, res) => res.set('Cache-Control', `public, max-age=${DAY}`).type('application/manifest+json').send(seo.manifest()));
+
+// Open Graph share image for a page: /og/png-to-webp.png. Only keys that map to a real page render.
+app.get(/^\/og\/([a-z0-9-]+)\.png$/, async (req, res, next) => {
+  const spec = pages.ogSpec(req.params[0]);
+  if (!spec) return next();
+  try { sendPng(res, await seo.ogPng(req.params[0], spec)); } catch (e) { next(e); }
+});
+
+// IndexNow (Bing, Yandex, Seznam...): set INDEXNOW_KEY and this serves the ownership file.
+if (/^[a-zA-Z0-9-]{8,128}$/.test(process.env.INDEXNOW_KEY || '')) {
+  app.get(`/${process.env.INDEXNOW_KEY}.txt`, (_req, res) => res.type('text/plain').send(process.env.INDEXNOW_KEY));
+}
+
 app.get('/', (req, res) => sendHtml(res, pages.homePage(baseOf(req))));
 app.get('/converters', (req, res) => sendHtml(res, pages.hubPage(baseOf(req))));
 
@@ -173,13 +228,17 @@ app.get(/^\/([a-z0-9-]+)-converter$/, (req, res, next) => {
 });
 
 app.get('/formats', (_req, res) => res.redirect(301, '/converters'));
+app.get(/^\/(about|privacy|terms|contact)$/, (req, res, next) => {
+  const r = pages.resolveInfo(req.params[0], baseOf(req));
+  return r ? sendHtml(res, r.html) : next();
+});
 
-app.get('/sitemap.xml', (req, res) => res.type('application/xml').send(pages.sitemap(baseOf(req))));
-app.get('/robots.txt', (req, res) => res.type('text/plain').send(pages.robots(baseOf(req))));
+app.get('/sitemap.xml', (req, res) => res.set('Cache-Control', 'public, max-age=3600').type('application/xml').send(pages.sitemap(baseOf(req))));
+app.get('/robots.txt', (req, res) => res.set('Cache-Control', 'public, max-age=3600').type('text/plain').send(pages.robots(baseOf(req))));
 
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) return next();
-  res.status(404).type('html').send(pages.notFoundPage());
+  res.status(404).type('html').send(pages.notFoundPage(baseOf(req)));
 });
 
 app.use((err, _req, res, _next) => {
