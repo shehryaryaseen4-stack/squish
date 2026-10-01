@@ -325,7 +325,7 @@ function buildConversionMap(fromIds) {
 //   outputs  choices for the Output format select
 //   any      true on home/category/format pages: files of any accepted type can be dropped, and
 //            non-image files get their own "convert to" select in the results list
-function toolHtml({ inputs, outputs, dropTitle, dropSub, any = false }) {
+function toolHtml({ inputs, outputs, dropTitle, dropSub, any = false, compress = false }) {
   const exts = [...new Set(inputs.flatMap((id) => registry.getFormat(id).extensions))];
   // extension -> category, so each file gets the right icon and "JPEG Image" / "MP4 Video" label
   const cats = {};
@@ -334,7 +334,8 @@ function toolHtml({ inputs, outputs, dropTitle, dropSub, any = false }) {
   const outs = outputs.map((id) => { const f = registry.getFormat(id); return [f.id, f.label, f.apiFormat, f.category]; });
   // CloudConvert-style flow: drop files -> one card per file ("Convert JPEG -> [PNG]", Options, x)
   // -> Convert -> each card shows FINISHED + Download; "Download all" zips every result.
-  return `<section class="tool-card" id="convert" aria-label="Upload and convert"${any ? ' data-any="1"' : ''} data-cats="${esc(JSON.stringify(cats))}" data-outputs="${esc(JSON.stringify(outs))}">
+  // compress: files keep their format; cards read "Compress [PNG]" and the button says Compress
+  return `<section class="tool-card" id="convert" aria-label="${compress ? 'Upload and compress' : 'Upload and convert'}"${any ? ' data-any="1"' : ''}${compress ? ' data-mode="compress"' : ''} data-cats="${esc(JSON.stringify(cats))}" data-outputs="${esc(JSON.stringify(outs))}">
   <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose files" data-exts="${exts.join(',')}">
     ${icon('upload', 'drop-ico')}
     <div class="cta">${dropTitle}</div>
@@ -347,7 +348,7 @@ function toolHtml({ inputs, outputs, dropTitle, dropSub, any = false }) {
     <div class="bar-actions">
       <button class="btn btn-ghost" id="addMoreBtn" type="button">${icon('upload')}Add more files</button>
       <button class="btn btn-success" id="zipBtn" type="button" hidden>${icon('download')}Download all</button>
-      <button class="btn btn-brand btn-convert" id="convertAllBtn" type="button">${icon('convert')}Convert</button>
+      <button class="btn btn-brand btn-convert" id="convertAllBtn" type="button">${compress ? `${icon('compress')}Compress` : `${icon('convert')}Convert`}</button>
     </div>
   </div>
 </section>`;
@@ -624,7 +625,7 @@ function compressPage(slug, base) {
         ? `Make your ${f.name} images smaller without fuss. Upload one file or many, set the quality and maximum size, and download the compressed versions individually or as a ZIP. No sign-up needed.`
         : `Make your ${f.name} files smaller without fuss. Upload one file or many and download the compressed versions individually or as a ZIP. Images inside are downsampled to 150 dpi. No sign-up needed.`,
       widget, withSelect: true }),
-    TOOL: toolHtml({ inputs: [slug], outputs: [slug, ...outputsFor(slug)], dropTitle: `Drop your ${f.label} files here`, dropSub: `or click to choose ${f.label} files` }),
+    TOOL: toolHtml({ inputs: [slug], outputs: [slug], compress: true, dropTitle: `Drop your ${f.label} files here`, dropSub: `or click to choose ${f.label} files` }),
     CONTENT: howToSteps(f.label, '', 'compress', isImageFmt(slug)) + `<section class="fcards" aria-label="About the format">${cardHtml(slug)}</section>` + faqHtml(faq),
     RELATED: `<section class="related"><h2>Related tools</h2>${chips([...others, ...conv])}</section>`,
   }));

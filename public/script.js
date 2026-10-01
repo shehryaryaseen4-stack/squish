@@ -165,6 +165,7 @@
   //   3. done -> FINISHED + output name + size + Download; "Download all" zips every result
   const tool = document.getElementById("convert");
   const anyMode = tool.dataset.any === "1"; // home/category pages: any file type
+  const compressMode = tool.dataset.mode === "compress"; // compress pages: same format in and out
   const fileInput = document.getElementById("fileInput");
   const fileList = document.getElementById("fileList");
   const toolBar = document.getElementById("toolBar");
@@ -336,7 +337,7 @@
   });
 
   // ------------------------------------------------------------------ rendering --
-  const BADGE = { waiting: ["WAITING", "st-wait"], uploading: ["UPLOADING", "st-busy"], converting: ["CONVERTING", "st-busy"],
+  const BADGE = { waiting: ["WAITING", "st-wait"], uploading: ["UPLOADING", "st-busy"], converting: [compressMode ? "COMPRESSING" : "CONVERTING", "st-busy"],
     finished: ["FINISHED", "st-ok"], error: ["ERROR", "st-err"] };
 
   function statusHtml(row){
@@ -344,9 +345,13 @@
     const [label, cls] = BADGE[row.state];
     let text = "";
     if (row.state === "uploading") text = `<span class="row-progress"><span style="width:${Math.round((row.progress || 0) * 100)}%"></span></span><span class="muted">${Math.round((row.progress || 0) * 100)}%</span>`;
-    else if (row.state === "converting") text = `<span class="spinner" aria-hidden="true"></span><span class="muted">Converting to ${esc(labelOf(row.target))}…</span>`;
+    else if (row.state === "converting") text = `<span class="spinner" aria-hidden="true"></span><span class="muted">${compressMode ? "Compressing…" : `Converting to ${esc(labelOf(row.target))}…`}</span>`;
     else if (row.state === "waiting") text = `<span class="muted">Waiting in queue…</span>`;
-    else if (row.state === "finished") text = `<span class="out-name">${esc(row.outName)}</span><span class="muted"> · ${fmtBytes(row.outSize)}</span>`;
+    else if (row.state === "finished") {
+      const pct = Math.round((1 - row.outSize / row.size) * 100);
+      text = `<span class="out-name">${esc(row.outName)}</span><span class="muted"> · ${fmtBytes(row.outSize)}</span>`
+        + (compressMode ? (pct > 0 ? `<span class="saved">${pct}% smaller</span>` : `<span class="muted">already well compressed</span>`) : "");
+    }
     else if (row.state === "error") text = `<span class="err-text">${esc(row.error)}</span>`;
     const action = row.state === "finished" ? `<button class="btn btn-success btn-sm dl-btn" type="button">${DL_ICON}Download</button>` : "";
     return `<div class="file-status"><span class="badge-state ${cls}">${label}</span><div class="status-text">${text}</div>${action}</div>`;
@@ -360,7 +365,15 @@
     const inLabel = row.fmt ? row.fmt.ext.toUpperCase() : "?";
     const meta = `${fmtBytes(row.size)}${row.fmt ? " · " + esc(inLabel) + " " + (KIND[inCat] || "File") : ""}`;
     let convert = "";
-    if (row.fmt && row.targets && row.targets.length){
+    if (compressMode && row.fmt && row.targets && row.targets.length){
+      // Compress: no target to pick, just "Compress [PNG]" and image options.
+      const showOptions = isImageTarget(row.target) && row.state === "ready";
+      convert = `<div class="file-convert">
+          <span class="convert-label">${COMPRESS_ICON}Compress</span>
+          <span class="fmt-pill">${fsvgHtml(inCat)}${esc(inLabel)}</span>
+          ${showOptions ? `<button class="btn btn-ghost btn-sm opt-btn" type="button" aria-expanded="${row.optionsOpen}">${OPT_ICON}Options</button>` : ""}
+        </div>`;
+    } else if (row.fmt && row.targets && row.targets.length){
       const locked = row.state !== "ready";
       const opts = row.targets.map(t => `<option value="${esc(t[0])}"${t[0] === row.target ? " selected" : ""}>${esc(t[1])}</option>`).join("");
       const showOptions = isImageTarget(row.target);
@@ -387,6 +400,7 @@
       </div>${options}${statusHtml(row)}`;
   }
   const CONVERT_ICON = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2"/><path d="M21 4v5h-5M3 20v-5h5"/></svg>';
+  const COMPRESS_ICON = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg>';
   const OPT_ICON = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>';
 
   function wireRow(el, row){
@@ -433,7 +447,7 @@
     zipBtn.hidden = done === 0;
     zipBtn.lastChild.textContent = done > 1 ? `Download all (${done})` : "Download";
     let status;
-    if (busy) status = `<span class="spinner" aria-hidden="true"></span> Converting ${busy} file${busy > 1 ? "s" : ""}…`;
+    if (busy) status = `<span class="spinner" aria-hidden="true"></span> ${compressMode ? "Compressing" : "Converting"} ${busy} file${busy > 1 ? "s" : ""}…`;
     else if (ready) status = `${ready} file${ready > 1 ? "s" : ""} ready`;
     else if (done) status = `<span class="done-check" aria-hidden="true">&#10003;</span> Done${failed ? ` &middot; ${failed} failed` : ""}`;
     else status = failed ? `${failed} file${failed > 1 ? "s" : ""} could not be converted` : "";

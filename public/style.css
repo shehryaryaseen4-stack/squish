@@ -424,3 +424,5 @@ input[type=range]{width:150px; accent-color:var(--brand);}
   .file-main .remove-btn{margin-left:auto;}
   .tool-bar{position:sticky; bottom:calc(8px + env(safe-area-inset-bottom, 0px)); z-index:5;}
 }
+
+.saved{display:inline-block; padding:2px 8px; border-radius:999px; background:rgba(30,158,90,.1); color:#1E9E5A; font-weight:700; font-size:.82rem;}
