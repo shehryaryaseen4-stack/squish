@@ -264,4 +264,9 @@ app.use((err, _req, res, _next) => {
 
 app.listen(PORT, () => {
   console.log(`Squish server listening on port ${PORT} (max ${MAX_FILE_MB}MB/file, ${MAX_FILES_PER_WINDOW} req/15min per IP)`);
+  // Say which engines are missing, so a half-installed server is obvious in the logs.
+  const stats = registry.getStats();
+  const missing = registry.getEngines().filter((e) => e.status === 'system' && !e.available);
+  console.log(`${stats.converters.live} conversions live, ${stats.compressors.live || 0} compressors live.`);
+  missing.forEach((e) => console.warn(`Engine not available: ${e.name} (missing: ${e.missingBins.join(', ')}). Its conversions are switched off.`));
 });

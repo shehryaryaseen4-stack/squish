@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # extra image formats (PSD, ICO, PPM, BMP/PSD/EPS output; HEIC/HEIF)
     imagemagick libheif-examples libheif-plugin-libde265 \
     # archives
-    libarchive-tools p7zip-full xz-utils lzip lzop ncompress \
+    libarchive-tools p7zip-full gzip bzip2 xz-utils lzip lzop ncompress \
     # DjVu
     djvulibre-bin \
     # fonts: text in share images and faithful office/PDF rendering
@@ -33,7 +33,11 @@ RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --omit=dev
+# npm can occasionally crash yet still exit 0 ("Exit handler never called"), so prove the
+# libraries the site needs are really there; otherwise the build stops here instead of
+# shipping an image whose image conversions all fail.
+RUN npm ci --omit=dev \
+  && node -e "for (const m of ['express','multer','sharp','jimp','png-to-ico','pdf-lib','wawoff2','jszip','helmet']) require(m); require('sharp')({create:{width:1,height:1,channels:3,background:'#fff'}}).png().toBuffer().then(()=>console.log('dependencies ok'))"
 
 COPY . .
 

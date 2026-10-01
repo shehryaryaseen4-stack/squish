@@ -231,11 +231,16 @@ Docker (recommended: it installs every conversion engine):
 docker build -t squish .
 docker run -p 3000:3000 --env-file .env squish
 ```
-The image is about 2 GB because of LibreOffice and Calibre, and needs a host with at least
-2 GB of RAM for document and video work. Its package list was checked against Ubuntu 24.04
-(the same packages the conversion tests ran with), but the image itself has not been built
-in this repository's CI yet, so build it once and run `npm run test:conversions` inside it
-before going live.
+The image is about 3 GB because of LibreOffice and Calibre, and needs a host with at least
+2 GB of RAM for document and video work. It was built and tested: inside the container, as
+the unprivileged `squish` user, `npm test` (100 tests) and `npm run test:conversions` (410 real
+conversions) all pass, and 16 simultaneous document/video conversions completed with every
+temp folder cleaned up. The build stops with an error if `npm ci` leaves a dependency
+missing, and the server logs at startup which engines (if any) are missing, e.g.:
+
+```
+2420 conversions live, 7 compressors live.
+```
 
 ## AdSense
 

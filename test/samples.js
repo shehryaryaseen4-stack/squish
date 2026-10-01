@@ -62,7 +62,9 @@ const MAKERS = {
   psd: async () => { fs.writeFileSync(file('p.png'), await sample('png')); sh('convert', ['p.png', 'p.psd']); return fs.readFileSync(file('p.psd')); },
   ico: () => via('png', 'ico', 'image'),
   ppm: async () => { fs.writeFileSync(file('m.png'), await sample('png')); sh('convert', ['m.png', 'm.ppm']); return fs.readFileSync(file('m.ppm')); },
-  heic: async () => { fs.writeFileSync(file('h.png'), await sample('png')); sh('heif-enc', ['-o', 'h.heic', 'h.png']); return fs.readFileSync(file('h.heic')); },
+  // Making HEIC needs an HEVC encoder, which servers do not need (they only decode), so a small
+  // real HEIC file is kept in the repo: the test then checks decoding on any machine.
+  heic: () => fs.readFileSync(path.join(__dirname, 'fixtures', 'sample.heic')),
   heif: () => sample('heic'),
   // vector
   eps: () => vec('eps'), ps: () => vec('ps'), emf: () => vec('emf'), wmf: () => vec('wmf'), dxf: () => vec('dxf'),
@@ -113,7 +115,7 @@ const MAKERS = {
   lzo: () => sh('lzop', ['-c', path.join(archiveTree(), 'readme.txt')]),
   z: () => sh('compress', ['-c', path.join(archiveTree(), 'readme.txt')]),
   cpio: () => { sh('bsdtar', ['--format', 'cpio', '-cf', 's.cpio', '-C', archiveTree(), '.']); return fs.readFileSync(file('s.cpio')); },
-  iso: () => { sh('genisoimage', ['-quiet', '-R', '-o', 's.iso', archiveTree()]); return fs.readFileSync(file('s.iso')); },
+  iso: () => { sh('bsdtar', ['--format', 'iso9660', '-cf', 's.iso', '-C', archiveTree(), '.']); return fs.readFileSync(file('s.iso')); },
   deb: () => {
     const root = file('debpkg');
     fs.mkdirSync(path.join(root, 'DEBIAN'), { recursive: true });
