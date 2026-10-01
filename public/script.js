@@ -84,11 +84,14 @@
       function fillTo(from){
         const outs = (MAP.pairs[from] || "").split(" ").filter(Boolean);
         const groups = MAP.cats.map(([id, name]) => [name, outs.filter(o => MAP.fmts[o][1].includes(id))]).filter(g => g[1].length);
+        // Open on the first tab that has a working conversion (e.g. Image for PNG), not just the first tab.
+        let act = groups.findIndex(g => g[1].some(o => live.has(from + ">" + o)));
+        if (act < 0) act = 0;
         const panel = toMenu.querySelector(".fmt-panel");
         panel.querySelector(".fmt-cats").innerHTML = groups.map(([name], i) =>
-          '<li><button type="button" class="fmt-cat' + (i ? '' : ' is-active') + '" data-cat="' + i + '">' + esc(name) + '<span class="fmt-arrow" aria-hidden="true">&rsaquo;</span></button></li>').join("");
+          '<li><button type="button" class="fmt-cat' + (i === act ? ' is-active' : '') + '" data-cat="' + i + '">' + esc(name) + '<span class="fmt-arrow" aria-hidden="true">&rsaquo;</span></button></li>').join("");
         panel.querySelector(".fmt-grids").innerHTML = groups.map(([name, list], i) =>
-          '<div class="fmt-grid' + (i ? '' : ' is-active') + '" data-cat="' + i + '" aria-label="' + esc(name) + '">' + list.map(o => {
+          '<div class="fmt-grid' + (i === act ? ' is-active' : '') + '" data-cat="' + i + '" aria-label="' + esc(name) + '">' + list.map(o => {
             const ok = live.has(from + ">" + o);
             const f = MAP.fmts[o];
             return '<a class="fmt-btn' + (ok ? ' is-live' : '') + '" href="' + routeOf(from, o) + '" data-name="' + esc((f[0] + " " + f[2]).toLowerCase()) + '"' + (ok ? '' : ' title="Coming soon"') + '>' + esc(f[0]) + '</a>';

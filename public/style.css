@@ -17,6 +17,7 @@
     --menu-bg:#20242A; --menu-side:#1A1D22; --menu-hover:#2A2F36; --btn-bg:#2A2E35;
     --shadow:0 10px 30px rgba(0,0,0,.35); --shadow-lg:0 18px 48px rgba(0,0,0,.5);
     --hero-bg:linear-gradient(180deg,#1B1E23 0%,#15171B 100%);
+    color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
@@ -26,6 +27,7 @@
   --menu-bg:#20242A; --menu-side:#1A1D22; --menu-hover:#2A2F36; --btn-bg:#2A2E35;
   --shadow:0 10px 30px rgba(0,0,0,.35); --shadow-lg:0 18px 48px rgba(0,0,0,.5);
   --hero-bg:linear-gradient(180deg,#1B1E23 0%,#15171B 100%);
+  color-scheme:dark;
 }
 *{box-sizing:border-box;}
 html{scroll-behavior:smooth;}

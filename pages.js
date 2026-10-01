@@ -133,7 +133,9 @@ function fmtButton({ id, href, text, live, current, dataFmt }) {
 }
 
 function pickerPanel(groups, { current, extraClass = '', dataFmt = false, heads = false } = {}) {
+  // Open on the current format's tab, else the first tab with a working conversion.
   let active = groups.findIndex(([, , items]) => items.some((it) => it.id === current));
+  if (active < 0) active = groups.findIndex(([, , items]) => items.some((it) => it.live));
   if (active < 0) active = 0;
   const cats = groups.map(([, name], i) =>
     `<li><button type="button" class="fmt-cat${i === active ? ' is-active' : ''}" data-cat="${i}">${name}<span class="fmt-arrow" aria-hidden="true">&rsaquo;</span></button></li>`).join('');
