@@ -65,7 +65,7 @@ function headTags({ url, title, desc, image, noindex, type = 'website' }) {
     `<meta name="twitter:description" content="${desc}">`,
     `<meta name="twitter:image" content="${image}">`,
     process.env.TWITTER_SITE ? `<meta name="twitter:site" content="${esc(process.env.TWITTER_SITE)}">` : '',
-    `<meta name="theme-color" content="${BRAND}">`,
+    '<meta name="theme-color" content="#2B2D33">',
     `<meta name="application-name" content="${esc(SITE)}">`,
     `<meta name="apple-mobile-web-app-title" content="${esc(SITE)}">`,
     '<meta name="format-detection" content="telephone=no">',
@@ -152,7 +152,7 @@ const manifest = () => JSON.stringify({
   scope: '/',
   display: 'standalone',
   background_color: '#FFFFFF',
-  theme_color: BRAND,
+  theme_color: '#2B2D33',
   icons: [
     { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
     { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },

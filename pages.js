@@ -183,7 +183,6 @@ function topbar() {
       <a class="nav-item nav-link" href="/converters">Formats</a>
     </nav>
     <div class="top-actions">
-      <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
       <a class="btn btn-brand btn-sm" href="/#convert">Convert now</a>
     </div>
   </div></header>`;
@@ -731,7 +730,7 @@ const INFO_PAGES = {
       <h2>Data we process</h2>
       <p>Like every website, our server receives your IP address and basic request information (browser type, the page requested). We use your IP address only to apply a rate limit that protects the service from abuse; it is held in memory for up to 15 minutes.</p>
       <h2>Cookies and local storage</h2>
-      <p>${SITE} itself sets no cookies. Your light/dark theme choice is stored in your browser's local storage and never sent to us.</p>
+      <p>${SITE} itself sets no cookies and stores nothing in your browser.</p>
       <h2>Advertising</h2>
       <p>If advertising is shown, it is provided by Google AdSense. Google and its partners may use cookies to show ads based on your visits to this and other websites. You can opt out of personalised advertising at <a href="https://adssettings.google.com/" rel="noopener">Google Ads Settings</a>. See <a href="https://policies.google.com/technologies/partner-sites" rel="noopener">how Google uses information from sites that use its services</a>.</p>
       <h2>Third-party services</h2>
