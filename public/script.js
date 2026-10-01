@@ -69,8 +69,12 @@
 
   // Show a format (icon + label) in a picker chip.
   function setChip(chip, id){
-    const ico = chip.querySelector(".ficon");
-    if (ico) ico.className = "ficon ficon-xs fi-" + (id ? primaryCat(id) : "none");
+    const ico = chip.querySelector(".fsvg");
+    if (ico){
+      const cat = id ? primaryCat(id) : "none";
+      ico.setAttribute("class", "fsvg fi-" + cat);
+      ico.querySelector("use").setAttribute("href", "#fi-" + cat);
+    }
     chip.querySelector(".chip-label").textContent = id ? MAP.fmts[id][0] : "...";
     chip.classList.toggle("chip-empty", !id);
   }
@@ -96,7 +100,7 @@
           const ok = LIVE.has(from + ">" + o);
           const f = MAP.fmts[o];
           return '<a class="fmt-btn' + (ok ? ' is-live' : '') + '" href="' + routeOf(from, o) + '" data-name="' + esc((f[0] + " " + f[2]).toLowerCase()) + '"' + (ok ? '' : ' title="Coming soon"') + '>'
-            + '<i class="ficon ficon-xs fi-' + primaryCat(o) + '" aria-hidden="true"></i>' + esc(f[0]) + '</a>';
+            + '<svg class="fsvg fi-' + primaryCat(o) + '" aria-hidden="true"><use href="#fi-' + primaryCat(o) + '"/></svg>' + esc(f[0]) + '</a>';
         }).join("") + '</div>').join("") + '<p class="fmt-none">No format found</p>' + (groups.length ? '' : '<p class="fmt-hint">No conversions for this format yet.</p>');
       setChip(toMenu.querySelector(".chip"), null);
     }

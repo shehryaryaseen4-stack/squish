@@ -124,6 +124,30 @@ const ficon = (id, size = 'sm') => {
   return `<i class="ficon ficon-${size} fi-${f.category}" aria-hidden="true">${size === 'xs' ? '' : `<b>${f.label}</b>`}</i>`;
 };
 
+// Category file icons as one SVG sprite per page (see topbar()); each use is a tiny <use>.
+// A page with a folded corner in the category colour and a white symbol that says what it is.
+const PAGE = '<path d="M3 1h12l6 6v19a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z" fill="currentColor"/><path d="M15 1v5a1 1 0 0 0 1 1h5z" fill="#fff" opacity=".45"/>';
+const GLYPHS = {
+  image: '<circle cx="8.5" cy="12" r="1.8" fill="#fff"/><path d="M5 22l4.5-5 3 3 3.5-4.5L19 22z" fill="#fff"/>',
+  video: '<path d="M9 12.2v8.6a.6.6 0 0 0 .9.5l7-4.3a.6.6 0 0 0 0-1l-7-4.3a.6.6 0 0 0-.9.5z" fill="#fff"/>',
+  audio: '<path d="M10 20.5V12l7-1.6v8" fill="none" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/><circle cx="8.6" cy="20.6" r="1.9" fill="#fff"/><circle cx="15.6" cy="18.8" r="1.9" fill="#fff"/>',
+  document: '<path d="M6 12h12M6 15.5h12M6 19h12M6 22.5h8" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>',
+  pdf: '<path d="M7.5 22.5c2.2-3.6 4-7.6 4.6-11 .3-1.6-1.5-1.8-1.5-.2 0 3.2 3.8 7.4 7.2 8.4 1.5.4 1.7-1.2.2-1.3-3.4-.3-7.6 1.4-10 4.1-.9 1 .2 1.6 1.5 0" fill="none" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/>',
+  spreadsheet: '<rect x="5.5" y="11" width="13" height="12" rx="1" fill="none" stroke="#fff" stroke-width="1.5"/><path d="M5.5 15h13M5.5 19h13M10 11v12" stroke="#fff" stroke-width="1.5"/>',
+  presentation: '<rect x="5" y="11" width="14" height="9" rx="1" fill="none" stroke="#fff" stroke-width="1.5"/><path d="M8.5 17.5l2.5-2.5 2 1.6 3-3.4M12 20v3M9.5 23h5" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
+  archive: '<path d="M11 3h2v2h-2zM13 5h2v2h-2zM11 7h2v2h-2zM13 9h2v2h-2zM11 11h2v2h-2z" fill="#fff"/><rect x="10" y="14" width="6" height="7" rx="1" fill="none" stroke="#fff" stroke-width="1.5"/><path d="M12 17.5h2" stroke="#fff" stroke-width="1.5"/>',
+  ebook: '<path d="M12 13.2c-1.8-1.3-4-1.6-6.5-1.2v10c2.5-.4 4.7-.1 6.5 1.2 1.8-1.3 4-1.6 6.5-1.2V12c-2.5-.4-4.7-.1-6.5 1.2zM12 13.2v10" fill="none" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>',
+  font: '<path d="M7 23l5-12 5 12M8.8 19h6.4" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>',
+  vector: '<path d="M6 21c2-6 10-6 12-9" fill="none" stroke="#fff" stroke-width="1.5"/><rect x="4.5" y="19.5" width="3" height="3" fill="#fff"/><rect x="16.5" y="10.5" width="3" height="3" fill="#fff"/><circle cx="12" cy="16.5" r="1.4" fill="#fff"/>',
+  cad: '<path d="M6 23V12l11 11z" fill="none" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><path d="M8.5 20.5v-3l3 3z" fill="#fff"/>',
+  none: '',
+};
+const SPRITE = `<svg width="0" height="0" style="position:absolute" aria-hidden="true">${Object.entries(GLYPHS).map(([k, g]) =>
+  `<symbol id="fi-${k}" viewBox="0 0 24 28">${PAGE}${g}</symbol>`).join('')}</svg>`;
+// Small category icon (pickers, menus): coloured by .fi-<category>.
+const fsvg = (cat) => `<svg class="fsvg fi-${cat}" aria-hidden="true"><use href="#fi-${cat}"/></svg>`;
+const fsvgFor = (id) => fsvg(registry.getFormat(id).category);
+
 const SEARCH_ICON = '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="2"/><path d="M13 13l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 
 // --------------------------------------------------------- format pickers --
@@ -141,7 +165,7 @@ function fmtButton({ id, href, text, live, current, dataFmt }) {
   const name = `${(text || f.label)} ${f.name} ${f.full}`.toLowerCase();
   return `<a class="fmt-btn${live ? ' is-live' : ''}" href="${href}" data-name="${esc(name)}"`
     + `${dataFmt ? ` data-fmt="${id}"` : ''}${current ? ' aria-current="true"' : ''}`
-    + `${live ? '' : ' title="Coming soon"'}>${ficon(id, 'xs')}${text || f.label}</a>`;
+    + `${live ? '' : ' title="Coming soon"'}>${fsvgFor(id)}${text || f.label}</a>`;
 }
 
 function pickerPanel(groups, { current, extraClass = '', dataFmt = false, heads = false } = {}) {
@@ -160,7 +184,7 @@ function pickerPanel(groups, { current, extraClass = '', dataFmt = false, heads 
 }
 
 function picker(label, groups, { current, align = '', role = '', dataFmt = false, placeholder = false } = {}) {
-  const chipIcon = current && !placeholder ? ficon(current, 'xs') : '<i class="ficon ficon-xs fi-none" aria-hidden="true"></i>';
+  const chipIcon = current && !placeholder ? fsvgFor(current) : fsvg('none');
   return `<details class="chip-menu" data-menu${role ? ` data-role="${role}"` : ''}>`
     + `<summary class="chip${placeholder ? ' chip-empty' : ''}" aria-label="Choose format${placeholder ? '' : ` (currently ${label})`}">${chipIcon}<span class="chip-label">${label}</span><span class="caret" aria-hidden="true"></span></summary>`
     + pickerPanel(groups, { current, extraClass: align, dataFmt }) + '</details>';
@@ -187,7 +211,7 @@ function topbar() {
   const convertList = CATS.map((c) =>
     `<li><a href="${categoryPath(c.id)}">${icon(c.icon)}${c.converterName}${categoryIsLive(c.id) ? '' : ' <span class="soon-tag">soon</span>'}</a></li>`).join('');
 
-  topbarCache = `<header class="top"><div class="top-row">
+  topbarCache = `${SPRITE}<header class="top"><div class="top-row">
     <a class="brand" href="/">${BRAND_SVG}<span>${SITE}</span></a>
     <nav class="main-nav" aria-label="Main">
       <details class="nav-menu" data-menu><summary class="nav-item">Tools<span class="caret" aria-hidden="true"></span></summary>${mega}</details>
@@ -263,7 +287,7 @@ function anyInputPicker(ids, current) {
 }
 
 const emptyToPicker = () =>
-  `<details class="chip-menu" data-menu data-role="to"><summary class="chip chip-empty" aria-label="Choose output format"><i class="ficon ficon-xs fi-none" aria-hidden="true"></i><span class="chip-label">...</span><span class="caret" aria-hidden="true"></span></summary>`
+  `<details class="chip-menu" data-menu data-role="to"><summary class="chip chip-empty" aria-label="Choose output format">${fsvg('none')}<span class="chip-label">...</span><span class="caret" aria-hidden="true"></span></summary>`
   + `<div class="fmt-panel fmt-right"><label class="fmt-search">${SEARCH_ICON}<input type="search" class="fmt-q" placeholder="Search Format" autocomplete="off" aria-label="Search format"></label>`
   + '<div class="fmt-body"><ul class="fmt-cats"></ul><div class="fmt-grids"><p class="fmt-hint">Choose the input format first.</p><p class="fmt-none">No format found</p></div></div></div></details>';
 
@@ -473,7 +497,7 @@ function categoryCards() {
 
 function popularCards() {
   return `<section class="pop-section"><h2 class="section-title">Popular conversions</h2><div class="pop-grid">${POPULAR.map(([f, t]) =>
-    `<a class="pop-card" href="${pairPath(f, t)}"><span class="pop-icons">${ficon(f, 'md')}<span class="pop-arrow" aria-hidden="true">&rarr;</span>${ficon(t, 'md')}</span><span class="pop-text">${F(f).label} to ${F(t).label}</span></a>`).join('')}</div></section>`;
+    `<a class="pop-card" href="${pairPath(f, t)}"><span class="pop-fmt">${F(f).label}</span><span class="pop-arrow" aria-hidden="true">&rarr;</span><span class="pop-fmt pop-to">${F(t).label}</span></a>`).join('')}</div></section>`;
 }
 
 // ------------------------------------------------------------- page makers --
