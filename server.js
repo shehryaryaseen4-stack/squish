@@ -1,4 +1,4 @@
-// Squish — server-side image compressor.
+// FlipFree — free online file converter and compressor.
 // One job: accept ONE image at a time, compress/convert it, return the bytes.
 // The frontend (public/script.js) loops over selected files and calls this
 // once per file, then optionally bundles the results into a zip in-browser.
@@ -266,7 +266,7 @@ app.use((err, _req, res, _next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Squish server listening on port ${PORT} (max ${MAX_FILE_MB}MB/file, ${MAX_FILES_PER_WINDOW} req/15min per IP)`);
+  console.log(`FlipFree server listening on port ${PORT} (max ${MAX_FILE_MB}MB/file, ${MAX_FILES_PER_WINDOW} req/15min per IP)`);
   // Say which engines are missing, so a half-installed server is obvious in the logs.
   const stats = registry.getStats();
   const missing = registry.getEngines().filter((e) => e.status === 'system' && !e.available);

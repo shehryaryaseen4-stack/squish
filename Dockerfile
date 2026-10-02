@@ -1,4 +1,4 @@
-# Squish with every conversion engine installed.
+# FlipFree with every conversion engine installed.
 # Ubuntu 24.04 is used because its package names are the ones the conversion tests were run
 # against; Node comes from the official Node image. The result is large (~2 GB) because of
 # LibreOffice and Calibre. To leave an engine out, delete its packages below: the site

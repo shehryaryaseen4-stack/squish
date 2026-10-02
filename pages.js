@@ -25,7 +25,7 @@ const path = require('path');
 const registry = require('./registry');
 const seo = require('./seo');
 
-const SITE = process.env.SITE_NAME || 'Squish';
+const SITE = process.env.SITE_NAME || 'FlipFree';
 const CONTACT_EMAIL = process.env.CONTACT_EMAIL || '';
 const MAX_MB = Number(process.env.MAX_FILE_MB || 40);
 
@@ -90,7 +90,12 @@ const chips = (items) => `<ul class="chips">${items.map(([h, t, live]) =>
   `<li>${link(h, t + (live === false ? ' <span class="soon-tag">soon</span>' : ''))}</li>`).join('')}</ul>`;
 const pairLabel = (f, t) => `${F(f).label} to ${F(t).label}`;
 
-const BRAND_SVG = `<svg class="brand-mark" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M9.5 25a6.5 6.5 0 0 1-1.1-12.9A8.5 8.5 0 0 1 24.6 11 7 7 0 0 1 23.5 25h-14Z" fill="var(--brand)"/><path d="M12 18.5h8m-3-3 3 3-3 3" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+// Logo: a page between two flip arrows on a red tile, then the name with "Free" in red.
+const RED = '#E5322D';
+const BRAND_SVG = `<svg class="brand-mark" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="8" fill="${RED}"/><path d="M12.6 10h4.6l2.8 2.8v8.6a.7.7 0 0 1-.7.7h-6.7a.7.7 0 0 1-.7-.7V10.7a.7.7 0 0 1 .7-.7z" fill="#fff"/><path d="M17.2 10v2.8H20" fill="none" stroke="${RED}" stroke-width="1.1" stroke-linejoin="round"/><g fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 14.2A9.6 9.6 0 0 1 12.4 6.6M9.4 5.6l3.4.9-.9 3.4M25.5 17.8A9.6 9.6 0 0 1 19.6 25.4M22.6 26.4l-3.4-.9.9-3.4"/></g></svg>`;
+// A name ending in "Free" shows that word in brand red so it is the first thing people read.
+const brandName = (name) => (/.Free$/.test(name) ? `${esc(name.slice(0, -4))}<b class="brand-free">Free</b>` : esc(name));
+const BRAND_LINK = `<a class="brand" href="/">${BRAND_SVG}<span class="brand-name">${brandName(SITE)}</span></a>`;
 
 // Small line icons per category (and a few UI icons). currentColor so they follow the theme.
 const ICON_PATHS = {
@@ -213,7 +218,7 @@ function topbar() {
     `<li><a href="${categoryPath(c.id)}">${icon(c.icon)}${c.converterName}${categoryIsLive(c.id) ? '' : ' <span class="soon-tag">soon</span>'}</a></li>`).join('');
 
   topbarCache = `${SPRITE}<header class="top"><div class="top-row">
-    <a class="brand" href="/">${BRAND_SVG}<span>${SITE}</span></a>
+    ${BRAND_LINK}
     <nav class="main-nav" aria-label="Main">
       <details class="nav-menu" data-menu><summary class="nav-item">Tools<span class="caret" aria-hidden="true"></span></summary>${mega}</details>
       <details class="nav-menu nav-simple" data-menu><summary class="nav-item">Convert<span class="caret" aria-hidden="true"></span></summary><div class="dropdown"><ul>${convertList}</ul></div></details>
@@ -232,7 +237,7 @@ function footer() {
   const cats = CATS.map((c) => `<li>${link(categoryPath(c.id), c.converterName)}</li>`).join('');
   const comp = COMPRESSIBLE.map((s) => `<li>${link(compressPath(s), `Compress ${F(s).label}`)}</li>`).join('');
   return `<footer class="site-footer"><div class="footer-inner">
-    <div class="footer-brand"><a class="brand" href="/">${BRAND_SVG}<span>${SITE}</span></a>
+    <div class="footer-brand">${BRAND_LINK}
       <p>Free online file converter. ${LIVE_COUNT.toLocaleString('en-US')} conversions across ${LIVE_CAT_NAMES.length} categories, free and without sign-up.</p></div>
     <div><h4>Converters</h4><ul>${cats}</ul></div>
     <div><h4>Popular</h4><ul>${pop}</ul></div>
@@ -258,7 +263,8 @@ function hero({ h1, intro, widget, withSelect, short, crumbs }) {
     ${breadcrumbs(crumbs)}
     <h1>${h1}</h1>
     <p class="hero-text">${intro}</p>
-    ${widget || select ? `<div class="converter-box">${widget || ''}${select}</div>` : ''}
+    ${widget || select ? `<div class="converter-box">${widget || ''}${select}</div>
+    <ul class="hero-free"><li>100% free</li><li>No sign-up</li><li>No watermark</li><li>Files deleted after conversion</li></ul>` : ''}
   </div></section>`;
 }
 

@@ -1,5 +1,5 @@
 {
-  "name": "squish-server",
+  "name": "flipfree",
   "version": "1.0.0",
   "description": "Free online file converter: images, video, audio, documents, ebooks, archives and fonts, using open-source engines (Sharp, FFmpeg, LibreOffice, Pandoc, Calibre, Ghostscript, Inkscape).",
   "main": "server.js",

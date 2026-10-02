@@ -1,4 +1,4 @@
-/* Squish - CloudConvert-style layout: dark grey header and hero banner with a
+/* FlipFree - CloudConvert-style layout: dark grey header and hero banner with a
    "convert [X] to [Y]" box and a red Select File button, light content and card grids below.
    Single light theme (no dark mode). */
 :root{
@@ -38,7 +38,13 @@ a{color:inherit;}
 .top-row{max-width:1180px; margin:0 auto; padding:0 20px; height:64px; display:flex; align-items:center; gap:28px;}
 .brand{display:flex; align-items:center; gap:9px; font-weight:800; font-size:1.3rem; color:var(--ink); text-decoration:none; letter-spacing:-.01em;}
 .top .brand{color:var(--band-ink);}
-.brand-mark{width:34px; height:34px;}
+.brand-mark{width:34px; height:34px; flex-shrink:0;}
+.brand-name{font-size:1.4rem; letter-spacing:-.02em;}
+.brand-free{color:var(--brand); font-weight:800;}
+.top .brand-free{color:#FF5049;}
+.hero-free{display:flex; flex-wrap:wrap; justify-content:center; gap:6px 20px; list-style:none; margin:18px 0 0; padding:0; font-size:.92rem; color:var(--band-ink); opacity:.88;}
+.hero-free li::before{content:"\2713"; color:#4ADE80; font-weight:800; margin-right:6px;}
+.hero-free li:first-child{font-weight:800; opacity:1;}
 .main-nav{display:flex; align-items:center; gap:4px; flex:1;}
 .nav-item{display:flex; align-items:center; gap:6px; padding:9px 12px; border-radius:var(--radius); font-weight:600; font-size:1rem; color:var(--band-ink); text-decoration:none; cursor:pointer; list-style:none; user-select:none;}
 .nav-item:hover, .nav-menu[open] > .nav-item{background:var(--band-hover);}
