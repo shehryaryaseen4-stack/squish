@@ -11,6 +11,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const brand = require('./brand');
 
 const SITE = process.env.SITE_NAME || 'FlipFree';
 const BRAND = '#E5322D';
@@ -80,10 +81,9 @@ function headTags({ url, title, desc, image, noindex, type = 'website' }) {
 }
 
 // --------------------------------------------------------------- brand icon --
-// Logo mark (same as the header logo in pages.js). With pad the red fills the whole square,
-// which maskable app icons need; without it the tile has rounded corners.
-const RED = BRAND;
-const MARK = `<path d="M12.6 10h4.6l2.8 2.8v8.6a.7.7 0 0 1-.7.7h-6.7a.7.7 0 0 1-.7-.7V10.7a.7.7 0 0 1 .7-.7z" fill="#fff"/><path d="M17.2 10v2.8H20" fill="none" stroke="${RED}" stroke-width="1.1" stroke-linejoin="round"/><g fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 14.2A9.6 9.6 0 0 1 12.4 6.6M9.4 5.6l3.4.9-.9 3.4M25.5 17.8A9.6 9.6 0 0 1 19.6 25.4M22.6 26.4l-3.4-.9.9-3.4"/></g>`;
+// Logo mark from brand.js. With pad the red fills the whole square, which maskable app icons
+// need; without it the tile has rounded corners.
+const { MARK } = brand;
 const ICON_SVG = (size, pad = 0) => `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="${-pad} ${-pad} ${32 + pad * 2} ${32 + pad * 2}">`
   + (pad ? `<rect x="${-pad}" y="${-pad}" width="${32 + pad * 2}" height="${32 + pad * 2}" fill="${BRAND}"/>`
     : `<rect x="1" y="1" width="30" height="30" rx="8" fill="${BRAND}"/>`)
@@ -116,8 +116,8 @@ function ogSvg({ title, subtitle, from, to }) {
   ${from ? badge(80, from, '#F1F2F4', '#23262D') + `<path d="M380 205h70m-24-26 26 26-26 26" stroke="#9AA0AA" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` + badge(480, to, BRAND, '#FFFFFF') : ''}
   ${lines.map((l, i) => `<text x="80" y="${titleY + i * 78}" font-size="68" font-weight="800" fill="#23262D" font-family="DejaVu Sans, Arial, sans-serif">${esc(l)}</text>`).join('')}
   <text x="80" y="${titleY + lines.length * 78 + 10}" font-size="32" fill="#6B7079" font-family="DejaVu Sans, Arial, sans-serif">${esc(subtitle || '')}</text>
-  <g transform="translate(80 518) scale(2.2)"><rect x="1" y="1" width="30" height="30" rx="8" fill="${BRAND}"/>${MARK}</g>
-  <text x="166" y="572" font-size="40" font-weight="800" fill="#23262D" font-family="DejaVu Sans, Arial, sans-serif">${/.Free$/.test(SITE) ? `${esc(SITE.slice(0, -4))}<tspan fill="${BRAND}">Free</tspan>` : esc(SITE)}</text>
+  ${SITE === 'FlipFree' ? `<g transform="translate(80 512) scale(1.8)">${brand.logoInner()}</g>`
+    : `<g transform="translate(80 518) scale(2.2)">${brand.TILE}${MARK}</g><text x="166" y="572" font-size="40" font-weight="700" fill="#23262D" font-family="DejaVu Sans, Arial, sans-serif">${esc(SITE)}</text>`}
   <text x="1120" y="572" font-size="28" text-anchor="end" fill="#6B7079" font-family="DejaVu Sans, Arial, sans-serif">100% free &#183; No sign-up &#183; No watermark</text>
 </svg>`;
 }

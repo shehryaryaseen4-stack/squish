@@ -36,12 +36,14 @@ a{color:inherit;}
 /* ----------------------------------------------------------------- header -- */
 .top{position:sticky; top:0; z-index:40; background:var(--band); border-bottom:1px solid var(--band-line);}
 .top-row{max-width:1180px; margin:0 auto; padding:0 20px; height:64px; display:flex; align-items:center; gap:28px;}
-.brand{display:flex; align-items:center; gap:9px; font-weight:800; font-size:1.3rem; color:var(--ink); text-decoration:none; letter-spacing:-.01em;}
+.brand{display:flex; align-items:center; gap:10px; font-weight:600; font-size:1.3rem; color:var(--ink); text-decoration:none; letter-spacing:.03em;}
 .top .brand{color:var(--band-ink);}
+.brand-logo{display:block; height:38px; width:auto;}
 .brand-mark{width:34px; height:34px; flex-shrink:0;}
-.brand-name{font-size:1.4rem; letter-spacing:-.02em;}
-.brand-free{color:var(--brand); font-weight:800;}
+.brand-name{font-size:1.35rem;}
+.brand-free{color:var(--brand); font-weight:600;}
 .top .brand-free{color:#FF5049;}
+.top .logo-free{fill:#FF5049;}
 .hero-free{display:flex; flex-wrap:wrap; justify-content:center; gap:6px 20px; list-style:none; margin:18px 0 0; padding:0; font-size:.92rem; color:var(--band-ink); opacity:.88;}
 .hero-free li::before{content:"\2713"; color:#4ADE80; font-weight:800; margin-right:6px;}
 .hero-free li:first-child{font-weight:800; opacity:1;}
