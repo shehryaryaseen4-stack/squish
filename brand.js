@@ -5,12 +5,10 @@
 
 const RED = '#E5322D';
 
-// Icon: a page between two thin flip arrows on a red rounded tile (32x32 units).
+// Icon: two arrows turning in a circle (convert) around a picture, white on a red rounded
+// tile (32x32 units).
 const TILE = `<rect x="1" y="1" width="30" height="30" rx="8" fill="${RED}"/>`;
-const MARK = '<path d="M12.9 11h3.9l2.3 2.3v7.2a.6.6 0 0 1-.6.6h-5.6a.6.6 0 0 1-.6-.6V11.6a.6.6 0 0 1 .6-.6z" fill="#fff"/>'
-  + `<path d="M16.8 11v2.3h2.3" fill="none" stroke="${RED}" stroke-width=".9" stroke-linejoin="round"/>`
-  + '<g fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'
-  + '<path d="M7 16.5A9 9 0 0 1 15 7.1M13.2 5.3l1.9 1.8-1.9 1.9M25 15.5A9 9 0 0 1 17 24.9M18.8 26.7l-1.9-1.8 1.9-1.9"/></g>';
+const MARK = `<path d="M6.92 18.43A9.4 9.4 0 0 1 20.7 7.86M25.08 13.57A9.4 9.4 0 0 1 11.3 24.14" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M23.34 10.13L21.95 5.69L19.45 10.02zM8.66 21.87L10.05 26.31L12.55 21.98z" fill="#fff" stroke="#fff" stroke-width=".6" stroke-linejoin="round"/><rect x="11" y="12" width="10" height="8" rx="1.4" fill="#fff"/><path d="M12.4 18.6l2.6-3 1.8 2 1.3-1.4 2.5 2.4z" fill="${RED}"/><circle cx="18.4" cy="14.3" r="1" fill="${RED}"/>`;
 
 // "Flip" and "Free" outlines, baseline at y=28, both starting at x=0.
 const FLIP = 'M1.9,28V9.08H14.02V11.94H5.29v5.67h7.87v2.82H5.29V28ZM21.14,9.08V28H17.84V9.08ZM25.44,28V13.81h3.3V28Zm1.65-16.2q-0.79,0-1.36-0.53-0.56-0.53-0.56-1.27 0-0.76 0.56-1.28 0.57-0.53 1.36-0.53 0.8,0 1.36,0.53 0.57,0.52 0.57,1.27 0,0.75-0.57,1.28-0.56,0.53-1.36,0.53zM33.05,33.31v-19.5h3.22v2.35h0.22q0.25-0.51 0.72-1.09 0.47-0.58 1.27-1 0.81-0.43 2.07-0.43 1.65,0 2.97,0.84 1.32,0.84 2.09,2.48 0.79,1.63 0.79,3.99 0,2.34-0.76,3.97-0.76,1.64-2.09,2.5-1.32,0.85-3.01,0.85-1.21,0-2.02-0.41-0.81-0.42-1.29-1-0.48-0.58-0.74-1.09h-0.14v7.55zm6.6-7.77q1.1,0 1.85-0.6 0.75-0.61 1.13-1.65 0.38-1.05 0.38-2.37 0-1.32-0.38-2.35-0.37-1.04-1.12-1.63-0.75-0.6-1.87-0.6-1.09,0-1.84,0.57-0.75,0.57-1.14,1.6-0.38,1.02-0.38,2.4 0,1.38 0.38,2.42 0.39,1.04 1.14,1.63 0.76,0.57 1.84,0.57z';
