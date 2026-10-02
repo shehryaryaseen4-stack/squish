@@ -83,7 +83,10 @@
   // Without JS the input buttons are plain links to the format page, which renders the same picker.
   const fromMenu = document.querySelector('details[data-role="from"]');
   const toMenu = document.querySelector('details[data-role="to"]');
-  let chosenFrom = null;
+  // Format pages (/png-converter) arrive with the input already chosen.
+  const curFrom = fromMenu && fromMenu.querySelector(".fmt-btn[data-fmt][aria-current]");
+  let chosenFrom = curFrom ? curFrom.dataset.fmt : null;
+  let chosenTo = null; // set by the output picker on pages with the upload tool
   const routeOf = (f, t) => "/" + f + "-to-" + t;
   if (MAP && fromMenu && toMenu){
     function fillTo(from){
@@ -112,6 +115,7 @@
       fromMenu.querySelectorAll(".fmt-btn[aria-current]").forEach(x => x.removeAttribute("aria-current"));
       b.setAttribute("aria-current", "true");
       chosenFrom = b.dataset.fmt;
+      chosenTo = null;
       setChip(fromMenu.querySelector(".chip"), chosenFrom);
       fromMenu.removeAttribute("open");
       fillTo(chosenFrom);
@@ -126,7 +130,7 @@
   let rotTimer = null;
   function stopRotator(){
     if (rotTimer){ clearInterval(rotTimer); rotTimer = null; }
-    [fromMenu, toMenu].forEach(m => { if (m && !chosenFrom) { const c = m.querySelector(".chip"); c.classList.remove("is-rotating"); setChip(c, null); } });
+    [fromMenu, toMenu].forEach(m => { if (m && !chosenFrom) { const c = m.querySelector(".chip"); c.classList.remove("is-rotating", "swap-out", "swap-in"); setChip(c, null); } });
   }
   if (MAP && fromMenu && toMenu && fromMenu.querySelector(".chip-empty") && !reduceMotion){
     const pairs = (MAP.rotate || []).filter(([f, t]) => MAP.fmts[f] && MAP.fmts[t] && LIVE.has(f + ">" + t));
@@ -138,6 +142,7 @@
         chips.forEach((c, k) => {
           c.classList.add("swap-out");
           setTimeout(() => {
+            if (!rotTimer) return; // stopped while this swap was pending
             setChip(c, k ? t : f); c.classList.add("is-rotating");
             c.classList.remove("swap-out"); c.classList.add("swap-in");
             requestAnimationFrame(() => requestAnimationFrame(() => c.classList.remove("swap-in")));
@@ -227,7 +232,7 @@
         if (!row.targets.length){ row.state = "error"; row.error = "This file type can't be converted yet."; }
         else {
           const pref = (PREFERRED[catOfExt(fmt.ext)] || []).map(id => row.targets.find(t => t[0] === id && id !== fmt.id)).find(Boolean);
-          const pick = row.targets.find(t => t[2] === defFmt) || pref || row.targets.find(t => t[0] !== fmt.id) || row.targets[0];
+          const pick = (chosenTo && row.targets.find(t => t[0] === chosenTo)) || row.targets.find(t => t[2] === defFmt) || pref || row.targets.find(t => t[0] !== fmt.id) || row.targets[0];
           row.target = pick[0];
         }
       }
@@ -249,6 +254,38 @@
     fileInput.value = "";
     if (rows.length) tool.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
   });
+
+  // Choosing the output in the banner picker stays on this page (no reload, no jump): the chip
+  // shows the choice, the URL and heading become "X to Y", and files added now (and cards not
+  // converted yet) default to that output. Pairs that aren't live still open their own page.
+  const pageFrom = (location.pathname.match(/^\/(.+?)-to-/) || [])[1] || null;
+  if (toMenu){
+    toMenu.addEventListener("click", e => {
+      const b = e.target.closest("a.fmt-btn");
+      const m = b && /(?:^\/|#)([a-z0-9-]+?)-to-([a-z0-9-]+)$/.exec(b.getAttribute("href") || "");
+      if (!m) return;
+      const [, from, to] = m;
+      const usable = anyMode ? from === chosenFrom && LIVE.has(from + ">" + to)
+        : from === (pageFrom || chosenFrom) && OUTS.some(o => o[0] === to);
+      if (!usable) return;
+      e.preventDefault();
+      chosenTo = to;
+      toMenu.querySelectorAll(".fmt-btn[aria-current]").forEach(x => x.removeAttribute("aria-current"));
+      b.setAttribute("aria-current", "true");
+      const label = MAP && MAP.fmts[to] ? MAP.fmts[to][0] : b.textContent.trim();
+      if (MAP && MAP.fmts[to]) setChip(toMenu.querySelector(".chip"), to);
+      else toMenu.querySelector(".chip-label").textContent = label;
+      toMenu.removeAttribute("open");
+      const fromLabel = MAP && MAP.fmts[from] ? MAP.fmts[from][0] : from.toUpperCase();
+      const h1 = document.querySelector(".hero h1");
+      if (h1) h1.textContent = fromLabel + " to " + label + " Converter";
+      document.title = document.title.replace(/^[^|]*/, fromLabel + " to " + label + " Converter - Free Online ");
+      if (!window.__route) try { history.replaceState(null, "", "/" + from + "-to-" + to); } catch (err) { /* sandboxed page */ }
+      rows.forEach(r => { if (r.state === "ready" && r.targets && r.targets.some(t => t[0] === to)) r.target = to; });
+      render();
+      if (selectBtn) selectBtn.focus({ preventScroll: true });
+    });
+  }
 
   // One upload + conversion. XHR (not fetch) so the card can show upload progress.
   function requestConversion(row, onProgress){

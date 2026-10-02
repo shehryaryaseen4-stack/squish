@@ -1,6 +1,8 @@
 /* FlipFree - CloudConvert-style layout: dark grey header and hero banner with a
    "convert [X] to [Y]" box and a red Select File button, light content and card grids below.
    Single light theme (no dark mode). */
+@view-transition{navigation:auto;}
+html{scrollbar-gutter:stable;}
 :root{
   --bg:#FFFFFF; --bg-soft:#F4F5F7; --panel:#FFFFFF; --ink:#23262D; --dim:#6B7079; --border:#E2E4E8;
   --brand:#E5322D; --brand-dark:#C42420; --brand-soft:rgba(229,50,45,.09);
