@@ -23,7 +23,7 @@ const logoInner = ({ flip = '#23262D', free = RED } = {}) => `<g transform="tran
   + `<g transform="translate(40.1 1.5)"><path fill="${flip}" d="${FLIP}"/><path fill="${free}" transform="translate(48.2 0)" d="${FREE}"/></g>`;
 
 // Standalone SVG file (public/logo.svg and friends).
-const logoFile = (colors) => `<svg xmlns="http://www.w3.org/2000/svg" width="${W * 4}" height="${H * 4}" viewBox="0 0 ${W} ${H}"><title>FlipFree</title>${logoInner(colors)}</svg>\n`;
+const logoFile = (colors) => `<svg xmlns="http://www.w3.org/2000/svg" width="${(W + 8) * 4}" height="${(H + 4) * 4}" viewBox="-4 -2 ${W + 8} ${H + 4}"><title>FlipFree</title>${logoInner(colors)}</svg>\n`;
 const iconFile = () => `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 32 32"><title>FlipFree</title>${TILE}${MARK}</svg>\n`;
 
 module.exports = { RED, TILE, MARK, W, H, logoInner, logoFile, iconFile };
