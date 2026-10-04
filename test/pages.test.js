@@ -112,3 +112,25 @@ test('hub and 404', () => {
   for (const c of registry.getCategories()) assert.ok(hub.includes(`id="cat-${c.id}"`), c.id);
   assert.ok(pages.notFoundPage().includes('<meta name="robots" content="noindex">'));
 });
+
+test('ads are off by default and, when configured, only on pages with the converter', () => {
+  const html = pages.resolvePair('jpg', 'png', BASE).html;
+  assert.ok(!html.includes('adsbygoogle') && !html.includes('{{AD'), 'no ad markup without ADSENSE_CLIENT');
+  assert.equal(pages.adsTxt(), null);
+  const { execFileSync } = require('node:child_process');
+  const out = execFileSync(process.execPath, ['-e', `
+    const p = require('./pages');
+    const B = 'https://example.test';
+    console.log(JSON.stringify({
+      live: p.resolvePair('jpg', 'png', B).html, soon: p.resolvePair('mp4', 'mp3', B).html,
+      privacy: p.resolveInfo('privacy', B).html, ads: p.adsTxt() }));`],
+  { cwd: require('node:path').join(__dirname, '..'), encoding: 'utf8',
+    env: { ...process.env, SQUISH_DETECT: '0', ADSENSE_CLIENT: 'ca-pub-1234567890123456', ADSENSE_SLOT_TOP: '1111111111' } });
+  const r = JSON.parse(out);
+  assert.match(r.live, /adsbygoogle\.js\?client=ca-pub-1234567890123456/);
+  assert.match(r.live, /data-ad-slot="1111111111"/);
+  assert.ok(!r.live.includes('data-ad-slot=""'), 'unset slots render nothing');
+  assert.ok(!r.soon.includes('adsbygoogle'), 'no ads on coming-soon pages');
+  assert.ok(!r.privacy.includes('adsbygoogle'), 'no ads on legal pages');
+  assert.equal(r.ads, 'google.com, pub-1234567890123456, DIRECT, f08c47fec0942fa0\n');
+});

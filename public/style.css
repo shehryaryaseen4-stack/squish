@@ -258,7 +258,7 @@ input[type=range]{width:150px; accent-color:var(--brand);}
 .privacy-note strong{color:var(--ink);}
 
 /* --------------------------------------------------------------------- ads -- */
-.ad-slot{margin:30px 0; padding:10px; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-soft); min-height:90px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;}
+.ad-slot{margin:48px 0 30px; padding:10px; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-soft); min-height:90px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;}
 .ad-slot .ad-label, .side-ad .ad-label{font-size:.7rem; color:var(--dim); align-self:flex-start;}
 .side-ad{position:fixed; top:120px; width:160px; display:none; flex-direction:column; align-items:center; gap:6px; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-soft); padding:10px; min-height:600px;}
 .side-ad.left{left:24px;} .side-ad.right{right:24px;}

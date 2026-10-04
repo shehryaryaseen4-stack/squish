@@ -28,6 +28,32 @@ const brand = require('./brand');
 
 const SITE = process.env.SITE_NAME || 'FlipFree';
 const CONTACT_EMAIL = process.env.CONTACT_EMAIL || '';
+
+// Google AdSense. Off until ADSENSE_CLIENT (ca-pub-...) is set; then the AdSense script loads
+// on pages that have the converter (never on "coming soon", legal or 404 pages, which AdSense
+// counts as screens without publisher content). Ad units appear only for the slot IDs that
+// are set; with none set, Auto ads (chosen in the AdSense dashboard) place the ads.
+const ADS_CLIENT = /^ca-pub-\d{10,20}$/.test(process.env.ADSENSE_CLIENT || '') ? process.env.ADSENSE_CLIENT : '';
+const AD_SLOTS = Object.fromEntries(['TOP', 'BOTTOM', 'LEFT', 'RIGHT'].map((k) => {
+  const v = process.env[`ADSENSE_SLOT_${k}`] || '';
+  return [k, /^\d{5,20}$/.test(v) ? v : ''];
+}));
+const adUnit = (slot, side) => {
+  if (!ADS_CLIENT || !slot) return '';
+  return side
+    ? `<div class="side-ad ${side}"><span class="ad-label">Advertisement</span><ins class="adsbygoogle" style="display:block; width:160px; height:600px;" data-ad-client="${ADS_CLIENT}" data-ad-slot="${slot}" data-ad-format="vertical"></ins></div>`
+    : `<div class="ad-slot"><span class="ad-label">Advertisement</span><ins class="adsbygoogle" style="display:block; width:100%;" data-ad-client="${ADS_CLIENT}" data-ad-slot="${slot}" data-ad-format="auto" data-full-width-responsive="true"></ins></div>`;
+};
+const adFields = (on) => (on && ADS_CLIENT ? {
+  ADS_HEAD: `<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADS_CLIENT}" crossorigin="anonymous"></script>`,
+  AD_TOP: adUnit(AD_SLOTS.TOP), AD_BOTTOM: adUnit(AD_SLOTS.BOTTOM),
+  AD_LEFT: adUnit(AD_SLOTS.LEFT, 'left'), AD_RIGHT: adUnit(AD_SLOTS.RIGHT, 'right'),
+} : { ADS_HEAD: '', AD_TOP: '', AD_BOTTOM: '', AD_LEFT: '', AD_RIGHT: '' });
+
+/** ads.txt for AdSense (https://support.google.com/adsense/answer/12171612), or null when ads are off. */
+function adsTxt() {
+  return ADS_CLIENT ? `google.com, ${ADS_CLIENT.replace(/^ca-/, '')}, DIRECT, f08c47fec0942fa0\n` : null;
+}
 const MAX_MB = Number(process.env.MAX_FILE_MB || 40);
 
 const PAGE_TPL = fs.readFileSync(path.join(__dirname, 'views', 'page.html'), 'utf8');
@@ -502,7 +528,8 @@ function baseFields(base, urlPath, title, desc, extra) {
 const noindex = (fields) => ({ ...fields, ROBOTS: 'noindex, follow', CANONICAL_TAG: '', JSONLD: '{}', _noindex: true });
 
 function renderPage(tpl, fields) {
-  return render(tpl, { ...fields, HEAD_TAGS: seo.headTags({ url: fields._url, title: fields._title, desc: fields._desc, image: fields._image, noindex: fields._noindex }) });
+  const ads = adFields(!fields._noindex && !!fields.TOOL);
+  return render(tpl, { ...fields, ...ads, HEAD_TAGS: seo.headTags({ url: fields._url, title: fields._title, desc: fields._desc, image: fields._image, noindex: fields._noindex }) });
 }
 
 // Structured data. Organization + WebSite are the same on every page (linked by @id);
@@ -772,7 +799,7 @@ const INFO_PAGES = {
       <h2>Cookies and local storage</h2>
       <p>${SITE} itself sets no cookies and stores nothing in your browser.</p>
       <h2>Advertising</h2>
-      <p>If advertising is shown, it is provided by Google AdSense. Google and its partners may use cookies to show ads based on your visits to this and other websites. You can opt out of personalised advertising at <a href="https://adssettings.google.com/" rel="noopener">Google Ads Settings</a>. See <a href="https://policies.google.com/technologies/partner-sites" rel="noopener">how Google uses information from sites that use its services</a>.</p>
+      <p>If advertising is shown, it is provided by Google AdSense. Google and its partners may use cookies to show ads based on your visits to this and other websites. Visitors in the European Economic Area, the UK and Switzerland are asked for their consent through Google's consent message before personalised ads are shown. You can opt out of personalised advertising at <a href="https://adssettings.google.com/" rel="noopener">Google Ads Settings</a>. See <a href="https://policies.google.com/technologies/partner-sites" rel="noopener">how Google uses information from sites that use its services</a>.</p>
       <h2>Third-party services</h2>
       <p>Pages load fonts from Google Fonts. No other third-party scripts are loaded unless advertising is enabled.</p>
       <h2>Your rights</h2>
@@ -889,4 +916,4 @@ function sitemap(base) {
 
 const robots = (base) => `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${base}/sitemap.xml\n`;
 
-module.exports = { homePage, hubPage, notFoundPage, resolvePair, resolveCompress, resolveConverter, resolveInfo, ogSpec, sitemap, robots, allPaths };
+module.exports = { homePage, hubPage, notFoundPage, resolvePair, resolveCompress, resolveConverter, resolveInfo, ogSpec, sitemap, robots, allPaths, adsTxt, ADS_ENABLED: !!ADS_CLIENT };

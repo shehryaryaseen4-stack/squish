@@ -1,7 +1,7 @@
 (function(){
   "use strict";
 
-  // Ad slots (no-op until the AdSense script is enabled in views/page.html).
+  // Ad slots: present only when ADSENSE_CLIENT and slot IDs are set on the server.
   document.querySelectorAll("ins.adsbygoogle").forEach(() => { (window.adsbygoogle = window.adsbygoogle || []).push({}); });
 
   // Every dropdown (header menus and format pickers) is a <details data-menu>.

@@ -35,13 +35,24 @@ const baseOf = (req) => BASE_URL || `${req.protocol}://${req.get('host')}`;
 //    via env var to match what your server/hosting plan can actually afford —
 //    this is the knob that keeps "unlimited free" from becoming a cost spiral.
 // Helmet's default CSP allows scripts from this site only, which is why JSZip is served
-// from node_modules below rather than a CDN. When you switch AdSense on, add
-// https://pagead2.googlesyndication.com and the other hosts Google lists for AdSense to
-// script-src / img-src / frame-src / connect-src.
+// from node_modules below rather than a CDN.
 // img-src adds blob: for the result thumbnails, which are object URLs of the converted files.
+// With AdSense on (ADSENSE_CLIENT set) the policy opens up to HTTPS hosts: AdSense, its
+// consent message and its ad-quality checks load scripts, frames and images from many
+// Google domains (country domains included) that change over time, so a fixed list breaks ads.
+const CSP = pages.ADS_ENABLED
+  ? {
+    'script-src': ["'self'", "'unsafe-inline'", 'https:'],
+    'img-src': ["'self'", 'data:', 'blob:', 'https:'],
+    'frame-src': ["'self'", 'https:'],
+    'connect-src': ["'self'", 'https:'],
+  }
+  : { 'img-src': ["'self'", 'data:', 'blob:'] };
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
-  contentSecurityPolicy: { directives: { 'img-src': ["'self'", 'data:', 'blob:'] } },
+  contentSecurityPolicy: { directives: CSP },
+  // Ad networks need the page origin to serve and count ads; full URLs still stay private.
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
 }));
 app.use(compression());
 
@@ -250,6 +261,11 @@ app.get(/^\/(about|privacy|terms|contact)$/, (req, res, next) => {
 });
 
 app.get('/sitemap.xml', (req, res) => res.set('Cache-Control', 'public, max-age=3600').type('application/xml').send(pages.sitemap(baseOf(req))));
+app.get('/ads.txt', (_req, res) => {
+  const txt = pages.adsTxt();
+  if (!txt) return res.status(404).type('text/plain').send('Not found');
+  res.set('Cache-Control', 'public, max-age=86400').type('text/plain').send(txt);
+});
 app.get('/robots.txt', (req, res) => res.set('Cache-Control', 'public, max-age=3600').type('text/plain').send(pages.robots(baseOf(req))));
 
 app.use((req, res, next) => {

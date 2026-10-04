@@ -244,11 +244,20 @@ missing, and the server logs at startup which engines (if any) are missing, e.g.
 
 ## AdSense
 
-The ad slots in `views/page.html` are placeholders — see the comment at the
-top of that file for the exact steps (get a live URL first, apply, wait for
-review, then swap in your real `ca-pub-...` ID and ad slot IDs). The site's
-Content-Security-Policy only allows its own scripts, so you also need to add the
-AdSense hosts in `server.js` (there is a comment where).
+Ads are off until you set `ADSENSE_CLIENT`; nothing ad-related is in the pages before that.
+
+1. Put the site live on its own domain with `CONTACT_EMAIL` set, then apply at
+   adsense.google.com (manual review, usually days to a few weeks).
+2. Set `ADSENSE_CLIENT=ca-pub-...` and restart. This loads the AdSense script, serves
+   `/ads.txt` and opens the Content-Security-Policy to the Google ad hosts.
+3. Either turn on Auto ads in the AdSense dashboard, or create display ad units and set
+   `ADSENSE_SLOT_TOP`, `ADSENSE_SLOT_BOTTOM` (in the page) and `ADSENSE_SLOT_LEFT`,
+   `ADSENSE_SLOT_RIGHT` (160x600 side units on very wide screens).
+4. In AdSense, Privacy & messaging, publish the GDPR consent message (required for
+   visitors from the EEA, UK and Switzerland).
+
+Ads only appear on pages with the converter. "Coming soon", legal, hub and 404 pages never
+load the ad script, as AdSense does not allow ads on screens without publisher content.
 
 ## Cost/abuse notes
 
