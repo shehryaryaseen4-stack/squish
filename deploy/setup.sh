@@ -80,7 +80,8 @@ TRUST_PROXY=1
 MAX_JOBS=$JOBS
 # Cloudflare's free plan stops waiting for an answer after 100 seconds.
 JOB_TIMEOUT_S=90
-MAX_FILE_MB=40
+# Cloudflare free plan accepts uploads up to 100 MB, so stay just under it.
+MAX_FILE_MB=${MAX_FILE_MB:-$(old MAX_FILE_MB | grep . || echo 95)}
 # Google AdSense publisher ID (ca-pub-...), once your account is approved.
 ADSENSE_CLIENT=$ADS
 EOF
@@ -111,7 +112,7 @@ https://$DOMAIN, https://www.$DOMAIN {
   tls internal
   encode gzip
   request_body {
-    max_size 60MB
+    max_size 110MB
   }
   # Cloudflare sends the visitor's IP in CF-Connecting-IP; pass it on so rate limits apply per
   # visitor. Only Cloudflare can reach this port (firewall), so the header can be trusted.
