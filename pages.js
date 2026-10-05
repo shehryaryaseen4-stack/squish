@@ -113,6 +113,7 @@ const LIVE_SUMMARY = `${LIVE_COUNT.toLocaleString('en-US')} conversions (${listW
 const render = (tpl, map) => tpl.replace(/\{\{([A-Z0-9_]+)\}\}/g, (m, k) => (k in map ? map[k] : m));
 const jsonLd = (obj) => JSON.stringify(obj).replace(/</g, '\\u003c');
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const mailLink = CONTACT_EMAIL ? `<a href="mailto:${esc(CONTACT_EMAIL)}">${esc(CONTACT_EMAIL)}</a>` : '';
 const link = (href, text) => `<a href="${href}">${text}</a>`;
 const chips = (items) => `<ul class="chips">${items.map(([h, t, live]) =>
   `<li>${link(h, t + (live === false ? ' <span class="soon-tag">soon</span>' : ''))}</li>`).join('')}</ul>`;
@@ -271,7 +272,7 @@ function footer() {
     <div><h4>Converters</h4><ul>${cats}</ul></div>
     <div><h4>Popular</h4><ul>${pop}</ul></div>
     <div><h4>Tools</h4><ul>${comp}<li>${link('/converters', 'All formats')}</li></ul></div>
-    <div><h4>Company</h4><ul><li>${link('/about', 'About')}</li><li>${link('/privacy', 'Privacy Policy')}</li><li>${link('/terms', 'Terms of Use')}</li><li>${link('/contact', 'Contact')}</li></ul></div>
+    <div><h4>Company</h4><ul><li>${link('/about', 'About')}</li><li>${link('/privacy', 'Privacy Policy')}</li><li>${link('/terms', 'Terms of Use')}</li><li>${link('/contact', 'Contact')}</li>${CONTACT_EMAIL ? `<li>${mailLink}</li>` : ''}</ul></div>
   </div><div class="footer-bottom">&copy; ${new Date().getFullYear()} ${SITE}. Files are deleted as soon as they are converted.</div></footer>`;
 }
 
@@ -550,7 +551,7 @@ function graph(base, urlPath, name, desc, faq, crumbs, { type = 'WebApplication'
   const url = base + urlPath;
   const org = { '@type': 'Organization', '@id': `${base}/#organization`, name: SITE, url: `${base}/`,
     logo: { '@type': 'ImageObject', url: `${base}/icon-512.png`, width: 512, height: 512 },
-    ...(CONTACT_EMAIL ? { email: CONTACT_EMAIL } : {}) };
+    ...(CONTACT_EMAIL ? { email: CONTACT_EMAIL, contactPoint: { '@type': 'ContactPoint', contactType: 'customer support', email: CONTACT_EMAIL, availableLanguage: ['English', 'Urdu'] } } : {}) };
   const site = { '@type': 'WebSite', '@id': `${base}/#website`, name: SITE, url: `${base}/`, inLanguage: 'en', publisher: { '@id': `${base}/#organization` } };
   const pageNode = type === 'WebApplication'
     ? { '@type': 'WebApplication', '@id': `${url}#app`, name, url, description: desc, inLanguage: 'en',
@@ -799,7 +800,7 @@ const INFO_PAGES = {
       <h2>What we are adding</h2>
       <p>Our catalogue lists ${FORMAT_COUNT} formats across ${CATS.length} categories. Conversions that are not ready yet are clearly marked <span class="soon-tag">soon</span>; we only switch one on once it really works.</p>
       <h2>Contact</h2>
-      <p>Questions or suggestions? ${link('/contact', 'Get in touch')}.</p></section>`,
+      <p>Questions or suggestions? ${CONTACT_EMAIL ? `Email ${mailLink} or see our ${link('/contact', 'contact page')}` : link('/contact', 'Get in touch')}.</p></section>`,
   },
   privacy: {
     title: `Privacy Policy | ${SITE}`, h1: 'Privacy Policy',
@@ -831,16 +832,25 @@ const INFO_PAGES = {
       <h2>Liability</h2>
       <p>To the extent permitted by law, ${SITE} is not liable for any loss resulting from the use of the service.</p>
       <h2>Changes</h2>
-      <p>We may update these terms; the date above shows the latest version. Questions: ${link('/contact', 'contact us')}.</p></section>`,
+      <p>We may update these terms; the date above shows the latest version. Questions: ${CONTACT_EMAIL ? `email ${mailLink} or see the ${link('/contact', 'contact page')}` : link('/contact', 'contact us')}.</p></section>`,
   },
   contact: {
     title: `Contact | ${SITE}`, h1: `Contact ${SITE}`,
-    desc: `Get in touch with the ${SITE} team about the file converter, a missing format or a problem.`,
+    desc: `Contact ${SITE}${CONTACT_EMAIL ? ` at ${CONTACT_EMAIL}` : ''}: questions about the free file converter, a missing format, a conversion problem or privacy.`,
     body: () => `<section class="prose">
-      <p>Found a file that will not convert, want a format added, or have a question about privacy?</p>
-      <p>${CONTACT_EMAIL ? `Email us at <a href="mailto:${esc(CONTACT_EMAIL)}">${esc(CONTACT_EMAIL)}</a>. We read every message.` : 'Contact details have not been published yet.'}</p>
-      <p>When reporting a conversion problem, tell us the file type, its size and the page you used. Please do not send confidential files.</p></section>`,
+      ${CONTACT_EMAIL
+    ? `<p class="contact-mail">Email: ${mailLink}</p><p>We read every message and usually reply within a few working days.</p>`
+    : '<p>Contact details have not been published yet.</p>'}
+      <h2>Report a conversion problem</h2>
+      <p>Tell us the file type, its size and the page you used (for example ${link('/jpg-to-png', 'JPG to PNG')}). Please do not send confidential files.</p>
+      <h2>Request a format</h2>
+      <p>Missing a conversion? Let us know which formats you need; the most requested ones are added first.</p>
+      <h2>Privacy and data requests</h2>
+      <p>We do not keep uploaded files or create accounts. See the ${link('/privacy', 'Privacy Policy')} for details, and write to us with any question about your data.</p>
+      <h2>Copyright or abuse reports</h2>
+      <p>If you believe the service is being misused, email us with the details and we will look into it promptly.</p></section>`,
   },
+
 };
 
 function infoPage(key, base) {

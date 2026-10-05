@@ -334,6 +334,7 @@ input[type=range]{width:150px; accent-color:var(--brand);}
 .prose p{margin:0 0 12px;}
 .prose a{color:var(--brand); font-weight:600;}
 .prose .muted{color:var(--dim); font-size:.92rem;}
+.contact-mail{font-size:1.15rem; font-weight:600;}
 .guide{margin:36px 0;}
 .guide ul{margin:0 0 12px; padding-left:22px;}
 .guide li{margin:4px 0;}
