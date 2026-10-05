@@ -574,7 +574,7 @@ function getConverterMetadata(from, to, opts = {}) {
   const c = getConverter(from, to, opts);
   if (!c) return null;
   const f = formatById.get(c.from), t = formatById.get(c.to);
-  const site = opts.siteName || 'FlipItFree';
+  const site = opts.siteName || 'Flipit Free';
   const alt = f.altLabel || t.altLabel ? ` (${f.altLabel || f.label} to ${t.altLabel || t.label})` : '';
   const image = bothIn(f, t, 'image');
   const h1 = `${f.label} to ${t.label} Converter`;
@@ -597,7 +597,7 @@ function getCompressMetadata(format, opts = {}) {
   const c = getCompressor(format, opts);
   if (!c) return null;
   const f = formatById.get(c.from);
-  const site = opts.siteName || 'FlipItFree';
+  const site = opts.siteName || 'Flipit Free';
   const image = inCategory(f, 'image');
   const noun = image ? 'images' : 'files';
   return {

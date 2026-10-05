@@ -300,14 +300,14 @@ test('every route the registry emits round-trips through resolveRoute', () => {
 
 // ---------------------------------------------------------------- metadata --
 test('converter metadata keeps the existing wording', () => {
-  const m = registry.getConverterMetadata('jpg', 'png', { siteName: 'FlipItFree' });
-  assert.equal(m.title, 'JPG to PNG Converter (JPEG to PNG) - Free Online | FlipItFree');
+  const m = registry.getConverterMetadata('jpg', 'png', { siteName: 'Flipit Free' });
+  assert.equal(m.title, 'JPG to PNG Converter (JPEG to PNG) - Free Online | Flipit Free');
   assert.equal(m.h1, 'JPG to PNG Converter');
   assert.equal(m.path, '/jpg-to-png');
   assert.match(m.description, /^Convert JPG to PNG online\. Adjust quality and size/);
   assert.equal(m.converter.status, 'live');
   assert.deepEqual(m.breadcrumbs.at(-1), ['JPG to PNG', '/jpg-to-png']);
-  assert.equal(registry.getConverterMetadata('png', 'webp').title, 'PNG to WEBP Converter - Free Online | FlipItFree');
+  assert.equal(registry.getConverterMetadata('png', 'webp').title, 'PNG to WEBP Converter - Free Online | Flipit Free');
   assert.equal(registry.getConverterMetadata('mp4', 'mp3'), null);
 });
 
@@ -320,8 +320,8 @@ test('metadata for not-yet-live conversions is generic, not image-specific', () 
 });
 
 test('compress metadata', () => {
-  const m = registry.getCompressMetadata('jpeg', { siteName: 'FlipItFree' });
-  assert.equal(m.title, 'Compress JPG - Free Online JPG Compressor | FlipItFree');
+  const m = registry.getCompressMetadata('jpeg', { siteName: 'Flipit Free' });
+  assert.equal(m.title, 'Compress JPG - Free Online JPG Compressor | Flipit Free');
   assert.equal(m.h1, 'Compress JPG Images Online');
   assert.equal(m.schemaName, 'JPG Compressor');
   assert.equal(registry.getCompressMetadata('svg'), null);

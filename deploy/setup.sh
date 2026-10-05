@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# FlipItFree: one-command setup on a fresh Ubuntu 24.04 server (Contabo, Hetzner, DigitalOcean...).
+# Flipit Free: one-command setup on a fresh Ubuntu 24.04 server (Contabo, Hetzner, DigitalOcean...).
 #
 #   curl -fsSL https://raw.githubusercontent.com/shehryaryaseen4-stack/squish/claude/cloudconvert-project-design-qzccpw/deploy/setup.sh -o setup.sh
 #   sudo bash setup.sh yourdomain.com contact@yourdomain.com
@@ -11,7 +11,7 @@
 #   4. Caddy serves HTTPS and passes requests to the site; use Cloudflare SSL mode "Full"
 #   5. the firewall only lets Cloudflare reach the website ports (SSH stays open)
 #
-# Options (environment variables): SITE_NAME (default FlipItFree), MAX_JOBS (default: CPU count - 1,
+# Options (environment variables): SITE_NAME (default Flipit Free), MAX_JOBS (default: CPU count - 1,
 # at least 1), NO_CF_FIREWALL=1 to leave ports 80/443 open to everyone (for testing without Cloudflare).
 set -euo pipefail
 
@@ -69,8 +69,8 @@ old() { [ -f "$ENV_FILE" ] && grep -E "^$1=" "$ENV_FILE" | tail -1 | cut -d= -f2
 [ -n "$CONTACT" ] || CONTACT="$(old CONTACT_EMAIL)"
 ADS="$(old ADSENSE_CLIENT)"
 cat > "$ENV_FILE" <<EOF
-# FlipItFree settings. Edit, then run: sudo bash $APP_DIR/deploy/update.sh
-SITE_NAME=${SITE_NAME:-$(old SITE_NAME | grep . || echo FlipItFree)}
+# Flipit Free settings. Edit, then run: sudo bash $APP_DIR/deploy/update.sh
+SITE_NAME=${SITE_NAME:-$(old SITE_NAME | grep . || echo "Flipit Free")}
 BASE_URL=https://$DOMAIN
 FORCE_CANONICAL_HOST=1
 CONTACT_EMAIL=$CONTACT
@@ -151,7 +151,7 @@ IP="$(curl -fsS --max-time 10 https://api.ipify.org || hostname -I | awk '{print
 cat <<EOF
 
 =====================================================================
-  FlipItFree is running.
+  Flipit Free is running.
 
   In Cloudflare (dash.cloudflare.com -> $DOMAIN):
     DNS:   A record  @    -> $IP   (Proxied, orange cloud)

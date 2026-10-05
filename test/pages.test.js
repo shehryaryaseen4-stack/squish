@@ -24,7 +24,7 @@ test('every live conversion page shows the tool, is indexable and keeps its word
     assert.ok(r.html.includes('id="selectBtn"'), `${c.route} Select File button`);
   }
   const html = pages.resolvePair('jpg', 'png', BASE).html;
-  assert.match(html, /<title>JPG to PNG Converter \(JPEG to PNG\) - Free Online \| FlipItFree<\/title>/);
+  assert.match(html, /<title>JPG to PNG Converter \(JPEG to PNG\) - Free Online \| Flipit Free<\/title>/);
   assert.match(html, /<h1>JPG to PNG Converter<\/h1>/);
   assert.match(html, /data-default-format="png"/);
 });

@@ -1,4 +1,4 @@
-# FlipItFree ko live karne ki guide (step by step)
+# Flipit Free ko live karne ki guide (step by step)
 
 Kul kharcha: server taqreeban $63/saal + domain taqreeban $10/saal. Waqt: 1 se 2 ghante (zyada tar intezar).
 
@@ -58,7 +58,7 @@ curl -fsSL https://raw.githubusercontent.com/shehryaryaseen4-stack/squish/claude
 bash setup.sh aapkadomain.com contact@aapkadomain.com
 ```
 
-Pehli baar 10 se 20 minute lagenge (saare conversion engines install hote hain). Aakhir mein hara box aayega: "FlipItFree is running".
+Pehli baar 10 se 20 minute lagenge (saare conversion engines install hote hain). Aakhir mein hara box aayega: "Flipit Free is running".
 
 ## Step 5: Cloudflare mein domain ko server se jorna
 
