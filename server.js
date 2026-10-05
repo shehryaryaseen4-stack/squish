@@ -47,7 +47,12 @@ const CSP = pages.ADS_ENABLED
     'frame-src': ["'self'", 'https:'],
     'connect-src': ["'self'", 'https:'],
   }
-  : { 'img-src': ["'self'", 'data:', 'blob:'] };
+  : {
+    'img-src': ["'self'", 'data:', 'blob:'],
+    // Cloudflare Web Analytics (visitor counts without cookies), injected by Cloudflare when enabled.
+    'script-src': ["'self'", 'https://static.cloudflareinsights.com'],
+    'connect-src': ["'self'", 'https://cloudflareinsights.com'],
+  };
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: { directives: CSP },
