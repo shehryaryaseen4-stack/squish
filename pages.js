@@ -27,7 +27,7 @@ const seo = require('./seo');
 const brand = require('./brand');
 const GUIDES = require('./content/guides');
 
-const SITE = process.env.SITE_NAME || 'FlipFree';
+const SITE = process.env.SITE_NAME || brand.NAME;
 const CONTACT_EMAIL = process.env.CONTACT_EMAIL || '';
 
 // Google AdSense. Off until ADSENSE_CLIENT (ca-pub-...) is set; then the AdSense script loads
@@ -118,12 +118,12 @@ const chips = (items) => `<ul class="chips">${items.map(([h, t, live]) =>
   `<li>${link(h, t + (live === false ? ' <span class="soon-tag">soon</span>' : ''))}</li>`).join('')}</ul>`;
 const pairLabel = (f, t) => `${F(f).label} to ${F(t).label}`;
 
-// Logo (brand.js). The default name uses the outlined FlipFree logo; a custom SITE_NAME gets
+// Logo (brand.js). The default name uses the outlined word mark; a custom SITE_NAME gets
 // the icon plus the name as text, with a trailing "Free" in red.
 const BRAND_SVG = `<svg class="brand-mark" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${brand.TILE}${brand.MARK}</svg>`;
 const brandName = (name) => (/.Free$/.test(name) ? `${esc(name.slice(0, -4))}<b class="brand-free">Free</b>` : esc(name));
-const BRAND_LINK = SITE === 'FlipFree'
-  ? `<a class="brand" href="/" aria-label="FlipFree home"><svg class="brand-logo" viewBox="0 0 ${brand.W} ${brand.H}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${brand.logoInner({ flip: 'currentColor' })}</svg></a>`
+const BRAND_LINK = SITE === brand.NAME
+  ? `<a class="brand" href="/" aria-label="${brand.NAME} home"><svg class="brand-logo" viewBox="0 0 ${brand.W} ${brand.H}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${brand.logoInner({ flip: 'currentColor' })}</svg></a>`
   : `<a class="brand" href="/">${BRAND_SVG}<span class="brand-name">${brandName(SITE)}</span></a>`;
 
 // Small line icons per category (and a few UI icons). currentColor so they follow the theme.

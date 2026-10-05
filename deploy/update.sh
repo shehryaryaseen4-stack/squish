@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# FlipFree: get the latest code from GitHub, rebuild and restart, keeping the settings in .env.
+# FlipItFree: get the latest code from GitHub, rebuild and restart, keeping the settings in .env.
 #   sudo bash /opt/flipfree/deploy/update.sh
 set -euo pipefail
 APP_DIR="/opt/flipfree"

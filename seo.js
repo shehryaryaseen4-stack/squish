@@ -13,7 +13,7 @@ const fs = require('fs');
 const path = require('path');
 const brand = require('./brand');
 
-const SITE = process.env.SITE_NAME || 'FlipFree';
+const SITE = process.env.SITE_NAME || brand.NAME;
 const BRAND = '#E5322D';
 
 // Search-engine ownership verification (paste only the content="..." value into the env var).
@@ -116,7 +116,7 @@ function ogSvg({ title, subtitle, from, to }) {
   ${from ? badge(80, from, '#F1F2F4', '#23262D') + `<path d="M380 205h70m-24-26 26 26-26 26" stroke="#9AA0AA" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` + badge(480, to, BRAND, '#FFFFFF') : ''}
   ${lines.map((l, i) => `<text x="80" y="${titleY + i * 78}" font-size="68" font-weight="800" fill="#23262D" font-family="DejaVu Sans, Arial, sans-serif">${esc(l)}</text>`).join('')}
   <text x="80" y="${titleY + lines.length * 78 + 10}" font-size="32" fill="#6B7079" font-family="DejaVu Sans, Arial, sans-serif">${esc(subtitle || '')}</text>
-  ${SITE === 'FlipFree' ? `<g transform="translate(80 512) scale(1.8)">${brand.logoInner()}</g>`
+  ${SITE === brand.NAME ? `<g transform="translate(80 512) scale(1.8)">${brand.logoInner()}</g>`
     : `<g transform="translate(80 518) scale(2.2)">${brand.TILE}${MARK}</g><text x="166" y="572" font-size="40" font-weight="700" fill="#23262D" font-family="DejaVu Sans, Arial, sans-serif">${esc(SITE)}</text>`}
   <text x="1120" y="572" font-size="28" text-anchor="end" fill="#6B7079" font-family="DejaVu Sans, Arial, sans-serif">100% free &#183; No sign-up &#183; No watermark</text>
 </svg>`;

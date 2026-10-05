@@ -1,4 +1,4 @@
-# FlipFree: free online file converter
+# FlipItFree: free online file converter
 
 Convert video, audio, images, documents, spreadsheets, presentations, ebooks, archives and
 fonts. Built only on free, open-source engines, with no paid API keys.
@@ -172,7 +172,7 @@ No code can guarantee a #1 ranking, or keep one forever. Rankings depend on comp
 
 **Before going live:**
 1. Set `BASE_URL` (e.g. `https://yourdomain.com`) so canonical tags and the sitemap use your real domain.
-2. Set `SITE_NAME` to your brand (default `FlipFree`).
+2. Set `SITE_NAME` to your brand (default `FlipItFree`).
 3. If you're behind Nginx / Render / Railway, set `TRUST_PROXY=1`.
 4. Submit `https://yourdomain.com/sitemap.xml` in Google Search Console (and Bing Webmaster Tools).
 
@@ -194,7 +194,7 @@ and earning links from other sites.
 | `MAX_EXTRACT_MB` | `500` | Largest total size an archive may unpack to (zip-bomb protection). |
 | `SQUISH_DISABLE` | unset | Comma-separated binaries to treat as missing, e.g. `ffmpeg` to switch video off. |
 | `BASE_URL` | derived from request | Public site URL used in canonical tags, sitemap and robots.txt. Set this in production. |
-| `SITE_NAME` | `FlipFree` | Brand name used in page titles and footer. |
+| `SITE_NAME` | `FlipItFree` | Brand name used in page titles and footer. |
 | `TRUST_PROXY` | unset | Number of reverse proxies in front of the app (usually `1`). Needed for correct visitor IPs behind a proxy. |
 | `FORCE_CANONICAL_HOST` | unset | `1` = 301 every request to `BASE_URL`'s exact protocol and host. |
 | `CONTACT_EMAIL` | unset | Shown on `/contact` and `/privacy` and in structured data. |
