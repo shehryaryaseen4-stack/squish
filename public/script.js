@@ -252,7 +252,6 @@
   fileInput.addEventListener("change", () => {
     if (fileInput.files.length) addFiles(Array.from(fileInput.files));
     fileInput.value = "";
-    if (rows.length) tool.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
   });
 
   // Choosing the output in the banner picker stays on this page (no reload, no jump): the chip
