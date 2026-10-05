@@ -242,6 +242,13 @@ missing, and the server logs at startup which engines (if any) are missing, e.g.
 2420 conversions live, 7 compressors live.
 ```
 
+## Going live on a VPS
+
+`deploy/setup.sh` sets up a fresh Ubuntu 24.04 server in one command: Docker, the site, Caddy for
+HTTPS behind Cloudflare (SSL mode "Full"), a firewall that only lets Cloudflare reach ports
+80/443, swap, and the production settings in `/opt/flipfree/.env`. `deploy/update.sh` pulls the
+latest code and restarts. Step-by-step instructions (Roman Urdu): `deploy/GUIDE-URDU.md`.
+
 ## AdSense
 
 Ads are off until you set `ADSENSE_CLIENT`; nothing ad-related is in the pages before that.
