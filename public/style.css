@@ -330,6 +330,12 @@ input[type=range]{width:150px; accent-color:var(--brand);}
 .prose p{margin:0 0 12px;}
 .prose a{color:var(--brand); font-weight:600;}
 .prose .muted{color:var(--dim); font-size:.92rem;}
+.guide{margin:36px 0;}
+.guide ul{margin:0 0 12px; padding-left:22px;}
+.guide li{margin:4px 0;}
+.guide .problems{margin:0;}
+.guide .problems dt{font-weight:700; margin-top:12px;}
+.guide .problems dd{margin:4px 0 0; color:var(--muted, #4b5059);}
 
 /* ------------------------------------------------------ file-type icons -- */
 /* A page with a folded corner, coloured by category, with the extension on it. */

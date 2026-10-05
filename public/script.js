@@ -425,7 +425,7 @@
     }
     const removable = !["waiting", "uploading", "converting"].includes(row.state);
     const options = row.optionsOpen && row.state === "ready" ? `<div class="file-options">
-        <label>Quality <input type="range" class="q-range" min="10" max="95" value="${row.quality}"><span class="q-val">${row.quality}%</span></label>
+        <label>Quality <input type="range" class="q-range" min="10" max="100" value="${row.quality}"><span class="q-val">${row.quality}%</span></label>
         <label>Resize <select class="dim-sel">${[[0, "Keep original size"], [2560, "Max 2560px"], [1920, "Max 1920px"], [1280, "Max 1280px"], [800, "Max 800px"]]
           .map(([v, l]) => `<option value="${v}"${v === row.maxDim ? " selected" : ""}>${l}</option>`).join("")}</select></label>
       </div>` : "";

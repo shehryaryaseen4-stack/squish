@@ -134,3 +134,20 @@ test('ads are off by default and, when configured, only on pages with the conver
   assert.ok(!r.privacy.includes('adsbygoogle'), 'no ads on legal pages');
   assert.equal(r.ads, 'google.com, pub-1234567890123456, DIRECT, f08c47fec0942fa0\n');
 });
+
+test('popular conversions carry their hand-written guide and extra FAQ', () => {
+  const GUIDES = require('../content/guides');
+  for (const [key, g] of Object.entries(GUIDES)) {
+    const [from, to] = key.split('>');
+    const r = pages.resolvePair(from, to, BASE);
+    assert.ok(r && r.html, key);
+    for (const field of ['why', 'keep']) assert.ok(typeof g[field] === 'string' && g[field].length > 80, `${key} ${field}`);
+    assert.ok(g.tips.length >= 3 && g.problems.length >= 2 && g.faq.length >= 2, `${key} lists`);
+    if (!registry.getConversionStatus(from, to) || !r.html.includes('id="dropzone"')) continue; // engine missing in this build
+    assert.ok(r.html.includes('class="guide prose"'), `${key} renders its guide`);
+    assert.ok(r.html.includes(JSON.stringify(g.faq[0][0]).slice(1, -1)), `${key} FAQ in structured data`);
+  }
+  const html = pages.resolvePair('jpg', 'png', BASE).html;
+  assert.match(html, /<h2>Why convert JPG to PNG\?<\/h2>/);
+  assert.ok(!pages.resolvePair('png', 'gif', BASE).html.includes('class="guide'), 'pairs without a guide are unchanged');
+});

@@ -47,3 +47,22 @@ test('asking the handler for an encoder it lacks fails clearly', { skip }, async
   const convert = createImageHandler({ sharp, Jimp: null, pngToIco: null });
   await assert.rejects(convert({ buffer: await sample('png'), inputExt: 'png', format: 'bogus', quality: 80, maxDim: 0 }, registry.getConverter('png', 'jpg')), /no encoder/);
 });
+
+test('phone photos with an EXIF orientation flag come out upright', { skip }, async () => {
+  const convert = createImageHandler({ sharp, Jimp: null, pngToIco: null });
+  // 64x48 pixels stored with orientation 6 ("rotate 90° clockwise to display").
+  const sideways = await sharp({ create: { width: 64, height: 48, channels: 3, background: '#c85028' } }).jpeg().withMetadata({ orientation: 6 }).toBuffer();
+  const out = await convert({ buffer: sideways, inputExt: 'jpg', format: 'png', quality: 80, maxDim: 0 }, registry.getConverter('jpg', 'png'));
+  const meta = await sharp(out).metadata();
+  assert.deepEqual([meta.width, meta.height], [48, 64]);
+});
+
+test('PNG output is a palette below Quality 100 and full colour at 100', { skip }, async () => {
+  const convert = createImageHandler({ sharp, Jimp: null, pngToIco: null });
+  const src = await sample('jpg');
+  const conv = registry.getConverter('jpg', 'png');
+  const small = await sharp(await convert({ buffer: src, inputExt: 'jpg', format: 'png', quality: 75, maxDim: 0 }, conv)).metadata();
+  const full = await sharp(await convert({ buffer: src, inputExt: 'jpg', format: 'png', quality: 100, maxDim: 0 }, conv)).metadata();
+  assert.equal(small.isPalette, true, 'quality 75 gives a palette PNG');
+  assert.equal(full.isPalette, false, 'quality 100 gives a full-colour PNG');
+});

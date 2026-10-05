@@ -34,6 +34,9 @@ function createImageHandler({ sharp, Jimp, pngToIco }) {
       throw new Error(`Image handler cannot decode with "${decoder}".`);
     }
 
+    // Phone photos are often stored sideways with an EXIF "orientation" flag; turn the pixels
+    // upright, since the output carries no metadata. (Animated images have no such flag.)
+    if (!animated) pipeline = pipeline.rotate();
     if (maxDim && maxDim > 0) {
       pipeline = pipeline.resize({ width: maxDim, height: maxDim, fit: 'inside', withoutEnlargement: true });
     }
@@ -53,7 +56,9 @@ function createImageHandler({ sharp, Jimp, pngToIco }) {
       case 'jpeg':
         return pipeline.flatten({ background: '#ffffff' }).jpeg({ quality, mozjpeg: true }).toBuffer();
       case 'png':
-        return pipeline.png({ quality, compressionLevel: 9 }).toBuffer();
+        // Below 100 the colours are reduced to a palette (much smaller files); at 100 the PNG
+        // is lossless full colour, which photos need.
+        return (quality >= 100 ? pipeline.png({ compressionLevel: 9 }) : pipeline.png({ quality, compressionLevel: 9 })).toBuffer();
       case 'webp':
         return pipeline.webp({ quality, animated: wantsAnimation }).toBuffer();
       case 'avif':

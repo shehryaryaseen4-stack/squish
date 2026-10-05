@@ -25,6 +25,7 @@ const path = require('path');
 const registry = require('./registry');
 const seo = require('./seo');
 const brand = require('./brand');
+const GUIDES = require('./content/guides');
 
 const SITE = process.env.SITE_NAME || 'FlipFree';
 const CONTACT_EMAIL = process.env.CONTACT_EMAIL || '';
@@ -462,6 +463,17 @@ function pairFaq(from, to, imagePair = true) {
   ];
 }
 
+// Hand-written guide for a popular conversion (content/guides.js), or '' when there is none.
+function guideHtml(from, to, g) {
+  if (!g) return '';
+  return `<section class="guide prose">
+    <h2>Why convert ${from.label} to ${to.label}?</h2><p>${g.why}</p>
+    <h2>When to keep the ${from.label}</h2><p>${g.keep}</p>
+    <h2>Tips for the best result</h2><ul>${g.tips.map((t) => `<li>${t}</li>`).join('')}</ul>
+    <h2>Common problems and fixes</h2><dl class="problems">${g.problems.map(([q, a]) => `<dt>${q}</dt><dd>${a}</dd>`).join('')}</dl>
+  </section>`;
+}
+
 function relatedForPair(from, to) {
   const a = outputsFor(from.slug, ANY).filter((o) => o !== to.slug).slice(0, 8).map((o) => [pairPath(from.slug, o), pairLabel(from.slug, o), isLivePair(from.slug, o)]);
   const b = inputsFor(to.slug, ANY).filter((i) => i !== from.slug).slice(0, 8).map((i) => [pairPath(i, to.slug), pairLabel(i, to.slug), isLivePair(i, to.slug)]);
@@ -609,7 +621,8 @@ function pairPage(fromSlug, toSlug, base) {
   }
 
   const imagePair = isImageFmt(fromSlug) && isImageFmt(toSlug);
-  const faq = pairFaq(from, to, imagePair);
+  const guide = GUIDES[`${fromSlug}>${toSlug}`];
+  const faq = [...(guide ? guide.faq : []), ...pairFaq(from, to, imagePair)];
   const notes = pairNotes(from, to);
   if (!imagePair && meta.converter.notes) notes.push(esc(meta.converter.notes));
   if (!notes.length) notes.push(`Your ${from.name} file is converted on our server and the ${to.name} result can be downloaded straight away.`);
@@ -622,7 +635,7 @@ function pairPage(fromSlug, toSlug, base) {
         : `Convert ${from.name} files to ${to.name} online for free. Upload one file or many and download the ${to.name} results one by one or all together in a ZIP. No sign-up needed.`,
       widget, withSelect: true }),
     TOOL: toolHtml({ inputs: [fromSlug], outputs: outputsFor(fromSlug), dropTitle: `Drop your ${from.label} files here`, dropSub: `or click to choose ${from.label} files` }),
-    CONTENT: howToSteps(from.label, to.label, 'convert', imagePair) + cards + compareTable([fromSlug, toSlug])
+    CONTENT: howToSteps(from.label, to.label, 'convert', imagePair) + guideHtml(from, to, guide) + cards + compareTable([fromSlug, toSlug])
       + `<section class="notes"><h2>Converting ${from.name} to ${to.name}</h2><ul>${notes.map((x) => `<li>${x}</li>`).join('')}</ul></section>` + faqHtml(faq),
     RELATED: relatedForPair(from, to),
   }));

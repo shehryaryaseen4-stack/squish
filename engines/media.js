@@ -80,7 +80,9 @@ async function convertMedia({ buffer, inputExt, to }) {
     const isAudioOut = !!AUDIO[target];
     try {
       await run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-nostdin', '-y', '-i', input,
-        ...(isAudioOut ? [] : ['-map_metadata', '-1']), ...recipe, output]);
+        // Video: drop subtitle and data tracks. Picture subtitles (Blu-ray PGS, DVD) cannot be
+        // re-encoded into most targets and would fail the whole conversion.
+        ...(isAudioOut ? [] : ['-map_metadata', '-1', '-sn', '-dn']), ...recipe, output]);
     } catch (e) {
       if (/does not contain any stream|Output file .* does not contain|matches no streams/i.test(e.stderr || '')) {
         throw new UserError(isAudioOut ? 'This file has no audio track to convert.' : 'This file has no video track to convert.');
