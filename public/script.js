@@ -286,6 +286,14 @@
     });
   }
 
+  // "Convert now" (header) on a page that has the upload tool: glide to it instead of jumping,
+  // centring it when it fits so the drop area is fully in view below the sticky header.
+  document.querySelectorAll('a[href="/#convert"], a[href="#convert"]').forEach(a => a.addEventListener("click", e => {
+    e.preventDefault();
+    const fits = tool.offsetHeight < window.innerHeight - 140;
+    tool.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: fits ? "center" : "start" });
+  }));
+
   // One upload + conversion. XHR (not fetch) so the card can show upload progress.
   function requestConversion(row, onProgress){
     return new Promise((resolve, reject) => {
