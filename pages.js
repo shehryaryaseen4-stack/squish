@@ -372,7 +372,7 @@ function toolHtml({ inputs, outputs, dropTitle, dropSub, any = false, compress =
   // -> Convert -> each card shows FINISHED + Download; "Download all" zips every result.
   // compress: files keep their format; cards read "Compress [PNG]" and the button says Compress
   return `<section class="tool-card" id="convert" aria-label="${compress ? 'Upload and compress' : 'Upload and convert'}"${any ? ' data-any="1"' : ''}${compress ? ' data-mode="compress"' : ''} data-cats="${esc(JSON.stringify(cats))}" data-outputs="${esc(JSON.stringify(outs))}">
-  <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose files" data-exts="${exts.join(',')}">
+  <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose files" data-exts="${exts.join(',')}" data-max-mb="${MAX_MB}">
     ${icon('upload', 'drop-ico')}
     <div class="cta">${dropTitle}</div>
     <div class="sub">${dropSub} &middot; up to ${MAX_MB}MB each</div>

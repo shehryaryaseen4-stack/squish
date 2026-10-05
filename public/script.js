@@ -219,6 +219,11 @@
     return (n/(1024*1024)).toFixed(1) + " MB";
   }
 
+  // Files over the per-file limit are refused here, before a long upload the server would reject.
+  const MAX_MB = Number(dropzone.dataset.maxMb) || 0;
+  const MAX_BYTES = MAX_MB * 1024 * 1024;
+  const tooBig = size => `This file is ${fmtBytes(size)}. The limit is ${MAX_MB} MB per file.`;
+
   const rows = [];
   let seq = 0;
 
@@ -227,6 +232,7 @@
       const fmt = formatOf(file.name);
       const row = { id: ++seq, file, name: file.name, size: file.size, fmt, state: "ready", quality: 75, maxDim: 0, optionsOpen: false };
       if (!fmt){ row.state = "error"; row.error = "This file type isn't supported here."; }
+      else if (MAX_BYTES && file.size > MAX_BYTES){ row.state = "error"; row.error = tooBig(file.size); }
       else {
         row.targets = targetsFor(fmt.id);
         if (!row.targets.length){ row.state = "error"; row.error = "This file type can't be converted yet."; }
@@ -311,7 +317,10 @@
       xhr.onerror = () => reject(new Error("Network error. Check your connection and try again."));
       xhr.onload = async () => {
         if (xhr.status !== 200){
-          let msg = "The server couldn't convert this file.";
+          let msg = xhr.status === 413 ? tooBig(row.size)
+            : xhr.status === 524 || xhr.status === 504 ? "This file took too long to convert. Try a smaller or shorter file."
+            : xhr.status === 429 ? "Too many files in a short time. Please wait a few minutes and try again."
+            : "The server couldn't convert this file.";
           try { const data = JSON.parse(await xhr.response.text()); if (data.error) msg = data.error; } catch (e) {}
           return reject(new Error(msg));
         }
