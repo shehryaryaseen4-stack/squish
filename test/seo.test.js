@@ -27,6 +27,7 @@ function fetchPath(p) {
 
 const indexable = pages.allPaths().map((p) => ({ p, html: fetchPath(p).html }));
 const attr = (html, re) => { const m = re.exec(html); return m ? m[1] : null; };
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const decode = (s) => s.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
 
 test('every sitemap page renders and is indexable', () => {
@@ -113,4 +114,20 @@ test('live pair pages carry unique, useful content', () => {
   assert.match(html, /<h2>How to convert PNG to WEBP<\/h2>/);
   assert.match(html, /<h2>PNG vs WEBP<\/h2>/);
   assert.match(html, /<th scope="row">Transparency<\/th><td>Yes<\/td><td>Yes<\/td>/);
+});
+
+test('target keywords lead the title, H1 and description of their pages', () => {
+  const KEYWORDS = require('../content/keywords');
+  const byPath = new Map(indexable.map((x) => [x.p, x.html]));
+  for (const [p, k] of Object.entries(KEYWORDS)) {
+    const html = byPath.get(p);
+    assert.ok(html, `${p} is in content/keywords.js but not an indexable page`);
+    const title = decode(attr(html, /<title>([^<]*)<\/title>/)).toLowerCase();
+    const desc = decode(attr(html, /<meta name="description" content="([^"]*)"/)).toLowerCase();
+    const h1 = attr(html, /<h1[^>]*>([\s\S]*?)<\/h1>/).replace(/<[^>]+>/g, '').toLowerCase();
+    assert.ok(title.includes(k.primary), `${p} title lacks "${k.primary}": ${title}`);
+    if (p !== '/pdf-converter') assert.ok(desc.includes(k.primary), `${p} description lacks "${k.primary}": ${desc}`);
+    assert.ok(h1.includes(k.primary), `${p} H1 lacks "${k.primary}": ${h1}`);
+    for (const [q] of k.faq || []) assert.ok(html.includes(esc(q)), `${p} is missing its FAQ "${q}"`);
+  }
 });

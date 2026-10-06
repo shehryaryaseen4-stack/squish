@@ -26,6 +26,7 @@ const registry = require('./registry');
 const seo = require('./seo');
 const brand = require('./brand');
 const GUIDES = require('./content/guides');
+const KEYWORDS = require('./content/keywords');
 
 const SITE = process.env.SITE_NAME || brand.NAME;
 const CONTACT_EMAIL = process.env.CONTACT_EMAIL || '';
@@ -118,6 +119,18 @@ const link = (href, text) => `<a href="${href}">${text}</a>`;
 const chips = (items) => `<ul class="chips">${items.map(([h, t, live]) =>
   `<li>${link(h, t + (live === false ? ' <span class="soon-tag">soon</span>' : ''))}</li>`).join('')}</ul>`;
 const pairLabel = (f, t) => `${F(f).label} to ${F(t).label}`;
+
+// Target keywords (content/keywords.js) are lower case; write them the way the page shows them.
+const UPPER = new Set(registry.getFormats().flatMap((f) => [f.id, ...(f.aliases || [])]).concat(['tif', 'jpeg']));
+const SPECIAL = { iphone: 'iPhone', powerpoint: 'PowerPoint', quicktime: 'QuickTime' };
+const SMALL = new Set(['to', 'from', 'for', 'and', 'of', 'in', 'as', 'a']);
+const kwCase = (s, title = true) => s.split(' ').map((w, i) => SPECIAL[w] || (UPPER.has(w) ? w.toUpperCase()
+  : (!title || (i && SMALL.has(w)) ? w : w[0].toUpperCase() + w.slice(1)))).join(' ');
+// A variant that is another name for the same thing ("jpeg to png"), not "... converter" or "convert ...".
+const kwAlt = (k) => k.secondary.find((x) => !/\b(convert|converter|online|free)\b/.test(x));
+// The longest title that still fits in a search result (65 characters).
+const fitTitle = (name, alt) => [alt && `${name} (${alt}) - Free Online`, alt && `${name} (${alt})`, `${name} - Free Online`]
+  .filter(Boolean).map((t) => `${t} | ${SITE}`).find((t) => t.length <= 65) || `${name} | ${SITE}`;
 
 // Logo (brand.js). The default name uses the outlined word mark; a custom SITE_NAME gets
 // the icon plus the name as text, with a trailing "Free" in red.
@@ -623,17 +636,28 @@ function pairPage(fromSlug, toSlug, base) {
 
   const imagePair = isImageFmt(fromSlug) && isImageFmt(toSlug);
   const guide = GUIDES[`${fromSlug}>${toSlug}`];
-  const faq = [...(guide ? guide.faq : []), ...pairFaq(from, to, imagePair)];
+  const kw = KEYWORDS[p];
+  const faq = [...(guide ? guide.faq : []), ...(kw && kw.faq ? kw.faq : []), ...pairFaq(from, to, imagePair)];
+  let { title, description, h1 } = meta;
+  let lead = '';
+  if (kw) {
+    const name = kwCase(kw.primary), alt = kwAlt(kw);
+    title = fitTitle(`${name} Converter`, alt && kwCase(alt));
+    const also = alt && / to /.test(alt) ? ` (${kwCase(alt)})` : '';
+    description = `Free ${name} converter${also}. Convert ${from.label} files to ${to.label} online, many at once, and download them as a ZIP. No sign-up, no watermark.`;
+    h1 = `${name} Converter`;
+    lead = `This ${name} converter works in your browser on any computer or phone. `;
+  }
   const notes = pairNotes(from, to);
   if (!imagePair && meta.converter.notes) notes.push(esc(meta.converter.notes));
   if (!notes.length) notes.push(`Your ${from.name} file is converted on our server and the ${to.name} result can be downloaded straight away.`);
-  return renderPage(PAGE_TPL, baseFields(base, p, meta.title, meta.description, {
-    JSONLD: graph(base, p, meta.schemaName, meta.description, faq, meta.breadcrumbs, { features: TOOL_FEATURES }),
+  return renderPage(PAGE_TPL, baseFields(base, p, title, description, {
+    JSONLD: graph(base, p, kw ? h1 : meta.schemaName, description, faq, meta.breadcrumbs, { features: TOOL_FEATURES }),
     DEFAULT_FORMAT: to.select,
-    HERO: hero({ h1: meta.h1, crumbs: meta.breadcrumbs,
-      intro: imagePair
+    HERO: hero({ h1, crumbs: meta.breadcrumbs,
+      intro: lead + (imagePair
         ? `Convert ${from.name} images to ${to.name} online for free. Upload one file or many, choose the quality and maximum size, then download the ${to.name} results one by one or all together in a ZIP. No sign-up needed.`
-        : `Convert ${from.name} files to ${to.name} online for free. Upload one file or many and download the ${to.name} results one by one or all together in a ZIP. No sign-up needed.`,
+        : `Convert ${from.name} files to ${to.name} online for free. Upload one file or many and download the ${to.name} results one by one or all together in a ZIP. No sign-up needed.`),
       widget, withSelect: true }),
     TOOL: toolHtml({ inputs: [fromSlug], outputs: outputsFor(fromSlug), dropTitle: `Drop your ${from.label} files here`, dropSub: `or click to choose ${from.label} files` }),
     CONTENT: howToSteps(from.label, to.label, 'convert', imagePair) + guideHtml(from, to, guide) + cards + compareTable([fromSlug, toSlug])
@@ -660,14 +684,23 @@ function compressPage(slug, base) {
   }
 
   const meta = registry.getCompressMetadata(slug, { siteName: SITE });
+  const kw = KEYWORDS[p];
+  let { title, description } = meta;
+  if (kw) {
+    const name = kwCase(kw.primary), alt = kw.secondary.find((x) => x.startsWith('reduce'));
+    title = `${name}${alt ? ` - ${kwCase(alt)}` : ''} Online Free | ${SITE}`;
+    description = `${name} online for free with our ${kwCase(kw.secondary[0], false)}. ${isImageFmt(slug)
+      ? 'Set the quality and maximum size' : 'Images inside are reduced to 150 dpi'}, compress many files at once and download a ZIP. No sign-up.`;
+  }
   const faq = [
+    ...(kw && kw.faq ? kw.faq : []),
     [`How do I compress a ${f.label} file?`, `Click Select File or drop your ${f.name} files onto the upload box, choose a Quality and Max dimension, and the smaller versions appear below with a download button. Lower quality and a smaller maximum size give smaller files.`],
     [`How much smaller will my ${f.label} be?`, 'It depends on the image and your settings. Photographs usually shrink the most and simple graphics the least. The list shows the exact before and after size for every file.'],
     ...FAQ_COMMON,
   ];
   const conv = outputsFor(slug).slice(0, 6).map((o) => [pairPath(slug, o), pairLabel(slug, o), true]);
-  return renderPage(PAGE_TPL, baseFields(base, p, meta.title, meta.description, {
-    JSONLD: graph(base, p, meta.schemaName, meta.description, faq, meta.breadcrumbs, { features: TOOL_FEATURES }),
+  return renderPage(PAGE_TPL, baseFields(base, p, title, description, {
+    JSONLD: graph(base, p, meta.schemaName, description, faq, meta.breadcrumbs, { features: TOOL_FEATURES }),
     DEFAULT_FORMAT: f.select,
     HERO: hero({ h1: meta.h1, crumbs: meta.breadcrumbs,
       intro: isImageFmt(slug)
@@ -719,8 +752,10 @@ function categoryPage(catId, base) {
   const fmts = registry.getFormatsByCategory(catId);
   const live = categoryIsLive(catId);
   const ins = registry.getInputFormats({ ...ANY, category: catId }).map((x) => x.id);
-  const title = `${c.converterName} - Free Online | ${SITE}`;
-  const desc = `${c.description} ${fmts.length} formats. Free, no sign-up.`;
+  const kw = KEYWORDS[p];
+  const alt = kw && kw.secondary.find((x) => !/\bonline\b/.test(x) && x !== kw.primary);
+  const title = fitTitle(c.converterName, alt && kwCase(alt));
+  const desc = kw ? `Free online ${kw.primary}. ${c.description} ${fmts.length} formats, no sign-up.` : `${c.description} ${fmts.length} formats. Free, no sign-up.`;
   const widget = convertRow(anyInputPicker(ins, null), emptyToPicker());
   const liveIns = LIVE_INPUTS.filter((i) => F(i).category === catId); // primary category only (GIF is not a video tool)
   const fmtGrid = `<section class="conv-section"><h2>Supported ${c.name.toLowerCase()} formats</h2><div class="fmt-cards">${fmts.map((f) =>
@@ -741,7 +776,7 @@ function categoryPage(catId, base) {
 
 function homePage(base) {
   const title = `File Converter - Convert Any File Online Free | ${SITE}`;
-  const desc = `Convert video, audio, images, documents, ebooks, archives and fonts online for free. ${LIVE_COUNT.toLocaleString('en-US')} conversions, batch upload, no sign-up.`;
+  const desc = `Free online file converter for video, audio, images, documents, ebooks, archives and fonts. ${LIVE_COUNT.toLocaleString('en-US')} conversions, batch upload, no sign-up.`;
   const faq = [...FAQ_CATALOG, ...FAQ_COMMON];
   return renderPage(PAGE_TPL, baseFields(base, '/', title, desc, {
     JSONLD: graph(base, '/', `${SITE} File Converter`, desc, faq, [['Home', '/']], { features: TOOL_FEATURES }),
