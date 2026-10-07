@@ -27,6 +27,83 @@ const METRICS = { helv: [0.905, 0.212], times: [0.891, 0.216], courier: [0.833, 
 const LINE = 1.2;
 const baselineOffset = (font, size) => { const [a, d] = METRICS[font] || METRICS.helv; return ((LINE - a - d) / 2 + a) * size; };
 
+// ------------------------------------------------------------------- fonts --
+// Three standard PDF fonts need no download. The others are Google Fonts served by our own
+// server (/fonts/<id>/<variant>.ttf), so the same file is shown on screen and embedded in the PDF.
+// Without that server (the static preview) they are shown through Google's CSS only.
+const FONTS_BASE = ROOT.dataset.fonts === undefined ? '/fonts/' : ROOT.dataset.fonts;
+const STD_FONTS = [{ id: 'helv', name: 'Helvetica', cat: 'standard' }, { id: 'times', name: 'Times', cat: 'standard' }, { id: 'courier', name: 'Courier', cat: 'standard' }];
+const FONT_CATS = [['all', 'All'], ['standard', 'Standard'], ['sans', 'Sans'], ['serif', 'Serif'], ['display', 'Display'], ['handwriting', 'Handwriting'], ['mono', 'Mono'], ['languages', 'Urdu & more']];
+let CATALOG = STD_FONTS.slice();
+const FONT_BY_ID = new Map(STD_FONTS.map((f) => [f.id, f]));
+const isStd = (id) => id === 'helv' || id === 'times' || id === 'courier';
+const fontInfo = (id) => FONT_BY_ID.get(id) || STD_FONTS[0];
+const variantOf = (bold, italic) => `${bold ? 700 : 400}${italic ? 'i' : ''}`;
+const FALLBACK = { serif: 'serif', mono: 'monospace', handwriting: 'cursive', display: 'sans-serif', sans: 'sans-serif', languages: 'sans-serif' };
+function cssFamily(id) {
+  if (isStd(id)) return FONT_CSS[id];
+  const f = fontInfo(id);
+  return `"pe-${id}", "${f.name}", ${FALLBACK[f.cat] || 'sans-serif'}`;
+}
+async function loadCatalog() {
+  try {
+    const list = await (await fetch(new URL('editor-fonts.json', import.meta.url))).json();
+    CATALOG = STD_FONTS.concat(list);
+    list.forEach((f) => FONT_BY_ID.set(f.id, f));
+  } catch { /* standard fonts only */ }
+}
+const fontLoads = new Map();   // `${id}:${variant}` -> Promise
+const fontMeta = new Map();    // id -> meta from the server
+function ensureFont(id, bold = false, italic = false) {
+  if (!id || isStd(id) || !FONT_BY_ID.has(id)) return Promise.resolve();
+  const v = variantOf(bold, italic);
+  const key = `${id}:${v}`;
+  if (fontLoads.has(key)) return fontLoads.get(key);
+  const f = fontInfo(id);
+  const job = (async () => {
+    if (FONTS_BASE) {
+      if (!fontMeta.has(id)) {
+        const meta = await fetch(`${FONTS_BASE}${id}/meta.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        fontMeta.set(id, meta);
+        if (meta) METRICS[id] = [meta.ascent, meta.descent];
+      }
+      const face = new FontFace(`pe-${id}`, `url(${FONTS_BASE}${id}/${v}.ttf)`, { weight: bold ? '700' : '400', style: italic ? 'italic' : 'normal' });
+      await face.load();
+      document.fonts.add(face);
+    } else {
+      if (!document.querySelector(`link[data-font="${id}"]`)) {
+        const l = document.createElement('link');
+        l.rel = 'stylesheet'; l.dataset.font = id;
+        l.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(f.name).replace(/%20/g, '+')}:ital,wght@0,400;0,700;1,400;1,700&display=swap`;
+        document.head.append(l);
+      }
+      await document.fonts.load(`${italic ? 'italic ' : ''}${bold ? 700 : 400} 16px "${f.name}"`);
+    }
+  })().catch(() => {});
+  fontLoads.set(key, job);
+  // once the font is there, text boxes using it change size: redraw those pages
+  job.then(() => S.pages.forEach((p, i) => { if (p.items.some((it) => it.type === 'text' && it.font === id)) drawItems(i); }));
+  return job;
+}
+let recentFonts = [];
+try { recentFonts = JSON.parse(localStorage.getItem('pe-recent-fonts') || '[]').filter((x) => typeof x === 'string').slice(0, 6); } catch { /* storage off */ }
+function rememberFont(id) {
+  recentFonts = [id, ...recentFonts.filter((x) => x !== id)].slice(0, 6);
+  try { localStorage.setItem('pe-recent-fonts', JSON.stringify(recentFonts)); } catch { /* storage off */ }
+}
+// match a font name found in a PDF to the catalogue ("ABCDEF+Roboto-Bold" -> roboto)
+function catalogMatch(name) {
+  const n = String(name || '').replace(/^[A-Z]{6}\+/, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!n) return null;
+  let best = null;
+  for (const f of CATALOG) {
+    if (isStd(f.id)) continue;
+    const k = f.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (n.startsWith(k) && (!best || k.length > best.k.length)) best = { id: f.id, k };
+  }
+  return best && best.id;
+}
+
 const SHAPES = new Set(['rect', 'ellipse', 'line', 'arrow', 'check', 'cross']);
 const HINTS = {
   select: 'Click an object to select it. Drag to move, use the corners to resize.',
@@ -42,21 +119,21 @@ const HINTS = {
 };
 // Which settings each kind of object (or tool) has.
 const PROPS = {
-  text: ['color', 'font', 'size', 'style', 'opacity'],
-  pen: ['color', 'width', 'opacity'], line: ['color', 'width', 'opacity'], arrow: ['color', 'width', 'opacity'],
+  text: ['color', 'font', 'size', 'style', 'align', 'opacity'],
+  pen: ['color', 'width', 'dash', 'opacity'], line: ['color', 'width', 'dash', 'opacity'], arrow: ['color', 'width', 'dash', 'opacity'],
   check: ['color', 'width'], cross: ['color', 'width'],
-  rect: ['color', 'width', 'fill', 'opacity'], ellipse: ['color', 'width', 'fill', 'opacity'],
+  rect: ['color', 'width', 'dash', 'fill', 'radius', 'opacity'], ellipse: ['color', 'width', 'dash', 'fill', 'opacity'],
   highlight: ['color', 'opacity'], whiteout: ['color'], image: ['opacity', 'replace'],
 };
 const DEFAULTS = {
-  text: { color: '#111827', font: 'helv', size: 14, bold: false, italic: false, opacity: 100 },
-  pen: { color: '#1d3c8f', width: 2, opacity: 100 },
-  line: { color: '#111827', width: 2, opacity: 100 },
-  arrow: { color: '#e5322d', width: 2, opacity: 100 },
+  text: { color: '#111827', font: 'helv', size: 14, bold: false, italic: false, underline: false, align: 'left', opacity: 100 },
+  pen: { color: '#1d3c8f', width: 2, dash: 'solid', opacity: 100 },
+  line: { color: '#111827', width: 2, dash: 'solid', opacity: 100 },
+  arrow: { color: '#e5322d', width: 2, dash: 'solid', opacity: 100 },
   check: { color: '#1e9e5a', width: 2.5, opacity: 100 },
   cross: { color: '#e5322d', width: 2.5, opacity: 100 },
-  rect: { color: '#e5322d', width: 2, fill: '#ffffff', fillOn: false, opacity: 100 },
-  ellipse: { color: '#e5322d', width: 2, fill: '#ffffff', fillOn: false, opacity: 100 },
+  rect: { color: '#e5322d', width: 2, dash: 'solid', fill: '#ffffff', fillOn: false, radius: 0, opacity: 100 },
+  ellipse: { color: '#e5322d', width: 2, dash: 'solid', fill: '#ffffff', fillOn: false, opacity: 100 },
   highlight: { color: '#ffe14d', opacity: 100 },
   whiteout: { color: '#ffffff', opacity: 100 },
   image: { opacity: 100 },
@@ -238,6 +315,8 @@ function rebuild() {
   buildThumbs();
   markCurrent();
   updateProps();
+  renderLayers();
+  drawRulersSoon();
 }
 
 async function paintPage(el) {
@@ -277,6 +356,7 @@ function drawItems(index) {
   if (keepRuns) layer.append(keepRuns);
   renderObjects(layer, p, S.zoom, true);
   if (S.sel && S.sel.page === p.id) decorateSelection();
+  if (layersPage() === p) renderLayers();
   // Text boxes size themselves; remember the size so selection and export agree with the screen.
   p.items.forEach((it) => {
     if (it.type !== 'text') return;
@@ -299,18 +379,24 @@ function renderObjects(layer, p, z, live) {
   const zoomSave = S.zoom;
   S.zoom = z; // svgFor reads the zoom
   p.items.forEach((it) => {
+    if (it.hidden) return;
     const o = document.createElement('div');
     o.className = 'pe-obj';
     if (live) o.dataset.id = it.id; // thumbnails get no id, so lookups only find the page copy
+    if (live && it.locked) o.classList.add('pe-locked');
     o.style.left = `${it.x * z}px`; o.style.top = `${it.y * z}px`;
     o.style.opacity = (it.opacity ?? 100) / 100;
+    if (it.rot) { o.style.transformOrigin = 'center'; o.style.transform = `rotate(${it.rot}deg)`; }
     if (it.type === 'text') {
       o.classList.add('pe-text');
       o.textContent = it.text;
+      o.dir = 'auto';
       Object.assign(o.style, {
-        fontFamily: FONT_CSS[it.font], fontSize: `${it.size * z}px`, color: it.color,
+        fontFamily: cssFamily(it.font), fontSize: `${it.size * z}px`, color: it.color,
         fontWeight: it.bold ? '700' : '400', fontStyle: it.italic ? 'italic' : 'normal',
+        textDecoration: it.underline ? 'underline' : 'none', textAlign: it.align || 'left',
       });
+      if (!isStd(it.font)) ensureFont(it.font, it.bold, it.italic);
       if (live && S.editing === it.id) startEditing(o, it, true);
     } else {
       o.style.width = `${it.w * z}px`; o.style.height = `${it.h * z}px`;
@@ -335,10 +421,12 @@ const PATHS = { check: 'M0.12 0.55 L0.4 0.84 L0.9 0.16', cross: 'M0.16 0.16 L0.8
 function svgFor(it) {
   const z = S.zoom;
   const sw = (it.width || 2) * z;
-  const stroke = `stroke="${it.color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"`;
+  const dash = dashArray(it, sw);
+  const stroke = `stroke="${it.color}" stroke-width="${sw}" stroke-linecap="${it.dash === 'dashed' ? 'butt' : 'round'}" stroke-linejoin="round"${dash ? ` stroke-dasharray="${dash.join(' ')}"` : ''}`;
   if (it.type === 'rect') {
     const fill = it.fillOn ? it.fill : 'none';
-    return `<svg viewBox="0 0 ${it.w * z} ${it.h * z}" preserveAspectRatio="none"><rect x="${sw / 2}" y="${sw / 2}" width="${Math.max(0, it.w * z - sw)}" height="${Math.max(0, it.h * z - sw)}" fill="${fill}" ${stroke}/></svg>`;
+    const r = Math.min((it.radius || 0) * z, (it.w * z - sw) / 2, (it.h * z - sw) / 2);
+    return `<svg viewBox="0 0 ${it.w * z} ${it.h * z}" preserveAspectRatio="none"><rect x="${sw / 2}" y="${sw / 2}" width="${Math.max(0, it.w * z - sw)}" height="${Math.max(0, it.h * z - sw)}" rx="${Math.max(0, r)}" fill="${fill}" ${stroke}/></svg>`;
   }
   if (it.type === 'ellipse') {
     const fill = it.fillOn ? it.fill : 'none';
@@ -362,6 +450,13 @@ function svgFor(it) {
   return '';
 }
 
+// dash pattern for a stroke width (same numbers on screen and in the PDF)
+function dashArray(it, w) {
+  if (it.dash === 'dashed') return [round(w * 3), round(w * 2)];
+  if (it.dash === 'dotted') return [round(Math.max(0.01, w * 0.01)), round(w * 2)];
+  return null;
+}
+
 function arrowHead(it) {
   const ang = Math.atan2(it.y2 - it.y1, it.x2 - it.x1);
   const len = Math.max(10, (it.width || 2) * 4.5);
@@ -372,25 +467,98 @@ function arrowHead(it) {
 function select(pageId, id) {
   finishEditing();
   S.sel = id ? { page: pageId, id } : null;
-  $$('.pe-sel').forEach((e) => e.classList.remove('pe-sel'));
-  $$('.pe-handle').forEach((e) => e.remove());
+  clearSelectionUi();
   if (S.sel) decorateSelection();
-  updateProps();
+  updateProps(); renderLayers();
 }
+const isLine = (it) => it.type === 'line' || it.type === 'arrow';
+function clearSelectionUi() { $$('.pe-selbox, .pe-handle').forEach((e) => e.remove()); }
+// Outline, corner handles and a rotation handle, turned with the object.
 function decorateSelection() {
+  clearSelectionUi();
   const it = itemOf(S.sel);
-  const pageEl = $(`.pe-page[data-id="${S.sel.page}"]`);
-  if (!it || !pageEl) return;
-  const o = pageEl.querySelector(`.pe-obj[data-id="${it.id}"]`);
-  if (!o) return;
-  if (S.editing === it.id) return;
-  if (it.type !== 'line' && it.type !== 'arrow') o.classList.add('pe-sel');
+  const pageEl = S.sel && $(`.pe-page[data-id="${S.sel.page}"]`);
+  if (!it || !pageEl || it.hidden || S.editing === it.id) return;
   const layer = pageEl.querySelector('.pe-layer');
   const z = S.zoom;
-  const add = (h, x, y) => { const d = document.createElement('div'); d.className = 'pe-handle'; d.dataset.h = h; d.style.left = `${x * z}px`; d.style.top = `${y * z}px`; layer.append(d); };
-  if (it.type === 'line' || it.type === 'arrow') { add('p1', it.x1, it.y1); add('p2', it.x2, it.y2); return; }
-  if (it.type === 'text') return; // text size comes from the font size setting
-  add('nw', it.x, it.y); add('ne', it.x + it.w, it.y); add('sw', it.x, it.y + it.h); add('se', it.x + it.w, it.y + it.h);
+  const handle = (h, parent, x, y) => {
+    const d = document.createElement('div'); d.className = 'pe-handle'; d.dataset.h = h;
+    d.style.left = typeof x === 'number' ? `${x}px` : x; d.style.top = typeof y === 'number' ? `${y}px` : y;
+    parent.append(d);
+  };
+  if (isLine(it)) {
+    if (!it.locked) { handle('p1', layer, it.x1 * z, it.y1 * z); handle('p2', layer, it.x2 * z, it.y2 * z); }
+    return;
+  }
+  const box = document.createElement('div');
+  box.className = 'pe-selbox';
+  Object.assign(box.style, { left: `${it.x * z}px`, top: `${it.y * z}px`, width: `${it.w * z}px`, height: `${it.h * z}px` });
+  if (it.rot) box.style.transform = `rotate(${it.rot}deg)`;
+  if (it.locked) box.classList.add('no-rot');
+  else {
+    [['nw', '0%', '0%'], ['ne', '100%', '0%'], ['sw', '0%', '100%'], ['se', '100%', '100%']].forEach(([h, x, y]) => handle(h, box, x, y));
+    handle('rot', box, '50%', 0);
+  }
+  layer.append(box);
+}
+
+// ----------------------------------------------------------- arrange etc. --
+function arrange(where) {
+  const it = itemOf(S.sel);
+  if (!it) return;
+  const p = pageById(S.sel.page);
+  const i = p.items.indexOf(it);
+  const j = clamp({ tofront: p.items.length - 1, toback: 0, forward: i + 1, backward: i - 1 }[where], 0, p.items.length - 1);
+  if (j === i) return;
+  snapshot();
+  p.items.splice(i, 1); p.items.splice(j, 0, it);
+  drawItems(pageIndex(p.id));
+}
+function toggleFlag(sel, flag) {
+  const it = itemOf(sel);
+  if (!it) return;
+  snapshot();
+  it[flag] = !it[flag];
+  const i = pageIndex(sel.page);
+  if (flag === 'hidden' && it.hidden && S.sel && S.sel.id === it.id) S.sel = null;
+  drawItems(i); updateProps(); renderLayers();
+}
+let clip = null;
+function copySel(cut) {
+  const it = itemOf(S.sel);
+  if (!it) return false;
+  clip = { item: JSON.parse(JSON.stringify(it)), page: S.sel.page };
+  if (cut) removeSelected(); else toast('Copied');
+  return true;
+}
+function pasteClip() {
+  if (!clip) return false;
+  const p = S.pages[S.current] || S.pages[0];
+  const c = { ...JSON.parse(JSON.stringify(clip.item)), id: uid(), locked: false, hidden: false };
+  if (clip.page === p.id) moveItem(c, 12, 12);
+  const [vw, vh] = viewSize(p);
+  moveItem(c, clamp(c.x, 0, Math.max(0, vw - c.w)) - c.x, clamp(c.y, 0, Math.max(0, vh - c.h)) - c.y);
+  snapshot();
+  p.items.push(c);
+  clip = { item: JSON.parse(JSON.stringify(c)), page: p.id }; // the next paste steps on again
+  drawItems(pageIndex(p.id)); setTool('select'); select(p.id, c.id);
+  return true;
+}
+// Paste from outside the editor: an image becomes an image, plain text becomes a text box.
+async function pasteExternal(e) {
+  const files = Array.from(e.clipboardData.files || []);
+  const img = files.find(isImage);
+  if (img) { e.preventDefault(); imagePick = null; insertImage(img); return; }
+  const text = e.clipboardData.getData('text/plain');
+  if (text && text.trim()) {
+    e.preventDefault();
+    const p = S.pages[S.current];
+    const [vw, vh] = viewSize(p);
+    snapshot();
+    const t = { id: uid(), type: 'text', ...DEFAULTS.text, text: text.replace(/\r/g, '').slice(0, 5000), x: vw * 0.1, y: vh * 0.1, w: 10, h: 10 };
+    p.items.push(t);
+    drawItems(pageIndex(p.id)); setTool('select'); select(p.id, t.id);
+  }
 }
 
 function removeSelected() {
@@ -412,14 +580,7 @@ function duplicateSelected() {
   p.items.push(c);
   drawItems(pageIndex(p.id)); select(p.id, c.id);
 }
-function frontSelected() {
-  const it = itemOf(S.sel);
-  if (!it) return;
-  snapshot();
-  const p = pageById(S.sel.page);
-  p.items = p.items.filter((i) => i !== it).concat(it);
-  drawItems(pageIndex(p.id));
-}
+function frontSelected() { arrange('tofront'); }
 function moveItem(it, dx, dy) {
   it.x += dx; it.y += dy;
   if (it.type === 'line' || it.type === 'arrow') { it.x1 += dx; it.x2 += dx; it.y1 += dy; it.y2 += dy; }
@@ -529,8 +690,8 @@ async function textRuns(p) {
     const style = tc.styles[t.fontName] || {};
     let name = '';
     try { const f = page.commonObjs.has(t.fontName) ? page.commonObjs.get(t.fontName) : null; name = (f && f.name) || ''; } catch { /* font not loaded */ }
-    const family = /mono|courier/i.test(`${style.fontFamily} ${name}`) ? 'courier'
-      : (/serif/i.test(style.fontFamily || '') && !/sans/i.test(style.fontFamily || '')) || /times|roman|georgia|garamond/i.test(name) ? 'times' : 'helv';
+    const family = catalogMatch(name) || (/mono|courier/i.test(`${style.fontFamily} ${name}`) ? 'courier'
+      : (/serif/i.test(style.fontFamily || '') && !/sans/i.test(style.fontFamily || '')) || /times|roman|georgia|garamond/i.test(name) ? 'times' : 'helv');
     runs.push({
       str: t.str, size, x: m[4], base: m[5], w: t.width * (vp.scale || 1), top: m[5] - size * 0.92, h: size * 1.18,
       font: family, bold: /bold|black|heavy|semibold|demi/i.test(name), italic: /italic|oblique/i.test(name),
@@ -652,7 +813,8 @@ async function editRunAt(p, pt) {
   snapshot();
   const cover = { id: uid(), type: 'whiteout', color: '#ffffff', opacity: 100, x: run.x - 1, y: run.top - 1, w: run.w + 2, h: run.h + 2 };
   const size = Math.round(run.size * 10) / 10;
-  const text = { id: uid(), type: 'text', text: run.str, font: run.font, size, bold: run.bold, italic: run.italic, color: '#000000', opacity: 100,
+  if (!isStd(run.font)) await ensureFont(run.font, run.bold, run.italic);
+  const text = { id: uid(), type: 'text', text: run.str, font: run.font, size, bold: run.bold, italic: run.italic, underline: false, align: 'left', color: '#000000', opacity: 100,
     x: run.x, y: run.base - baselineOffset(run.font, size), w: run.w, h: run.h };
   p.items.push(cover, text);
   drawItems(pageIndex(p.id));
@@ -683,7 +845,8 @@ function onPointerDown(e) {
   if (handle) {
     e.preventDefault();
     const sel = itemOf(S.sel);
-    drag = { kind: 'resize', h: handle.dataset.h, page: p, it: sel, start: pt, orig: JSON.parse(JSON.stringify(sel)), moved: false };
+    if (!sel) return;
+    drag = { kind: handle.dataset.h === 'rot' ? 'rotate' : 'resize', h: handle.dataset.h, page: p, it: sel, start: pt, orig: JSON.parse(JSON.stringify(sel)), moved: false };
     pageEl.setPointerCapture(e.pointerId);
     return;
   }
@@ -693,7 +856,7 @@ function onPointerDown(e) {
     if (!it) { select(null, null); return; }
     e.preventDefault();
     if (!(S.sel && S.sel.id === it.id)) select(p.id, it.id);
-    drag = { kind: 'move', page: p, it, start: pt, last: pt, moved: false, pageEl };
+    drag = { kind: 'move', page: p, it, start: pt, orig: { x: it.x, y: it.y }, moved: false, pageEl };
     pageEl.setPointerCapture(e.pointerId);
     return;
   }
@@ -771,15 +934,29 @@ function onPointerMove(e) {
   const pt = ptOf(e, pageEl);
   const [vw, vh] = viewSize(drag.page);
   if (drag.kind === 'move') {
-    let dx = pt.x - drag.last.x, dy = pt.y - drag.last.y;
     if (!drag.moved) { if (Math.hypot(pt.x - drag.start.x, pt.y - drag.start.y) < 2 / S.zoom) return; snapshot(); drag.moved = true; }
     const it = drag.it;
-    dx = clamp(dx, -it.x - it.w + 8, vw - it.x - 8); dy = clamp(dy, -it.y - it.h + 8, vh - it.y - 8);
-    moveItem(it, dx, dy);
-    drag.last = { x: drag.last.x + dx, y: drag.last.y + dy };
+    let nx = clamp(drag.orig.x + pt.x - drag.start.x, -it.w + 8, vw - 8);
+    let ny = clamp(drag.orig.y + pt.y - drag.start.y, -it.h + 8, vh - 8);
+    const sn = e.altKey ? { x: nx, y: ny } : snapMove(drag.page, it, nx, ny);
+    moveItem(it, sn.x - it.x, sn.y - it.y);
     const o = pageEl.querySelector(`.pe-obj[data-id="${it.id}"]`);
     o.style.left = `${it.x * S.zoom}px`; o.style.top = `${it.y * S.zoom}px`;
-    $$('.pe-handle', pageEl).forEach((h) => h.remove());
+    showGuides(pageEl, sn.gx, sn.gy);
+    decorateSelection();
+    updatePanel();
+    return;
+  }
+  if (drag.kind === 'rotate') {
+    if (!drag.moved) { snapshot(); drag.moved = true; }
+    const it = drag.it;
+    const cx = it.x + it.w / 2, cy = it.y + it.h / 2;
+    let a = (Math.atan2(pt.y - cy, pt.x - cx) * 180) / Math.PI + 90;
+    if (e.shiftKey) a = Math.round(a / 15) * 15;
+    else { const r90 = Math.round(a / 90) * 90; if (Math.abs(a - r90) < 4) a = r90; }
+    it.rot = Math.round((((a % 360) + 360) % 360) * 10) / 10;
+    drawItems(pageIndex(drag.page.id));
+    updatePanel();
     return;
   }
   if (drag.kind === 'resize') {
@@ -790,21 +967,27 @@ function onPointerMove(e) {
       it[`x${drag.h[1]}`] = clamp(o[`x${drag.h[1]}`] + dx, 0, vw); it[`y${drag.h[1]}`] = clamp(o[`y${drag.h[1]}`] + dy, 0, vh);
       lineBox(it);
     } else {
-      let { x, y, w, h } = o;
-      if (drag.h.includes('e')) w = o.w + dx;
-      if (drag.h.includes('s')) h = o.h + dy;
-      if (drag.h.includes('w')) { x = o.x + dx; w = o.w - dx; }
-      if (drag.h.includes('n')) { y = o.y + dy; h = o.h - dy; }
-      if ((it.type === 'image' || it.type === 'check' || it.type === 'cross') && !e.shiftKey) {
-        const ratio = o.w / o.h;
-        if (Math.abs(w / ratio - o.h) > Math.abs(h * ratio - o.w)) h = w / ratio; else w = h * ratio;
-        if (drag.h.includes('w')) x = o.x + o.w - w;
-        if (drag.h.includes('n')) y = o.y + o.h - h;
+      // work in the object's own (unrotated) frame, keep the opposite corner where it is
+      const th = ((o.rot || 0) * Math.PI) / 180, cs = Math.cos(th), sn = Math.sin(th);
+      const lx = dx * cs + dy * sn, ly = -dx * sn + dy * cs;
+      let L = -o.w / 2, R = o.w / 2, T = -o.h / 2, B = o.h / 2;
+      if (drag.h.includes('e')) R += lx; if (drag.h.includes('w')) L += lx;
+      if (drag.h.includes('s')) B += ly; if (drag.h.includes('n')) T += ly;
+      let w = R - L, h = B - T;
+      if ((it.type === 'image' || it.type === 'check' || it.type === 'cross' || it.type === 'text') && !e.shiftKey) {
+        const k = Math.max(w / o.w, h / o.h);
+        w = o.w * k; h = o.h * k;
+        if (drag.h.includes('w')) L = R - w; else R = L + w;
+        if (drag.h.includes('n')) T = B - h; else B = T + h;
       }
       if (w < 4 || h < 4) return;
-      Object.assign(it, { x, y, w, h });
+      const mx = (L + R) / 2, my = (T + B) / 2;
+      const cx = o.x + o.w / 2 + mx * cs - my * sn, cy = o.y + o.h / 2 + mx * sn + my * cs;
+      if (it.type === 'text') it.size = clamp(Math.round(o.size * (w / o.w) * 10) / 10, 4, 400);
+      Object.assign(it, { x: cx - w / 2, y: cy - h / 2, w, h });
     }
     drawItems(pageIndex(drag.page.id));
+    updatePanel();
     return;
   }
   if (drag.kind === 'pen') {
@@ -815,6 +998,31 @@ function onPointerMove(e) {
     return;
   }
   if (drag.kind === 'shape') { drag.end = { x: clamp(pt.x, 0, vw), y: clamp(pt.y, 0, vh) }; drawRubber(drag); }
+}
+
+// Snap a moving object's edges and centre to the page and to other objects (Alt turns it off).
+function snapMove(p, it, nx, ny) {
+  const [vw, vh] = viewSize(p);
+  const th = 5 / S.zoom;
+  const xs = [0, vw / 2, vw], ys = [0, vh / 2, vh];
+  p.items.forEach((o) => { if (o !== it && !o.hidden) { xs.push(o.x, o.x + o.w / 2, o.x + o.w); ys.push(o.y, o.y + o.h / 2, o.y + o.h); } });
+  const pick = (pos, size, lines) => {
+    let best = null;
+    for (const off of [0, size / 2, size]) for (const c of lines) {
+      const d = c - (pos + off);
+      if (Math.abs(d) < th && (!best || Math.abs(d) < Math.abs(best.d))) best = { d, c };
+    }
+    return best;
+  };
+  const bx = pick(nx, it.w, xs), by = pick(ny, it.h, ys);
+  return { x: nx + (bx ? bx.d : 0), y: ny + (by ? by.d : 0), gx: bx ? bx.c : null, gy: by ? by.c : null };
+}
+function showGuides(pageEl, gx, gy) {
+  $$('.pe-guide').forEach((g) => g.remove());
+  if (!pageEl) return;
+  const layer = pageEl.querySelector('.pe-layer');
+  if (gx != null) { const g = document.createElement('div'); g.className = 'pe-guide v'; g.style.left = `${gx * S.zoom}px`; layer.append(g); }
+  if (gy != null) { const g = document.createElement('div'); g.className = 'pe-guide h'; g.style.top = `${gy * S.zoom}px`; layer.append(g); }
 }
 
 function drawRubber(d) {
@@ -834,8 +1042,9 @@ function onPointerUp() {
   if (!drag) return;
   const d = drag; drag = null;
   const p = d.page, idx = pageIndex(p.id);
-  if (d.kind === 'move' || d.kind === 'resize') {
-    if (d.moved) { drawItems(idx); updateProps(); }
+  if (d.kind === 'move' || d.kind === 'resize' || d.kind === 'rotate') {
+    showGuides(null);
+    if (d.moved) { drawItems(idx); updateProps(); updatePanel(); }
     else if (d.kind === 'move' && d.it.type === 'text' && S.tool !== 'select') editText(p.id, d.it);
     return;
   }
@@ -889,8 +1098,9 @@ function setTool(tool) {
 
 // -------------------------------------------------------------- properties --
 const FIELDS = {
-  color: $('#pColor'), fill: $('#pFill'), fillOn: $('#pFillOn'), width: $('#pWidth'), font: $('#pFont'),
-  size: $('#pSize'), bold: $('#pBold'), italic: $('#pItalic'), opacity: $('#pOpacity'),
+  color: $('#pColor'), fill: $('#pFill'), fillOn: $('#pFillOn'), width: $('#pWidth'),
+  size: $('#pSize'), bold: $('#pBold'), italic: $('#pItalic'), underline: $('#pUnder'), opacity: $('#pOpacity'),
+  dash: $('#pDash'), radius: $('#pRadius'),
 };
 function propTarget() {
   const it = itemOf(S.sel);
@@ -908,13 +1118,18 @@ function updateProps() {
     if ('color' in o) FIELDS.color.value = o.color;
     if ('fill' in o) { FIELDS.fill.value = o.fill; FIELDS.fillOn.checked = !!o.fillOn; }
     if ('width' in o) { FIELDS.width.value = o.width; $('#pWidthOut').textContent = o.width; }
-    if ('font' in o) FIELDS.font.value = o.font;
+    if ('font' in o) { const n = $('#pFontName'); n.textContent = fontInfo(o.font).name; n.style.fontFamily = cssFamily(o.font); if (!isStd(o.font)) ensureFont(o.font); }
     if ('size' in o) FIELDS.size.value = o.size;
     if ('bold' in o) FIELDS.bold.setAttribute('aria-pressed', String(!!o.bold));
     if ('italic' in o) FIELDS.italic.setAttribute('aria-pressed', String(!!o.italic));
+    if ('underline' in o) FIELDS.underline.setAttribute('aria-pressed', String(!!o.underline));
+    $$('[data-align]').forEach((b) => b.setAttribute('aria-pressed', String((o.align || 'left') === b.dataset.align)));
+    if ('dash' in o) FIELDS.dash.value = o.dash || 'solid';
+    if ('radius' in o) { FIELDS.radius.value = o.radius || 0; $('#pRadiusOut').textContent = o.radius || 0; }
     if ('opacity' in o) { FIELDS.opacity.value = o.opacity; $('#pOpacityOut').textContent = `${o.opacity}%`; }
   }
   $('#peHint').textContent = t && t.item ? 'Delete key removes the selected object.' : HINTS[S.tool] || '';
+  updatePanel();
 }
 let propSnap = false;
 function setProp(key, value) {
@@ -933,19 +1148,333 @@ function setProp(key, value) {
     if (wasEditing) { const o = $(`.pe-obj[data-id="${wasEditing}"]`); if (o) o.focus(); }
   }
 }
+const toggleProp = (key) => { const t = propTarget(); if (!t || !(key in t.obj || key === 'underline')) return; setProp(key, !t.obj[key]); propSnap = false; updateProps(); };
 function bindProps() {
   const end = () => { propSnap = false; };
   FIELDS.color.addEventListener('input', () => setProp('color', FIELDS.color.value));
   FIELDS.fill.addEventListener('input', () => { setProp('fill', FIELDS.fill.value); setProp('fillOn', true); FIELDS.fillOn.checked = true; });
   FIELDS.fillOn.addEventListener('change', () => { setProp('fillOn', FIELDS.fillOn.checked); end(); });
   FIELDS.width.addEventListener('input', () => { $('#pWidthOut').textContent = FIELDS.width.value; setProp('width', Number(FIELDS.width.value)); });
-  FIELDS.font.addEventListener('change', () => { setProp('font', FIELDS.font.value); end(); });
   FIELDS.size.addEventListener('input', () => { const v = clamp(Number(FIELDS.size.value) || 0, 4, 200); if (v) setProp('size', v); });
   FIELDS.opacity.addEventListener('input', () => { $('#pOpacityOut').textContent = `${FIELDS.opacity.value}%`; setProp('opacity', Number(FIELDS.opacity.value)); });
-  [FIELDS.bold, FIELDS.italic].forEach((b) => b.addEventListener('mousedown', (e) => e.preventDefault())); // keep the caret in the text
-  FIELDS.bold.addEventListener('click', () => { const v = FIELDS.bold.getAttribute('aria-pressed') !== 'true'; FIELDS.bold.setAttribute('aria-pressed', String(v)); setProp('bold', v); end(); });
-  FIELDS.italic.addEventListener('click', () => { const v = FIELDS.italic.getAttribute('aria-pressed') !== 'true'; FIELDS.italic.setAttribute('aria-pressed', String(v)); setProp('italic', v); end(); });
+  [FIELDS.bold, FIELDS.italic, FIELDS.underline, ...$$('[data-align]'), $('#pFontBtn')].forEach((b) => b.addEventListener('mousedown', (e) => e.preventDefault())); // keep the caret in the text
+  FIELDS.bold.addEventListener('click', () => { const t = propTarget(); if (t && t.item && t.obj.type === 'text') ensureFont(t.obj.font, !t.obj.bold, t.obj.italic); toggleProp('bold'); });
+  FIELDS.italic.addEventListener('click', () => { const t = propTarget(); if (t && t.item && t.obj.type === 'text') ensureFont(t.obj.font, t.obj.bold, !t.obj.italic); toggleProp('italic'); });
+  FIELDS.underline.addEventListener('click', () => toggleProp('underline'));
+  $$('[data-align]').forEach((b) => b.addEventListener('click', () => { setProp('align', b.dataset.align); end(); updateProps(); }));
+  FIELDS.dash.addEventListener('change', () => { setProp('dash', FIELDS.dash.value); end(); });
+  FIELDS.radius.addEventListener('input', () => { $('#pRadiusOut').textContent = FIELDS.radius.value; setProp('radius', Number(FIELDS.radius.value)); });
+  $('#pFontBtn').addEventListener('click', (e) => { e.stopPropagation(); if ($('#peFontPop').hidden) openFontPicker(); else closeFontPicker(); });
   Object.values(FIELDS).forEach((f) => f.addEventListener('change', end));
+}
+
+// ------------------------------------------------------------- font picker --
+let fontCat = 'all', fontActive = -1, fontIO = null;
+function openFontPicker() {
+  const pop = $('#peFontPop'), btn = $('#pFontBtn');
+  pop.hidden = false;
+  const r = btn.getBoundingClientRect();
+  pop.style.left = `${clamp(r.left, 8, window.innerWidth - pop.offsetWidth - 8)}px`;
+  pop.style.top = `${clamp(r.bottom + 6, 8, window.innerHeight - pop.offsetHeight - 8)}px`;
+  $('#peFontSearch').value = '';
+  renderFontList();
+  $('#peFontSearch').focus();
+}
+function closeFontPicker() { $('#peFontPop').hidden = true; }
+function renderFontList() {
+  const cats = $('#peFontCats');
+  if (!cats.childElementCount) {
+    FONT_CATS.forEach(([id, label]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.dataset.cat = id; b.textContent = label;
+      b.addEventListener('mousedown', (e) => e.preventDefault());
+      b.addEventListener('click', () => { fontCat = id; renderFontList(); });
+      cats.append(b);
+    });
+  }
+  $$('button', cats).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cat === fontCat)));
+  const q = $('#peFontSearch').value.trim().toLowerCase();
+  const t = propTarget();
+  const current = t && t.obj.font;
+  const list = $('#peFontList');
+  list.textContent = '';
+  if (fontIO) fontIO.disconnect();
+  fontIO = new IntersectionObserver((es) => es.forEach((e) => {
+    if (!e.isIntersecting) return;
+    const id = e.target.dataset.font;
+    fontIO.unobserve(e.target);
+    ensureFont(id).then(() => { e.target.firstChild.style.fontFamily = cssFamily(id); });
+  }), { root: list });
+  const row = (f) => {
+    const li = document.createElement('li');
+    li.dataset.font = f.id; li.setAttribute('role', 'option'); li.setAttribute('aria-selected', String(f.id === current));
+    const name = document.createElement('span'); name.textContent = f.name;
+    if (isStd(f.id) || fontLoads.has(`${f.id}:400`)) name.style.fontFamily = cssFamily(f.id);
+    const tag = document.createElement('small'); tag.textContent = f.note || (f.cat === 'standard' ? 'built in' : f.cat);
+    li.append(name, tag);
+    li.addEventListener('mousedown', (e) => e.preventDefault());
+    li.addEventListener('click', () => chooseFont(f.id));
+    list.append(li);
+    if (!isStd(f.id)) fontIO.observe(li);
+  };
+  const head = (text) => { const li = document.createElement('li'); li.className = 'pe-fonthead'; li.textContent = text; list.append(li); };
+  const match = (f) => (fontCat === 'all' || f.cat === fontCat) && (!q || f.name.toLowerCase().includes(q) || (f.note || '').toLowerCase().includes(q));
+  const recent = recentFonts.map((id) => FONT_BY_ID.get(id)).filter(Boolean).filter(match);
+  if (!q && fontCat === 'all' && recent.length) { head('Recent'); recent.forEach(row); head('All fonts'); }
+  const all = CATALOG.filter(match);
+  all.forEach(row);
+  if (!all.length) head('No font matches');
+  fontActive = -1;
+}
+function chooseFont(id) {
+  const t = propTarget();
+  closeFontPicker();
+  if (!t) return;
+  rememberFont(id);
+  ensureFont(id, t.obj.bold, t.obj.italic);
+  setProp('font', id); propSnap = false;
+  updateProps();
+}
+function fontKeys(e) {
+  const items = $$('#peFontList li[data-font]');
+  if (e.key === 'Escape') { closeFontPicker(); return; }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    fontActive = clamp(fontActive + (e.key === 'ArrowDown' ? 1 : -1), 0, items.length - 1);
+    items.forEach((li, i) => li.classList.toggle('active', i === fontActive));
+    if (items[fontActive]) items[fontActive].scrollIntoView({ block: 'nearest' });
+  }
+  if (e.key === 'Enter') { e.preventDefault(); const li = items[Math.max(0, fontActive)]; if (li) chooseFont(li.dataset.font); }
+}
+
+// ---------------------------------------------------- design panel + layers --
+const UNITS = { pt: 1, px: 96 / 72, mm: 25.4 / 72, cm: 2.54 / 72, in: 1 / 72 };
+let UNIT = 'mm';
+try { UNIT = UNITS[localStorage.getItem('pe-unit')] ? localStorage.getItem('pe-unit') : 'mm'; } catch { /* storage off */ }
+const toU = (v) => Math.round(v * UNITS[UNIT] * (UNIT === 'in' ? 1000 : 10)) / (UNIT === 'in' ? 1000 : 10);
+const fromU = (v) => v / UNITS[UNIT];
+const DFIELDS = ['dX', 'dY', 'dW', 'dH', 'dR'];
+function updatePanel() {
+  const d = $('#peDesign');
+  if (!d) return;
+  const it = itemOf(S.sel);
+  d.hidden = !it;
+  if (!it) return;
+  const set = (id, v, off) => { const el = $(`#${id}`); if (document.activeElement !== el) el.value = v; el.disabled = !!off; };
+  set('dX', toU(it.x)); set('dY', toU(it.y));
+  set('dW', toU(it.w), it.type === 'text' || isLine(it)); set('dH', toU(it.h), it.type === 'text' || isLine(it));
+  set('dR', Math.round((it.rot || 0) * 10) / 10, isLine(it));
+  $('#dLock').setAttribute('aria-pressed', String(!!it.locked));
+}
+function onDesignInput(id) {
+  const it = itemOf(S.sel);
+  const v = Number($(`#${id}`).value);
+  if (!it || !Number.isFinite(v)) return;
+  snapshot();
+  if (id === 'dX') moveItem(it, fromU(v) - it.x, 0);
+  if (id === 'dY') moveItem(it, 0, fromU(v) - it.y);
+  if (id === 'dW' && fromU(v) >= 2) it.w = fromU(v);
+  if (id === 'dH' && fromU(v) >= 2) it.h = fromU(v);
+  if (id === 'dR') it.rot = ((v % 360) + 360) % 360;
+  drawItems(pageIndex(S.sel.page)); updatePanel();
+}
+function alignTo(where) {
+  const it = itemOf(S.sel);
+  if (!it) return;
+  const [vw, vh] = viewSize(pageById(S.sel.page));
+  const nx = { left: 0, hcenter: (vw - it.w) / 2, right: vw - it.w }[where];
+  const ny = { top: 0, vcenter: (vh - it.h) / 2, bottom: vh - it.h }[where];
+  snapshot();
+  moveItem(it, nx === undefined ? 0 : nx - it.x, ny === undefined ? 0 : ny - it.y);
+  drawItems(pageIndex(S.sel.page)); updatePanel();
+}
+function rotateSel(deg) {
+  const it = itemOf(S.sel);
+  if (!it || isLine(it)) return;
+  snapshot();
+  it.rot = ((((it.rot || 0) + deg) % 360) + 360) % 360;
+  drawItems(pageIndex(S.sel.page)); updatePanel();
+}
+
+const LAYER_NAMES = { image: 'Image', pen: 'Drawing', highlight: 'Highlight', whiteout: 'Whiteout', rect: 'Rectangle', ellipse: 'Circle', line: 'Line', arrow: 'Arrow', check: 'Check mark', cross: 'Cross' };
+const LAYER_ICONS = {
+  text: '<path d="M5 6V4h14v2M12 4v16m-3 0h6"/>', image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>',
+  pen: '<path d="M3 21c3-1 4-4 7-7l7-7a2.1 2.1 0 0 0-3-3l-7 7c-3 3-6 4-7 7z"/>', highlight: '<path d="M9 11l-5 5v4h4l5-5"/><path d="M9 11l6-6 4 4-6 6z"/>',
+  whiteout: '<rect x="3" y="6" width="18" height="12" rx="1.5"/>', rect: '<rect x="4" y="5" width="16" height="14" rx="1"/>', ellipse: '<ellipse cx="12" cy="12" rx="8" ry="7"/>',
+  line: '<path d="M5 19L19 5"/>', arrow: '<path d="M5 19L19 5m-8 0h8v8"/>', check: '<path d="M5 12l5 5L20 7"/>', cross: '<path d="M6 6l12 12M18 6L6 18"/>',
+};
+const EYE = '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>';
+const EYE_OFF = '<path d="M3 3l18 18M10.6 5.1A9.7 9.7 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.2M6.6 6.6C3.9 8.3 2 12 2 12s3.5 7 10 7c1.6 0 3-.4 4.3-1"/>';
+const LOCK = '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>';
+const UNLOCK = '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/>';
+const layerName = (it) => (it.type === 'text' ? (it.text.split('\n')[0].trim().slice(0, 40) || 'Text') : LAYER_NAMES[it.type] || it.type);
+const layersPage = () => (S.sel && pageById(S.sel.page)) || S.pages[S.current];
+function renderLayers() {
+  const list = $('#peLayers');
+  if (!list || $('#peApp').hidden) return;
+  const p = layersPage();
+  if (!p) return;
+  $('#peLayerPage').textContent = `Page ${pageIndex(p.id) + 1}`;
+  // Rebuild only when the layers changed; otherwise just move the highlight (a rebuild in the
+  // middle of a click would swallow the click).
+  const sig = p.id + p.items.map((it) => `|${it.id}:${layerName(it)}:${it.hidden ? 1 : 0}${it.locked ? 1 : 0}:${it.font || ''}`).join('');
+  if (list.dataset.sig === sig) {
+    $$('li', list).forEach((li) => li.classList.toggle('sel', !!(S.sel && S.sel.id === li.dataset.id)));
+    return;
+  }
+  list.dataset.sig = sig;
+  list.textContent = '';
+  list.dataset.page = p.id;
+  $('#peLayersEmpty').hidden = p.items.length > 0;
+  p.items.slice().reverse().forEach((it) => {
+    const li = document.createElement('li');
+    li.draggable = true; li.dataset.id = it.id;
+    li.className = `${S.sel && S.sel.id === it.id ? 'sel' : ''} ${it.hidden ? 'is-hidden' : ''}`;
+    li.innerHTML = `<svg viewBox="0 0 24 24">${LAYER_ICONS[it.type] || ''}</svg><span class="pe-lname"></span>
+      <button type="button" class="pe-lbtn${it.locked ? ' on' : ''}" data-l="lock" title="${it.locked ? 'Unlock' : 'Lock'}" aria-label="${it.locked ? 'Unlock' : 'Lock'}"><svg viewBox="0 0 24 24">${it.locked ? LOCK : UNLOCK}</svg></button>
+      <button type="button" class="pe-lbtn${it.hidden ? ' on' : ''}" data-l="eye" title="${it.hidden ? 'Show' : 'Hide'}" aria-label="${it.hidden ? 'Show' : 'Hide'}"><svg viewBox="0 0 24 24">${it.hidden ? EYE_OFF : EYE}</svg></button>`;
+    li.querySelector('.pe-lname').textContent = layerName(it);
+    if (it.type === 'text') li.querySelector('.pe-lname').style.fontFamily = cssFamily(it.font);
+    list.append(li);
+  });
+}
+function bindLayers() {
+  const list = $('#peLayers');
+  list.addEventListener('click', (e) => {
+    const li = e.target.closest('li');
+    if (!li) return;
+    const pid = list.dataset.page;
+    const btn = e.target.closest('[data-l]');
+    if (btn) { toggleFlag({ page: pid, id: li.dataset.id }, btn.dataset.l === 'eye' ? 'hidden' : 'locked'); return; }
+    const it = itemOf({ page: pid, id: li.dataset.id });
+    if (!it || it.hidden) return;
+    if (S.tool !== 'select') setTool('select');
+    select(pid, li.dataset.id);
+    const el = $(`.pe-page[data-id="${pid}"] .pe-obj[data-id="${li.dataset.id}"]`);
+    if (el) el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  });
+  list.addEventListener('dblclick', (e) => {
+    const li = e.target.closest('li');
+    const it = li && itemOf({ page: list.dataset.page, id: li.dataset.id });
+    if (it && it.type === 'text' && !it.locked && !it.hidden) editText(list.dataset.page, it);
+  });
+  let dragId = null;
+  const clear = () => $$('li', list).forEach((x) => x.classList.remove('drop-before', 'drop-after'));
+  list.addEventListener('dragstart', (e) => { const li = e.target.closest('li'); if (!li) return; dragId = li.dataset.id; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragId); });
+  list.addEventListener('dragover', (e) => {
+    const li = e.target.closest('li');
+    if (!dragId || !li) return;
+    e.preventDefault(); clear();
+    const r = li.getBoundingClientRect();
+    li.classList.add(e.clientY < r.top + r.height / 2 ? 'drop-before' : 'drop-after');
+  });
+  list.addEventListener('dragend', () => { dragId = null; clear(); });
+  list.addEventListener('drop', (e) => {
+    const li = e.target.closest('li');
+    if (!dragId || !li) return;
+    e.preventDefault();
+    const before = li.classList.contains('drop-before');
+    clear();
+    const p = pageById(list.dataset.page);
+    if (!p || li.dataset.id === dragId) { dragId = null; return; }
+    const order = p.items.slice().reverse().map((x) => x.id).filter((id) => id !== dragId); // top of the list = front
+    order.splice(order.indexOf(li.dataset.id) + (before ? 0 : 1), 0, dragId);
+    snapshot();
+    const byId = new Map(p.items.map((x) => [x.id, x]));
+    p.items = order.reverse().map((id) => byId.get(id));
+    dragId = null;
+    drawItems(pageIndex(p.id));
+  });
+}
+
+// ------------------------------------------------------------------ rulers --
+let rulerRaf = 0, rulerMouse = null;
+function drawRulersSoon(mouse) { if (mouse !== undefined) rulerMouse = mouse; cancelAnimationFrame(rulerRaf); rulerRaf = requestAnimationFrame(drawRulers); }
+function drawRulers() {
+  const stage = $('#peStage');
+  if (!stage || !stage.classList.contains('rulers') || $('#peApp').hidden) return;
+  const p = S.pages[S.current];
+  const pageEl = p && $(`.pe-page[data-id="${p.id}"]`);
+  const [vw, vh] = p ? viewSize(p) : [0, 0];
+  const pr = pageEl ? pageEl.getBoundingClientRect() : null;
+  const perUnit = S.zoom / UNITS[UNIT]; // screen px per unit
+  const steps = [0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000];
+  const step = steps.find((v) => v * perUnit >= 56) || 5000;
+  const sub = step * perUnit / 10 >= 5 ? 10 : step * perUnit / 5 >= 5 ? 5 : 2;
+  const dpr = DPR();
+  [['x', $('#peRulerX')], ['y', $('#peRulerY')]].forEach(([axis, cv]) => {
+    const r = cv.getBoundingClientRect();
+    const len = axis === 'x' ? r.width : r.height, thick = axis === 'x' ? r.height : r.width;
+    cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+    const ctx = cv.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = '#F4F5F7'; ctx.fillRect(0, 0, r.width, r.height);
+    if (!pr) return;
+    const origin = axis === 'x' ? pr.left - r.left : pr.top - r.top;
+    const extent = (axis === 'x' ? vw : vh) * S.zoom;
+    ctx.fillStyle = '#FFFFFF';
+    if (axis === 'x') ctx.fillRect(origin, 0, extent, thick); else ctx.fillRect(0, origin, thick, extent);
+    ctx.strokeStyle = '#A3A9B3'; ctx.fillStyle = '#6B7079'; ctx.lineWidth = 1;
+    ctx.font = '600 9px "Source Sans 3", system-ui, sans-serif';
+    const minor = step / sub;
+    const first = Math.floor(-origin / perUnit / minor) * minor;
+    ctx.beginPath();
+    for (let v = first, n = 0; (v * perUnit) + origin <= len && n < 5000; v += minor, n++) {
+      const pos = Math.round(origin + v * perUnit) + 0.5;
+      const major = Math.abs(v / step - Math.round(v / step)) < 1e-6;
+      const half = !major && sub === 10 && Math.abs((v * 2) / step - Math.round((v * 2) / step)) < 1e-6;
+      const t = major ? thick : half ? thick * 0.45 : thick * 0.28;
+      if (axis === 'x') { ctx.moveTo(pos, thick); ctx.lineTo(pos, thick - t); } else { ctx.moveTo(thick, pos); ctx.lineTo(thick - t, pos); }
+      if (major) {
+        const label = String(Math.round(v * 100) / 100);
+        if (axis === 'x') ctx.fillText(label, pos + 3, 9);
+        else { ctx.save(); ctx.translate(9, pos + 3); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'right'; ctx.fillText(label, 0, 0); ctx.restore(); }
+      }
+    }
+    ctx.stroke();
+    if (rulerMouse) {
+      const m = axis === 'x' ? rulerMouse.x - r.left : rulerMouse.y - r.top;
+      ctx.strokeStyle = '#E5322D'; ctx.beginPath();
+      if (axis === 'x') { ctx.moveTo(m + 0.5, 0); ctx.lineTo(m + 0.5, thick); } else { ctx.moveTo(0, m + 0.5); ctx.lineTo(thick, m + 0.5); }
+      ctx.stroke();
+    }
+  });
+  $('.pe-ruler-corner').textContent = '';
+}
+function setRulers(on) {
+  $('#peStage').classList.toggle('rulers', on);
+  try { localStorage.setItem('pe-rulers', on ? '1' : '0'); } catch { /* storage off */ }
+  drawRulersSoon();
+}
+
+// ------------------------------------------------------------ context menu --
+function openCtx(e) {
+  const pageEl = e.target.closest('.pe-page');
+  if (!pageEl) return;
+  e.preventDefault();
+  finishEditing();
+  const p = pageById(pageEl.dataset.id);
+  setCurrent(pageIndex(p.id));
+  const objEl = e.target.closest('.pe-obj[data-id]');
+  if (objEl) { if (S.tool !== 'select') setTool('select'); select(p.id, objEl.dataset.id); } else select(null, null);
+  const it = itemOf(S.sel);
+  const m = $('#peCtx');
+  $$('[data-ctx]', m).forEach((b) => { b.disabled = b.dataset.ctx === 'paste' ? !clip : !it; });
+  const lock = $('[data-ctx="lock"]', m); lock.firstChild.textContent = it && it.locked ? 'Unlock' : 'Lock';
+  m.hidden = false;
+  m.style.left = `${clamp(e.clientX, 8, window.innerWidth - m.offsetWidth - 8)}px`;
+  m.style.top = `${clamp(e.clientY, 8, window.innerHeight - m.offsetHeight - 8)}px`;
+}
+const closeCtx = () => { const m = $('#peCtx'); if (m) m.hidden = true; };
+function ctxAction(a) {
+  closeCtx();
+  if (a === 'cut') copySel(true);
+  else if (a === 'copy') copySel(false);
+  else if (a === 'paste') pasteClip();
+  else if (a === 'dup') duplicateSelected();
+  else if (a === 'delete') removeSelected();
+  else if (a === 'lock') toggleFlag(S.sel, 'locked');
+  else if (a === 'hide') toggleFlag(S.sel, 'hidden');
+  else arrange(a);
 }
 
 // -------------------------------------------------------------------- pages --
@@ -992,7 +1521,7 @@ function markCurrent() {
   $$('.pe-thumb').forEach((t) => t.classList.toggle('current', t.dataset.id === id));
   $$('.pe-page').forEach((t) => t.classList.toggle('current', t.dataset.id === id && S.pages.length > 1));
 }
-function setCurrent(i) { if (i !== S.current && i >= 0) { S.current = i; markCurrent(); } }
+function setCurrent(i) { if (i !== S.current && i >= 0) { S.current = i; markCurrent(); if (!S.sel) renderLayers(); drawRulersSoon(); } }
 function scrollToPage(i) {
   const el = $(`.pe-page[data-id="${S.pages[i].id}"]`);
   if (el) $('#peView').scrollTo({ top: el.offsetTop - 16, behavior: 'smooth' });
@@ -1211,24 +1740,90 @@ function pageMatrix(p, atOrigin = false) {
   }
 }
 
+// fontkit (for embedding TrueType fonts and shaping Urdu/Arabic) is only loaded when needed
+let fontkitLoad = null;
+function loadFontkit() {
+  if (window.fontkit) return Promise.resolve(window.fontkit);
+  if (!fontkitLoad) {
+    fontkitLoad = new Promise((res, rej) => {
+      const sc = document.createElement('script');
+      sc.src = `${VENDOR}fontkit.umd.min.js`;
+      sc.onload = () => res(window.fontkit);
+      sc.onerror = () => { fontkitLoad = null; rej(new Error('The font tool did not load. Check your connection.')); };
+      document.head.append(sc);
+    });
+  }
+  return fontkitLoad;
+}
+const fontFiles = new Map();
+function fontFile(id, v) {
+  const key = `${id}:${v}`;
+  if (!fontFiles.has(key)) {
+    fontFiles.set(key, fetch(`${FONTS_BASE}${id}/${v}.ttf`).then((r) => {
+      if (!r.ok) throw new Error(`The font ${fontInfo(id).name} could not be downloaded.`);
+      return r.arrayBuffer();
+    }).then((b) => new Uint8Array(b)).catch((e) => { fontFiles.delete(key); throw e; }));
+  }
+  return fontFiles.get(key);
+}
+const RTL_RE = /[֐-ࣿיִ-﷿ﹰ-﻿]/;
+
 async function buildPdf(opts = {}) {
   const L = PDFLib();
   const { PDFDocument, StandardFonts, rgb, degrees, pushGraphicsState, popGraphicsState, concatTransformationMatrix, BlendMode, LineCapStyle } = L;
+  // text placement needs each font's metrics: make sure they are known
+  await Promise.all(S.pages.flatMap((p) => p.items.filter((it) => it.type === 'text' && !it.hidden).map((it) => ensureFont(it.font, it.bold, it.italic))));
   const out = await PDFDocument.create();
   const sources = new Map();
   const fonts = new Map();
   const images = new Map();
-  let replaced = 0;
+  let replaced = 0, fkReady = false;
   const font = async (f, bold, italic) => {
-    const name = STD[f][(bold ? 1 : 0) + (italic ? 2 : 0)];
-    if (!fonts.has(name)) {
-      const ft = await out.embedFont(StandardFonts[name]);
-      fonts.set(name, { ft, chars: new Set(ft.getCharacterSet()) });
+    if (isStd(f) || !FONTS_BASE || !FONT_BY_ID.has(f)) {
+      const name = STD[isStd(f) ? f : 'helv'][(bold ? 1 : 0) + (italic ? 2 : 0)];
+      if (!fonts.has(name)) {
+        const ft = await out.embedFont(StandardFonts[name]);
+        fonts.set(name, { ft, chars: new Set(ft.getCharacterSet()) });
+      }
+      return fonts.get(name);
     }
-    return fonts.get(name);
+    const key = `${f}:${variantOf(bold, italic)}`;
+    if (!fonts.has(key)) {
+      const fk = await loadFontkit();
+      if (!fkReady) { out.registerFontkit(fk); fkReady = true; }
+      const bytes = await fontFile(f, variantOf(bold, italic));
+      // whole font: subsetting drops glyphs of fonts with ligatures and alternates (Lobster, scripts)
+      const ft = await out.embedFont(bytes, { subset: false });
+      fonts.set(key, { ft, chars: new Set(ft.getCharacterSet()), fk: fk.create(bytes) });
+    }
+    return fonts.get(key);
   };
   const clean = (fo, s) => Array.from(s).map((ch) => { if (fo.chars.has(ch.codePointAt(0))) return ch; replaced++; return '?'; }).join('');
   const color = (hex) => rgb(...hexToRgb(hex));
+  // One line of text: its width and how to draw it. Urdu, Arabic and Hebrew are shaped by fontkit
+  // and drawn as outlines, because the PDF writer cannot join their letters itself.
+  const textLine = async (page, fo, line, size) => {
+    if (RTL_RE.test(line) && FONTS_BASE) {
+      const covers = (f) => f.fk && Array.from(line).every((ch) => /\s/.test(ch) || f.fk.hasGlyphForCodePoint(ch.codePointAt(0)));
+      const f2 = covers(fo) ? fo : await font(/[֐-׿]/.test(line) ? 'noto-sans-hebrew' : 'noto-naskh-arabic', false, false);
+      const run = f2.fk.layout(line);
+      const sc = size / f2.fk.unitsPerEm;
+      let cx = 0, d = '';
+      run.glyphs.forEach((g, i) => {
+        const pos = run.positions[i];
+        d += g.path.scale(sc, -sc).translate(cx + pos.xOffset * sc, -pos.yOffset * sc).toSVG();
+        cx += pos.xAdvance * sc;
+      });
+      return { width: cx, draw: (x, y, col, op) => { if (d) page.drawSvgPath(d, { x, y, color: col, opacity: op }); } };
+    }
+    const t = clean(fo, line);
+    return { width: fo.ft.widthOfTextAtSize(t, size), draw: (x, y, col, op) => page.drawText(t, { x, y, size, font: fo.ft, color: col, opacity: op }) };
+  };
+  const roundRect = (w, h, r, inset) => {
+    const x0 = inset, y0 = inset, x1 = w - inset, y1 = h - inset;
+    r = Math.max(0, Math.min(r, (x1 - x0) / 2, (y1 - y0) / 2));
+    return `M${x0 + r} ${y0} L${x1 - r} ${y0} A${r} ${r} 0 0 1 ${x1} ${y0 + r} L${x1} ${y1 - r} A${r} ${r} 0 0 1 ${x1 - r} ${y1} L${x0 + r} ${y1} A${r} ${r} 0 0 1 ${x0} ${y1 - r} L${x0} ${y0 + r} A${r} ${r} 0 0 1 ${x0 + r} ${y0} Z`;
+  };
   const total = S.pages.length;
 
   for (let n = 0; n < total; n++) {
@@ -1258,44 +1853,65 @@ async function buildPdf(opts = {}) {
     page.pushOperators(pushGraphicsState(), concatTransformationMatrix(...pageMatrix(p, raster)));
 
     for (const it of p.items) {
+      if (it.hidden) continue;
       const op = (it.opacity ?? 100) / 100;
+      const dash = dashArray(it, it.width || 1);
+      const cap = it.dash === 'dashed' ? LineCapStyle.Butt : LineCapStyle.Round;
+      // rotation turns the object about its centre (clockwise on screen, so negative here)
+      if (it.rot && !isLine(it)) {
+        const th = (-it.rot * Math.PI) / 180, c = Math.cos(th), sn = Math.sin(th);
+        const cx = it.x + it.w / 2, cy = VH - (it.y + it.h / 2);
+        page.pushOperators(pushGraphicsState(), concatTransformationMatrix(c, sn, -sn, c, cx - c * cx + sn * cy, cy - sn * cx - c * cy));
+      }
       if (it.type === 'text') {
         const fo = await font(it.font, it.bold, it.italic);
-        it.text.split('\n').forEach((line, i) => {
-          if (!line) return;
-          page.drawText(clean(fo, line), { x: it.x, y: VH - (it.y + baselineOffset(it.font, it.size) + i * LINE * it.size), size: it.size, font: fo.ft, color: color(it.color), opacity: op });
-        });
+        const lines = it.text.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (!lines[i]) continue;
+          const ln = await textLine(page, fo, lines[i], it.size);
+          const x = it.x + (it.align === 'center' ? (it.w - ln.width) / 2 : it.align === 'right' ? it.w - ln.width : 0);
+          const y = VH - (it.y + baselineOffset(it.font, it.size) + i * LINE * it.size);
+          ln.draw(x, y, color(it.color), op);
+          if (it.underline) page.drawLine({ start: { x, y: y - it.size * 0.12 }, end: { x: x + ln.width, y: y - it.size * 0.12 }, thickness: Math.max(0.5, it.size / 16), color: color(it.color), opacity: op });
+        }
       } else if (it.type === 'whiteout') {
         page.drawRectangle({ x: it.x, y: VH - it.y - it.h, width: it.w, height: it.h, color: color(it.color), opacity: op });
       } else if (it.type === 'highlight') {
         page.drawRectangle({ x: it.x, y: VH - it.y - it.h, width: it.w, height: it.h, color: color(it.color), opacity: 0.45 * op, blendMode: BlendMode.Multiply });
       } else if (it.type === 'rect') {
         const bw = it.width;
-        page.drawRectangle({ x: it.x + bw / 2, y: VH - it.y - it.h + bw / 2, width: Math.max(0, it.w - bw), height: Math.max(0, it.h - bw),
-          borderColor: color(it.color), borderWidth: bw, borderOpacity: op, ...(it.fillOn ? { color: color(it.fill), opacity: op } : {}) });
+        const fill = it.fillOn ? { color: color(it.fill), opacity: op } : {};
+        if (it.radius > 0) {
+          page.drawSvgPath(roundRect(it.w, it.h, it.radius, bw / 2), { x: it.x, y: VH - it.y, borderColor: color(it.color), borderWidth: bw, borderOpacity: op, ...(dash ? { borderDashArray: dash } : {}), borderLineCap: cap, ...fill });
+        } else {
+          page.drawRectangle({ x: it.x + bw / 2, y: VH - it.y - it.h + bw / 2, width: Math.max(0, it.w - bw), height: Math.max(0, it.h - bw),
+            borderColor: color(it.color), borderWidth: bw, borderOpacity: op, ...(dash ? { borderDashArray: dash } : {}), borderLineCap: cap, ...fill });
+        }
       } else if (it.type === 'ellipse') {
         page.drawEllipse({ x: it.x + it.w / 2, y: VH - it.y - it.h / 2, xScale: Math.max(0, it.w / 2 - it.width / 2), yScale: Math.max(0, it.h / 2 - it.width / 2),
-          borderColor: color(it.color), borderWidth: it.width, borderOpacity: op, ...(it.fillOn ? { color: color(it.fill), opacity: op } : {}) });
+          borderColor: color(it.color), borderWidth: it.width, borderOpacity: op, ...(dash ? { borderDashArray: dash } : {}), borderLineCap: cap, ...(it.fillOn ? { color: color(it.fill), opacity: op } : {}) });
       } else if (it.type === 'line' || it.type === 'arrow') {
-        const seg = (ax, ay, bx, by) => page.drawLine({ start: { x: ax, y: VH - ay }, end: { x: bx, y: VH - by }, thickness: it.width, color: color(it.color), opacity: op, lineCap: LineCapStyle.Round });
-        seg(it.x1, it.y1, it.x2, it.y2);
-        if (it.type === 'arrow') arrowHead(it).forEach(([hx, hy]) => seg(it.x2, it.y2, hx, hy));
+        const seg = (ax, ay, bx, by, dsh) => page.drawLine({ start: { x: ax, y: VH - ay }, end: { x: bx, y: VH - by }, thickness: it.width, color: color(it.color), opacity: op, lineCap: dsh ? cap : LineCapStyle.Round, ...(dsh ? { dashArray: dsh } : {}) });
+        seg(it.x1, it.y1, it.x2, it.y2, dash);
+        if (it.type === 'arrow') arrowHead(it).forEach(([hx, hy]) => seg(it.x2, it.y2, hx, hy, null));
       } else if (it.type === 'pen' || it.type === 'check' || it.type === 'cross') {
         let d;
         if (it.type === 'pen') {
           const sx = it.w / it.w0, sy = it.h / it.h0;
           d = it.pts.map(([x, y], i) => `${i ? 'L' : 'M'}${round(x * sx)} ${round(y * sy)}`).join(' ');
         } else d = PATHS[it.type].replace(/([\d.]+) ([\d.]+)/g, (_, a, b) => `${round(a * it.w)} ${round(b * it.h)}`);
-        page.drawSvgPath(d, { x: it.x, y: VH - it.y, borderColor: color(it.color), borderWidth: it.width, borderOpacity: op, borderLineCap: LineCapStyle.Round });
+        page.drawSvgPath(d, { x: it.x, y: VH - it.y, borderColor: color(it.color), borderWidth: it.width, borderOpacity: op, borderLineCap: cap, ...(dash ? { borderDashArray: dash } : {}) });
       } else if (it.type === 'image') {
         const a = S.assets.get(it.asset);
-        if (!a) continue;
-        if (!images.has(a.id)) {
-          const bytes = Uint8Array.from(atob(a.url.split(',')[1]), (ch) => ch.charCodeAt(0));
-          images.set(a.id, a.mime === 'image/jpeg' ? await out.embedJpg(bytes) : await out.embedPng(bytes));
+        if (a) {
+          if (!images.has(a.id)) {
+            const bytes = Uint8Array.from(atob(a.url.split(',')[1]), (ch) => ch.charCodeAt(0));
+            images.set(a.id, a.mime === 'image/jpeg' ? await out.embedJpg(bytes) : await out.embedPng(bytes));
+          }
+          page.drawImage(images.get(a.id), { x: it.x, y: VH - it.y - it.h, width: it.w, height: it.h, opacity: op });
         }
-        page.drawImage(images.get(a.id), { x: it.x, y: VH - it.y - it.h, width: it.w, height: it.h, opacity: op });
       }
+      if (it.rot && !isLine(it)) page.pushOperators(popGraphicsState());
     }
 
     if (opts.watermark) {
@@ -1368,18 +1984,28 @@ function onKey(e) {
   const mod = e.ctrlKey || e.metaKey;
   if (mod && e.key.toLowerCase() === 'z' && !typing) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
   if (mod && e.key.toLowerCase() === 'y' && !typing) { e.preventDefault(); redo(); return; }
+  const selIt = itemOf(S.sel);
+  if (mod && !e.shiftKey && ['b', 'i', 'u'].includes(e.key.toLowerCase()) && selIt && selIt.type === 'text' && (S.editing === selIt.id || !typing)) {
+    e.preventDefault(); toggleProp({ b: 'bold', i: 'italic', u: 'underline' }[e.key.toLowerCase()]); return;
+  }
   if (typing) return;
+  if (mod && e.key.toLowerCase() === 'c') { if (copySel(false)) e.preventDefault(); return; }
+  if (mod && e.key.toLowerCase() === 'x') { if (copySel(true)) e.preventDefault(); return; }
+  if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); duplicateSelected(); return; }
+  if (mod && (e.code === 'BracketRight' || e.code === 'BracketLeft')) { e.preventDefault(); arrange(e.code === 'BracketRight' ? (e.shiftKey ? 'tofront' : 'forward') : (e.shiftKey ? 'toback' : 'backward')); return; }
+  if (e.key === '?') { $('#peHelpDlg').showModal(); return; }
+  if (e.shiftKey && !mod && e.key.toLowerCase() === 'r') { setRulers(!$('#peStage').classList.contains('rulers')); return; }
   if ((e.key === 'Delete' || e.key === 'Backspace') && S.sel) { e.preventDefault(); removeSelected(); return; }
-  if (e.key === 'Escape') { closeImgMenu(); select(null, null); setTool('select'); return; }
-  if (S.sel && e.key.startsWith('Arrow')) {
+  if (e.key === 'Escape') { closeImgMenu(); closeCtx(); closeFontPicker(); select(null, null); setTool('select'); return; }
+  if (S.sel && e.key.startsWith('Arrow') && !(selIt && selIt.locked)) {
     e.preventDefault();
     const it = itemOf(S.sel), st = e.shiftKey ? 10 : 1;
     snapshot();
     moveItem(it, e.key === 'ArrowLeft' ? -st : e.key === 'ArrowRight' ? st : 0, e.key === 'ArrowUp' ? -st : e.key === 'ArrowDown' ? st : 0);
-    drawItems(pageIndex(S.sel.page));
+    drawItems(pageIndex(S.sel.page)); updatePanel();
     return;
   }
-  if (mod) return;
+  if (mod || e.altKey) return;
   const k = { v: 'select', e: 'edittext', i: 'editimage', t: 'text', p: 'pen', h: 'highlight', w: 'whiteout', r: 'rect' }[e.key.toLowerCase()];
   if (k) setTool(k);
 }
@@ -1423,6 +2049,8 @@ function init() {
     if (!e.target.closest('.pe-more')) $$('.pe-more.open').forEach((m) => m.classList.remove('open'));
     if (!e.target.closest('.pe-menu')) $$('.pe-menu.open').forEach((m) => m.classList.remove('open'));
     if (!e.target.closest('#peImgMenu') && !e.target.closest('.pe-page')) closeImgMenu();
+    if (!e.target.closest('#peCtx')) closeCtx();
+    if (!e.target.closest('#peFontPop') && !e.target.closest('#pFontBtn')) closeFontPicker();
   });
   $$('.pe-menu .pe-pop button').forEach((b) => b.addEventListener('click', () => b.closest('.pe-menu').classList.remove('open')));
 
@@ -1440,6 +2068,11 @@ function init() {
     zoomin: () => setZoom(S.zoom * 1.2), zoomout: () => setZoom(S.zoom / 1.2), zoomfit: () => setZoom(fitZoom()),
     addpage: addBlankPage,
     delete: removeSelected, dup: duplicateSelected, front: frontSelected,
+    tofront: () => arrange('tofront'), forward: () => arrange('forward'), backward: () => arrange('backward'), toback: () => arrange('toback'),
+    lock: () => toggleFlag(S.sel, 'locked'), rotl: () => rotateSel(-90), rotr: () => rotateSel(90),
+    help: () => $('#peHelpDlg').showModal(),
+    rulers: () => setRulers(!$('#peStage').classList.contains('rulers')),
+    panel: () => $('.pe-body').classList.toggle('show-right'),
     export: () => { finishEditing(); $('#peExportNote').textContent = ''; $('#peExportDlg').showModal(); },
   };
   $$('[data-act]').forEach((b) => b.addEventListener('click', () => { const f = acts[b.dataset.act]; if (f) f(); }));
@@ -1449,7 +2082,38 @@ function init() {
 
   const view = $('#peView');
   view.addEventListener('pointerdown', onPointerDown);
-  view.addEventListener('pointermove', onPointerMove);
+  view.addEventListener('pointermove', (e) => { onPointerMove(e); drawRulersSoon({ x: e.clientX, y: e.clientY }); });
+  view.addEventListener('pointerleave', () => drawRulersSoon(null));
+  view.addEventListener('contextmenu', openCtx);
+  // Ctrl + mouse wheel (or a trackpad pinch) zooms
+  let wheelZoom = 0, wheelT = 0;
+  view.addEventListener('wheel', (e) => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    wheelZoom = (wheelZoom || S.zoom) * Math.exp(-e.deltaY * 0.0025);
+    $('#peZoom').textContent = `${Math.round(clamp(wheelZoom, 0.25, 4) * 100)}%`;
+    clearTimeout(wheelT); wheelT = setTimeout(() => { setZoom(wheelZoom); wheelZoom = 0; }, 160);
+  }, { passive: false });
+  $$('#peCtx [data-ctx]').forEach((b) => b.addEventListener('click', () => ctxAction(b.dataset.ctx)));
+  DFIELDS.forEach((id) => {
+    const el = $(`#${id}`);
+    el.addEventListener('change', () => onDesignInput(id));
+    el.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } });
+  });
+  $$('[data-align-to]').forEach((b) => b.addEventListener('click', () => alignTo(b.dataset.alignTo)));
+  const unit = $('#peUnit');
+  unit.value = UNIT;
+  unit.addEventListener('change', () => { UNIT = unit.value; try { localStorage.setItem('pe-unit', UNIT); } catch { /* storage off */ } updatePanel(); drawRulersSoon(); });
+  try { if (localStorage.getItem('pe-rulers') === '0') $('#peStage').classList.remove('rulers'); } catch { /* storage off */ }
+  $('#peFontSearch').addEventListener('input', renderFontList);
+  $('#peFontSearch').addEventListener('keydown', fontKeys);
+  bindLayers();
+  document.addEventListener('paste', (e) => {
+    if ($('#peApp').hidden || S.editing || /^(input|textarea)$/i.test(e.target.tagName)) return;
+    const files = Array.from(e.clipboardData.files || []);
+    if (!files.some(isImage) && clip) { e.preventDefault(); pasteClip(); return; }
+    pasteExternal(e);
+  });
   view.addEventListener('pointerup', onPointerUp);
   view.addEventListener('pointercancel', onPointerUp);
   view.addEventListener('dblclick', (e) => {
@@ -1467,7 +2131,8 @@ function init() {
       let best = 0;
       els.forEach((el, i) => { if (el.getBoundingClientRect().top <= top) best = i; });
       setCurrent(best);
-      closeImgMenu();
+      closeImgMenu(); closeCtx();
+      drawRulersSoon();
       if (RUNS[S.tool]) els.forEach((el) => { const r = el.getBoundingClientRect(); if (r.bottom > 0 && r.top < window.innerHeight) showRuns(el); });
     });
   });
@@ -1502,11 +2167,12 @@ function init() {
   document.addEventListener('keydown', onKey);
   window.addEventListener('beforeunload', (e) => { if (S.dirty) { e.preventDefault(); e.returnValue = ''; } });
   let resizeT = 0;
-  window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (!$('#peApp').hidden) buildThumbs(); }, 200); });
+  window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (!$('#peApp').hidden) { buildThumbs(); drawRulersSoon(); } }, 200); });
   setTool('select');
+  loadCatalog();
   lib().catch(() => {}); // start loading pdf.js while the visitor picks a file
 }
 
 init();
 // Exposed for tests.
-window.__pe = { S, buildPdf, pageMatrix, viewSize, baselineOffset, rotatePage, imageRuns, textRuns };
+window.__pe = { S, buildPdf, pageMatrix, viewSize, baselineOffset, rotatePage, imageRuns, textRuns, select, arrange, setTool, drawItems };

@@ -821,7 +821,9 @@ const EDITOR_FAQ = [
   ['Can I add, delete, rotate or reorder pages?', 'Yes. Use the buttons on each page in the side bar, drag pages to reorder them, add blank pages or image pages, and use Merge to add the pages of another PDF.'],
   ['Can I create a new PDF from scratch?', 'Yes. Choose Create a new PDF, pick the page size, then add text, images, shapes and more pages.'],
   ['Can I use whiteout to remove private information?', 'No. Whiteout and Edit text cover content so it is not visible, but the original text is still inside the file and can be copied out. Do not use them to remove passwords, account numbers or other private data.'],
-  ['Which languages can I type?', 'Text you add uses the standard PDF fonts, which cover English and Western European languages. Characters they cannot show, such as Urdu or Chinese, are replaced with a question mark.'],
+  ['Which fonts can I use?', 'More than 150: Helvetica, Times and Courier plus popular Google Fonts such as Roboto, Montserrat, Playfair Display, Lobster and Dancing Script. The font you pick is embedded in the PDF, so it looks the same on every device.'],
+  ['Can I type in Urdu or Arabic?', 'Yes. Type Urdu, Arabic or Hebrew and choose Noto Naskh Arabic or Noto Sans Arabic (Urdu & more in the font list); the letters are joined correctly in the downloaded PDF. Chinese, Japanese and Hindi are not supported yet.'],
+  ['Does it have layers like Figma?', 'Yes. The Layers panel lists everything on the page. Drag layers to change their order, hide or lock them, and use Bring to front or Send to back. You can also set exact position, size and rotation, align objects to the page, and turn on rulers.'],
 ];
 function editorPage(base) {
   const p = '/edit-pdf';
@@ -839,7 +841,9 @@ function editorPage(base) {
     <ul class="feat">
       <li><strong>Change existing text</strong>Click a line in the PDF and retype it.</li>
       <li><strong>Replace images</strong>Swap, move, resize or remove the pictures already in the PDF.</li>
-      <li><strong>Add text</strong>Choose the font, size, colour, bold and italic.</li>
+      <li><strong>Add text</strong>150+ fonts, size, colour, bold, italic, underline and alignment, also in Urdu.</li>
+      <li><strong>Layers and arrange</strong>Reorder by dragging, hide, lock, bring to front or send to back.</li>
+      <li><strong>Precise layout</strong>Rulers, snapping guides, exact position, size and rotation, align to page.</li>
       <li><strong>Sign</strong>Draw or type your signature and place it anywhere.</li>
       <li><strong>Highlight and whiteout</strong>Mark important lines or hide content.</li>
       <li><strong>Draw and shapes</strong>Freehand pen, rectangles, circles, lines, arrows, check marks and crosses.</li>
@@ -851,7 +855,7 @@ function editorPage(base) {
   return render(EDITOR_TPL, {
     ...baseFields(base, p, title, desc, {}),
     HEAD_TAGS: seo.headTags({ url: base + p, title: esc(title), desc: esc(desc), image: `${base}/og/home.png` }),
-    JSONLD: graph(base, p, 'PDF Editor', desc, EDITOR_FAQ, crumbs, { features: ['Edit existing text', 'Replace images', 'Add text', 'Sign PDF', 'Highlight', 'Whiteout', 'Draw', 'Shapes', 'Insert images', 'Add, delete, rotate and reorder pages', 'Merge PDF', 'Page numbers', 'Watermark'] }),
+    JSONLD: graph(base, p, 'PDF Editor', desc, EDITOR_FAQ, crumbs, { features: ['Edit existing text', 'Replace images', 'Add text', '150+ fonts', 'Layers', 'Rulers and alignment', 'Rotate objects', 'Sign PDF', 'Highlight', 'Whiteout', 'Draw', 'Shapes', 'Insert images', 'Add, delete, rotate and reorder pages', 'Merge PDF', 'Page numbers', 'Watermark'] }),
     EDITOR: EDITOR_APP + `<div class="wrap">${info}</div>`,
     EDITOR_CSS_V: seo.ASSET_V.editorCss, EDITOR_JS_V: seo.ASSET_V.editorJs,
   });

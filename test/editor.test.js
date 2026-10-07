@@ -35,3 +35,14 @@ test('PDF_EDITOR=1 adds the page, the menu link and the sitemap entry', () => {
   assert.equal(r.app, true);
   assert.ok(r.jsonld.includes('WebApplication') && r.jsonld.includes('FAQPage'));
 });
+
+test('font catalogue: 150+ unique Google families, and only listed fonts can be fetched', async () => {
+  const fonts = require('../fonts');
+  assert.ok(fonts.CATALOG.length >= 150, `only ${fonts.CATALOG.length} fonts`);
+  const ids = new Set(fonts.CATALOG.map((f) => f.id));
+  assert.equal(ids.size, fonts.CATALOG.length);
+  for (const f of fonts.CATALOG) assert.match(f.id, /^[a-z0-9-]+$/);
+  assert.equal(await fonts.fontFile('../../etc/passwd', '400'), null);
+  assert.equal(await fonts.fontFile('roboto', 'bold'), null);
+  assert.equal(await fonts.fontMeta('not-a-font'), null);
+});

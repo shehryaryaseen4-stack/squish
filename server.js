@@ -270,6 +270,9 @@ if (pages.PDF_EDITOR) {
   }
   app.get('/vendor/pdf-lib.min.js', (_req, res) => res.set('Cache-Control', 'public, max-age=604800')
     .sendFile(require.resolve('pdf-lib/dist/pdf-lib.min.js')));
+  app.get('/vendor/fontkit.umd.min.js', (_req, res) => res.set('Cache-Control', 'public, max-age=604800')
+    .sendFile(require.resolve('@pdf-lib/fontkit/dist/fontkit.umd.min.js')));
+  require('./fonts').routes(app);
   app.get('/edit-pdf', (req, res) => sendHtml(res, pages.editorPage(baseOf(req))));
 }
 

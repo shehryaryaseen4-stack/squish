@@ -87,6 +87,8 @@
       </div>
 
       <div class="pe-head-right">
+        <button type="button" class="pe-ibtn" data-act="help" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14"/><path d="M12 17.5v.01"/></svg></button>
+        <button type="button" class="pe-ibtn pe-right-toggle" data-act="panel" title="Design and layers" aria-label="Design and layers"><svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg></button>
         <button type="button" class="pe-ibtn" data-act="undo" title="Undo (Ctrl+Z)" aria-label="Undo"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
         <button type="button" class="pe-ibtn" data-act="redo" title="Redo (Ctrl+Y)" aria-label="Redo"><svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
         <button type="button" class="btn btn-brand pe-download" data-act="export"><svg class="ico" viewBox="0 0 24 24"><path d="M12 4v12m-5-5 5 5 5-5M5 20h14"/></svg><span>Download</span></button>
@@ -110,9 +112,12 @@
             <label class="pe-prop" data-for="color" title="Colour"><span class="pe-swatch"><input type="color" id="pColor" value="#1f2937" aria-label="Colour"></span></label>
             <label class="pe-prop" data-for="fill" title="Fill"><span class="pe-lbl">Fill</span><span class="pe-swatch"><input type="color" id="pFill" value="#ffffff" aria-label="Fill colour"></span><input type="checkbox" id="pFillOn" aria-label="Fill on"></label>
             <label class="pe-prop" data-for="width" title="Thickness"><span class="pe-lbl">Size</span><input type="range" id="pWidth" min="1" max="16" value="2"><output id="pWidthOut">2</output></label>
-            <label class="pe-prop" data-for="font"><select id="pFont" aria-label="Font"><option value="helv">Helvetica</option><option value="times">Times</option><option value="courier">Courier</option></select></label>
+            <span class="pe-prop" data-for="font"><button type="button" class="pe-fontbtn" id="pFontBtn" aria-haspopup="true" title="Font"><span id="pFontName">Helvetica</span><svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></svg></button></span>
             <label class="pe-prop" data-for="size" title="Font size"><input type="number" id="pSize" min="4" max="200" value="14" aria-label="Font size"><span class="pe-lbl">pt</span></label>
-            <span class="pe-prop" data-for="style"><button type="button" class="pe-toggle" id="pBold" aria-pressed="false" title="Bold"><b>B</b></button><button type="button" class="pe-toggle" id="pItalic" aria-pressed="false" title="Italic"><i>I</i></button></span>
+            <span class="pe-prop" data-for="style"><button type="button" class="pe-toggle" id="pBold" aria-pressed="false" title="Bold (Ctrl+B)"><b>B</b></button><button type="button" class="pe-toggle" id="pItalic" aria-pressed="false" title="Italic (Ctrl+I)"><i>I</i></button><button type="button" class="pe-toggle" id="pUnder" aria-pressed="false" title="Underline (Ctrl+U)"><u>U</u></button></span>
+            <span class="pe-prop" data-for="align"><button type="button" class="pe-toggle" data-align="left" title="Align left"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 10h10M4 14h16M4 18h10"/></svg></button><button type="button" class="pe-toggle" data-align="center" title="Align centre"><svg viewBox="0 0 24 24"><path d="M4 6h16M7 10h10M4 14h16M7 18h10"/></svg></button><button type="button" class="pe-toggle" data-align="right" title="Align right"><svg viewBox="0 0 24 24"><path d="M4 6h16M10 10h10M4 14h16M10 18h10"/></svg></button></span>
+            <label class="pe-prop" data-for="dash" title="Line style"><select id="pDash" aria-label="Line style"><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></label>
+            <label class="pe-prop" data-for="radius" title="Corner radius"><span class="pe-lbl">Corners</span><input type="range" id="pRadius" min="0" max="60" value="0"><output id="pRadiusOut">0</output></label>
             <label class="pe-prop" data-for="opacity" title="Opacity"><span class="pe-lbl">Opacity</span><input type="range" id="pOpacity" min="10" max="100" value="100"><output id="pOpacityOut">100%</output></label>
             <span class="pe-prop" data-for="replace"><button type="button" class="pe-chip" data-act="replaceimg"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M4 20v-5h5"/></svg>Replace</button></span>
             <span class="pe-prop" data-for="layer">
@@ -123,13 +128,82 @@
             <span class="pe-hint" id="peHint"></span>
           </div>
         </div>
+        <div class="pe-stage rulers" id="peStage">
+        <canvas class="pe-ruler pe-ruler-x" id="peRulerX" aria-hidden="true"></canvas>
+        <canvas class="pe-ruler pe-ruler-y" id="peRulerY" aria-hidden="true"></canvas>
+        <span class="pe-ruler-corner" aria-hidden="true"></span>
         <div class="pe-view" id="peView" tabindex="-1"></div>
         <div class="pe-zoombar">
+          <button type="button" class="pe-ibtn pe-sm" data-act="rulers" title="Show or hide rulers (Shift+R)" aria-label="Rulers"><svg viewBox="0 0 24 24"><path d="M3 15l12-12 6 6-12 12z"/><path d="M7 11l2 2m1-5l2 2m1-5l2 2"/></svg></button>
+          <select id="peUnit" class="pe-unit" aria-label="Units" title="Units for rulers and sizes"><option value="mm">mm</option><option value="cm">cm</option><option value="in">in</option><option value="pt">pt</option><option value="px">px</option></select>
+          <span class="pe-zsep" aria-hidden="true"></span>
           <button type="button" class="pe-ibtn pe-sm" data-act="zoomout" title="Zoom out" aria-label="Zoom out"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button>
           <button type="button" class="pe-zoom" data-act="zoomfit" title="Fit to width" id="peZoom">100%</button>
           <button type="button" class="pe-ibtn pe-sm" data-act="zoomin" title="Zoom in" aria-label="Zoom in"><svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg></button>
         </div>
+        </div>
       </div>
+
+      <!-- Figma-style panel: position, size, rotation, alignment, order, layers -->
+      <aside class="pe-right" id="peRight" aria-label="Design and layers">
+        <section class="pe-design" id="peDesign" hidden>
+          <h3>Position and size</h3>
+          <div class="pe-grid">
+            <label><span>X</span><input type="number" step="any" id="dX"></label>
+            <label><span>Y</span><input type="number" step="any" id="dY"></label>
+            <label><span>W</span><input type="number" step="any" id="dW" min="0"></label>
+            <label><span>H</span><input type="number" step="any" id="dH" min="0"></label>
+            <label class="pe-rot"><span><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg></span><input type="number" step="any" id="dR" title="Rotation in degrees"></label>
+            <div class="pe-rotbtns"><button type="button" class="pe-ibtn pe-sm" data-act="rotl" title="Rotate left 90°" aria-label="Rotate left"><svg viewBox="0 0 24 24"><path d="M4 4v6h6"/><path d="M5 15a8 8 0 1 0 2-8.5L4 10"/></svg></button><button type="button" class="pe-ibtn pe-sm" data-act="rotr" title="Rotate right 90°" aria-label="Rotate right"><svg viewBox="0 0 24 24"><path d="M20 4v6h-6"/><path d="M19 15a8 8 0 1 1-2-8.5L20 10"/></svg></button></div>
+          </div>
+          <h3>Align to page</h3>
+          <div class="pe-row">
+            <button type="button" class="pe-ibtn pe-sm" data-align-to="left" title="Align left"><svg viewBox="0 0 24 24"><path d="M4 3v18"/><rect x="7" y="6" width="12" height="4" rx="1"/><rect x="7" y="14" width="7" height="4" rx="1"/></svg></button>
+            <button type="button" class="pe-ibtn pe-sm" data-align-to="hcenter" title="Align centre"><svg viewBox="0 0 24 24"><path d="M12 3v18"/><rect x="5" y="6" width="14" height="4" rx="1"/><rect x="8" y="14" width="8" height="4" rx="1"/></svg></button>
+            <button type="button" class="pe-ibtn pe-sm" data-align-to="right" title="Align right"><svg viewBox="0 0 24 24"><path d="M20 3v18"/><rect x="5" y="6" width="12" height="4" rx="1"/><rect x="10" y="14" width="7" height="4" rx="1"/></svg></button>
+            <button type="button" class="pe-ibtn pe-sm" data-align-to="top" title="Align top"><svg viewBox="0 0 24 24"><path d="M3 4h18"/><rect x="6" y="7" width="4" height="12" rx="1"/><rect x="14" y="7" width="4" height="7" rx="1"/></svg></button>
+            <button type="button" class="pe-ibtn pe-sm" data-align-to="vcenter" title="Align middle"><svg viewBox="0 0 24 24"><path d="M3 12h18"/><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="8" width="4" height="8" rx="1"/></svg></button>
+            <button type="button" class="pe-ibtn pe-sm" data-align-to="bottom" title="Align bottom"><svg viewBox="0 0 24 24"><path d="M3 20h18"/><rect x="6" y="5" width="4" height="12" rx="1"/><rect x="14" y="10" width="4" height="7" rx="1"/></svg></button>
+          </div>
+          <h3>Arrange</h3>
+          <div class="pe-row">
+            <button type="button" class="pe-ibtn pe-sm" data-act="tofront" title="Bring to front (Ctrl+Shift+])"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" fill="currentColor" fill-opacity=".18"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/></svg></button>
+            <button type="button" class="pe-ibtn pe-sm" data-act="forward" title="Bring forward (Ctrl+])"><svg viewBox="0 0 24 24"><path d="M12 19V7m-5 5 5-5 5 5"/></svg></button>
+            <button type="button" class="pe-ibtn pe-sm" data-act="backward" title="Send backward (Ctrl+[)"><svg viewBox="0 0 24 24"><path d="M12 5v12m-5-5 5 5 5-5"/></svg></button>
+            <button type="button" class="pe-ibtn pe-sm" data-act="toback" title="Send to back (Ctrl+Shift+[)"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="12" height="12" rx="2"/><path d="M20 8v10a2 2 0 0 1-2 2H8" /><rect x="4" y="4" width="12" height="12" rx="2" fill="currentColor" fill-opacity=".18"/></svg></button>
+            <button type="button" class="pe-ibtn pe-sm" data-act="lock" title="Lock or unlock" id="dLock"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button>
+          </div>
+        </section>
+        <section class="pe-layers">
+          <h3>Layers <span id="peLayerPage"></span></h3>
+          <ol class="pe-layer-list" id="peLayers"></ol>
+          <p class="pe-layers-empty" id="peLayersEmpty">Nothing on this page yet. Objects you add appear here; drag them to change their order.</p>
+        </section>
+      </aside>
+    </div>
+
+    <!-- Font picker -->
+    <div class="pe-pop pe-fontpop" id="peFontPop" role="dialog" aria-label="Choose a font" hidden>
+      <input type="search" id="peFontSearch" placeholder="Search 150+ fonts" aria-label="Search fonts" autocomplete="off">
+      <div class="pe-fontcats" id="peFontCats" role="tablist"></div>
+      <ul class="pe-fontlist" id="peFontList" role="listbox" aria-label="Fonts"></ul>
+    </div>
+
+    <!-- Right-click menu -->
+    <div class="pe-pop pe-ctx" id="peCtx" role="menu" hidden>
+      <button type="button" role="menuitem" data-ctx="cut">Cut<kbd>Ctrl+X</kbd></button>
+      <button type="button" role="menuitem" data-ctx="copy">Copy<kbd>Ctrl+C</kbd></button>
+      <button type="button" role="menuitem" data-ctx="paste">Paste<kbd>Ctrl+V</kbd></button>
+      <button type="button" role="menuitem" data-ctx="dup">Duplicate<kbd>Ctrl+D</kbd></button>
+      <hr>
+      <button type="button" role="menuitem" data-ctx="tofront">Bring to front<kbd>Ctrl+Shift+]</kbd></button>
+      <button type="button" role="menuitem" data-ctx="forward">Bring forward<kbd>Ctrl+]</kbd></button>
+      <button type="button" role="menuitem" data-ctx="backward">Send backward<kbd>Ctrl+[</kbd></button>
+      <button type="button" role="menuitem" data-ctx="toback">Send to back<kbd>Ctrl+Shift+[</kbd></button>
+      <hr>
+      <button type="button" role="menuitem" data-ctx="lock">Lock</button>
+      <button type="button" role="menuitem" data-ctx="hide">Hide</button>
+      <button type="button" role="menuitem" data-ctx="delete" class="pe-danger">Delete<kbd>Del</kbd></button>
     </div>
 
     <!-- Actions for an image that is part of the PDF (Edit image tool) -->
@@ -192,6 +266,25 @@
         <button type="button" class="btn pe-btn-ghost" data-close>Cancel</button>
         <button type="button" class="btn btn-brand btn-sm" id="peExportOk">Download</button>
       </div>
+    </form>
+  </dialog>
+
+  <dialog class="pe-dialog" id="peHelpDlg" aria-labelledby="peHelpTitle">
+    <form method="dialog" class="pe-dlg-inner">
+      <h2 id="peHelpTitle">Keyboard shortcuts</h2>
+      <div class="pe-keys">
+        <dl>
+          <dt>V</dt><dd>Select</dd><dt>E</dt><dd>Edit text</dd><dt>I</dt><dd>Edit image</dd><dt>T</dt><dd>Add text</dd>
+          <dt>P</dt><dd>Draw</dd><dt>H</dt><dd>Highlight</dd><dt>W</dt><dd>Whiteout</dd><dt>R</dt><dd>Rectangle</dd>
+          <dt>Shift+R</dt><dd>Rulers on or off</dd><dt>Ctrl + scroll</dt><dd>Zoom</dd>
+        </dl>
+        <dl>
+          <dt>Ctrl+Z / Ctrl+Y</dt><dd>Undo / redo</dd><dt>Ctrl+C / X / V</dt><dd>Copy / cut / paste</dd><dt>Ctrl+D</dt><dd>Duplicate</dd>
+          <dt>Delete</dt><dd>Delete selected</dd><dt>Arrows</dt><dd>Nudge (Shift = 10)</dd><dt>Ctrl+] / Ctrl+[</dt><dd>Forward / backward</dd>
+          <dt>Shift (resize)</dt><dd>Free proportions</dd><dt>Alt (move)</dt><dd>No snapping</dd><dt>Esc</dt><dd>Deselect</dd>
+        </dl>
+      </div>
+      <div class="pe-dlg-actions"><button type="button" class="btn btn-brand btn-sm" data-close>Got it</button></div>
     </form>
   </dialog>
 
