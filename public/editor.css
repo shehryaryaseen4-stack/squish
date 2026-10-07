@@ -1,0 +1,149 @@
+/* PDF editor (/edit-pdf). Builds on style.css tokens: --brand, --ink, --dim, --border, --bg-soft. */
+.editor-body{background:var(--bg-soft);}
+.pe{--pe-bar:52px; --pe-side:168px; --sel:#2563EB;}
+.pe [hidden]{display:none !important;}
+.pe svg{fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;}
+
+/* ------------------------------------------------------------ start screen -- */
+.pe-start{background:var(--band); color:var(--band-ink); padding:56px 20px 64px;}
+.pe-start-inner{max-width:880px; margin:0 auto; text-align:center;}
+.pe-start h1{font-size:clamp(2rem,4vw,2.8rem); font-weight:800; letter-spacing:-.01em;}
+.pe-lede{max-width:640px; margin:12px auto 0; color:var(--band-dim); font-size:1.08rem; line-height:1.55;}
+.pe-choices{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:32px; text-align:center;}
+.pe-drop,.pe-new{display:flex; flex-direction:column; align-items:center; gap:8px; background:#fff; color:var(--ink); border-radius:10px; padding:28px 20px; box-shadow:var(--shadow);}
+.pe-drop{cursor:pointer; border:2px dashed transparent; transition:border-color .15s, background .15s;}
+.pe-drop:hover,.pe-drop.is-over{border-color:var(--brand); background:#fff8f7;}
+.pe-drop:focus-within{outline:2px solid var(--brand); outline-offset:2px;}
+.pe-big-ico{width:44px; height:44px; color:var(--brand); stroke-width:1.5;}
+.pe-drop strong,.pe-new strong{font-size:1.15rem;}
+.pe-drop span,.pe-new > span{color:var(--dim); font-size:.95rem;}
+.pe-new-row{display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-top:6px;}
+.pe-new-row select{font:inherit; padding:7px 8px; border:1px solid var(--border); border-radius:var(--radius); background:#fff;}
+.pe-promise{display:flex; flex-wrap:wrap; justify-content:center; gap:6px 22px; list-style:none; margin:22px 0 0; padding:0; font-size:.95rem; opacity:.9;}
+.pe-promise li::before{content:"\2713"; color:#4ADE80; font-weight:800; margin-right:6px;}
+
+/* ----------------------------------------------------------------- toolbar -- */
+.pe-app{display:flex; flex-direction:column; height:calc(100dvh - 65px); min-height:420px;}
+.pe-bar{display:flex; align-items:center; gap:6px; padding:6px 10px; background:#fff; border-bottom:1px solid var(--border); overflow-x:auto; scrollbar-width:thin;}
+.pe-group{display:flex; align-items:center; gap:2px; padding-right:6px; margin-right:4px; border-right:1px solid var(--border); flex-shrink:0;}
+.pe-group:last-child{border-right:0;}
+.pe-end{margin-left:auto; border-right:0;}
+.pe-btn{display:flex; flex-direction:column; align-items:center; gap:2px; min-width:52px; padding:5px 6px; border:0; border-radius:var(--radius); background:none; color:var(--ink); font:600 .72rem/1.1 inherit; cursor:pointer; white-space:nowrap;}
+.pe-btn svg{width:20px; height:20px;}
+.pe-btn:hover{background:var(--btn-bg);}
+.pe-btn:focus-visible,.pe-zoom:focus-visible,.pe-mini:focus-visible,.pe-toggle:focus-visible{outline:2px solid var(--sel); outline-offset:1px;}
+.pe-btn[aria-pressed="true"]{background:var(--brand-soft); color:var(--brand);}
+.pe-btn:disabled{opacity:.35; cursor:default; background:none;}
+.pe-icon{min-width:34px;}
+.pe-zoom{min-width:52px; padding:6px 4px; border:1px solid var(--border); border-radius:var(--radius); background:#fff; font:600 .85rem inherit; font-variant-numeric:tabular-nums; cursor:pointer;}
+.pe-more{position:relative;}
+.pe-sub{display:none; position:fixed; z-index:60; background:#fff; border:1px solid var(--border); border-radius:8px; box-shadow:var(--shadow); padding:4px; grid-template-columns:repeat(3,auto); gap:2px;}
+.pe-more.open .pe-sub{display:grid;}
+
+/* ------------------------------------------------------------ properties -- */
+.pe-props{display:flex; align-items:center; flex-wrap:wrap; gap:6px 16px; min-height:42px; padding:6px 14px; background:#fbfbfc; border-bottom:1px solid var(--border); font-size:.88rem; color:var(--dim);}
+.pe-prop{display:none; align-items:center; gap:6px; font-weight:600;}
+.pe-prop.show{display:inline-flex;}
+.pe-prop input[type="color"]{width:30px; height:26px; padding:0 2px; border:1px solid var(--border); border-radius:4px; background:#fff; cursor:pointer;}
+.pe-prop input[type="range"]{width:90px;}
+.pe-prop output{min-width:34px; font-variant-numeric:tabular-nums; color:var(--ink);}
+.pe-prop select,.pe-prop input[type="number"]{font:inherit; padding:3px 6px; border:1px solid var(--border); border-radius:4px; background:#fff; color:var(--ink);}
+.pe-prop input[type="number"]{width:62px;}
+.pe-toggle{width:30px; height:28px; border:1px solid var(--border); border-radius:4px; background:#fff; color:var(--ink); cursor:pointer; font-size:.95rem;}
+.pe-toggle[aria-pressed="true"]{background:var(--ink); color:#fff; border-color:var(--ink);}
+.pe-mini{padding:4px 9px; border:1px solid var(--border); border-radius:4px; background:#fff; color:var(--ink); font:600 .8rem inherit; cursor:pointer; white-space:nowrap;}
+.pe-mini:hover{background:var(--btn-bg);}
+.pe-danger{color:var(--down);}
+.pe-hint{margin-left:auto; font-size:.85rem;}
+
+/* ---------------------------------------------------------- pages + view -- */
+.pe-body{flex:1; display:flex; min-height:0;}
+.pe-side{width:var(--pe-side); flex-shrink:0; display:flex; flex-direction:column; background:#fff; border-right:1px solid var(--border); min-height:0;}
+.pe-side-head{display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:8px 10px; border-bottom:1px solid var(--border); font-size:.85rem; font-weight:700;}
+.pe-side-head span{flex-basis:100%;}
+.pe-thumbs{list-style:none; margin:0; padding:10px; overflow-y:auto; display:flex; flex-direction:column; gap:12px; counter-reset:pg;}
+.pe-thumb{position:relative; counter-increment:pg; cursor:pointer; text-align:center; font-size:.78rem; color:var(--dim);}
+.pe-thumb-frame{position:relative; margin:0 auto; background:#fff; border:2px solid var(--border); border-radius:4px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.08);}
+.pe-thumb canvas{display:block; width:100%; height:100%;}
+.pe-thumb.current .pe-thumb-frame{border-color:var(--brand);}
+.pe-thumb.drag-over .pe-thumb-frame{border-color:var(--sel); border-style:dashed;}
+.pe-thumb::after{content:counter(pg); display:block; margin-top:3px; font-weight:600;}
+.pe-thumb-tools{position:absolute; top:4px; right:4px; display:none; grid-template-columns:repeat(3,24px); gap:3px; z-index:2;}
+.pe-thumb:hover .pe-thumb-tools,.pe-thumb.current .pe-thumb-tools,.pe-thumb:focus-within .pe-thumb-tools{display:grid;}
+.pe-thumb-frame .pe-mini-layer{position:absolute; inset:0; pointer-events:none; overflow:hidden;}
+.pe-thumb canvas{position:absolute; inset:0;}
+.pe-thumb-tools button{width:24px; height:24px; display:grid; place-items:center; padding:0; border:1px solid var(--border); border-radius:4px; background:rgba(255,255,255,.95); color:var(--ink); cursor:pointer;}
+.pe-thumb-tools button svg{width:15px; height:15px;}
+.pe-thumb-tools button:hover{background:var(--btn-bg);}
+.pe-thumb-tools .pe-danger{color:var(--down);}
+
+.pe-view{flex:1; overflow:auto; padding:24px; display:flex; flex-direction:column; align-items:center; gap:24px; outline:0;}
+.pe-page{position:relative; flex-shrink:0; background:#fff; box-shadow:0 2px 10px rgba(20,24,32,.14);}
+.pe-page canvas{position:absolute; inset:0; width:100%; height:100%;}
+.pe-layer{position:absolute; inset:0; touch-action:none;}
+.pe-page.current{outline:2px solid rgba(229,50,45,.35); outline-offset:3px;}
+.pe-layer.tool-text,.pe-layer.tool-edittext{cursor:text;}
+.pe-layer.tool-pen,.pe-layer.tool-highlight,.pe-layer.tool-whiteout,.pe-layer.tool-rect,.pe-layer.tool-ellipse,
+.pe-layer.tool-line,.pe-layer.tool-arrow,.pe-layer.tool-check,.pe-layer.tool-cross{cursor:crosshair;}
+
+/* Objects on a page. Positions come from JS in page points times the zoom. */
+.pe-obj{position:absolute; transform-origin:0 0;}
+.pe-obj svg{position:absolute; inset:0; width:100%; height:100%; overflow:visible; fill:none; stroke-width:initial;}
+.pe-obj img{position:absolute; inset:0; width:100%; height:100%; user-select:none; -webkit-user-drag:none; pointer-events:none;}
+.pe-layer.tool-select .pe-obj{cursor:move;}
+.pe-text{white-space:pre; line-height:1.2; outline:0; min-width:4px;}
+.pe-text[contenteditable="true"]{cursor:text; outline:1px dashed var(--sel); outline-offset:2px; background:rgba(255,255,255,.35);}
+.pe-sel{outline:1.5px solid var(--sel); outline-offset:1px;}
+.pe-handle{position:absolute; width:11px; height:11px; margin:-6px 0 0 -6px; background:#fff; border:1.5px solid var(--sel); border-radius:2px; z-index:5; touch-action:none;}
+.pe-handle[data-h="nw"],.pe-handle[data-h="se"]{cursor:nwse-resize;}
+.pe-handle[data-h="ne"],.pe-handle[data-h="sw"]{cursor:nesw-resize;}
+.pe-handle[data-h="p1"],.pe-handle[data-h="p2"]{cursor:move; border-radius:50%;}
+.pe-runs{position:absolute; inset:0; pointer-events:none;}
+.pe-run{position:absolute; border-radius:2px; background:rgba(37,99,235,.08); outline:1px solid rgba(37,99,235,.35);}
+.pe-run.hot{background:rgba(37,99,235,.18); outline-color:var(--sel);}
+.pe-rubber{position:absolute; border:1px dashed var(--sel); background:rgba(37,99,235,.06); pointer-events:none;}
+
+/* ----------------------------------------------------------------- dialogs -- */
+.pe-dialog{border:0; border-radius:12px; padding:0; width:min(600px, calc(100vw - 32px)); box-shadow:var(--shadow-lg); color:var(--ink);}
+.pe-dialog::backdrop{background:rgba(20,24,32,.45);}
+.pe-dlg-inner{display:flex; flex-direction:column; gap:14px; padding:22px;}
+.pe-dlg-inner h2{font-size:1.3rem;}
+.pe-dlg-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:6px;}
+.pe-tabs{display:flex; gap:4px; border-bottom:1px solid var(--border);}
+.pe-tab{padding:8px 14px; border:0; border-bottom:2px solid transparent; background:none; font:600 .95rem inherit; color:var(--dim); cursor:pointer;}
+.pe-tab[aria-selected="true"]{color:var(--brand); border-bottom-color:var(--brand);}
+#peSignPad{width:100%; height:auto; aspect-ratio:14/5; border:1px solid var(--border); border-radius:8px; background:#fff; touch-action:none; cursor:crosshair;}
+.pe-sign-row{display:flex; align-items:center; justify-content:space-between; gap:10px; color:var(--dim); font-size:.9rem;}
+.pe-sign-row label{display:inline-flex; align-items:center; gap:8px; font-weight:600;}
+#peSignText,.pe-field input,.pe-sub-field input,.pe-sub-field select{width:100%; font:inherit; padding:9px 10px; border:1px solid var(--border); border-radius:var(--radius);}
+.pe-sign-preview{padding:18px 10px; border:1px solid var(--border); border-radius:8px; text-align:center; font:italic 2.6rem/1.2 "Segoe Script","Brush Script MT","Apple Chancery",cursive; color:#1d3c8f; min-height:90px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;}
+.pe-field{display:flex; flex-direction:column; gap:6px; font-weight:600;}
+.pe-check{display:flex; align-items:center; gap:8px; font-weight:600;}
+.pe-sub-field{display:flex; gap:8px; padding-left:26px;}
+.pe-note{color:var(--dim); font-size:.9rem;}
+.pe-note:empty{display:none;}
+
+.pe-toast{position:fixed; left:50%; bottom:24px; transform:translateX(-50%); z-index:80; max-width:calc(100vw - 32px); padding:10px 16px; border-radius:8px; background:var(--ink); color:#fff; font-weight:600; box-shadow:var(--shadow-lg);}
+.pe-toast.err{background:var(--down);}
+
+/* SEO content under the start screen */
+.pe-info{max-width:880px; margin:0 auto; padding:40px 20px 64px;}
+.pe-info h2{font-size:1.45rem; margin:28px 0 12px;}
+.pe-info p,.pe-info li{line-height:1.6;}
+.pe-info .feat{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; list-style:none; padding:0;}
+.pe-info .feat li{background:#fff; border:1px solid var(--border); border-radius:8px; padding:14px;}
+.pe-info .feat strong{display:block; margin-bottom:4px;}
+.pe.editing ~ .pe-info, .editor-body.is-editing .site-footer{display:none;}
+
+@media (max-width:760px){
+  .pe-choices{grid-template-columns:1fr;}
+  .pe{--pe-side:96px;}
+  .pe-side-head .pe-mini{padding:3px 6px; font-size:.72rem;}
+  .pe-view{padding:12px; gap:14px;}
+  .pe-btn{min-width:46px;}
+  .pe-thumb-tools{grid-template-columns:repeat(3,20px); gap:2px; top:2px; right:2px;}
+  .pe-thumb-tools button{width:20px; height:20px;}
+  .pe-props{gap:6px 10px; padding:6px 10px;}
+  .pe-hint{display:none;}
+}
+@media (prefers-reduced-motion:reduce){ .pe *{transition:none !important;} }

@@ -85,7 +85,7 @@ MAX_FILE_MB=${MAX_FILE_MB:-$(old MAX_FILE_MB | grep . || echo 95)}
 # Google AdSense publisher ID (ca-pub-...), once your account is approved.
 ADSENSE_CLIENT=$ADS
 EOF
-for k in ADSENSE_SLOT_TOP ADSENSE_SLOT_BOTTOM ADSENSE_SLOT_LEFT ADSENSE_SLOT_RIGHT TWITTER_SITE; do
+for k in ADSENSE_SLOT_TOP ADSENSE_SLOT_BOTTOM ADSENSE_SLOT_LEFT ADSENSE_SLOT_RIGHT TWITTER_SITE PDF_EDITOR; do
   v="$(old "$k")"; [ -n "$v" ] && echo "$k=$v" >> "$ENV_FILE"
 done
 chmod 600 "$ENV_FILE"

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en" data-vendor="/vendor/">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<meta name="description" content="{{META_DESC}}">
+<meta name="robots" content="{{ROBOTS}}">
+{{CANONICAL_TAG}}
+{{HEAD_TAGS}}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css?v={{CSS_V}}">
+<link rel="stylesheet" href="/editor.css?v={{EDITOR_CSS_V}}">
+<script type="application/ld+json">{{JSONLD}}</script>
+</head>
+<body class="editor-body">
+<a class="skip-link" href="#main">Skip to content</a>
+{{TOPBAR}}
+<main id="main">
+{{EDITOR}}
+</main>
+<script src="/script.js?v={{JS_V}}" defer></script>
+<script src="/vendor/pdf-lib.min.js?v={{EDITOR_JS_V}}" defer></script>
+<script type="module" src="/editor.js?v={{EDITOR_JS_V}}"></script>
+</body>
+</html>

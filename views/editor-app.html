@@ -1,0 +1,163 @@
+<div class="pe" id="pe">
+  <!-- Start screen: open a PDF or start a blank one. -->
+  <section class="pe-start" id="peStart">
+    <div class="pe-start-inner">
+      <h1>Edit PDF</h1>
+      <p class="pe-lede">Add text, change existing text, draw, highlight, sign, insert images and rearrange pages. Everything runs in your browser, so your PDF never leaves your device.</p>
+      <div class="pe-choices">
+        <label class="pe-drop" id="peDrop">
+          <input type="file" id="peOpenInput" accept="application/pdf,.pdf" hidden>
+          <svg class="pe-big-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 17v-6m-3 3 3-3 3 3"/></svg>
+          <strong>Open a PDF</strong>
+          <span>Drop a PDF here or <u>choose a file</u></span>
+        </label>
+        <div class="pe-new">
+          <svg class="pe-big-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 11v6m-3-3h6"/></svg>
+          <strong>Create a new PDF</strong>
+          <span>Start from a blank page</span>
+          <div class="pe-new-row">
+            <select id="peNewSize" aria-label="Page size">
+              <option value="a4">A4</option>
+              <option value="letter">Letter</option>
+              <option value="legal">Legal</option>
+              <option value="a5">A5</option>
+            </select>
+            <select id="peNewOrient" aria-label="Orientation">
+              <option value="portrait">Portrait</option>
+              <option value="landscape">Landscape</option>
+            </select>
+            <button type="button" class="btn btn-brand btn-sm" id="peNewBtn">Create</button>
+          </div>
+        </div>
+      </div>
+      <ul class="pe-promise">
+        <li>Free, no sign-up</li>
+        <li>No watermark</li>
+        <li>Files stay on your device</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Editor -->
+  <div class="pe-app" id="peApp" hidden>
+    <div class="pe-bar" role="toolbar" aria-label="PDF editor">
+      <div class="pe-group">
+        <button type="button" class="pe-btn" data-act="new" title="New blank PDF"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 11v6m-3-3h6"/></svg><span>New</span></button>
+        <button type="button" class="pe-btn" data-act="open" title="Open another PDF"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span>Open</span></button>
+        <button type="button" class="pe-btn" data-act="addpdf" title="Add pages from another PDF (merge)"><svg viewBox="0 0 24 24"><rect x="8" y="3" width="12" height="15" rx="2"/><path d="M16 21H6a2 2 0 0 1-2-2V7"/><path d="M14 8v5m-2.5-2.5h5"/></svg><span>Merge</span></button>
+      </div>
+      <div class="pe-group pe-tools" role="radiogroup" aria-label="Tools">
+        <button type="button" class="pe-btn" data-tool="select" title="Select and move (V)"><svg viewBox="0 0 24 24"><path d="M5 3l14 8-6 2-3 6z"/></svg><span>Select</span></button>
+        <button type="button" class="pe-btn" data-tool="edittext" title="Edit existing text (E)"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg><span>Edit text</span></button>
+        <button type="button" class="pe-btn" data-tool="text" title="Add text (T)"><svg viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16m-3 0h6"/></svg><span>Text</span></button>
+        <button type="button" class="pe-btn" data-tool="pen" title="Draw (P)"><svg viewBox="0 0 24 24"><path d="M3 21c3-1 4-4 7-7l7-7a2.1 2.1 0 0 0-3-3l-7 7c-3 3-6 4-7 7z"/></svg><span>Draw</span></button>
+        <button type="button" class="pe-btn" data-tool="highlight" title="Highlight (H)"><svg viewBox="0 0 24 24"><path d="M9 11l-5 5v4h4l5-5"/><path d="M9 11l6-6 4 4-6 6z"/><path d="M14 21h7"/></svg><span>Highlight</span></button>
+        <button type="button" class="pe-btn" data-tool="whiteout" title="Whiteout: hide content (W)"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="1.5"/><path d="M7 10h10M7 14h6" opacity=".35"/></svg><span>Whiteout</span></button>
+        <div class="pe-more">
+          <button type="button" class="pe-btn" data-tool="rect" title="Rectangle (R)"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="1"/></svg><span>Shapes</span></button>
+          <div class="pe-sub">
+            <button type="button" class="pe-btn" data-tool="rect" title="Rectangle"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="1"/></svg><span>Rectangle</span></button>
+            <button type="button" class="pe-btn" data-tool="ellipse" title="Circle"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="8" ry="7"/></svg><span>Circle</span></button>
+            <button type="button" class="pe-btn" data-tool="line" title="Line"><svg viewBox="0 0 24 24"><path d="M5 19L19 5"/></svg><span>Line</span></button>
+            <button type="button" class="pe-btn" data-tool="arrow" title="Arrow"><svg viewBox="0 0 24 24"><path d="M5 19L19 5m-8 0h8v8"/></svg><span>Arrow</span></button>
+            <button type="button" class="pe-btn" data-tool="check" title="Check mark"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg><span>Check</span></button>
+            <button type="button" class="pe-btn" data-tool="cross" title="Cross"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg><span>Cross</span></button>
+          </div>
+        </div>
+        <button type="button" class="pe-btn" data-act="image" title="Insert image"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg><span>Image</span></button>
+        <button type="button" class="pe-btn" data-act="sign" title="Add signature"><svg viewBox="0 0 24 24"><path d="M3 17c3 0 4-9 7-9s-1 9 2 9 3-4 5-4 2 3 4 3"/><path d="M3 21h18"/></svg><span>Sign</span></button>
+      </div>
+      <div class="pe-group">
+        <button type="button" class="pe-btn pe-icon" data-act="undo" title="Undo (Ctrl+Z)" aria-label="Undo"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
+        <button type="button" class="pe-btn pe-icon" data-act="redo" title="Redo (Ctrl+Y)" aria-label="Redo"><svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
+        <button type="button" class="pe-btn pe-icon" data-act="zoomout" title="Zoom out" aria-label="Zoom out"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M8 11h6m3 6l4 4"/></svg></button>
+        <button type="button" class="pe-zoom" data-act="zoomfit" title="Fit width" id="peZoom">100%</button>
+        <button type="button" class="pe-btn pe-icon" data-act="zoomin" title="Zoom in" aria-label="Zoom in"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M8 11h6m-3-3v6m6 3l4 4"/></svg></button>
+      </div>
+      <div class="pe-group pe-end">
+        <button type="button" class="btn btn-brand btn-sm" data-act="export"><svg class="ico" viewBox="0 0 24 24"><path d="M12 4v12m-5-5 5 5 5-5M5 20h14"/></svg>Download PDF</button>
+      </div>
+    </div>
+
+    <!-- Settings for the selected object or the current tool -->
+    <div class="pe-props" id="peProps">
+      <label class="pe-prop" data-for="color">Colour <input type="color" id="pColor" value="#1f2937"></label>
+      <label class="pe-prop" data-for="fill">Fill <input type="color" id="pFill" value="#ffffff"><input type="checkbox" id="pFillOn" aria-label="Fill on"></label>
+      <label class="pe-prop" data-for="width">Thickness <input type="range" id="pWidth" min="1" max="16" value="2"><output id="pWidthOut">2</output></label>
+      <label class="pe-prop" data-for="font">Font <select id="pFont"><option value="helv">Helvetica</option><option value="times">Times</option><option value="courier">Courier</option></select></label>
+      <label class="pe-prop" data-for="size">Size <input type="number" id="pSize" min="4" max="200" value="14"></label>
+      <span class="pe-prop" data-for="style"><button type="button" class="pe-toggle" id="pBold" aria-pressed="false" title="Bold"><b>B</b></button><button type="button" class="pe-toggle" id="pItalic" aria-pressed="false" title="Italic"><i>I</i></button></span>
+      <label class="pe-prop" data-for="opacity">Opacity <input type="range" id="pOpacity" min="10" max="100" value="100"><output id="pOpacityOut">100%</output></label>
+      <span class="pe-prop" data-for="layer"><button type="button" class="pe-mini" data-act="front">Bring to front</button><button type="button" class="pe-mini" data-act="dup">Duplicate</button><button type="button" class="pe-mini pe-danger" data-act="delete">Delete</button></span>
+      <span class="pe-hint" id="peHint"></span>
+    </div>
+
+    <div class="pe-body">
+      <aside class="pe-side" aria-label="Pages">
+        <div class="pe-side-head"><span id="pePageCount">Pages</span>
+          <button type="button" class="pe-mini" data-act="addpage" title="Add a blank page after the current one">+ Page</button>
+          <button type="button" class="pe-mini" data-act="imgpage" title="Add a page from an image">+ Image page</button>
+        </div>
+        <ol class="pe-thumbs" id="peThumbs"></ol>
+      </aside>
+      <div class="pe-view" id="peView" tabindex="-1"></div>
+    </div>
+  </div>
+
+  <input type="file" id="peAddPdfInput" accept="application/pdf,.pdf" hidden>
+  <input type="file" id="peImageInput" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+  <input type="file" id="peImgPageInput" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
+
+  <!-- Signature -->
+  <dialog class="pe-dialog" id="peSignDlg" aria-labelledby="peSignTitle">
+    <form method="dialog" class="pe-dlg-inner">
+      <h2 id="peSignTitle">Add your signature</h2>
+      <div class="pe-tabs" role="tablist">
+        <button type="button" role="tab" class="pe-tab" data-tab="draw" aria-selected="true">Draw</button>
+        <button type="button" role="tab" class="pe-tab" data-tab="type" aria-selected="false">Type</button>
+      </div>
+      <div class="pe-tabpanel" data-panel="draw">
+        <canvas id="peSignPad" width="560" height="200" aria-label="Signature pad"></canvas>
+        <div class="pe-sign-row"><span>Sign with your mouse or finger</span><button type="button" class="pe-mini" id="peSignClear">Clear</button></div>
+      </div>
+      <div class="pe-tabpanel" data-panel="type" hidden>
+        <input type="text" id="peSignText" placeholder="Type your name" maxlength="40" autocomplete="name">
+        <div class="pe-sign-preview" id="peSignPreview">Your Name</div>
+      </div>
+      <div class="pe-sign-row"><label>Ink <input type="color" id="peSignColor" value="#1d3c8f"></label></div>
+      <div class="pe-dlg-actions">
+        <button type="button" class="btn btn-dark" value="cancel" data-close>Cancel</button>
+        <button type="button" class="btn btn-brand btn-sm" id="peSignOk">Add signature</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Download options -->
+  <dialog class="pe-dialog" id="peExportDlg" aria-labelledby="peExportTitle">
+    <form method="dialog" class="pe-dlg-inner">
+      <h2 id="peExportTitle">Download PDF</h2>
+      <label class="pe-field">File name <input type="text" id="peFileName" value="edited.pdf"></label>
+      <label class="pe-check"><input type="checkbox" id="peNumbers"> Add page numbers</label>
+      <div class="pe-sub-field" id="peNumbersOpts" hidden>
+        <select id="peNumbersPos" aria-label="Page number position">
+          <option value="bc">Bottom centre</option><option value="br">Bottom right</option><option value="bl">Bottom left</option>
+          <option value="tc">Top centre</option><option value="tr">Top right</option>
+        </select>
+        <select id="peNumbersFmt" aria-label="Page number format">
+          <option value="n">1</option><option value="n/t">1 / 10</option><option value="page">Page 1 of 10</option>
+        </select>
+      </div>
+      <label class="pe-check"><input type="checkbox" id="peWatermark"> Add a watermark</label>
+      <div class="pe-sub-field" id="peWatermarkOpts" hidden>
+        <input type="text" id="peWatermarkText" value="CONFIDENTIAL" maxlength="40" aria-label="Watermark text">
+      </div>
+      <p class="pe-note" id="peExportNote"></p>
+      <div class="pe-dlg-actions">
+        <button type="button" class="btn btn-dark" data-close>Cancel</button>
+        <button type="button" class="btn btn-brand btn-sm" id="peExportOk">Download</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="pe-toast" id="peToast" role="status" aria-live="polite" hidden></div>
+</div>

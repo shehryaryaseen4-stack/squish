@@ -126,3 +126,14 @@ bash /opt/flipfree/deploy/update.sh
 | Error 524 | Bohot bari video 100 second se zyada le rahi thi; choti file try karein. |
 | Domain nahi khul raha | Naye domain/DNS mein kuch ghante lag sakte hain. Cloudflare mein `A` records aur orange cloud check karein. |
 | Script beech mein ruk gayi | Dobara wahi command chalayein, yeh safe hai. |
+
+## PDF editor on karna (jab tayyar hon)
+
+PDF editor (`/edit-pdf`) code mein maujood hai lekin band hai. On karne ke liye server pe:
+
+```
+echo "PDF_EDITOR=1" >> /opt/flipfree/.env
+bash /opt/flipfree/deploy/update.sh
+```
+
+Menu mein "Edit PDF" aa jayega. Band karne ke liye `.env` se `PDF_EDITOR=1` wali line hata kar dobara `update.sh` chalayein.

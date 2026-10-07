@@ -259,6 +259,20 @@ app.get(/^\/([a-z0-9-]+)-converter$/, (req, res, next) => {
   sendHtml(res, r.html);
 });
 
+// PDF editor: switched on with PDF_EDITOR=1. pdf.js (rendering) and pdf-lib (saving) are served
+// from node_modules, like JSZip, so the page needs no third-party scripts.
+if (pages.PDF_EDITOR) {
+  const pdfjsDir = path.dirname(require.resolve('pdfjs-dist/package.json'));
+  const vendorOpts = { index: false, maxAge: '7d' };
+  for (const dir of ['build', 'cmaps', 'standard_fonts', 'wasm', 'iccs']) {
+    // the legacy build includes the polyfills that older (but still common) browsers need
+    app.use(`/vendor/pdfjs${dir === 'build' ? '' : `/${dir}`}`, express.static(path.join(pdfjsDir, dir === 'build' ? 'legacy/build' : dir), vendorOpts));
+  }
+  app.get('/vendor/pdf-lib.min.js', (_req, res) => res.set('Cache-Control', 'public, max-age=604800')
+    .sendFile(require.resolve('pdf-lib/dist/pdf-lib.min.js')));
+  app.get('/edit-pdf', (req, res) => sendHtml(res, pages.editorPage(baseOf(req))));
+}
+
 app.get('/formats', (_req, res) => res.redirect(301, '/converters'));
 app.get(/^\/(about|privacy|terms|contact)$/, (req, res, next) => {
   const r = pages.resolveInfo(req.params[0], baseOf(req));

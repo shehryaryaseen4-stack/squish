@@ -60,6 +60,10 @@ const MAX_MB = Number(process.env.MAX_FILE_MB || 40);
 
 const PAGE_TPL = fs.readFileSync(path.join(__dirname, 'views', 'page.html'), 'utf8');
 const HUB_TPL = fs.readFileSync(path.join(__dirname, 'views', 'hub.html'), 'utf8');
+// The PDF editor (/edit-pdf) is switched on with PDF_EDITOR=1; until then it has no page, link or sitemap entry.
+const PDF_EDITOR = process.env.PDF_EDITOR === '1';
+const EDITOR_TPL = fs.readFileSync(path.join(__dirname, 'views', 'editor.html'), 'utf8');
+const EDITOR_APP = fs.readFileSync(path.join(__dirname, 'views', 'editor-app.html'), 'utf8');
 
 const ANY = { minStatus: 'planned' };
 
@@ -266,7 +270,7 @@ function topbar() {
       <details class="nav-menu" data-menu><summary class="nav-item">Tools<span class="caret" aria-hidden="true"></span></summary>${mega}</details>
       <details class="nav-menu nav-simple" data-menu><summary class="nav-item">Convert<span class="caret" aria-hidden="true"></span></summary><div class="dropdown"><ul>${convertList}</ul></div></details>
       <details class="nav-menu nav-simple" data-menu><summary class="nav-item">Compress<span class="caret" aria-hidden="true"></span></summary><div class="dropdown"><ul>${compress}</ul></div></details>
-      <a class="nav-item nav-link" href="/converters">Formats</a>
+      <a class="nav-item nav-link" href="/converters">Formats</a>${PDF_EDITOR ? '\n      <a class="nav-item nav-link" href="/edit-pdf">Edit PDF</a>' : ''}
     </nav>
     <div class="top-actions">
       <a class="btn btn-brand btn-sm" href="/#convert">Convert now</a>
@@ -807,6 +811,50 @@ function hubPage(base) {
   }));
 }
 
+// PDF editor: the app itself is static markup (views/editor-app.html) driven by public/editor.js.
+const EDITOR_FAQ = [
+  ['Is the PDF editor free?', 'Yes. Editing and downloading are free, with no sign-up and no watermark.'],
+  ['Is my PDF uploaded to a server?', 'No. The editor runs in your browser, so the PDF is opened, edited and saved on your own device and never sent to us.'],
+  ['Can I change the existing text in a PDF?', 'Yes. Choose Edit text and click a line of text. It is covered and retyped so you can change it. The replacement uses Helvetica, Times or Courier, so a special font may look slightly different, and the original text stays hidden underneath in the file. Scanned PDFs only contain pictures of text; type over them with the Text tool instead.'],
+  ['How do I sign a PDF?', 'Click Sign, draw your signature with the mouse or your finger, or type your name, then place and resize it on the page and download the PDF.'],
+  ['Can I add, delete, rotate or reorder pages?', 'Yes. Use the buttons on each page in the side bar, drag pages to reorder them, add blank pages or image pages, and use Merge to add the pages of another PDF.'],
+  ['Can I create a new PDF from scratch?', 'Yes. Choose Create a new PDF, pick the page size, then add text, images, shapes and more pages.'],
+  ['Can I use whiteout to remove private information?', 'No. Whiteout and Edit text cover content so it is not visible, but the original text is still inside the file and can be copied out. Do not use them to remove passwords, account numbers or other private data.'],
+  ['Which languages can I type?', 'Text you add uses the standard PDF fonts, which cover English and Western European languages. Characters they cannot show, such as Urdu or Chinese, are replaced with a question mark.'],
+];
+function editorPage(base) {
+  const p = '/edit-pdf';
+  const title = `Edit PDF Online Free - PDF Editor | ${SITE}`;
+  const desc = 'Free online PDF editor. Add and change text, sign, highlight, draw, insert images and add, delete, rotate or reorder pages. Files stay on your device.';
+  const crumbs = [['Home', '/'], ['Edit PDF', p]];
+  const info = `<div class="pe-info">
+    <h2>How to edit a PDF</h2>
+    <ol class="steps">
+      <li><strong>Open your PDF</strong> or create a blank one. It opens in your browser; nothing is uploaded.</li>
+      <li><strong>Choose a tool</strong> from the bar: Edit text, Text, Draw, Highlight, Whiteout, Shapes, Image or Sign, then click on the page.</li>
+      <li><strong>Download</strong> the edited PDF, with page numbers or a watermark if you like.</li>
+    </ol>
+    <h2>Everything you can do</h2>
+    <ul class="feat">
+      <li><strong>Change existing text</strong>Click a line in the PDF and retype it.</li>
+      <li><strong>Add text</strong>Choose the font, size, colour, bold and italic.</li>
+      <li><strong>Sign</strong>Draw or type your signature and place it anywhere.</li>
+      <li><strong>Highlight and whiteout</strong>Mark important lines or hide content.</li>
+      <li><strong>Draw and shapes</strong>Freehand pen, rectangles, circles, lines, arrows, check marks and crosses.</li>
+      <li><strong>Images</strong>Insert PNG, JPG or WebP pictures, or add them as new pages.</li>
+      <li><strong>Pages</strong>Add, delete, duplicate, rotate and reorder pages, or merge another PDF.</li>
+      <li><strong>Page numbers and watermark</strong>Added when you download.</li>
+    </ul>
+  </div>${faqHtml(EDITOR_FAQ)}`;
+  return render(EDITOR_TPL, {
+    ...baseFields(base, p, title, desc, {}),
+    HEAD_TAGS: seo.headTags({ url: base + p, title: esc(title), desc: esc(desc), image: `${base}/og/home.png` }),
+    JSONLD: graph(base, p, 'PDF Editor', desc, EDITOR_FAQ, crumbs, { features: ['Edit existing text', 'Add text', 'Sign PDF', 'Highlight', 'Whiteout', 'Draw', 'Shapes', 'Insert images', 'Add, delete, rotate and reorder pages', 'Merge PDF', 'Page numbers', 'Watermark'] }),
+    EDITOR: EDITOR_APP + `<div class="wrap">${info}</div>`,
+    EDITOR_CSS_V: seo.ASSET_V.editorCss, EDITOR_JS_V: seo.ASSET_V.editorJs,
+  });
+}
+
 function notFoundPage(base = '') {
   return renderPage(HUB_TPL, {
     ...noindex(baseFields(base, '/', `Page not found | ${SITE}`, 'This page does not exist.', {})), ROBOTS: 'noindex',
@@ -955,6 +1003,7 @@ function allPaths() {
     ...registry.getConverters().map((c) => c.route),
     ...COMPRESSIBLE.map((s) => compressPath(s)),
     ...Object.keys(INFO_PAGES).map((k) => `/${k}`),
+    ...(PDF_EDITOR ? ['/edit-pdf'] : []),
   ];
 }
 
@@ -962,7 +1011,7 @@ function allPaths() {
 // (Google ignores priority/changefreq; Bing and others still read them.)
 function sitemapPriority(p) {
   if (p === '/') return '1.0';
-  if (/-to-|^\/compress-/.test(p)) return '0.9';
+  if (/-to-|^\/compress-|^\/edit-pdf$/.test(p)) return '0.9';
   if (/-converter$/.test(p) || p === '/converters') return '0.8';
   return '0.3';
 }
@@ -974,4 +1023,5 @@ function sitemap(base) {
 
 const robots = (base) => `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${base}/sitemap.xml\n`;
 
-module.exports = { homePage, hubPage, notFoundPage, resolvePair, resolveCompress, resolveConverter, resolveInfo, ogSpec, sitemap, robots, allPaths, adsTxt, ADS_ENABLED: !!ADS_CLIENT };
+module.exports = {
+  editorPage, PDF_EDITOR, homePage, hubPage, notFoundPage, resolvePair, resolveCompress, resolveConverter, resolveInfo, ogSpec, sitemap, robots, allPaths, adsTxt, ADS_ENABLED: !!ADS_CLIENT };
