@@ -31,7 +31,7 @@ const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 // that are obviously fake, so this only changes when content files change.
 function siteUpdated() {
   if (/^\d{4}-\d{2}-\d{2}/.test(process.env.SITE_UPDATED || '')) return process.env.SITE_UPDATED.slice(0, 10);
-  const files = ['pages.js', 'registry/formats.js', 'registry/converters.js', 'views/page.html', 'public/style.css'];
+  const files = ['pages.js', 'registry/formats.js', 'registry/converters.js', 'views/page.html', 'public/style.css', 'content/guides.js', 'content/guides-more.js', 'content/articles.js', 'content/keywords.js'];
   const newest = Math.max(...files.map((f) => { try { return fs.statSync(path.join(__dirname, f)).mtimeMs; } catch { return 0; } }));
   return new Date(newest || Date.now()).toISOString().slice(0, 10);
 }

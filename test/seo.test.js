@@ -16,6 +16,8 @@ function fetchPath(p) {
   if (clean === '/converters') return { html: pages.hubPage(BASE) };
   let m = /^\/(about|privacy|terms|contact)$/.exec(clean);
   if (m) return pages.resolveInfo(m[1], BASE);
+  m = /^\/guides(?:\/([a-z0-9-]+))?$/.exec(clean);
+  if (m) return pages.resolveGuide(m[1], BASE);
   m = /^\/([a-z0-9-]+)-converter$/.exec(clean);
   if (m) return pages.resolveConverter(m[1], BASE);
   m = /^\/compress-([a-z0-9-]+)$/.exec(clean);
@@ -96,7 +98,7 @@ test('no broken internal links anywhere on the indexable pages', () => {
 });
 
 test('share images exist for indexable pages and nothing else', () => {
-  for (const { p } of indexable) assert.ok(pages.ogSpec(p === '/' ? 'home' : p.slice(1)), p);
+  for (const { p } of indexable) assert.ok(pages.ogSpec(p === '/' ? 'home' : p.slice(1).replace(/\//g, '-')), p);
   assert.equal(pages.ogSpec('anything-we-did-not-make'), null);
   assert.equal(pages.ogSpec('jpeg-to-png'), null); // alias: canonical image only
 });
@@ -153,4 +155,38 @@ test('pages other than home load the Tools menu on demand; home keeps it in the 
   assert.doesNotMatch(html, /class="fmt-panel mega/);
   assert.match(html, /data-lazy="\/menu\.html\?v=[0-9a-f]{10}"/);
   assert.match(pages.megaMenu(), /^<div class="fmt-panel mega/);
+});
+
+test('guides: every article is indexed, linked from its tools and links back to them', () => {
+  const ARTICLES = require('../content/articles');
+  const inMap = new Set(pages.allPaths());
+  assert.ok(inMap.has('/guides'));
+  assert.ok(ARTICLES.length >= 10);
+  for (const a of ARTICLES) {
+    const p = `/guides/${a.slug}`;
+    assert.ok(inMap.has(p), p);
+    const html = fetchPath(p).html;
+    assert.match(html, /"@type":"Article"/, p);
+    for (const t of a.tools) {
+      assert.ok(inMap.has(t), `${p} promotes ${t}, which is not an indexed tool`);
+      assert.ok(html.includes(`href="${t}"`), `${p} does not link to ${t}`);
+      assert.ok(fetchPath(t).html.includes(`href="${p}"`), `${t} does not link back to ${p}`);
+    }
+  }
+  assert.equal(fetchPath('/guides/no-such-guide'), null);
+  assert.match(pages.homePage(BASE), /href="\/guides"/);
+});
+
+test('every guide in content/ is for a live, indexed conversion', () => {
+  const all = { ...require('../content/guides'), ...require('../content/guides-more') };
+  assert.ok(Object.keys(all).length >= 100, `${Object.keys(all).length} guides`);
+  const inMap = new Set(pages.allPaths());
+  for (const k of Object.keys(all)) {
+    const [f, t] = k.split('>');
+    assert.ok(registry.getConversionStatus(f, t), `${k} is not a known conversion`);
+    if (registry.getConversionStatus(f, t) !== 'live') continue; // engine missing in this build
+    const p = registry.getConverterRoute(f, t);
+    assert.ok(inMap.has(p), `${p} has a guide but is not indexed`);
+    assert.match(fetchPath(p).html, /<h2>Why convert /, p);
+  }
 });

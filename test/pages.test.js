@@ -95,7 +95,7 @@ test('sitemap only lists pages that are indexable', () => {
   for (const c of registry.getConverters({ type: 'all' })) assert.ok(paths.includes(c.route), c.route);
   assert.ok(paths.includes('/image-converter') && paths.includes('/png-converter') && paths.includes('/jfif-to-png'));
   assert.ok(!paths.includes('/mp4-to-mp3') && !paths.includes('/video-converter') && !paths.includes('/mp4-converter'));
-  for (const p of paths.filter((x) => x !== '/' && x !== '/converters' && !/^\/(about|privacy|terms|contact)$/.test(x))) {
+  for (const p of paths.filter((x) => x !== '/' && x !== '/converters' && !/^\/(about|privacy|terms|contact|guides)(\/|$)/.test(x))) {
     const m = /^\/(.+)-converter$/.exec(p);
     const r = m ? null : registry.parseConverterRoute(p);
     const html = m ? pages.resolveConverter(m[1], BASE).html
@@ -136,7 +136,7 @@ test('ads are off by default and, when configured, only on pages with the conver
 });
 
 test('popular conversions carry their hand-written guide and extra FAQ', () => {
-  const GUIDES = require('../content/guides');
+  const GUIDES = { ...require('../content/guides'), ...require('../content/guides-more') };
   for (const [key, g] of Object.entries(GUIDES)) {
     const [from, to] = key.split('>');
     const r = pages.resolvePair(from, to, BASE);
@@ -149,5 +149,5 @@ test('popular conversions carry their hand-written guide and extra FAQ', () => {
   }
   const html = pages.resolvePair('jpg', 'png', BASE).html;
   assert.match(html, /<h2>Why convert JPG to PNG\?<\/h2>/);
-  assert.ok(!pages.resolvePair('png', 'gif', BASE).html.includes('class="guide'), 'pairs without a guide are unchanged');
+  assert.ok(!pages.resolvePair('png', 'bmp', BASE).html.includes('class="guide'), 'pairs without a guide are unchanged');
 });

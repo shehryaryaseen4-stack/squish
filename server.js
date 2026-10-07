@@ -284,6 +284,12 @@ app.get(/^\/(about|privacy|terms|contact)$/, (req, res, next) => {
   return r ? sendHtml(res, r.html) : next();
 });
 
+// How-to articles: /guides lists them, /guides/<slug> is one article.
+app.get(/^\/guides(?:\/([a-z0-9-]+))?$/, (req, res, next) => {
+  const r = pages.resolveGuide(req.params[0], baseOf(req));
+  return r ? sendHtml(res, r.html) : next();
+});
+
 app.get('/sitemap.xml', (req, res) => res.set('Cache-Control', 'public, max-age=3600').type('application/xml').send(pages.sitemap(baseOf(req))));
 app.get('/ads.txt', (_req, res) => {
   const txt = pages.adsTxt();

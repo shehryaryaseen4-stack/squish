@@ -25,7 +25,8 @@ const path = require('path');
 const registry = require('./registry');
 const seo = require('./seo');
 const brand = require('./brand');
-const GUIDES = require('./content/guides');
+const GUIDES = { ...require('./content/guides'), ...require('./content/guides-more') };
+const ARTICLES = require('./content/articles');
 const KEYWORDS = require('./content/keywords');
 
 const SITE = process.env.SITE_NAME || brand.NAME;
@@ -306,7 +307,7 @@ function footer() {
     <div><h4>Converters</h4><ul>${cats}</ul></div>
     <div><h4>Popular</h4><ul>${pop}</ul></div>
     <div><h4>Tools</h4><ul>${comp}<li>${link('/converters', 'All formats')}</li></ul></div>
-    <div><h4>Company</h4><ul><li>${link('/about', 'About')}</li><li>${link('/privacy', 'Privacy Policy')}</li><li>${link('/terms', 'Terms of Use')}</li><li>${link('/contact', 'Contact')}</li>${CONTACT_EMAIL ? `<li>${mailLink}</li>` : ''}</ul></div>
+    <div><h4>Company</h4><ul><li>${link('/about', 'About')}</li><li>${link('/guides', 'Guides')}</li><li>${link('/privacy', 'Privacy Policy')}</li><li>${link('/terms', 'Terms of Use')}</li><li>${link('/contact', 'Contact')}</li>${CONTACT_EMAIL ? `<li>${mailLink}</li>` : ''}</ul></div>
   </div><div class="footer-bottom">&copy; ${new Date().getFullYear()} ${SITE}. Files are deleted as soon as they are converted.</div></footer>`;
 }
 
@@ -557,7 +558,7 @@ function popularCards() {
 
 // ------------------------------------------------------------- page makers --
 // Share-image key for a URL path: '/' -> 'home', '/png-to-webp' -> 'png-to-webp'.
-const ogKey = (urlPath) => (urlPath === '/' ? 'home' : urlPath.slice(1));
+const ogKey = (urlPath) => (urlPath === '/' ? 'home' : urlPath.slice(1).replace(/\//g, '-'));
 
 function baseFields(base, urlPath, title, desc, extra) {
   const url = base + urlPath;
@@ -592,7 +593,7 @@ function renderPage(tpl, fields) {
 
 // Structured data. Organization + WebSite are the same on every page (linked by @id);
 // the page itself is a WebApplication (tools) or WebPage (lists, legal pages).
-function graph(base, urlPath, name, desc, faq, crumbs, { type = 'WebApplication', features } = {}) {
+function graph(base, urlPath, name, desc, faq, crumbs, { type = 'WebApplication', features, article } = {}) {
   const url = base + urlPath;
   const org = { '@type': 'Organization', '@id': `${base}/#organization`, name: SITE, url: `${base}/`,
     logo: { '@type': 'ImageObject', url: `${base}/icon-512.png`, width: 512, height: 512 },
@@ -605,7 +606,11 @@ function graph(base, urlPath, name, desc, faq, crumbs, { type = 'WebApplication'
       isAccessibleForFree: true, image: `${base}/og/${ogKey(urlPath)}.png`, publisher: { '@id': `${base}/#organization` },
       isPartOf: { '@id': `${base}/#website` }, dateModified: seo.LASTMOD,
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }, ...(features ? { featureList: features } : {}) }
-    : { '@type': type, '@id': `${url}#webpage`, name, url, description: desc, inLanguage: 'en', isPartOf: { '@id': `${base}/#website` }, dateModified: seo.LASTMOD };
+    : type === 'Article'
+      ? { '@type': 'Article', '@id': `${url}#article`, headline: name, url, description: desc, inLanguage: 'en', mainEntityOfPage: url,
+        image: `${base}/og/${ogKey(urlPath)}.png`, datePublished: article.date, dateModified: article.updated || article.date,
+        author: { '@id': `${base}/#organization` }, publisher: { '@id': `${base}/#organization` }, isPartOf: { '@id': `${base}/#website` } }
+      : { '@type': type, '@id': `${url}#webpage`, name, url, description: desc, inLanguage: 'en', isPartOf: { '@id': `${base}/#website` }, dateModified: seo.LASTMOD };
   return jsonLd({
     '@context': 'https://schema.org',
     '@graph': [
@@ -694,7 +699,7 @@ function pairPage(fromSlug, toSlug, base) {
       widget, withSelect: true }),
     TOOL: toolHtml({ inputs: [fromSlug], outputs: outputsFor(fromSlug), dropTitle: `Drop your ${from.label} files here`, dropSub: `or click to choose ${from.label} files` }),
     CONTENT: howToSteps(from.label, to.label, 'convert', imagePair) + guideHtml(from, to, guide) + cards + compareTable([fromSlug, toSlug])
-      + `<section class="notes"><h2>Converting ${from.name} to ${to.name}</h2><ul>${notes.map((x) => `<li>${x}</li>`).join('')}</ul></section>` + faqHtml(faq),
+      + `<section class="notes"><h2>Converting ${from.name} to ${to.name}</h2><ul>${notes.map((x) => `<li>${x}</li>`).join('')}</ul></section>` + readMore(p) + faqHtml(faq),
     RELATED: relatedForPair(from, to),
   });
   return renderPage(PAGE_TPL, pairIndexable(fromSlug, toSlug) ? pairFields : notIndexed(pairFields));
@@ -742,7 +747,7 @@ function compressPage(slug, base) {
         : `Make your ${f.name} files smaller without fuss. Upload one file or many and download the compressed versions individually or as a ZIP. Images inside are downsampled to 150 dpi. No sign-up needed.`,
       widget, withSelect: true }),
     TOOL: toolHtml({ inputs: [slug], outputs: [slug], compress: true, dropTitle: `Drop your ${f.label} files here`, dropSub: `or click to choose ${f.label} files` }),
-    CONTENT: howToSteps(f.label, '', 'compress', isImageFmt(slug)) + `<section class="fcards" aria-label="About the format">${cardHtml(slug)}</section>` + faqHtml(faq),
+    CONTENT: howToSteps(f.label, '', 'compress', isImageFmt(slug)) + `<section class="fcards" aria-label="About the format">${cardHtml(slug)}</section>` + readMore(p) + faqHtml(faq),
     RELATED: `<section class="related"><h2>Related tools</h2>${chips([...others, ...conv])}</section>`,
   }));
 }
@@ -900,6 +905,62 @@ function notFoundPage(base = '') {
   });
 }
 
+// ---------------------------------------------------------------- guides --
+// /guides and /guides/<slug>: how-to articles from content/articles.js. Each converter page an
+// article is about links back to it (readMore), so the guides and the tools support each other.
+const articlePath = (slug) => `/guides/${slug}`;
+const ARTICLE_BY_SLUG = new Map(ARTICLES.map((a) => [a.slug, a]));
+const articlesFor = (toolPath) => ARTICLES.filter((a) => a.tools.includes(toolPath));
+const toolName = (p) => {
+  const r = registry.resolveRoute(p, ANY);
+  return r && r.type === 'compress' ? `Compress ${r.from.label}` : r ? `${r.from.label} to ${r.to.label}` : p;
+};
+const longDate = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+const readingMinutes = (a) => Math.max(2, Math.round(`${a.intro} ${a.sections.map(([h, b]) => `${h} ${b}`).join(' ')}`.replace(/<[^>]+>/g, ' ').split(/\s+/).length / 220));
+
+function readMore(toolPath) {
+  const list = articlesFor(toolPath);
+  if (!list.length) return '';
+  return `<section class="read-more"><h2>Related ${list.length > 1 ? 'guides' : 'guide'}</h2><ul class="guide-links">${list
+    .map((a) => `<li>${link(articlePath(a.slug), esc(a.h1))}<span>${esc(a.desc)}</span></li>`).join('')}</ul></section>`;
+}
+
+function articlePage(a, base) {
+  const p = articlePath(a.slug);
+  const crumbs = [['Home', '/'], ['Guides', '/guides'], [a.h1, p]];
+  const tools = `<div class="article-tools">${a.tools.map((t, i) => `<a class="btn ${i ? 'btn-ghost' : 'btn-brand'} btn-sm" href="${t}">${icon('convert')}${esc(toolName(t))}</a>`).join('')}</div>`;
+  const others = ARTICLES.filter((x) => x !== a).map((x) => [articlePath(x.slug), esc(x.h1), true]);
+  return renderPage(HUB_TPL, baseFields(base, p, a.title, a.desc, {
+    JSONLD: graph(base, p, a.h1, a.desc, a.faq, crumbs, { type: 'Article', article: a }),
+    HERO: hero({ h1: esc(a.h1), crumbs, intro: esc(a.intro), short: true }),
+    BODY: `<article class="prose article">
+      <p class="muted article-meta">Updated <time datetime="${a.updated || a.date}">${longDate(a.updated || a.date)}</time> &middot; ${readingMinutes(a)} min read</p>
+      ${tools}
+      ${a.sections.map(([h, html]) => `<h2>${esc(h)}</h2>${html}`).join('\n')}
+    </article>${faqHtml(a.faq.map(([q, ans]) => [esc(q), esc(ans)]))}
+    <section class="related"><h2>More guides</h2>${chips(others)}</section>`,
+  }));
+}
+
+function guidesHub(base) {
+  const p = '/guides';
+  const crumbs = [['Home', '/'], ['Guides', p]];
+  const title = `File Conversion Guides and How-Tos | ${SITE}`;
+  const desc = 'Step-by-step guides for converting and compressing images, PDFs, documents, video, audio and ebooks: the right settings, common problems and fixes.';
+  return renderPage(HUB_TPL, baseFields(base, p, title, desc, {
+    JSONLD: graph(base, p, 'Guides', desc, null, crumbs, { type: 'CollectionPage' }),
+    HERO: hero({ h1: 'Guides', crumbs, intro: 'Practical how-tos for everyday file problems: smaller images, lighter PDFs, photos that will not open and videos that will not play.', short: true }),
+    BODY: `<section class="hub-section"><ul class="guide-links guide-list">${ARTICLES.map((a) =>
+      `<li>${link(articlePath(a.slug), esc(a.h1))}<span>${esc(a.desc)}</span></li>`).join('')}</ul></section>`,
+  }));
+}
+
+function resolveGuide(slug, base) {
+  if (slug === undefined) return { html: guidesHub(base) };
+  const a = ARTICLE_BY_SLUG.get(slug);
+  return a ? { html: articlePage(a, base) } : null;
+}
+
 // ------------------------------------------------------------ trust pages --
 // About / Privacy / Terms / Contact. Google's quality guidelines and AdSense both expect a
 // site to say who runs it and how it treats data. The privacy text describes what this
@@ -935,7 +996,7 @@ const INFO_PAGES = {
       <h2>Advertising</h2>
       <p>If advertising is shown, it is provided by Google AdSense. Google and its partners may use cookies to show ads based on your visits to this and other websites. Visitors in the European Economic Area, the UK and Switzerland are asked for their consent through Google's consent message before personalised ads are shown. You can opt out of personalised advertising at <a href="https://adssettings.google.com/" rel="noopener">Google Ads Settings</a>. See <a href="https://policies.google.com/technologies/partner-sites" rel="noopener">how Google uses information from sites that use its services</a>.</p>
       <h2>Third-party services</h2>
-      <p>Pages load fonts from Google Fonts. No other third-party scripts are loaded unless advertising is enabled.</p>
+      <p>Fonts are served from this site; no third-party scripts are loaded unless advertising is enabled.</p>
       <h2>Your rights</h2>
       <p>Because we do not store your files or create accounts, we hold no personal data about you beyond the short-lived rate-limit record. For any privacy question, ${contactLine}.</p></section>`,
   },
@@ -987,7 +1048,13 @@ const resolveInfo = (key, base) => (Object.prototype.hasOwnProperty.call(INFO_PA
 
 // ------------------------------------------------------------ share images --
 /** What to draw on /og/<key>.png, or null for an unknown key (so nobody can make us render arbitrary text). */
-function ogSpec(key) {
+function ogSpec(rawKey) {
+  const key = String(rawKey).replace(/\//g, '-');
+  if (key === 'guides') return { title: 'File Conversion Guides', subtitle: 'How-to articles for images, PDFs, video and more' };
+  if (key.startsWith('guides-')) {
+    const a = ARTICLE_BY_SLUG.get(key.slice(7));
+    return a ? { title: a.h1.length > 48 ? `${a.h1.slice(0, 46).replace(/\s+\S*$/, '')}...` : a.h1, subtitle: 'Guide' } : null;
+  }
   if (key === 'home') return { title: 'Free Online File Converter', subtitle: `${LIVE_COUNT.toLocaleString('en-US')} conversions \u00b7 Video, audio, documents, images` };
   if (key === 'converters') return { title: 'All File Formats', subtitle: `${FORMAT_COUNT} formats in ${CATS.length} categories` };
   if (INFO_PAGES[key]) return { title: INFO_PAGES[key].h1, subtitle: 'Free online file converter' };
@@ -1040,6 +1107,7 @@ function allPaths() {
     ...registry.getConverters().filter((c) => pairIndexable(c.from, c.to)).map((c) => c.route),
     ...COMPRESSIBLE.map((s) => compressPath(s)),
     ...Object.keys(INFO_PAGES).map((k) => `/${k}`),
+    '/guides', ...ARTICLES.map((a) => articlePath(a.slug)),
     ...(PDF_EDITOR ? ['/edit-pdf'] : []),
   ];
 }
@@ -1050,6 +1118,7 @@ function sitemapPriority(p) {
   if (p === '/') return '1.0';
   if (/-to-|^\/compress-|^\/edit-pdf$/.test(p)) return '0.9';
   if (/-converter$/.test(p) || p === '/converters') return '0.8';
+  if (p.startsWith('/guides')) return '0.6';
   return '0.3';
 }
 
@@ -1062,4 +1131,4 @@ const robots = (base) => `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: $
 
 module.exports = {
   megaMenu,
-  editorPage, PDF_EDITOR, homePage, hubPage, notFoundPage, resolvePair, resolveCompress, resolveConverter, resolveInfo, ogSpec, sitemap, robots, allPaths, adsTxt, ADS_ENABLED: !!ADS_CLIENT };
+  editorPage, PDF_EDITOR, homePage, resolveGuide, hubPage, notFoundPage, resolvePair, resolveCompress, resolveConverter, resolveInfo, ogSpec, sitemap, robots, allPaths, adsTxt, ADS_ENABLED: !!ADS_CLIENT };
