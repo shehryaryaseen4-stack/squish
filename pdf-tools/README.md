@@ -39,7 +39,7 @@ JSZip, loaded only on tool pages when they are needed.
 |---|---|
 | Organize | Merge, Split (by ranges, every N pages, or every page), Extract pages, Delete pages, Rearrange (drag and drop), Rotate, Duplicate pages |
 | Convert | PDF to JPG, PDF to PNG (72/150/300 dpi), JPG to PDF, PNG to PDF (EXIF rotation, page size, margins), PDF to Text, PDF to ZIP |
-| Edit | Edit PDF, Add text, Add image, Add shapes, Sign (draw, type or upload), Highlight, Annotate (real PDF comments), Add watermark |
+| Edit | Edit PDF (including changing existing text), Add text, Add image, Add shapes, Sign (draw, type or upload), Highlight, Annotate (real PDF comments), Add watermark |
 | Security | Redact: marked pages are flattened to images, so the covered content is really removed |
 | Other | Page numbers, Metadata editor |
 
@@ -159,8 +159,10 @@ npm run test:e2e  # real browser (Playwright): every tool, drag and drop, errors
 
 - **PDF to Word, Excel and PowerPoint** rebuild the layout. Simple documents convert well;
   complex layouts may need touch-ups. Scanned PDFs have no text until you run OCR PDF on them.
-- **The editor adds content on top of the page.** It does not reflow existing text. To change
-  existing wording, cover it with White-out and type over it.
+- **Edit text** covers the original words in their background color and writes the new words
+  on top, in Helvetica, Times or Courier. Text doesn't reflow, and the original text is still in
+  the file underneath (use Redact PDF for confidential content). Scanned pages have no
+  clickable text.
 - **Sign PDF** places a picture of the signature. It is not a certificate-based digital
   signature.
 - **HTML to PDF** takes an uploaded `.html` file, not a URL. Online images and stylesheets are

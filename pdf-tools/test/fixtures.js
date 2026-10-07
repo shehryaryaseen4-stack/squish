@@ -44,6 +44,21 @@ async function samplePdf(pages = 3) {
   return Buffer.from(await doc.save());
 }
 
+// A small invoice with colored table cells, for editing existing text.
+async function invoicePdf() {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const p = doc.addPage([595, 842]);
+  p.drawText('INVOICE', { x: 400, y: 780, size: 30, font: bold, color: rgb(0.12, 0.3, 0.55) });
+  p.drawRectangle({ x: 60, y: 720, width: 475, height: 26, color: rgb(0.12, 0.3, 0.55) });
+  p.drawText('Invoice Date', { x: 80, y: 728, size: 12, font: bold, color: rgb(1, 1, 1) });
+  p.drawRectangle({ x: 60, y: 694, width: 475, height: 26, color: rgb(0.94, 0.94, 0.94) });
+  p.drawText('24 08 2026', { x: 80, y: 702, size: 11, font, color: rgb(0.2, 0.2, 0.2) });
+  p.drawText('Total due: PKR 150000', { x: 80, y: 650, size: 14, font: bold, color: rgb(0.12, 0.3, 0.55) });
+  return Buffer.from(await doc.save());
+}
+
 async function build() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-fixtures-'));
   const f = (name) => path.join(dir, name);
@@ -51,6 +66,7 @@ async function build() {
   fs.writeFileSync(f('second.pdf'), await samplePdf(2));
   fs.writeFileSync(f('long.pdf'), await samplePdf(12));
   fs.writeFileSync(f('pic.png'), makePng(320, 240));
+  fs.writeFileSync(f('invoice.pdf'), await invoicePdf());
   fs.writeFileSync(f('not-a-pdf.pdf'), 'MZ this is not a pdf at all');
   fs.writeFileSync(f('page.html'), '<!doctype html><html><head><title>T</title><link rel="stylesheet" href="http://169.254.169.254/x.css"><script>alert(1)</script></head><body><h1>Hello HTML</h1><p style="color:#c00">Paragraph text.</p><img src="file:///etc/passwd"><table border="1"><tr><td>a</td><td>b</td></tr></table></body></html>');
   const src = fs.readFileSync(f('sample.pdf'));

@@ -53,6 +53,7 @@ export async function openForView(bytes) {
     standardFontDataUrl: '/vendor/pdfjs/standard_fonts/',
     wasmUrl: '/vendor/pdfjs/wasm/', iccUrl: '/vendor/pdfjs/iccs/',
     isEvalSupported: false, enableXfa: false,
+    fontExtraProperties: true, // font names, so edited text keeps bold/regular
   });
   try {
     return await task.promise;

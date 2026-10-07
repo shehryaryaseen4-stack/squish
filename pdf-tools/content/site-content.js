@@ -36,7 +36,7 @@ const homeFaqs = [
   },
   {
     q: "Can I edit the existing text in a PDF?",
-    a: "Partly. You can add new text anywhere on a page and cover existing content with a white box, then type replacement text on top. What you cannot do is reflow or rewrite the original text the way a word processor would, because PDFs store text as fixed positions on the page. If you need heavy rewriting, try converting the PDF to Word, editing it there and converting it back.",
+    a: "Yes, in Edit PDF. Choose Edit text and click the words you want to change: the old text is covered in its own background color and your new text is written in its place, in a standard font. PDFs store text at fixed positions, so a much longer sentence will not reflow onto the next line. For heavy rewriting, convert the PDF to Word, edit it there and convert it back.",
   },
   {
     q: "Are signatures added with {site} legally binding?",

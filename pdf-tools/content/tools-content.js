@@ -538,28 +538,28 @@ module.exports = {
 
   // ------------------------------------------------------------------ edit
   'edit-pdf': {
-    title: 'Edit PDF Online: Add Text, Images and Shapes',
-    description: 'Add text, images, shapes, drawings, highlights, notes and signatures to any PDF. A free online PDF editor that works in your browser.',
+    title: 'Edit PDF Online: Change Text, Add Images',
+    description: 'Change existing text in a PDF, or add text, images, shapes, highlights, notes and signatures. A free online PDF editor that works in your browser.',
     h1: 'Edit PDF',
-    lead: 'Add text, pictures, shapes, signatures and notes on top of any PDF page.',
+    lead: 'Click any text to change it, or add pictures, shapes, signatures and notes.',
     intro: [
       "This is the full editor, with every tool in one place. Fill in a form that has no fillable fields, add your company logo to a quote, sign a lease, draw an arrow to point out a problem on a plan, or leave a sticky note for a colleague. Text boxes come with a choice of font, size and color, and every object can be moved, resized or deleted until you save.",
-      "It is worth knowing what the editor does not do. It adds new content on top of the page; it does not rewrite the text already in the PDF. To change an existing word or number, cover it with the white-out box and type the new text over it. Everything runs in your browser, so the document is never uploaded, and very large files depend on your device's memory.",
+      "To change text that is already in the PDF, such as a date, a price or a name, choose Edit text and click it. The old words are covered in the page's own background color and your new words are written in their place, in a similar standard font. The PDF does not reflow like a Word file, so a much longer sentence will not push the next line down. Everything runs in your browser, so the document is never uploaded, and very large files depend on your device's memory.",
     ],
     steps: [
       'Open the PDF you want to edit.',
-      'Pick a tool from the toolbar: text, image, shape, pen, highlighter, white-out, signature or note.',
+      'Click any text to change it (Edit text is selected at the start), or pick another tool: text, image, shape, pen, highlighter, white-out, signature or note.',
       'Click on the page to add it, then drag to move or resize.',
       'Click Save PDF to download the edited file.',
     ],
     features: [
-      { title: 'All tools together', text: 'Text, images, rectangles, ellipses, lines, arrows, freehand drawing, highlighter, white-out, signatures and sticky notes.' },
+      { title: 'All tools together', text: 'Edit existing text, add text, images, rectangles, ellipses, lines, arrows, drawings, highlights, white-out, signatures and sticky notes.' },
       { title: 'Change until you save', text: 'Move, resize or delete anything you have added before you download the result.' },
       { title: 'No upload', text: 'Your PDF is edited in the browser and never leaves your device.' },
     ],
     faqs: [
-      { q: 'Can I change the existing text in my PDF?', a: 'Not directly. The editor adds new content on top of the page. To replace a word, cover it with the white-out tool and type the new text in a text box on top.' },
-      { q: 'Will people see my white-out box?', a: 'It looks like plain white paper on a white page. But the original text is still in the file underneath, so for anything confidential use Redact PDF, which removes it for good.' },
+      { q: 'Can I change the existing text in my PDF?', a: 'Yes. Choose Edit text and click the words you want to change. The original is covered with its own background color and the new text is placed exactly where it was. The replacement uses a standard font (Helvetica, Times or Courier), so it can look slightly different from the original. Scanned pages are pictures, so their text cannot be clicked; run OCR PDF first or use white-out and a new text box.' },
+      { q: 'Is the old text really gone?', a: 'It is hidden on the page, but the original text is still stored in the file underneath, so someone could copy it out. For anything confidential use Redact PDF, which removes it for good.' },
       { q: 'Can I edit a PDF on my phone or tablet?', a: 'Yes. The editor works with touch, so you can tap to place items and drag them with your finger. A larger screen makes precise placement easier.' },
       { q: 'Is a watermark added to my file?', a: 'No. The tool is free and your saved PDF contains only what you added.' },
       { q: 'Do sticky notes show up in other PDF readers?', a: 'Yes. Notes are saved as real PDF comments, so they appear in Adobe Acrobat and other readers that show comments.' },
@@ -587,7 +587,7 @@ module.exports = {
       { title: 'White-out included', text: 'Cover printed text or mistakes with a white box before typing over them.' },
     ],
     faqs: [
-      { q: 'Can I edit the text that is already in the PDF?', a: 'No, this tool adds new text on top. To replace existing text, cover it with white-out and type your new text over it.' },
+      { q: 'Can I edit the text that is already in the PDF?', a: 'Yes. Choose Edit text in the toolbar and click the words you want to change. You can also cover anything with white-out and type over it.' },
       { q: 'How do I line up text with the boxes on a form?', a: 'Drag the text box until it sits on the line, and lower the font size if the space is small. Zooming in helps with precise placement.' },
       { q: 'Can I add a signature too?', a: 'For a handwritten-style signature, use Sign PDF, or the full Edit PDF tool which has every option.' },
       { q: 'Is my form uploaded anywhere?', a: 'No. Everything happens in your browser, so personal details on the form stay on your device.' },

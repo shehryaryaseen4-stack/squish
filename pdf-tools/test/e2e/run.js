@@ -293,6 +293,21 @@ async function pdfText(buf) {
     const text = await pdfText(r.buf);
     assert.match(text[0], /Hello from the editor/);
   });
+  await test('edit-pdf: change existing text', async () => {
+    await open('edit-pdf');
+    await upload('invoice.pdf');
+    await page.waitForSelector('.ed-run');
+    const run = page.locator('.ed-run').nth(2); // "24 08 2026"
+    const b = await run.boundingBox();
+    await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+    await page.waitForSelector('.ed-obj--text[contenteditable]');
+    await page.keyboard.press('Control+A');
+    await page.keyboard.type('01 09 2026');
+    await page.click('[data-tool="select"]');
+    const r = await go();
+    const text = (await pdfText(r.buf))[0];
+    assert.match(text, /01 09 2026/);
+  });
   await test('add-image-to-pdf', async () => {
     await open('add-image-to-pdf');
     await upload('sample.pdf');

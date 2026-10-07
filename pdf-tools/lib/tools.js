@@ -219,9 +219,9 @@ const TOOLS = [
   // ------------------------------------------------------------------ edit
   {
     slug: 'edit-pdf', name: 'Edit PDF', category: 'edit', icon: 'edit',
-    short: 'Add text, images, shapes, drawings and signatures to a PDF.',
+    short: 'Change existing text, or add text, images, shapes and signatures.',
     input: 'pdf', runs: 'browser', module: 'editor', fn: 'apply', workspace: 'editor',
-    editorTools: ['select', 'text', 'image', 'rect', 'ellipse', 'line', 'arrow', 'draw', 'highlight', 'whiteout', 'signature', 'note'],
+    editorTools: ['select', 'edittext', 'text', 'image', 'rect', 'ellipse', 'line', 'arrow', 'draw', 'highlight', 'whiteout', 'signature', 'note'], defaultTool: 'edittext',
     action: 'Save PDF', output: 'pdf', keywords: 'editor modify write fill change',
     related: ['sign-pdf', 'add-watermark-to-pdf', 'annotate-pdf'],
   },
@@ -229,7 +229,7 @@ const TOOLS = [
     slug: 'add-text-to-pdf', name: 'Add Text to PDF', category: 'edit', icon: 'add-text',
     short: 'Type text anywhere on a PDF: fill in forms, add labels or notes.',
     input: 'pdf', runs: 'browser', module: 'editor', fn: 'apply', workspace: 'editor',
-    editorTools: ['select', 'text', 'whiteout'], defaultTool: 'text',
+    editorTools: ['select', 'text', 'edittext', 'whiteout'], defaultTool: 'text',
     action: 'Save PDF', output: 'pdf', keywords: 'type write fill form typewriter',
     related: ['edit-pdf', 'sign-pdf', 'pdf-page-numbers'],
   },

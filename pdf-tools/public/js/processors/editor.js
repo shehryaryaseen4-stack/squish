@@ -9,7 +9,7 @@
 // Object coordinates are in PDF points, measured on the page as displayed (origin top-left).
 
 import {
-  pdfLib, openForView, openForEdit, renderPage, canvasToBlob, placer, fontFor, color, baseName, pdfBlob, tick, ToolError,
+  pdfLib, pdfjs, openForView, openForEdit, renderPage, canvasToBlob, placer, fontFor, color, baseName, pdfBlob, tick, ToolError,
 } from '../lib/pdf.js';
 
 const svg = (d, size = 20) => `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
@@ -18,6 +18,7 @@ const h = (html) => { const t = document.createElement('template'); t.innerHTML 
 
 const TOOLS = {
   select: { label: 'Select', icon: '<path d="M5 3l14 8-6 1.5L9.5 19z"/>' },
+  edittext: { label: 'Edit text', icon: '<path d="M4 7V5h10v2M9 5v12M7 17h4"/><path d="M14 20l1-3.5 5-5 2.5 2.5-5 5z"/>' },
   text: { label: 'Text', icon: '<path d="M5 6V4h14v2M12 4v16M9 20h6"/>' },
   image: { label: 'Image', icon: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="9.5" r="1.8"/><path d="M21 16l-5-5-9 9"/>' },
   signature: { label: 'Sign', icon: '<path d="M3 17c3-1 4-9 6-9s-1 9 2 9 3-4 5-4 1 4 3 4h2"/><path d="M3 21h18"/>' },
@@ -40,7 +41,7 @@ const UI = {
 const FONTS = { Helvetica: 'Helvetica, Arial, sans-serif', Times: '"Times New Roman", Times, serif', Courier: '"Courier New", Courier, monospace' };
 const BASELINE = { Helvetica: 0.94, Times: 0.94, Courier: 0.87 };
 const HIGHLIGHTS = [['#ffe14d', 'Yellow'], ['#7cf29a', 'Green'], ['#ff9ed2', 'Pink'], ['#8fd3ff', 'Blue'], ['#ffb35c', 'Orange']];
-const RECT_TYPES = new Set(['rect', 'ellipse', 'highlight', 'whiteout', 'redact']);
+const RECT_TYPES = new Set(['rect', 'ellipse', 'highlight', 'whiteout', 'redact', 'cover']);
 
 let lastSignature = null; // reused within this visit, never stored
 
@@ -96,9 +97,10 @@ export async function mountEditor(container, fileEntry, cfg, { onChange }) {
     const page = await view.getPage(i + 1);
     const vp = page.getViewport({ scale: 1 });
     const pg = { index: i, page, vw: vp.width, vh: vp.height, rendered: 0 };
-    pg.el = h(`<div class="ed-page" data-page="${i}"><canvas aria-hidden="true"></canvas><div class="ed-layer" role="group" aria-label="Page ${i + 1}"></div><span class="ed-page__num">Page ${i + 1} of ${view.numPages}</span></div>`);
+    pg.el = h(`<div class="ed-page" data-page="${i}"><canvas aria-hidden="true"></canvas><div class="ed-runs" aria-hidden="true"></div><div class="ed-layer" role="group" aria-label="Page ${i + 1}"></div><span class="ed-page__num">Page ${i + 1} of ${view.numPages}</span></div>`);
     pg.canvas = pg.el.querySelector('canvas');
     pg.layer = pg.el.querySelector('.ed-layer');
+    pg.runsEl = pg.el.querySelector('.ed-runs');
     pagesEl.append(pg.el);
     ed.pages.push(pg);
     bindLayer(pg);
@@ -120,6 +122,7 @@ export async function mountEditor(container, fileEntry, cfg, { onChange }) {
       pg.layer.querySelectorAll('.ed-obj').forEach((n) => n.remove());
     }
     ed.objects.forEach(renderObject);
+    ed.pages.forEach(renderRuns);
     if (ed.selected) select(ed.selected);
   }
   async function drawPage(pg) {
@@ -132,6 +135,7 @@ export async function mountEditor(container, fileEntry, cfg, { onChange }) {
       pg.canvas.getContext('2d').drawImage(c, 0, 0);
       c.width = c.height = 0;
       pg.rendered = target;
+      if (ed.tool === 'edittext') ensureRuns(pg).then(() => renderRuns(pg));
     } catch { /* page stays blank; saving still works */ } finally { pg.drawing = false; }
   }
   ed.pages.forEach((pg) => io.observe(pg.el));
@@ -140,6 +144,103 @@ export async function mountEditor(container, fileEntry, cfg, { onChange }) {
   layout();
 
   function setZoom(z) { ed.zoom = Math.min(4, Math.max(0.4, z)); layout(); }
+
+  // ------------------------------------------------------- existing text
+  // Text already in the PDF, as pdf.js reports it: one box per run of text. Clicking a box
+  // covers the original (in its own background color) and puts an editable copy on top.
+  function ensureRuns(pg) {
+    if (!pg.runsP) {
+      pg.runsP = (async () => {
+        const lib = await pdfjs();
+        const vp = pg.page.getViewport({ scale: 1 });
+        const tc = await pg.page.getTextContent();
+        const runs = [];
+        tc.items.forEach((it, i) => {
+          if (!it.str || !it.str.trim() || !it.transform) return;
+          const m = lib.Util.transform(vp.transform, it.transform);
+          if (Math.abs(m[1]) > 0.01 || Math.abs(m[2]) > 0.01 || m[0] <= 0) return; // upright, left-to-right text only
+          const size = Math.abs(m[3]);
+          if (size < 1) return;
+          const st = tc.styles[it.fontName] || {};
+          const asc = st.ascent > 0 ? st.ascent : 0.8;
+          const desc = st.descent < 0 ? st.descent : -0.2;
+          runs.push({ key: `${pg.index}:${i}`, str: it.str, x: m[4], y: m[5] - size * asc, w: Math.max(it.width, size * 0.3), h: size * (asc - desc), size, baseline: m[5], fontName: it.fontName, family: st.fontFamily || '' });
+        });
+        pg.runs = runs;
+        return runs;
+      })().catch(() => { pg.runs = []; return []; });
+    }
+    return pg.runsP;
+  }
+  function renderRuns(pg) {
+    pg.runsEl.textContent = '';
+    if (ed.tool !== 'edittext' || !pg.runs) return;
+    const used = new Set(ed.objects.map((o) => o.runKey).filter(Boolean));
+    const frag = document.createDocumentFragment();
+    for (const r of pg.runs) {
+      if (used.has(r.key)) continue;
+      const el = document.createElement('div');
+      el.className = 'ed-run';
+      el.dataset.key = r.key;
+      Object.assign(el.style, { left: `${r.x * scale}px`, top: `${r.y * scale}px`, width: `${r.w * scale}px`, height: `${r.h * scale}px` });
+      frag.append(el);
+    }
+    pg.runsEl.append(frag);
+  }
+  function runAt(pg, x, y) {
+    if (!pg.runs) return null;
+    const used = new Set(ed.objects.map((o) => o.runKey).filter(Boolean));
+    const pad = 1.5;
+    return pg.runs.find((r) => !used.has(r.key) && x >= r.x - pad && x <= r.x + r.w + pad && y >= r.y - pad && y <= r.y + r.h + pad) || null;
+  }
+  // Background and ink colors around/inside a run, read from the rendered page.
+  function sampleColors(pg, r) {
+    const fallback = { bg: '#ffffff', fg: '#000000' };
+    if (!pg.rendered || !pg.canvas.width) return fallback;
+    try {
+      const k = pg.canvas.width / pg.vw;
+      const x0 = Math.max(0, Math.floor(r.x * k) - 3); const y0 = Math.max(0, Math.floor(r.y * k) - 3);
+      const x1 = Math.min(pg.canvas.width, Math.ceil((r.x + r.w) * k) + 3); const y1 = Math.min(pg.canvas.height, Math.ceil((r.y + r.h) * k) + 3);
+      const w = x1 - x0; const hh = y1 - y0;
+      if (w < 4 || hh < 4) return fallback;
+      const d = pg.canvas.getContext('2d').getImageData(x0, y0, w, hh).data;
+      const counts = new Map();
+      const px = (x, y) => { const o = (y * w + x) * 4; return [d[o], d[o + 1], d[o + 2]]; };
+      for (let y = 0; y < hh; y++) {
+        for (let x = 0; x < w; x++) {
+          if (x > 1 && x < w - 2 && y > 1 && y < hh - 2) continue; // ring around the text only
+          const c = px(x, y).map((v) => Math.round(v / 6) * 6);
+          const key = c.join(',');
+          counts.set(key, (counts.get(key) || 0) + 1);
+        }
+      }
+      const bg = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0].split(',').map(Number);
+      const dist = (c) => Math.abs(c[0] - bg[0]) + Math.abs(c[1] - bg[1]) + Math.abs(c[2] - bg[2]);
+      let max = 0; const inner = [];
+      for (let y = 3; y < hh - 3; y++) for (let x = 3; x < w - 3; x++) { const c = px(x, y); const dd = dist(c); inner.push([c, dd]); if (dd > max) max = dd; }
+      let fg = [0, 0, 0];
+      if (max > 60) {
+        const ink = inner.filter(([, dd]) => dd > max * 0.7);
+        fg = [0, 1, 2].map((ch) => Math.round(ink.reduce((s, [c]) => s + c[ch], 0) / ink.length));
+      } else fg = (bg[0] + bg[1] + bg[2]) / 3 > 128 ? [0, 0, 0] : [255, 255, 255];
+      const hex = (c) => `#${c.map((v) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('')}`;
+      return { bg: hex(bg), fg: hex(fg) };
+    } catch { return fallback; }
+  }
+  function editRun(pg, r) {
+    const { bg, fg } = sampleColors(pg, r);
+    let bold = false;
+    try { const f = pg.page.commonObjs.get(r.fontName); bold = !!(f.bold || f.black) || /bold|black|heavy|semibold|demi/i.test(f.name || ''); } catch { /* font not loaded */ }
+    const font = /serif/i.test(r.family) && !/sans/i.test(r.family) ? 'Times' : /mono/i.test(r.family) ? 'Courier' : 'Helvetica';
+    const pad = Math.max(0.6, r.size * 0.08);
+    const padY = r.size * 0.15;
+    add({ type: 'cover', page: pg.index, x: r.x - pad, y: r.y - padY, w: r.w + pad * 2, h: r.h + padY * 2, color: bg, runKey: r.key });
+    const size = Math.round(r.size * 10) / 10;
+    const o = add({ type: 'text', page: pg.index, x: r.x, y: r.baseline - size * BASELINE[font], w: r.w, h: size * 1.2, text: r.str, size, font, bold, color: fg, runKey: r.key });
+    renderRuns(pg);
+    select(o);
+    startEditing(o);
+  }
 
   // ------------------------------------------------------- objects
   const snapshot = () => { ed.history.push(ed.objects.map((o) => ({ ...o, points: o.points && o.points.map((p) => [...p]) }))); if (ed.history.length > 60) ed.history.shift(); };
@@ -198,6 +299,8 @@ export async function mountEditor(container, fileEntry, cfg, { onChange }) {
         : `<ellipse cx="${b.w * scale / 2}" cy="${b.h * scale / 2}" rx="${Math.max(0, b.w * scale / 2 - sw / 2)}" ry="${Math.max(0, b.h * scale / 2 - sw / 2)}"`} fill="${o.fill || 'none'}" stroke="${o.stroke || 'none'}" stroke-width="${o.stroke ? sw : 0}" opacity="${o.opacity / 100}"/></svg>`;
     } else if (o.type === 'highlight') {
       el.style.background = o.color; el.style.opacity = '0.45';
+    } else if (o.type === 'cover') {
+      el.style.background = o.color;
     } else if (o.points) {
       const pts = o.points.map(([x, y]) => [(x - b.x) * scale, (y - b.y) * scale]);
       let body;
@@ -324,7 +427,7 @@ export async function mountEditor(container, fileEntry, cfg, { onChange }) {
         };
         const onUp = () => {
           window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp);
-          if (!moved && obj.type === 'text' && ed.tool === 'text') startEditing(obj);
+          if (!moved && obj.type === 'text' && (ed.tool === 'text' || ed.tool === 'edittext')) startEditing(obj);
           if (!moved && obj.type === 'note') editNote(obj);
           if (moved) onChange();
         };
@@ -332,6 +435,12 @@ export async function mountEditor(container, fileEntry, cfg, { onChange }) {
         return;
       }
 
+      if (ed.tool === 'edittext') {
+        e.preventDefault();
+        const run = runAt(pg, x0, y0);
+        if (run) editRun(pg, run); else select(null);
+        return;
+      }
       if (ed.tool === 'select') { select(null); return; }
       e.preventDefault();
 
@@ -449,6 +558,7 @@ export async function mountEditor(container, fileEntry, cfg, { onChange }) {
   function setTool(t) {
     finishEditing();
     ed.tool = t;
+    ed.pages.forEach((pg) => { if (t === 'edittext') ensureRuns(pg).then(() => renderRuns(pg)); else renderRuns(pg); });
     toolbar.querySelectorAll('[data-tool]').forEach((b) => { const on = b.dataset.tool === t; b.classList.toggle('is-active', on); b.setAttribute('aria-pressed', String(on)); });
     ed.pages.forEach((pg) => { pg.layer.className = `ed-layer tool-${t}`; });
     if (t !== 'select') select(null); else renderProps();
@@ -471,7 +581,7 @@ export async function mountEditor(container, fileEntry, cfg, { onChange }) {
     if (t === 'text') {
       const s = ed.style.text;
       html = `<label>Font <select class="select" data-k="font">${Object.keys(FONTS).map((f) => `<option${val('font', s.font) === f ? ' selected' : ''}>${f}</option>`).join('')}</select></label>
-        <label>Size <select class="select" data-k="size">${[8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64, 72].map((n) => `<option${Number(val('size', s.size)) === n ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
+        <label>Size <select class="select" data-k="size">${[...new Set([8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48, 64, 72, Number(val('size', s.size))])].sort((a, b) => a - b).map((n) => `<option${Number(val('size', s.size)) === n ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
         <label>Color <input type="color" data-k="color" value="${val('color', s.color)}"></label>
         <label class="check"><input type="checkbox" data-k="bold"${val('bold', s.bold) ? ' checked' : ''}> Bold</label>
         <span class="ed-props__hint">${o ? 'Double-click the text to edit it.' : 'Click on the page where you want to type.'}</span>`;
@@ -510,7 +620,7 @@ export async function mountEditor(container, fileEntry, cfg, { onChange }) {
     } else if (t === 'image') {
       html = o ? '<span class="ed-props__hint">Drag to move. Resize from the corner.</span>' : '<button class="btn btn--primary btn--sm" type="button" data-pick-img>Choose an image</button><span class="ed-props__hint">PNG or JPG</span>';
     } else {
-      html = `<span class="ed-props__hint">${o ? 'Drag to move. Press Delete to remove.' : 'Pick a tool above, then click or drag on the page.'}</span>`;
+      html = `<span class="ed-props__hint">${o ? 'Drag to move. Press Delete to remove.' : t === 'edittext' ? 'Click any text in the PDF to change it. Dashed boxes show the text you can edit.' : 'Pick a tool above, then click or drag on the page.'}</span>`;
     }
     props.innerHTML = html;
     props.querySelectorAll('[data-k]').forEach((inp) => {
@@ -635,7 +745,7 @@ export async function mountEditor(container, fileEntry, cfg, { onChange }) {
     get pageCount() { return ed.pages.length; },
     bytes, file: fileEntry.file,
     summary() {
-      const n = ed.objects.length;
+      const n = ed.objects.filter((o) => o.type !== 'cover').length;
       if (isRedact) return n ? `${n} area${n === 1 ? '' : 's'} marked for redaction on ${new Set(ed.objects.map((o) => o.page)).size} page(s)` : 'Drag boxes over the content to remove';
       return n ? `${n} item${n === 1 ? '' : 's'} added` : 'Nothing added yet';
     },
@@ -742,6 +852,7 @@ export async function apply({ editor, files, progress }) {
       const at = origin(o.x, o.y, o.h);
       const opts = { x: at.x, y: at.y, width: o.w, height: o.h, rotate: degrees(r) };
       if (o.type === 'whiteout') Object.assign(opts, { color: rgb(1, 1, 1) });
+      else if (o.type === 'cover') Object.assign(opts, { color: await color(o.color) });
       else if (o.type === 'redact') Object.assign(opts, { color: rgb(0, 0, 0) });
       else if (o.type === 'highlight') Object.assign(opts, { color: await color(o.color), opacity: 0.45, blendMode: BlendMode.Multiply });
       else {
