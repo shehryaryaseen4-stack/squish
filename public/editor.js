@@ -143,11 +143,10 @@ const structureKey = () => S.pages.map((p) => `${p.id}:${p.rot}`).join('|');
 // ---------------------------------------------------------- open / create --
 async function addPdf(bytes) {
   const lib_ = await lib();
-  // pdf-lib must be able to read the file too, or the edits could never be saved.
-  try { await PDFLib().PDFDocument.load(bytes, { updateMetadata: false }); } catch (e) {
-    if (/encrypt/i.test(String(e && e.message))) throw new Error('This PDF is password-protected. Remove the protection first, then edit it.');
-    throw new Error('This PDF could not be read. It may be damaged.');
-  }
+  // Saving copies the original pages with pdf-lib. PDFs it cannot copy (most often ones
+  // protected against changes, which open without a password) are saved as page pictures.
+  let raster = false;
+  try { await PDFLib().PDFDocument.load(bytes, { updateMetadata: false }); } catch { raster = true; }
   let proxy;
   try {
     proxy = await lib_.getDocument({
@@ -156,11 +155,13 @@ async function addPdf(bytes) {
       standardFontDataUrl: `${VENDOR}pdfjs/standard_fonts/`, wasmUrl: `${VENDOR}pdfjs/wasm/`, iccUrl: `${VENDOR}pdfjs/iccs/`,
     }).promise;
   } catch (e) {
-    if (e && e.name === 'PasswordException') throw new Error('This PDF is password-protected. Remove the password first, then edit it.');
-    throw new Error('This PDF could not be read. It may be damaged.');
+    if (e && e.name === 'PasswordException') throw new Error('This PDF needs a password to open. Remove the password first, then edit it.');
+    console.error(e);
+    throw new Error(`This PDF could not be opened (${(e && e.message) || 'unknown error'}).`);
   }
   const docId = uid();
-  S.docs.set(docId, { bytes, proxy });
+  S.docs.set(docId, { bytes, proxy, raster });
+  if (raster) toast('This PDF is protected against changes. You can still edit it; the pages are saved as pictures, so their original text will not be selectable.');
   const pages = [];
   for (let i = 0; i < proxy.numPages; i++) {
     const pg = await proxy.getPage(i + 1);
@@ -1057,8 +1058,8 @@ const STD = {
   courier: ['Courier', 'CourierBold', 'CourierOblique', 'CourierBoldOblique'],
 };
 // Maps view points (origin bottom-left of the displayed page, y up) to the page's own space.
-function pageMatrix(p) {
-  const [x0, y0, W, H] = p.box;
+function pageMatrix(p, atOrigin = false) {
+  const [x0, y0, W, H] = atOrigin ? [0, 0, p.box[2], p.box[3]] : p.box;
   switch (rotOf(p)) {
     case 90: return [0, 1, -1, 0, x0 + W, y0];
     case 180: return [-1, 0, 0, -1, x0 + W, y0 + H];
@@ -1090,7 +1091,19 @@ async function buildPdf(opts = {}) {
   for (let n = 0; n < total; n++) {
     const p = S.pages[n];
     let page;
-    if (p.src) {
+    const raster = p.src && S.docs.get(p.src.doc).raster;
+    if (raster) {
+      // the page as a 200 dpi picture, unrotated, filling a page of the same size
+      const src = await S.docs.get(p.src.doc).proxy.getPage(p.src.index + 1);
+      const vp = src.getViewport({ scale: 200 / 72, rotation: 0 });
+      const c = document.createElement('canvas');
+      c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+      await src.render({ canvas: c, viewport: vp, background: '#ffffff' }).promise;
+      const jpg = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.92));
+      const img = await out.embedJpg(new Uint8Array(await jpg.arrayBuffer()));
+      page = out.addPage([p.box[2], p.box[3]]);
+      page.drawImage(img, { x: 0, y: 0, width: p.box[2], height: p.box[3] });
+    } else if (p.src) {
       if (!sources.has(p.src.doc)) sources.set(p.src.doc, await PDFDocument.load(S.docs.get(p.src.doc).bytes, { updateMetadata: false }));
       [page] = await out.copyPages(sources.get(p.src.doc), [p.src.index]);
       out.addPage(page);
@@ -1099,7 +1112,7 @@ async function buildPdf(opts = {}) {
     }
     page.setRotation(degrees(rotOf(p)));
     const [VW, VH] = viewSize(p);
-    page.pushOperators(pushGraphicsState(), concatTransformationMatrix(...pageMatrix(p)));
+    page.pushOperators(pushGraphicsState(), concatTransformationMatrix(...pageMatrix(p, raster)));
 
     for (const it of p.items) {
       const op = (it.opacity ?? 100) / 100;
