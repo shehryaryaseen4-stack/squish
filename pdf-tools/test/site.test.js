@@ -89,6 +89,12 @@ test('sitemap, robots, 404 and URL normalisation', async () => {
   assert.equal(r.headers.get('location'), '/merge-pdf');
 });
 
+test('only hashed CSS/JS URLs are cached for good', async () => {
+  assert.match((await fetch(`${base}/js/tool.js?v=abc`)).headers.get('cache-control'), /immutable/);
+  assert.equal((await fetch(`${base}/js/processors/editor.js`)).headers.get('cache-control'), 'no-cache');
+  assert.equal((await fetch(`${base}/js/lib/pdf.js`)).headers.get('cache-control'), 'no-cache');
+});
+
 test('security headers', async () => {
   const { headers } = await get('/');
   assert.match(headers.get('content-security-policy'), /default-src 'self'/);

@@ -67,11 +67,14 @@ app.use((req, res, next) => {
 
 // ------------------------------------------------------------ static files --
 const year = { maxAge: '365d', immutable: true };
+// Only files requested as /file.js?v=<hash> may be cached for good. Modules imported by
+// other modules (processors, lib/) have no hash in their URL, so the browser must check
+// for a newer copy each time (a cheap 304 when nothing changed).
+app.use((req, res, next) => { res.locals.versioned = typeof req.query.v === 'string'; next(); });
 app.use(express.static(path.join(__dirname, 'public'), {
   index: false,
   setHeaders: (res, file) => {
-    // versioned (?v=hash) CSS/JS are immutable; icons and the like get a day
-    if (/\.(css|js|mjs)$/.test(file)) res.set('Cache-Control', 'public, max-age=31536000, immutable');
+    if (/\.(css|js|mjs)$/.test(file)) res.set('Cache-Control', res.locals.versioned ? 'public, max-age=31536000, immutable' : 'no-cache');
     else res.set('Cache-Control', 'public, max-age=86400');
   },
 }));
