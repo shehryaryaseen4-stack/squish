@@ -209,9 +209,10 @@ const renderTasks = new WeakMap();
 
 function fitZoom() {
   const view = $('#peView');
-  const avail = Math.max(240, (view.clientWidth || window.innerWidth - 220) - 48);
+  // fit the widest page with room on both sides, but never larger than 100%
+  const avail = Math.max(240, (view.clientWidth || window.innerWidth - 220) - 96);
   const widest = Math.max(...S.pages.map((p) => viewSize(p)[0]), 1);
-  return clamp(Math.floor((avail / widest) * 20) / 20, 0.25, 1.25);
+  return clamp(Math.floor((avail / widest) * 20) / 20, 0.25, 1);
 }
 
 function rebuild() {
