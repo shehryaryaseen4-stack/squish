@@ -1,4 +1,4 @@
-# Pagefold PDF tools with every server-side engine installed.
+# PDFKaro PDF tools with every server-side engine installed.
 # Browser-side tools need nothing here; the engines below power the server tools
 # (Office conversions, compression, passwords, OCR, repair, image extraction).
 FROM node:22-bookworm-slim AS node
@@ -35,8 +35,8 @@ COPY . .
 
 # Jobs run as an unprivileged user; uploads live in private folders under /tmp and are
 # deleted after every request.
-RUN useradd --create-home --shell /usr/sbin/nologin pagefold
-USER pagefold
+RUN useradd --create-home --shell /usr/sbin/nologin pdfkaro
+USER pdfkaro
 ENV PORT=3000 NODE_ENV=production
 EXPOSE 3000
 HEALTHCHECK --interval=60s --timeout=5s CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT+'/api/status').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"

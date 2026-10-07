@@ -1,4 +1,4 @@
-/* Pagefold: one stylesheet for the whole site. Mobile first. */
+/* PDFKaro: one stylesheet for the whole site. Mobile first. */
 
 :root {
   --ink: #141b2d;
@@ -105,6 +105,8 @@ main:focus { outline: none; }
 .header__bar { display: flex; align-items: center; gap: 18px; height: 66px; }
 .logo { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); font-weight: 800; font-size: 1.22rem; letter-spacing: -.03em; flex: none; }
 .logo:hover { color: var(--ink); }
+.logo__accent { color: var(--brand-dark); }
+.site-footer .logo__accent { color: #ff8a73; }
 .nav { display: none; flex: 1; justify-content: center; }
 .nav__list { display: flex; gap: 2px; list-style: none; margin: 0; padding: 0; }
 .nav__item { position: relative; }

@@ -13,7 +13,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const config = require('../config');
 
-const PREFIX = 'pagefold-';
+const PREFIX = 'pdfkaro-';
 
 class UserError extends Error {
   constructor(message, statusCode = 422) { super(message); this.userMessage = message; this.statusCode = statusCode; }

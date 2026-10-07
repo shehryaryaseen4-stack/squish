@@ -7,7 +7,7 @@ const MAX_UPLOAD_MB = num(process.env.MAX_UPLOAD_MB, 100);
 
 module.exports = {
   PORT: num(process.env.PORT, 3000),
-  SITE_NAME: process.env.SITE_NAME || 'Pagefold',
+  SITE_NAME: process.env.SITE_NAME || 'PDFKaro',
   BASE_URL: (process.env.BASE_URL || '').replace(/\/+$/, ''),
   CONTACT_EMAIL: process.env.CONTACT_EMAIL || '',
   TRUST_PROXY: process.env.TRUST_PROXY || '',

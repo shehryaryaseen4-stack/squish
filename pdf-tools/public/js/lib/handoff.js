@@ -1,7 +1,7 @@
 // Hands files picked on the homepage to a tool page in the same browser, via IndexedDB.
 // Nothing leaves the device; the entry is deleted as soon as the tool page reads it.
 
-const DB = 'pagefold';
+const DB = 'pdfkaro';
 const STORE = 'handoff';
 const MAX_AGE = 10 * 60 * 1000;
 

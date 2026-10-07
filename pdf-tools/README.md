@@ -1,4 +1,4 @@
-# Pagefold: free online PDF tools
+# PDFKaro: free online PDF tools
 
 41 PDF tools: convert, organize, edit, sign, compress, protect, OCR. Every tool is free. There
 are no accounts, plans, credits, trials or watermarks. The site is meant to be funded by Google
@@ -22,8 +22,8 @@ The browser tools work straight away. The server tools need the engines listed b
 Dockerfile installs all of them:
 
 ```bash
-docker build -t pagefold .
-docker run -p 3000:3000 --env-file .env pagefold
+docker build -t pdfkaro .
+docker run -p 3000:3000 --env-file .env pdfkaro
 ```
 
 When the server starts, it logs which engines it found. A tool whose engine is missing shows

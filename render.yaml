@@ -2,7 +2,7 @@
 # Render dashboard: New + > Blueprint > pick this repo > Apply.
 services:
   - type: web
-    name: pagefold-pdf-tools
+    name: pdfkaro-pdf-tools
     runtime: docker
     plan: free
     rootDir: pdf-tools

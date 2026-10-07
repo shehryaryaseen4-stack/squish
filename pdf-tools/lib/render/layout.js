@@ -30,7 +30,9 @@ const MARK = '<svg class="logo__mark" width="34" height="34" viewBox="0 0 34 34"
   + '<path d="M10 7.5h9.5l6 6V25a1.5 1.5 0 0 1-1.5 1.5H10A1.5 1.5 0 0 1 8.5 25V9A1.5 1.5 0 0 1 10 7.5z" fill="#fff"/>'
   + '<path d="M19.5 7.5v4.5a1.5 1.5 0 0 0 1.5 1.5h4.5z" fill="#ffc9bd"/>'
   + '<path d="M12.5 17.5h9M12.5 21h6" stroke="#e8452c" stroke-width="1.9" stroke-linecap="round"/></svg>';
-const logo = (href = '/') => `<a class="logo" href="${href}" aria-label="${esc(SITE)} home">${MARK}<span class="logo__text">${esc(SITE)}</span></a>`;
+// "PDFKaro" -> PDF + <accent>Karo</accent>; other names are shown as they are.
+const wordmark = /^PDF.+/.test(SITE) ? `PDF<span class="logo__accent">${esc(SITE.slice(3))}</span>` : esc(SITE);
+const logo = (href = '/') => `<a class="logo" href="${href}" aria-label="${esc(SITE)} home">${MARK}<span class="logo__text">${wordmark}</span></a>`;
 
 // ------------------------------------------------------------------ ad slots --
 // Reserved, clearly separated places for Google AdSense. Nothing is rendered until ads are
