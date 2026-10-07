@@ -85,7 +85,7 @@ test('no broken internal links anywhere on the indexable pages', () => {
   const seen = new Set();
   for (const { p, html } of indexable) {
     for (const [, href] of html.matchAll(/href="(\/[^"]*)"/g)) {
-      if (seen.has(href) || /\.(css|js|png|ico|svg|webmanifest)(\?|$)/.test(href)) continue;
+      if (seen.has(href) || /\.(css|js|png|ico|svg|webmanifest|woff2)(\?|$)/.test(href)) continue;
       seen.add(href);
       const r = fetchPath(href);
       assert.ok(r && (r.html || r.redirect), `${p} links to ${href}, which is a 404`);
@@ -130,4 +130,27 @@ test('target keywords lead the title, H1 and description of their pages', () => 
     assert.ok(h1.includes(k.primary), `${p} H1 lacks "${k.primary}": ${h1}`);
     for (const [q] of k.faq || []) assert.ok(html.includes(esc(q)), `${p} is missing its FAQ "${q}"`);
   }
+});
+
+test('rare conversions still work but are left out of the index; popular ones are indexed', () => {
+  const inMap = new Set(pages.allPaths());
+  assert.ok(inMap.size > 300 && inMap.size < 600, `sitemap has ${inMap.size} URLs`);
+  for (const p of ['/jpg-to-png', '/pdf-to-docx', '/mp4-to-mp3', '/heic-to-jpg', '/compress-pdf', '/image-converter']) assert.ok(inMap.has(p), `${p} should be indexed`);
+  let rare = 0;
+  for (const c of registry.getConverters()) {
+    if (inMap.has(c.route)) continue;
+    rare++;
+    const html = fetchPath(c.route).html;
+    assert.match(html, /<meta name="robots" content="noindex, follow">/, c.route);
+    assert.ok(html.includes('id="fileInput"'), `${c.route} lost its converter`);
+  }
+  assert.ok(rare > 1500, `only ${rare} pages left out`);
+});
+
+test('pages other than home load the Tools menu on demand; home keeps it in the page', () => {
+  assert.match(pages.homePage(BASE), /class="fmt-panel mega/);
+  const html = fetchPath('/jpg-to-png').html;
+  assert.doesNotMatch(html, /class="fmt-panel mega/);
+  assert.match(html, /data-lazy="\/menu\.html\?v=[0-9a-f]{10}"/);
+  assert.match(pages.megaMenu(), /^<div class="fmt-panel mega/);
 });

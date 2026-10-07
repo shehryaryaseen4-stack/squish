@@ -16,4 +16,5 @@ docker run -d --name "$IMAGE" --restart unless-stopped --env-file "$APP_DIR/.env
 docker image prune -f >/dev/null
 sleep 5
 docker logs --tail 5 "$IMAGE"
+docker exec "$IMAGE" node scripts/indexnow.js || true
 echo "Updated."

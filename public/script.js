@@ -57,6 +57,25 @@
   }
   document.querySelectorAll(".fmt-panel").forEach(wirePanel);
 
+  // Menus that load their contents on demand (the Tools menu on most pages): fetched on first
+  // hover, focus or open, then wired exactly like a menu that was in the page from the start.
+  document.querySelectorAll("details[data-lazy]").forEach(d => {
+    let loading = null;
+    const load = () => loading || (loading = fetch(d.dataset.lazy).then(r => r.ok ? r.text() : Promise.reject(r.status)).then(html => {
+      const tpl = document.createElement("template");
+      tpl.innerHTML = html.trim();
+      const panel = tpl.content.firstElementChild;
+      const wait = d.querySelector(".mega-wait");
+      if (wait) wait.replaceWith(panel); else d.append(panel);
+      wirePanel(panel);
+      if (d.open && window.matchMedia("(min-width: 641px)").matches) { const q = panel.querySelector(".fmt-q"); if (q) q.focus(); }
+    }).catch(() => { loading = null; }));
+    const sum = d.querySelector("summary");
+    sum.addEventListener("pointerenter", load);
+    sum.addEventListener("focus", load);
+    d.addEventListener("toggle", () => { if (d.open) load(); });
+  });
+
   // Conversion map (home, category and format pages): formats, pairs, which pairs are live,
   // file extension -> format, and the pairs the hero animation cycles through.
   let MAP = null;

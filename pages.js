@@ -30,6 +30,9 @@ const KEYWORDS = require('./content/keywords');
 
 const SITE = process.env.SITE_NAME || brand.NAME;
 const CONTACT_EMAIL = process.env.CONTACT_EMAIL || '';
+// The site's social profiles (Facebook, YouTube, X...), comma separated; they tell search engines
+// which accounts belong to this brand (Organization.sameAs).
+const SOCIAL_LINKS = (process.env.SOCIAL_LINKS || '').split(/[\s,]+/).filter((u) => /^https:\/\/[^\s"<>]+$/.test(u));
 
 // Google AdSense. Off until ADSENSE_CLIENT (ca-pub-...) is set; then the AdSense script loads
 // on pages that have the converter (never on "coming soon", legal or 404 pages, which AdSense
@@ -244,9 +247,12 @@ function picker(label, groups, { current, align = '', role = '', dataFmt = false
 }
 
 // ----------------------------------------------------------------- header --
-let topbarCache = null;
-function topbar() {
-  if (topbarCache) return topbarCache;
+// The Tools mega menu lists every format (about 900 elements). The home page carries it in full;
+// other pages load it from /menu.html (cached) when the menu is first hovered or opened, which
+// keeps their HTML small. The menu looks and works the same either way.
+let megaCache = null, megaVersion = null;
+function megaMenu() {
+  if (megaCache) return megaCache;
   const groups = [];
   groups.push(['popular', 'Popular', POPULAR.map(([f, t]) => ({ id: f, href: pairPath(f, t), text: `${F(f).label} &rarr; ${F(t).label}`, live: true })),
     `<a class="mega-head" href="/converters">All ${TOTAL_COUNT.toLocaleString('en-US')} conversions &rarr;</a>`]);
@@ -258,16 +264,27 @@ function topbar() {
     '<span class="mega-head">Make files smaller</span>']);
 
   // Tools mega menu reuses the picker; it groups by explicit lists instead of by category.
-  const mega = pickerPanel(groups.map(([, name, items, head]) => [null, name, items, head]), { extraClass: 'mega', heads: true });
+  megaCache = pickerPanel(groups.map(([, name, items, head]) => [null, name, items, head]), { extraClass: 'mega', heads: true });
+  megaVersion = require('crypto').createHash('sha1').update(megaCache).digest('hex').slice(0, 10);
+  return megaCache;
+}
+const topbarCache = {};
+function topbar(full = false) {
+  const key = full ? 'full' : 'lazy';
+  if (topbarCache[key]) return topbarCache[key];
+  const mega = megaMenu();
+  const toolsMenu = full
+    ? `<details class="nav-menu" data-menu><summary class="nav-item">Tools<span class="caret" aria-hidden="true"></span></summary>${mega}</details>`
+    : `<details class="nav-menu" data-menu data-lazy="/menu.html?v=${megaVersion}"><summary class="nav-item">Tools<span class="caret" aria-hidden="true"></span></summary><div class="dropdown mega-wait"><ul><li><a href="/converters">All formats and converters</a></li></ul></div></details>`;
   const compress = ALL_COMPRESSORS.map((c) =>
     `<li><a href="${c.route}">${icon('compress')}Compress ${F(c.from).label}${c.status === 'live' ? '' : ' <span class="soon-tag">soon</span>'}</a></li>`).join('');
   const convertList = CATS.map((c) =>
     `<li><a href="${categoryPath(c.id)}">${icon(c.icon)}${c.converterName}${categoryIsLive(c.id) ? '' : ' <span class="soon-tag">soon</span>'}</a></li>`).join('');
 
-  topbarCache = `${SPRITE}<header class="top"><div class="top-row">
+  topbarCache[key] = `${SPRITE}<header class="top"><div class="top-row">
     ${BRAND_LINK}
     <nav class="main-nav" aria-label="Main">
-      <details class="nav-menu" data-menu><summary class="nav-item">Tools<span class="caret" aria-hidden="true"></span></summary>${mega}</details>
+      ${toolsMenu}
       <details class="nav-menu nav-simple" data-menu><summary class="nav-item">Convert<span class="caret" aria-hidden="true"></span></summary><div class="dropdown"><ul>${convertList}</ul></div></details>
       <details class="nav-menu nav-simple" data-menu><summary class="nav-item">Compress<span class="caret" aria-hidden="true"></span></summary><div class="dropdown"><ul>${compress}</ul></div></details>
       <a class="nav-item nav-link" href="/converters">Formats</a>${PDF_EDITOR ? '\n      <a class="nav-item nav-link" href="/edit-pdf">Edit PDF</a>' : ''}
@@ -276,7 +293,7 @@ function topbar() {
       <a class="btn btn-brand btn-sm" href="/#convert">Convert now</a>
     </div>
   </div></header>`;
-  return topbarCache;
+  return topbarCache[key];
 }
 
 function footer() {
@@ -554,12 +571,23 @@ function baseFields(base, urlPath, title, desc, extra) {
   };
 }
 
+// Which working pages search engines are asked to index. Every conversion keeps working; the
+// many rare pairs (CR2 to TGA, MKV to WMA...) are 'noindex, follow' and left out of the sitemap,
+// so search engines spend their time on the pages people actually search for.
+const COMMON = new Set(('jpg png webp gif bmp tiff heic avif svg ico jfif pdf docx doc odt rtf txt html xlsx xls csv pptx ppt '
+  + 'epub mobi mp4 mov avi mkv webm wmv mp3 wav aac m4a flac ogg wma opus zip rar 7z ttf otf woff woff2').split(' '));
+const POPULAR_SET = new Set(registry.getPopularConversions().map((c) => `${c.from}>${c.to}`));
+const pairIndexable = (f, t) => POPULAR_SET.has(`${f}>${t}`) || !!GUIDES[`${f}>${t}`] || !!KEYWORDS[pairPath(f, t)] || (COMMON.has(f) && COMMON.has(t));
+const formatIndexable = (id) => COMMON.has(id) || !!KEYWORDS[formatPath(id)];
+// Working page, not indexed: keeps its tool, ads and structured data.
+const notIndexed = (fields) => ({ ...fields, ROBOTS: 'noindex, follow', _soft: true });
+
 // Planned/experimental pages: visible and linked, but kept out of the index.
 const noindex = (fields) => ({ ...fields, ROBOTS: 'noindex, follow', CANONICAL_TAG: '', JSONLD: '{}', _noindex: true });
 
 function renderPage(tpl, fields) {
   const ads = adFields(!fields._noindex && !!fields.TOOL);
-  return render(tpl, { ...fields, ...ads, HEAD_TAGS: seo.headTags({ url: fields._url, title: fields._title, desc: fields._desc, image: fields._image, noindex: fields._noindex }) });
+  return render(tpl, { ...fields, ...ads, HEAD_TAGS: seo.headTags({ url: fields._url, title: fields._title, desc: fields._desc, image: fields._image, noindex: fields._noindex || fields._soft }) });
 }
 
 // Structured data. Organization + WebSite are the same on every page (linked by @id);
@@ -568,7 +596,8 @@ function graph(base, urlPath, name, desc, faq, crumbs, { type = 'WebApplication'
   const url = base + urlPath;
   const org = { '@type': 'Organization', '@id': `${base}/#organization`, name: SITE, url: `${base}/`,
     logo: { '@type': 'ImageObject', url: `${base}/icon-512.png`, width: 512, height: 512 },
-    ...(CONTACT_EMAIL ? { email: CONTACT_EMAIL, contactPoint: { '@type': 'ContactPoint', contactType: 'customer support', email: CONTACT_EMAIL, availableLanguage: ['English', 'Urdu'] } } : {}) };
+    ...(CONTACT_EMAIL ? { email: CONTACT_EMAIL, contactPoint: { '@type': 'ContactPoint', contactType: 'customer support', email: CONTACT_EMAIL, availableLanguage: ['English', 'Urdu'] } } : {}),
+    ...(SOCIAL_LINKS.length ? { sameAs: SOCIAL_LINKS } : {}) };
   const site = { '@type': 'WebSite', '@id': `${base}/#website`, name: SITE, url: `${base}/`, inLanguage: 'en', publisher: { '@id': `${base}/#organization` } };
   const pageNode = type === 'WebApplication'
     ? { '@type': 'WebApplication', '@id': `${url}#app`, name, url, description: desc, inLanguage: 'en',
@@ -655,7 +684,7 @@ function pairPage(fromSlug, toSlug, base) {
   const notes = pairNotes(from, to);
   if (!imagePair && meta.converter.notes) notes.push(esc(meta.converter.notes));
   if (!notes.length) notes.push(`Your ${from.name} file is converted on our server and the ${to.name} result can be downloaded straight away.`);
-  return renderPage(PAGE_TPL, baseFields(base, p, title, description, {
+  const pairFields = baseFields(base, p, title, description, {
     JSONLD: graph(base, p, kw ? h1 : meta.schemaName, description, faq, meta.breadcrumbs, { features: TOOL_FEATURES }),
     DEFAULT_FORMAT: to.select,
     HERO: hero({ h1, crumbs: meta.breadcrumbs,
@@ -667,7 +696,8 @@ function pairPage(fromSlug, toSlug, base) {
     CONTENT: howToSteps(from.label, to.label, 'convert', imagePair) + guideHtml(from, to, guide) + cards + compareTable([fromSlug, toSlug])
       + `<section class="notes"><h2>Converting ${from.name} to ${to.name}</h2><ul>${notes.map((x) => `<li>${x}</li>`).join('')}</ul></section>` + faqHtml(faq),
     RELATED: relatedForPair(from, to),
-  }));
+  });
+  return renderPage(PAGE_TPL, pairIndexable(fromSlug, toSlug) ? pairFields : notIndexed(pairFields));
 }
 
 function compressPage(slug, base) {
@@ -748,7 +778,7 @@ function formatPage(slug, base) {
     CONTENT: conversionMap(ALL_INPUTS) + sections + faqHtml(faq),
     RELATED: canCompress ? `<section class="related"><h2>Related tools</h2>${chips([[compressPath(slug), `Compress ${f.label}`, true]])}</section>` : '',
   });
-  return renderPage(PAGE_TPL, live ? fields : noindex(fields));
+  return renderPage(PAGE_TPL, !live ? noindex(fields) : formatIndexable(slug) ? fields : notIndexed(fields));
 }
 
 function categoryPage(catId, base) {
@@ -783,6 +813,7 @@ function homePage(base) {
   const desc = `Free online file converter for video, audio, images, documents, ebooks, archives and fonts. ${LIVE_COUNT.toLocaleString('en-US')} conversions, batch upload, no sign-up.`;
   const faq = [...FAQ_CATALOG, ...FAQ_COMMON];
   return renderPage(PAGE_TPL, baseFields(base, '/', title, desc, {
+    TOPBAR: topbar(true),
     JSONLD: graph(base, '/', `${SITE} File Converter`, desc, faq, [['Home', '/']], { features: TOOL_FEATURES }),
     HERO: hero({ h1: 'File Converter',
       intro: `${SITE} is an online file converter. We support ${LIVE_COUNT.toLocaleString('en-US')} conversions between audio, video, document, ebook, archive, image, spreadsheet, presentation and font formats. To get started, choose your formats or use the button below to select files from your computer.`,
@@ -1005,8 +1036,8 @@ function allPaths() {
   return [
     '/', '/converters',
     ...CATS.filter((c) => categoryIsLive(c.id) && !registry.getFormat(c.id)).map((c) => categoryPath(c.id)),
-    ...registry.getFormats().filter((f) => formatIsLive(f.id)).map((f) => formatPath(f.id)),
-    ...registry.getConverters().map((c) => c.route),
+    ...registry.getFormats().filter((f) => formatIsLive(f.id) && formatIndexable(f.id)).map((f) => formatPath(f.id)),
+    ...registry.getConverters().filter((c) => pairIndexable(c.from, c.to)).map((c) => c.route),
     ...COMPRESSIBLE.map((s) => compressPath(s)),
     ...Object.keys(INFO_PAGES).map((k) => `/${k}`),
     ...(PDF_EDITOR ? ['/edit-pdf'] : []),
@@ -1030,4 +1061,5 @@ function sitemap(base) {
 const robots = (base) => `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${base}/sitemap.xml\n`;
 
 module.exports = {
+  megaMenu,
   editorPage, PDF_EDITOR, homePage, hubPage, notFoundPage, resolvePair, resolveCompress, resolveConverter, resolveInfo, ogSpec, sitemap, robots, allPaths, adsTxt, ADS_ENABLED: !!ADS_CLIENT };

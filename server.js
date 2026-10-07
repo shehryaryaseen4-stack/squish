@@ -276,6 +276,8 @@ if (pages.PDF_EDITOR) {
   app.get('/edit-pdf', (req, res) => sendHtml(res, pages.editorPage(baseOf(req))));
 }
 
+// The Tools menu for pages that load it on demand (see topbar() in pages.js); versioned, so cached for a year.
+app.get('/menu.html', (_req, res) => res.set({ 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Robots-Tag': 'noindex' }).type('html').send(pages.megaMenu()));
 app.get('/formats', (_req, res) => res.redirect(301, '/converters'));
 app.get(/^\/(about|privacy|terms|contact)$/, (req, res, next) => {
   const r = pages.resolveInfo(req.params[0], baseOf(req));

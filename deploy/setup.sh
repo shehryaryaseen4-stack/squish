@@ -84,8 +84,10 @@ JOB_TIMEOUT_S=90
 MAX_FILE_MB=${MAX_FILE_MB:-$(old MAX_FILE_MB | grep . || echo 95)}
 # Google AdSense publisher ID (ca-pub-...), once your account is approved.
 ADSENSE_CLIENT=$ADS
+# IndexNow key: lets Bing and others index new pages within minutes (made once, then kept).
+INDEXNOW_KEY=${INDEXNOW_KEY:-$(old INDEXNOW_KEY | grep . || head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')}
 EOF
-for k in ADSENSE_SLOT_TOP ADSENSE_SLOT_BOTTOM ADSENSE_SLOT_LEFT ADSENSE_SLOT_RIGHT TWITTER_SITE PDF_EDITOR; do
+for k in ADSENSE_SLOT_TOP ADSENSE_SLOT_BOTTOM ADSENSE_SLOT_LEFT ADSENSE_SLOT_RIGHT TWITTER_SITE PDF_EDITOR SOCIAL_LINKS; do
   v="$(old "$k")"; [ -n "$v" ] && echo "$k=$v" >> "$ENV_FILE"
 done
 chmod 600 "$ENV_FILE"
@@ -147,6 +149,7 @@ for _ in $(seq 1 30); do
 done
 [ "$ok" -eq 1 ] || { docker logs --tail 50 "$IMAGE"; die "the site did not start (log above)"; }
 docker logs "$IMAGE" 2>&1 | grep -E 'listening|live' | tail -2 || true
+docker exec "$IMAGE" node scripts/indexnow.js || true
 IP="$(curl -fsS --max-time 10 https://api.ipify.org || hostname -I | awk '{print $1}')"
 
 cat <<EOF
