@@ -329,3 +329,87 @@ body.is-editing .pe-app{height:auto;}
   .pe-body{position:relative;}
 }
 @media (max-width:640px){ .pe-keys{grid-template-columns:1fr;} .pe-fontpop{width:calc(100vw - 24px);} }
+
+/* ======================================================= modern layer (v3) == */
+.pe-head{box-shadow:0 1px 0 var(--line), 0 6px 18px -12px rgba(17,20,28,.18); border-bottom:0;}
+/* tool dock: one raised pill slides to the active tool */
+.pe-tools{position:relative; isolation:isolate; background:linear-gradient(180deg,#F3F4F7,#ECEEF2); box-shadow:inset 0 1px 2px rgba(17,20,28,.06);}
+.pe-tool-ind{position:absolute; z-index:-1; top:4px; left:4px; height:calc(100% - 8px); width:0; border-radius:10px; background:#fff;
+  box-shadow:0 1px 2px rgba(17,20,28,.08), 0 4px 12px -4px rgba(229,50,45,.35); transition:left .28s cubic-bezier(.3,1.3,.5,1), width .28s cubic-bezier(.3,1.3,.5,1); opacity:0;}
+.pe-tools.has-ind .pe-tool-ind{opacity:1;}
+.pe-tool[aria-pressed="true"]{background:transparent; box-shadow:none; color:var(--brand);}
+.pe-tool:hover{background:rgba(255,255,255,.55);}
+.pe-tool[aria-pressed="true"]:hover{background:transparent;}
+.pe-tool svg{transition:transform .18s ease;}
+.pe-tool:hover svg{transform:translateY(-1px);}
+
+/* glass for everything that floats over the page */
+.pe-props,.pe-zoombar{background:rgba(255,255,255,.86); -webkit-backdrop-filter:blur(14px) saturate(1.4); backdrop-filter:blur(14px) saturate(1.4); border:1px solid rgba(17,20,28,.06);}
+.pe-props{border-radius:16px; animation:peRise .2s ease-out;}
+@keyframes peRise{from{opacity:0; transform:translateY(-4px);}}
+.pe-ctxchip{display:inline-flex; align-items:center; gap:6px; padding:5px 10px 5px 7px; margin-right:2px; border-radius:999px; background:var(--brand-soft); color:var(--brand); font-size:.8rem; font-weight:800; white-space:nowrap;}
+.pe-ctxchip svg{width:16px; height:16px;}
+
+/* quick start card */
+.pe-quick{position:absolute; z-index:12; top:34px; left:50%; transform:translateX(-50%); width:min(640px, calc(100% - 32px)); padding:20px; border-radius:22px; background:rgba(255,255,255,.96);
+  -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px); box-shadow:0 30px 80px -20px rgba(17,20,28,.35), 0 0 0 1px rgba(17,20,28,.05); animation:peQuick .32s cubic-bezier(.2,1.2,.4,1);}
+@keyframes peQuick{from{opacity:0; transform:translate(-50%, 12px) scale(.98);}}
+.pe-quick-head{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:14px;}
+.pe-quick-head strong{display:block; font-size:1.25rem; font-weight:800; letter-spacing:-.01em;}
+.pe-quick-head span{display:block; margin-top:2px; color:var(--muted); font-size:.9rem;}
+.pe-quick-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px;}
+.pe-quick-grid button{display:flex; flex-direction:column; align-items:flex-start; gap:4px; padding:14px; border:1px solid var(--line); border-radius:16px; background:#fff; text-align:left; cursor:pointer; transition:transform .15s, box-shadow .15s, border-color .15s;}
+.pe-quick-grid button:hover{transform:translateY(-2px); border-color:transparent; box-shadow:0 10px 26px -10px rgba(17,20,28,.28), 0 0 0 1.5px var(--brand);}
+.pe-quick-grid button:focus-visible{outline:2px solid var(--sel); outline-offset:2px;}
+.pe-quick-grid b{margin-top:6px; font-size:.98rem; color:var(--ink);}
+.pe-quick-grid small{font-size:.8rem; line-height:1.35; color:var(--muted);}
+.qi{display:grid; place-items:center; width:40px; height:40px; border-radius:12px;}
+.qi svg{width:22px; height:22px;}
+.qi-blue{background:#E8EFFF; color:#2563EB;} .qi-red{background:#FDECEB; color:#E5322D;} .qi-green{background:#E3F6EC; color:#178A4C;}
+.qi-violet{background:#F0EAFE; color:#7C3AED;} .qi-amber{background:#FFF4D6; color:#B7791F;} .qi-teal{background:#DFF5F3; color:#0F8B80;}
+.pe-quick-off{display:flex; align-items:center; gap:8px; margin-top:14px; font-size:.85rem; color:var(--muted); cursor:pointer;}
+.pe-quick-off input{accent-color:var(--brand);}
+
+/* rich tooltips */
+.pe-tip{position:fixed; z-index:90; display:grid; grid-template-columns:1fr auto; gap:2px 12px; max-width:240px; padding:9px 12px; border-radius:12px; background:#1B1D22; color:#fff; box-shadow:0 12px 30px -10px rgba(0,0,0,.45); pointer-events:none; animation:peTip .14s ease-out;}
+@keyframes peTip{from{opacity:0; transform:translateY(-3px);}}
+.pe-tip strong{font-size:.85rem;}
+.pe-tip span{grid-column:1 / -1; font-size:.8rem; line-height:1.4; color:#C9CDD5;}
+.pe-tip kbd{grid-row:1; grid-column:2; align-self:center; padding:1px 6px; border-radius:5px; background:rgba(255,255,255,.14); font:600 .72rem "IBM Plex Mono",ui-monospace,monospace;}
+.pe-tip kbd:empty{display:none;}
+
+/* font picker with a live preview */
+.pe-fontpop{width:340px; max-height:min(560px, 76vh); padding:12px; border-radius:18px; animation:peRise .16s ease-out;}
+.pe-fontprev{display:flex; flex-direction:column; gap:4px; margin-bottom:10px; padding:14px 14px 12px; border-radius:12px; background:linear-gradient(135deg,#FFF4F3,#F4F0FF); overflow:hidden;}
+.pe-fontprev span{font-size:1.65rem; line-height:1.2; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:opacity .12s;}
+.pe-fontprev small{font:700 .72rem "Source Sans 3",system-ui,sans-serif; letter-spacing:.06em; text-transform:uppercase; color:var(--muted);}
+.pe-fontsearch{position:relative;}
+.pe-fontsearch svg{position:absolute; left:10px; top:50%; width:16px; height:16px; transform:translateY(-50%); color:var(--muted);}
+.pe-fontpop .pe-fontsearch input{padding-left:32px; border-radius:10px; background:var(--rail);}
+.pe-fontlist li{position:relative; transition:background .1s;}
+.pe-fontlist li[aria-selected="true"]::after{content:"\2713"; position:absolute; right:10px; top:50%; transform:translateY(-50%); font:800 .9rem "Source Sans 3",sans-serif; color:var(--brand);}
+.pe-fontlist li[aria-selected="true"] small{visibility:hidden;}
+.pe-fontlist li:hover,.pe-fontlist li.active{background:linear-gradient(90deg,var(--brand-soft),transparent);}
+
+/* calmer, friendlier side panels */
+.pe-right h3::before{content:""; display:inline-block; width:6px; height:6px; margin-right:7px; border-radius:50%; background:var(--brand); vertical-align:middle;}
+.pe-right h3{justify-content:flex-start;}
+.pe-right h3 span{margin-left:auto;}
+.pe-layer-list li{border:1px solid transparent;}
+.pe-layer-list li.sel{border-color:rgba(37,99,235,.25);}
+.pe-thumb-frame{border-radius:8px;}
+.pe-page{box-shadow:0 0 0 1px rgba(17,20,28,.05), 0 12px 32px -12px rgba(17,20,28,.22);}
+@media (max-width:640px){ .pe-quick-grid{grid-template-columns:repeat(2,1fr);} .pe-quick{top:14px; padding:16px;} .pe-ctxchip span{display:none;} }
+@media (prefers-reduced-motion:reduce){ .pe-tool-ind{transition:none;} }
+/* With the design panel on screen, its Arrange buttons replace the pill's, so the pill stays one line. */
+@media (min-width:1101px){ .pe-body:not(.no-right) .pe-prop[data-for="layer"]{display:none !important;} }
+.pe-prop input[type="range"]{width:80px;}
+/* The settings pill floats over the work area, so the pages never jump when it grows or shrinks. */
+.pe-props-wrap{position:absolute; top:30px; left:0; right:0; z-index:10; padding:0 16px;}
+.pe-view{padding-top:84px;}
+/* One line at every width: on narrow screens the pill scrolls sideways instead of growing. */
+.pe-props{flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:none;}
+.pe-props::-webkit-scrollbar{display:none;}
+.pe-prop,.pe-ctxchip{flex-shrink:0;}
+.pe-hint{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0;}
+@media (max-width:860px){ .pe-props{justify-content:flex-start;} .pe-hint{display:none;} }

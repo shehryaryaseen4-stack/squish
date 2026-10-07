@@ -62,6 +62,7 @@
       </div>
 
       <div class="pe-tools" role="toolbar" aria-label="Tools">
+        <span class="pe-tool-ind" aria-hidden="true"></span>
         <button type="button" class="pe-tool" data-tool="select" title="Select and move (V)"><svg viewBox="0 0 24 24"><path d="M6 3l12 9-5.5 1.2L15 20l-2.4 1-2.5-6.6L6 18z"/></svg><span>Select</span></button>
         <button type="button" class="pe-tool" data-tool="edittext" title="Edit text in the PDF (E)"><svg viewBox="0 0 24 24"><path d="M4 7V5h11v2M9.5 5v14m-2 0h4"/><path d="M14 19l6-6 2 2-6 6h-2z"/></svg><span>Edit text</span></button>
         <button type="button" class="pe-tool" data-tool="editimage" title="Edit images in the PDF (I)"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="14" height="12" rx="2"/><circle cx="8" cy="9" r="1.6"/><path d="M17 12l-4-3-7 7"/><path d="M15 21l5.5-5.5 2 2L17 23h-2z"/></svg><span>Edit image</span></button>
@@ -109,6 +110,7 @@
         <!-- Settings for the selected object or the current tool -->
         <div class="pe-props-wrap">
           <div class="pe-props" id="peProps">
+            <span class="pe-ctxchip" id="peCtxChip"><svg viewBox="0 0 24 24" id="peCtxIco"></svg><span id="peCtxName">Select</span></span>
             <label class="pe-prop" data-for="color" title="Colour"><span class="pe-swatch"><input type="color" id="pColor" value="#1f2937" aria-label="Colour"></span></label>
             <label class="pe-prop" data-for="fill" title="Fill"><span class="pe-lbl">Fill</span><span class="pe-swatch"><input type="color" id="pFill" value="#ffffff" aria-label="Fill colour"></span><input type="checkbox" id="pFillOn" aria-label="Fill on"></label>
             <label class="pe-prop" data-for="width" title="Thickness"><span class="pe-lbl">Size</span><input type="range" id="pWidth" min="1" max="16" value="2"><output id="pWidthOut">2</output></label>
@@ -129,6 +131,22 @@
           </div>
         </div>
         <div class="pe-stage rulers" id="peStage">
+        <!-- First thing people see after opening a PDF: the main jobs, one click each -->
+        <div class="pe-quick" id="peQuick" hidden>
+          <div class="pe-quick-head">
+            <div><strong>What would you like to do?</strong><span>Pick one to start. All tools stay in the bar above.</span></div>
+            <button type="button" class="pe-ibtn pe-sm" data-quick="close" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+          </div>
+          <div class="pe-quick-grid">
+            <button type="button" data-quick="edittext"><span class="qi qi-blue"><svg viewBox="0 0 24 24"><path d="M4 7V5h11v2M9.5 5v14m-2 0h4"/><path d="M14 19l6-6 2 2-6 6h-2z"/></svg></span><b>Edit text</b><small>Click words in the PDF and retype them</small></button>
+            <button type="button" data-quick="text"><span class="qi qi-red"><svg viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16m-3 0h6"/></svg></span><b>Add text</b><small>Type anywhere, 150+ fonts</small></button>
+            <button type="button" data-quick="sign"><span class="qi qi-green"><svg viewBox="0 0 24 24"><path d="M3 17c3 0 4-9 7-9s-1 9 2 9 3-4 5-4 2 3 4 3"/><path d="M3 21h18"/></svg></span><b>Sign</b><small>Draw or type your signature</small></button>
+            <button type="button" data-quick="editimage"><span class="qi qi-violet"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="14" height="12" rx="2"/><circle cx="8" cy="9" r="1.6"/><path d="M17 12l-4-3-7 7"/></svg></span><b>Edit images</b><small>Replace, move or remove pictures</small></button>
+            <button type="button" data-quick="highlight"><span class="qi qi-amber"><svg viewBox="0 0 24 24"><path d="M9 11l-5 5v4h4l5-5"/><path d="M9 11l6-6 4 4-6 6z"/><path d="M14 21h7"/></svg></span><b>Highlight</b><small>Mark the important lines</small></button>
+            <button type="button" data-quick="image"><span class="qi qi-teal"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg></span><b>Add image</b><small>Logo, photo or stamp</small></button>
+          </div>
+          <label class="pe-quick-off"><input type="checkbox" id="peQuickOff"> Don't show this again</label>
+        </div>
         <canvas class="pe-ruler pe-ruler-x" id="peRulerX" aria-hidden="true"></canvas>
         <canvas class="pe-ruler pe-ruler-y" id="peRulerY" aria-hidden="true"></canvas>
         <span class="pe-ruler-corner" aria-hidden="true"></span>
@@ -184,7 +202,8 @@
 
     <!-- Font picker -->
     <div class="pe-pop pe-fontpop" id="peFontPop" role="dialog" aria-label="Choose a font" hidden>
-      <input type="search" id="peFontSearch" placeholder="Search 150+ fonts" aria-label="Search fonts" autocomplete="off">
+      <div class="pe-fontprev" aria-live="polite"><span id="peFontPrevText">The quick brown fox</span><small id="peFontPrevName">Helvetica</small></div>
+      <div class="pe-fontsearch"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input type="search" id="peFontSearch" placeholder="Search 150+ fonts" aria-label="Search fonts" autocomplete="off"></div>
       <div class="pe-fontcats" id="peFontCats" role="tablist"></div>
       <ul class="pe-fontlist" id="peFontList" role="listbox" aria-label="Fonts"></ul>
     </div>
@@ -288,5 +307,6 @@
     </form>
   </dialog>
 
+  <div class="pe-tip" id="peTip" role="tooltip" hidden><strong id="peTipTitle"></strong><span id="peTipText"></span><kbd id="peTipKey"></kbd></div>
   <div class="pe-toast" id="peToast" role="status" aria-live="polite" hidden></div>
 </div>

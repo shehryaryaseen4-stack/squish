@@ -277,6 +277,8 @@ function resetDoc(pages, name, title) {
   $('#pe').classList.add('editing');
   S.zoom = fitZoom();
   rebuild(); updateUndo();
+  showQuick();
+  requestAnimationFrame(moveToolIndicator);
   $('#peView').scrollTop = 0;
 }
 
@@ -1089,6 +1091,7 @@ function setTool(tool) {
   S.tool = tool;
   const more = $('.pe-more > .pe-tool');
   $$('[data-tool]').forEach((b) => b.setAttribute('aria-pressed', String(b === more ? SHAPES.has(tool) : b.dataset.tool === tool)));
+  moveToolIndicator();
   $$('.pe-layer').forEach((l) => { l.className = `pe-layer tool-${tool}`; });
   hideRuns();
   S.runToast = false;
@@ -1108,8 +1111,29 @@ function propTarget() {
   const d = defaultsFor(S.tool);
   return d ? { kind: S.tool === 'edittext' ? 'text' : S.tool, obj: d, item: false } : null;
 }
+// The raised pill in the tool dock glides to the active tool.
+function moveToolIndicator() {
+  const dock = $('.pe-tools'), ind = $('.pe-tool-ind');
+  if (!dock || !ind) return;
+  const btn = $$(':scope > .pe-tool[aria-pressed="true"], :scope > .pe-more > .pe-tool[aria-pressed="true"]', dock)[0];
+  dock.classList.toggle('has-ind', !!btn && btn.offsetWidth > 0);
+  if (!btn) return;
+  const box = btn.closest('.pe-more') || btn;
+  ind.style.left = `${box.offsetLeft}px`; ind.style.width = `${btn.offsetWidth}px`;
+}
+const TOOL_NAMES = { select: 'Select', edittext: 'Edit text', editimage: 'Edit image', text: 'Text', pen: 'Draw', highlight: 'Highlight', whiteout: 'Whiteout', rect: 'Rectangle', ellipse: 'Circle', line: 'Line', arrow: 'Arrow', check: 'Check mark', cross: 'Cross' };
+const TOOL_ICONS = { select: '<path d="M6 3l12 9-5.5 1.2L15 20l-2.4 1-2.5-6.6L6 18z"/>', edittext: '<path d="M4 7V5h11v2M9.5 5v14m-2 0h4"/><path d="M14 19l6-6 2 2-6 6h-2z"/>', editimage: '<rect x="3" y="4" width="14" height="12" rx="2"/><circle cx="8" cy="9" r="1.6"/><path d="M17 12l-4-3-7 7"/>' };
+function updateContextChip(t) {
+  const it = itemOf(S.sel);
+  const kind = it ? it.type : S.tool;
+  $('#peCtxName').textContent = it ? (it.type === 'text' ? 'Text' : LAYER_NAMES[it.type] || 'Object') : TOOL_NAMES[S.tool] || '';
+  $('#peCtxIco').innerHTML = TOOL_ICONS[kind] || LAYER_ICONS[kind] || TOOL_ICONS.select;
+  $('#peCtxChip').title = it ? 'Selected object' : 'Current tool';
+  return t;
+}
 function updateProps() {
   const t = propTarget();
+  updateContextChip(t);
   const show = new Set(t ? PROPS[t.kind] || [] : []);
   if (t && t.item) show.add('layer');
   $$('.pe-prop').forEach((el) => el.classList.toggle('show', show.has(el.dataset.for)));
@@ -1177,10 +1201,36 @@ function openFontPicker() {
   pop.style.left = `${clamp(r.left, 8, window.innerWidth - pop.offsetWidth - 8)}px`;
   pop.style.top = `${clamp(r.bottom + 6, 8, window.innerHeight - pop.offsetHeight - 8)}px`;
   $('#peFontSearch').value = '';
+  const t = propTarget();
+  const own = t && t.item && t.obj.type === 'text' ? t.obj.text.split('\n')[0].trim().slice(0, 48) : '';
+  $('#peFontPrevText').textContent = own || 'The quick brown fox';
+  previewFont(null);
   renderFontList();
   $('#peFontSearch').focus();
 }
-function closeFontPicker() { $('#peFontPop').hidden = true; }
+function closeFontPicker() {
+  if ($('#peFontPop').hidden) return;
+  if (fontPreviewing) previewFont(null);
+  $('#peFontPop').hidden = true;
+}
+// Hovering a font shows it at once on the selected text (and in the sample); leaving the list
+// or closing the picker puts the real font back. Nothing is saved until a font is clicked.
+let fontPreviewing = null;
+function previewFont(id) {
+  const t = propTarget();
+  const base = (t && t.obj.font) || 'helv';
+  const fid = id || base;
+  fontPreviewing = id;
+  const el = t && t.item && t.obj.type === 'text' ? $(`#peView .pe-obj[data-id="${t.obj.id}"]`) : null;
+  const apply = () => {
+    if (fontPreviewing !== id) return;
+    $('#peFontPrevText').style.fontFamily = cssFamily(fid);
+    $('#peFontPrevName').textContent = id && id !== base ? `${fontInfo(fid).name} (preview)` : fontInfo(fid).name;
+    if (el) el.style.fontFamily = cssFamily(fid);
+  };
+  apply();
+  if (id) ensureFont(id, t && t.obj.bold, t && t.obj.italic).then(apply);
+}
 function renderFontList() {
   const cats = $('#peFontCats');
   if (!cats.childElementCount) {
@@ -1212,6 +1262,7 @@ function renderFontList() {
     const tag = document.createElement('small'); tag.textContent = f.note || (f.cat === 'standard' ? 'built in' : f.cat);
     li.append(name, tag);
     li.addEventListener('mousedown', (e) => e.preventDefault());
+    li.addEventListener('mouseenter', () => previewFont(f.id));
     li.addEventListener('click', () => chooseFont(f.id));
     list.append(li);
     if (!isStd(f.id)) fontIO.observe(li);
@@ -1227,7 +1278,8 @@ function renderFontList() {
 }
 function chooseFont(id) {
   const t = propTarget();
-  closeFontPicker();
+  fontPreviewing = null;
+  $('#peFontPop').hidden = true;
   if (!t) return;
   rememberFont(id);
   ensureFont(id, t.obj.bold, t.obj.italic);
@@ -1241,7 +1293,7 @@ function fontKeys(e) {
     e.preventDefault();
     fontActive = clamp(fontActive + (e.key === 'ArrowDown' ? 1 : -1), 0, items.length - 1);
     items.forEach((li, i) => li.classList.toggle('active', i === fontActive));
-    if (items[fontActive]) items[fontActive].scrollIntoView({ block: 'nearest' });
+    if (items[fontActive]) { items[fontActive].scrollIntoView({ block: 'nearest' }); previewFont(items[fontActive].dataset.font); }
   }
   if (e.key === 'Enter') { e.preventDefault(); const li = items[Math.max(0, fontActive)]; if (li) chooseFont(li.dataset.font); }
 }
@@ -2010,6 +2062,58 @@ function onKey(e) {
   if (k) setTool(k);
 }
 
+// ------------------------------------------------------ quick start + tips --
+let quickOff = false;
+try { quickOff = localStorage.getItem('pe-quick-off') === '1'; } catch { /* storage off */ }
+const showQuick = () => { if (!quickOff) $('#peQuick').hidden = false; };
+const hideQuick = () => { $('#peQuick').hidden = true; };
+function quickAction(a) {
+  hideQuick();
+  if (a === 'sign') openSign();
+  else if (a === 'image') { imagePick = null; $('#peImageInput').click(); }
+  else if (a !== 'close') setTool(a);
+}
+const TIPS = {
+  select: ['Select', 'Move, resize and rotate anything you added.', 'V'],
+  edittext: ['Edit text', 'Click a line of text in the PDF and type to change it.', 'E'],
+  editimage: ['Edit image', 'Click a picture in the PDF to replace, move or remove it.', 'I'],
+  text: ['Add text', 'Click anywhere on the page and start typing.', 'T'],
+  pen: ['Draw', 'Draw freely with the mouse or your finger.', 'P'],
+  highlight: ['Highlight', 'Drag over text to mark it in colour.', 'H'],
+  whiteout: ['Whiteout', 'Cover parts of the page with white.', 'W'],
+  rect: ['Shapes', 'Rectangles, circles, lines, arrows, check marks and crosses.', 'R'],
+  image: ['Insert image', 'Add a logo, photo or stamp from your device.', ''],
+  sign: ['Sign', 'Draw or type your signature, then place it.', ''],
+  undo: ['Undo', 'Take back the last change.', 'Ctrl+Z'], redo: ['Redo', 'Bring back what you undid.', 'Ctrl+Y'],
+  help: ['Shortcuts', 'All keyboard shortcuts.', '?'], export: ['Download', 'Save your edited PDF.', ''],
+  panel: ['Design and layers', 'Position, size, rotation and the layer list.', ''],
+};
+function bindTips() {
+  const tip = $('#peTip');
+  let timer = 0;
+  const hide = () => { clearTimeout(timer); tip.hidden = true; };
+  $$('.pe-head [data-tool], .pe-head [data-act]').forEach((el) => {
+    const key = el.dataset.tool || el.dataset.act;
+    const t = TIPS[key];
+    if (!t || el.closest('.pe-pop')) return;
+    if (!el.getAttribute('aria-label')) el.setAttribute('aria-label', t[0]);
+    el.removeAttribute('title');
+    el.addEventListener('pointerenter', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        $('#peTipTitle').textContent = t[0]; $('#peTipText').textContent = t[1]; $('#peTipKey').textContent = t[2];
+        tip.hidden = false;
+        const r = el.getBoundingClientRect();
+        tip.style.left = `${clamp(r.left + r.width / 2 - tip.offsetWidth / 2, 8, window.innerWidth - tip.offsetWidth - 8)}px`;
+        tip.style.top = `${r.bottom + 8}px`;
+      }, 380);
+    });
+    el.addEventListener('pointerleave', hide);
+    el.addEventListener('pointerdown', hide);
+  });
+}
+
 function bindDrop(el, onFiles) {
   el.addEventListener('dragover', (e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); el.classList.add('is-over'); } });
   el.addEventListener('dragleave', () => el.classList.remove('is-over'));
@@ -2104,10 +2208,19 @@ function init() {
   const unit = $('#peUnit');
   unit.value = UNIT;
   unit.addEventListener('change', () => { UNIT = unit.value; try { localStorage.setItem('pe-unit', UNIT); } catch { /* storage off */ } updatePanel(); drawRulersSoon(); });
-  try { if (localStorage.getItem('pe-rulers') === '0') $('#peStage').classList.remove('rulers'); } catch { /* storage off */ }
+  // rulers start off on phones (they take space there) unless switched on before
+  let rulersPref = null;
+  try { rulersPref = localStorage.getItem('pe-rulers'); } catch { /* storage off */ }
+  if (rulersPref === '0' || (rulersPref === null && window.matchMedia('(max-width:640px)').matches)) $('#peStage').classList.remove('rulers');
   $('#peFontSearch').addEventListener('input', renderFontList);
   $('#peFontSearch').addEventListener('keydown', fontKeys);
   bindLayers();
+  bindTips();
+  $$('[data-quick]').forEach((b) => b.addEventListener('click', () => quickAction(b.dataset.quick)));
+  $('#peQuickOff').addEventListener('change', (e) => { quickOff = e.target.checked; try { localStorage.setItem('pe-quick-off', quickOff ? '1' : '0'); } catch { /* storage off */ } });
+  $$('.pe-head [data-tool], .pe-head [data-act]').forEach((b) => b.addEventListener('click', () => { if (!b.closest('.pe-menu')) hideQuick(); }));
+  view.addEventListener('pointerdown', hideQuick);
+  $('#peFontList').addEventListener('mouseleave', () => { if (fontPreviewing) previewFont(null); });
   document.addEventListener('paste', (e) => {
     if ($('#peApp').hidden || S.editing || /^(input|textarea)$/i.test(e.target.tagName)) return;
     const files = Array.from(e.clipboardData.files || []);
@@ -2167,7 +2280,7 @@ function init() {
   document.addEventListener('keydown', onKey);
   window.addEventListener('beforeunload', (e) => { if (S.dirty) { e.preventDefault(); e.returnValue = ''; } });
   let resizeT = 0;
-  window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (!$('#peApp').hidden) { buildThumbs(); drawRulersSoon(); } }, 200); });
+  window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (!$('#peApp').hidden) { buildThumbs(); drawRulersSoon(); moveToolIndicator(); } }, 200); });
   setTool('select');
   loadCatalog();
   lib().catch(() => {}); // start loading pdf.js while the visitor picks a file
