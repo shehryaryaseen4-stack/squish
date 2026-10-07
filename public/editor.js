@@ -31,6 +31,7 @@ const SHAPES = new Set(['rect', 'ellipse', 'line', 'arrow', 'check', 'cross']);
 const HINTS = {
   select: 'Click an object to select it. Drag to move, use the corners to resize.',
   edittext: 'Click on any text in the PDF to change it.',
+  editimage: 'Click on an image in the PDF to replace, move or remove it.',
   text: 'Click anywhere on a page to add text.',
   pen: 'Draw on the page with your mouse or finger.',
   highlight: 'Drag over text to highlight it.',
@@ -45,7 +46,7 @@ const PROPS = {
   pen: ['color', 'width', 'opacity'], line: ['color', 'width', 'opacity'], arrow: ['color', 'width', 'opacity'],
   check: ['color', 'width'], cross: ['color', 'width'],
   rect: ['color', 'width', 'fill', 'opacity'], ellipse: ['color', 'width', 'fill', 'opacity'],
-  highlight: ['color', 'opacity'], whiteout: ['color'], image: ['opacity'],
+  highlight: ['color', 'opacity'], whiteout: ['color'], image: ['opacity', 'replace'],
 };
 const DEFAULTS = {
   text: { color: '#111827', font: 'helv', size: 14, bold: false, italic: false, opacity: 100 },
@@ -178,21 +179,22 @@ async function openFile(file) {
   busy(true, 'Opening PDF…');
   try {
     const pages = await addPdf(await readFile(file));
-    resetDoc(pages, file.name.replace(/\.pdf$/i, '') + '-edited.pdf');
+    resetDoc(pages, file.name.replace(/\.pdf$/i, '') + '-edited.pdf', file.name);
   } catch (e) { toast(e.message, true); } finally { busy(false); }
 }
 
 function createNew() {
   const [w, h] = SIZES[$('#peNewSize').value] || SIZES.a4;
   const land = $('#peNewOrient').value === 'landscape';
-  resetDoc([land ? blankPage(h, w) : blankPage(w, h)], 'document.pdf');
+  resetDoc([land ? blankPage(h, w) : blankPage(w, h)], 'document.pdf', 'Untitled document');
   setTool('text');
 }
 
-function resetDoc(pages, name) {
+function resetDoc(pages, name, title) {
   S.docs.forEach((d, id) => { if (!pages.some((p) => p.src && p.src.doc === id)) { d.proxy.destroy(); S.docs.delete(id); } });
   S.pages = pages; S.undo = []; S.redo = []; S.sel = null; S.editing = null; S.current = 0; S.dirty = false; S.runs.clear();
   $('#peFileName').value = name;
+  $('#peDocName').textContent = title || name;
   $('#peStart').hidden = true; $('#peApp').hidden = false;
   document.body.classList.add('is-editing');
   $('#pe').classList.add('editing');
@@ -297,7 +299,8 @@ function renderObjects(layer, p, z, live) {
   S.zoom = z; // svgFor reads the zoom
   p.items.forEach((it) => {
     const o = document.createElement('div');
-    o.className = 'pe-obj'; o.dataset.id = it.id;
+    o.className = 'pe-obj';
+    if (live) o.dataset.id = it.id; // thumbnails get no id, so lookups only find the page copy
     o.style.left = `${it.x * z}px`; o.style.top = `${it.y * z}px`;
     o.style.opacity = (it.opacity ?? 100) / 100;
     if (it.type === 'text') {
@@ -466,12 +469,53 @@ function finishEditing() {
 }
 
 // ----------------------------------------------------- "Edit text" support --
+const runKey = (tool, p) => `${tool}:${p.id}:${rotOf(p)}`;
+const pdfPage = (p) => S.docs.get(p.src.doc).proxy.getPage(p.src.index + 1);
+
+// Images drawn by the PDF itself, in view points: follows the graphics state through the
+// page's drawing operations and maps each image's unit square to the page.
+async function imageRuns(p) {
+  const key = runKey('editimage', p);
+  if (S.runs.has(key)) return S.runs.get(key);
+  if (!p.src) { S.runs.set(key, []); return []; }
+  const L = await lib();
+  const page = await pdfPage(p);
+  const vp = page.getViewport({ scale: 1, rotation: rotOf(p) });
+  const ops = await page.getOperatorList();
+  const O = L.OPS;
+  const IMG = new Set([O.paintImageXObject, O.paintInlineImageXObject, O.paintImageMaskXObject, O.paintImageXObjectRepeat, O.paintJpegXObject].filter((v) => v !== undefined));
+  const [vw, vh] = viewSize(p);
+  const runs = [];
+  let ctm = [1, 0, 0, 1, 0, 0];
+  const stack = [];
+  for (let i = 0; i < ops.fnArray.length; i++) {
+    const fn = ops.fnArray[i], a = ops.argsArray[i];
+    if (fn === O.save) stack.push(ctm);
+    else if (fn === O.restore) ctm = stack.pop() || [1, 0, 0, 1, 0, 0];
+    else if (fn === O.transform) ctm = L.Util.transform(ctm, a);
+    else if (fn === O.paintFormXObjectBegin) { stack.push(ctm); if (a && a[0]) ctm = L.Util.transform(ctm, a[0]); }
+    else if (fn === O.paintFormXObjectEnd) ctm = stack.pop() || ctm;
+    else if (IMG.has(fn)) {
+      const m = L.Util.transform(vp.transform, ctm);
+      const pts = [[0, 0], [1, 0], [0, 1], [1, 1]].map(([x, y]) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]]);
+      const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
+      const x = clamp(Math.min(...xs), 0, vw), y = clamp(Math.min(...ys), 0, vh);
+      const w = clamp(Math.max(...xs), 0, vw) - x, h = clamp(Math.max(...ys), 0, vh) - y;
+      if (w < 6 || h < 6) continue;
+      if (runs.some((r) => Math.abs(r.x - x) < 1 && Math.abs(r.y - y) < 1 && Math.abs(r.w - w) < 1 && Math.abs(r.h - h) < 1)) continue;
+      runs.push({ x, y, w, h, top: y });
+    }
+  }
+  S.runs.set(key, runs);
+  return runs;
+}
+
 async function textRuns(p) {
-  const key = `${p.id}:${rotOf(p)}`;
+  const key = runKey('edittext', p);
   if (S.runs.has(key)) return S.runs.get(key);
   if (!p.src) { S.runs.set(key, []); return []; }
   const lib_ = await lib();
-  const page = await S.docs.get(p.src.doc).proxy.getPage(p.src.index + 1);
+  const page = await pdfPage(p);
   const vp = page.getViewport({ scale: 1, rotation: rotOf(p) });
   const tc = await page.getTextContent();
   const runs = [];
@@ -495,25 +539,110 @@ async function textRuns(p) {
   return runs;
 }
 
+const RUNS = { edittext: textRuns, editimage: imageRuns };
 async function showRuns(pageEl) {
   const p = pageById(pageEl.dataset.id);
   const layer = pageEl.querySelector('.pe-layer');
-  if (!p || S.tool !== 'edittext' || layer.querySelector('.pe-runs')) return;
-  const runs = await textRuns(p);
-  if (S.tool !== 'edittext' || layer.querySelector('.pe-runs')) return;
+  const tool = S.tool;
+  if (!p || !RUNS[tool] || layer.querySelector('.pe-runs')) return;
+  const runs = await RUNS[tool](p);
+  if (S.tool !== tool || layer.querySelector('.pe-runs')) return;
   const box = document.createElement('div');
   box.className = 'pe-runs';
   const z = S.zoom;
   runs.forEach((r, i) => {
     const d = document.createElement('div');
-    d.className = 'pe-run'; d.dataset.run = i;
+    d.className = tool === 'editimage' ? 'pe-run img' : 'pe-run'; d.dataset.run = i;
     Object.assign(d.style, { left: `${r.x * z}px`, top: `${r.top * z}px`, width: `${r.w * z}px`, height: `${r.h * z}px` });
     box.append(d);
   });
   layer.prepend(box);
-  if (!runs.length) toast(p.src ? 'No editable text found on this page. Scanned pages contain pictures of text; use Text to type over them.' : 'This page has no text yet. Use Text to add some.');
+  if (!runs.length && !S.runToast && pageIndex(p.id) === S.current) {
+    S.runToast = true;
+    if (tool === 'editimage') toast(p.src ? 'No images found on this page. Use Image to add one.' : 'This page has no images yet. Use Image to add one.');
+    else toast(p.src ? 'No editable text found on this page. Scanned pages contain pictures of text; use Text to type over them.' : 'This page has no text yet. Use Text to add some.');
+  }
 }
-function hideRuns() { $$('.pe-runs').forEach((e) => e.remove()); }
+function hideRuns() { $$('.pe-runs').forEach((e) => e.remove()); closeImgMenu(); }
+
+// ------------------------------------------------------------ edit images --
+let imgTarget = null;   // { page, box } of the PDF image the menu acts on
+let imagePick = null;   // what the chosen file in #peImageInput is for
+function openImgMenu(p, run, e) {
+  imgTarget = { page: p.id, box: { x: run.x, y: run.y, w: run.w, h: run.h } };
+  const m = $('#peImgMenu');
+  m.hidden = false;
+  const r = m.getBoundingClientRect();
+  m.style.left = `${clamp(e.clientX + 6, 8, window.innerWidth - r.width - 8)}px`;
+  m.style.top = `${clamp(e.clientY + 6, 8, window.innerHeight - r.height - 8)}px`;
+  m.querySelector('button').focus();
+}
+function closeImgMenu() { const m = $('#peImgMenu'); if (m) m.hidden = true; }
+
+// The original page (without any edits) cut out at the box, as a PNG.
+async function cropPage(p, box) {
+  const page = await pdfPage(p);
+  const sc = 2.5;
+  const vp = page.getViewport({ scale: sc, rotation: rotOf(p) });
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(box.w * sc)); c.height = Math.max(1, Math.round(box.h * sc));
+  const ctx = c.getContext('2d');
+  ctx.translate(-box.x * sc, -box.y * sc);
+  await page.render({ canvas: c, canvasContext: ctx, viewport: vp }).promise;
+  return c.toDataURL('image/png');
+}
+// a little larger than the image, so its soft edge pixels are covered too
+const coverFor = (box) => ({ id: uid(), type: 'whiteout', color: '#ffffff', opacity: 100, x: box.x - 2, y: box.y - 2, w: box.w + 4, h: box.h + 4 });
+const fitInto = (a, box) => { const s = Math.min(box.w / a.w, box.h / a.h); const w = a.w * s, h = a.h * s; return { x: box.x + (box.w - w) / 2, y: box.y + (box.h - h) / 2, w, h }; };
+
+async function imgAction(act) {
+  closeImgMenu();
+  const t = imgTarget;
+  if (!t) return;
+  const p = pageById(t.page);
+  if (!p) return;
+  if (act === 'replace') { imagePick = { mode: 'pdf', target: t }; $('#peImageInput').click(); return; }
+  if (act === 'delete') {
+    snapshot(); p.items.push(coverFor(t.box)); drawItems(pageIndex(p.id));
+    toast('Image covered. It stays hidden in the file; it is not removed from it.');
+    return;
+  }
+  if (act === 'move') {
+    busy(true, 'Preparing image…');
+    try {
+      const a = await addAsset(await cropPage(p, t.box));
+      snapshot();
+      const it = { id: uid(), type: 'image', asset: a.id, opacity: 100, ...t.box };
+      p.items.push(coverFor(t.box), it);
+      setTool('select');
+      drawItems(pageIndex(p.id));
+      select(p.id, it.id);
+      toast('Drag the image to move it; use the corners to resize it.');
+    } catch (e) { toast(e.message, true); } finally { busy(false); }
+  }
+}
+
+async function replaceWith(file) {
+  const pick = imagePick; imagePick = null;
+  if (!isImage(file)) { toast('Please choose a PNG, JPG, WebP or GIF image.', true); return; }
+  let a;
+  try { a = await addAsset(file); } catch (e) { toast(e.message, true); return; }
+  if (pick.mode === 'pdf') {
+    const p = pageById(pick.target.page);
+    if (!p) return;
+    snapshot();
+    const it = { id: uid(), type: 'image', asset: a.id, opacity: 100, ...fitInto(a, pick.target.box) };
+    p.items.push(coverFor(pick.target.box), it);
+    setTool('select');
+    drawItems(pageIndex(p.id)); select(p.id, it.id);
+  } else if (pick.mode === 'item') {
+    const it = itemOf(pick.sel);
+    if (!it) return;
+    snapshot();
+    Object.assign(it, { asset: a.id }, fitInto(a, { x: it.x, y: it.y, w: it.w, h: it.h }));
+    drawItems(pageIndex(pick.sel.page)); select(pick.sel.page, it.id);
+  }
+}
 
 async function editRunAt(p, pt) {
   const runs = await textRuns(p);
@@ -582,6 +711,17 @@ function onPointerDown(e) {
     updateProps();
     return;
   }
+  if (tool === 'editimage') {
+    e.preventDefault();
+    finishEditing();
+    if (it && it.type === 'image') { setTool('select'); select(p.id, it.id); return; }
+    imageRuns(p).then((runs) => {
+      // the smallest image under the pointer (a logo on top of a background picture)
+      const hits = runs.filter((r) => pt.x >= r.x && pt.x <= r.x + r.w && pt.y >= r.y && pt.y <= r.y + r.h).sort((a, b) => a.w * a.h - b.w * b.h);
+      if (hits.length) openImgMenu(p, hits[0], e); else toast('Click on an image in the PDF. To add a new one, use Image.');
+    });
+    return;
+  }
   if (tool === 'edittext') {
     e.preventDefault();
     if (it && it.type === 'text') { editText(p.id, it); return; }
@@ -611,16 +751,17 @@ function onPointerDown(e) {
 
 function onPointerMove(e) {
   if (!drag) {
-    if (S.tool === 'edittext') {
+    if (RUNS[S.tool]) {
       const pageEl = e.target.closest('.pe-page');
       if (pageEl) {
         showRuns(pageEl);
         const pt = ptOf(e, pageEl);
         const p = pageById(pageEl.dataset.id);
-        const runs = S.runs.get(`${p.id}:${rotOf(p)}`) || [];
+        const runs = S.runs.get(runKey(S.tool, p)) || [];
         $$('.pe-run.hot').forEach((r) => r.classList.remove('hot'));
-        const i = runs.findIndex((r) => pt.x >= r.x && pt.x <= r.x + r.w && pt.y >= r.top && pt.y <= r.top + r.h);
-        if (i >= 0) { const d = pageEl.querySelector(`.pe-run[data-run="${i}"]`); if (d) d.classList.add('hot'); }
+        const hits = runs.map((r, i) => [r, i]).filter(([r]) => pt.x >= r.x && pt.x <= r.x + r.w && pt.y >= r.top && pt.y <= r.top + r.h)
+          .sort((a, b) => a[0].w * a[0].h - b[0].w * b[0].h);
+        if (hits.length) { const d = pageEl.querySelector(`.pe-run[data-run="${hits[0][1]}"]`); if (d) d.classList.add('hot'); }
       }
     }
     return;
@@ -736,12 +877,12 @@ function onPointerUp() {
 function setTool(tool) {
   finishEditing();
   S.tool = tool;
-  $$('[data-tool]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tool === tool && !b.closest('.pe-more > .pe-btn:first-child'))));
-  const more = $('.pe-more > .pe-btn');
-  if (more) more.setAttribute('aria-pressed', String(SHAPES.has(tool)));
+  const more = $('.pe-more > .pe-tool');
+  $$('[data-tool]').forEach((b) => b.setAttribute('aria-pressed', String(b === more ? SHAPES.has(tool) : b.dataset.tool === tool)));
   $$('.pe-layer').forEach((l) => { l.className = `pe-layer tool-${tool}`; });
-  if (tool !== 'edittext') hideRuns();
-  else $$('.pe-page').forEach((el) => { if (el.getBoundingClientRect().bottom > 0 && el.getBoundingClientRect().top < window.innerHeight) showRuns(el); });
+  hideRuns();
+  S.runToast = false;
+  if (RUNS[tool]) $$('.pe-page').forEach((el) => { if (el.getBoundingClientRect().bottom > 0 && el.getBoundingClientRect().top < window.innerHeight) showRuns(el); });
   if (tool !== 'select') select(null, null); else updateProps();
 }
 
@@ -813,11 +954,11 @@ function buildThumbs() {
   const io = new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { paintThumb(e.target); io.unobserve(e.target); } }), { root: list, rootMargin: '300px 0px' });
   S.pages.forEach((p, i) => {
     const [w, h] = viewSize(p);
-    const tw = list.clientWidth ? Math.min(120, list.clientWidth - 24) : 120;
+    const tw = list.clientWidth ? Math.min(150, list.clientWidth - 30) : 150;
     const li = document.createElement('li');
     li.className = 'pe-thumb'; li.dataset.id = p.id; li.draggable = true; li.tabIndex = 0;
     li.setAttribute('aria-label', `Page ${i + 1}`);
-    li.innerHTML = `<div class="pe-thumb-frame" style="width:${tw}px;height:${(tw * h) / w}px"><canvas></canvas></div>
+    li.innerHTML = `<div class="pe-thumb-frame" style="width:${tw}px;height:${(tw * h) / w}px"><canvas></canvas>
       <div class="pe-thumb-tools">
         <button type="button" data-pg="rotl" title="Rotate left" aria-label="Rotate page ${i + 1} left"><svg viewBox="0 0 24 24"><path d="M4 4v6h6"/><path d="M5 15a8 8 0 1 0 2-8.5L4 10"/></svg></button>
         <button type="button" data-pg="rotr" title="Rotate right" aria-label="Rotate page ${i + 1} right"><svg viewBox="0 0 24 24"><path d="M20 4v6h-6"/><path d="M19 15a8 8 0 1 1-2-8.5L20 10"/></svg></button>
@@ -825,12 +966,13 @@ function buildThumbs() {
         <button type="button" data-pg="down" title="Move down" aria-label="Move page ${i + 1} down"><svg viewBox="0 0 24 24"><path d="M6 10l6 6 6-6"/></svg></button>
         <button type="button" data-pg="dup" title="Duplicate page" aria-label="Duplicate page ${i + 1}"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></button>
         <button type="button" data-pg="del" class="pe-danger" title="Delete page" aria-label="Delete page ${i + 1}"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
-      </div>`;
+      </div></div>`;
     list.append(li);
     io.observe(li);
     drawThumbItems(p);
   });
   $('#pePageCount').textContent = `${S.pages.length} page${S.pages.length === 1 ? '' : 's'}`;
+  if (window.matchMedia('(max-width:860px)').matches) $('.pe-body').classList.remove('show-pages');
   markCurrent();
 }
 async function paintThumb(li) {
@@ -1227,7 +1369,7 @@ function onKey(e) {
   if (mod && e.key.toLowerCase() === 'y' && !typing) { e.preventDefault(); redo(); return; }
   if (typing) return;
   if ((e.key === 'Delete' || e.key === 'Backspace') && S.sel) { e.preventDefault(); removeSelected(); return; }
-  if (e.key === 'Escape') { select(null, null); setTool('select'); return; }
+  if (e.key === 'Escape') { closeImgMenu(); select(null, null); setTool('select'); return; }
   if (S.sel && e.key.startsWith('Arrow')) {
     e.preventDefault();
     const it = itemOf(S.sel), st = e.shiftKey ? 10 : 1;
@@ -1237,7 +1379,7 @@ function onKey(e) {
     return;
   }
   if (mod) return;
-  const k = { v: 'select', e: 'edittext', t: 'text', p: 'pen', h: 'highlight', w: 'whiteout', r: 'rect' }[e.key.toLowerCase()];
+  const k = { v: 'select', e: 'edittext', i: 'editimage', t: 'text', p: 'pen', h: 'highlight', w: 'whiteout', r: 'rect' }[e.key.toLowerCase()];
   if (k) setTool(k);
 }
 
@@ -1252,7 +1394,13 @@ function init() {
   if (!pe) return;
   $('#peOpenInput').addEventListener('change', (e) => { if (e.target.files[0]) openFile(e.target.files[0]); e.target.value = ''; });
   $('#peAddPdfInput').addEventListener('change', (e) => { if (e.target.files[0]) mergePdf(e.target.files[0]); e.target.value = ''; });
-  $('#peImageInput').addEventListener('change', (e) => { if (e.target.files[0]) insertImage(e.target.files[0]); e.target.value = ''; });
+  $('#peImageInput').addEventListener('change', (e) => {
+    const f = e.target.files[0];
+    e.target.value = '';
+    if (!f) { imagePick = null; return; }
+    if (imagePick) replaceWith(f); else insertImage(f);
+  });
+  $$('#peImgMenu [data-img]').forEach((b) => b.addEventListener('click', () => imgAction(b.dataset.img)));
   $('#peImgPageInput').addEventListener('change', (e) => { addImagePages(e.target.files); e.target.value = ''; });
   $('#peNewBtn').addEventListener('click', createNew);
   bindDrop($('#peDrop'), (files) => openFile(files[0]));
@@ -1270,13 +1418,21 @@ function init() {
     if (more) more.classList.remove('open');
     setTool(b.dataset.tool);
   }));
-  document.addEventListener('click', (e) => { if (!e.target.closest('.pe-more')) $$('.pe-more.open').forEach((m) => m.classList.remove('open')); });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.pe-more')) $$('.pe-more.open').forEach((m) => m.classList.remove('open'));
+    if (!e.target.closest('.pe-menu')) $$('.pe-menu.open').forEach((m) => m.classList.remove('open'));
+    if (!e.target.closest('#peImgMenu') && !e.target.closest('.pe-page')) closeImgMenu();
+  });
+  $$('.pe-menu .pe-pop button').forEach((b) => b.addEventListener('click', () => b.closest('.pe-menu').classList.remove('open')));
 
   const acts = {
     new: () => { if (!S.dirty || window.confirm('Start a new PDF? Changes you have not downloaded will be lost.')) { $('#peApp').hidden = true; $('#peStart').hidden = false; document.body.classList.remove('is-editing'); $('#pe').classList.remove('editing'); } },
     open: () => $('#peOpenInput').click(),
     addpdf: () => $('#peAddPdfInput').click(),
-    image: () => $('#peImageInput').click(),
+    image: () => { imagePick = null; $('#peImageInput').click(); },
+    replaceimg: () => { if (itemOf(S.sel)) { imagePick = { mode: 'item', sel: { ...S.sel } }; $('#peImageInput').click(); } },
+    filemenu: () => $('#peFileMenu').classList.toggle('open'),
+    pages: () => $('.pe-body').classList.toggle(window.matchMedia('(max-width:860px)').matches ? 'show-pages' : 'no-pages'),
     imgpage: () => $('#peImgPageInput').click(),
     sign: openSign,
     undo, redo,
@@ -1310,7 +1466,8 @@ function init() {
       let best = 0;
       els.forEach((el, i) => { if (el.getBoundingClientRect().top <= top) best = i; });
       setCurrent(best);
-      if (S.tool === 'edittext') els.forEach((el) => { const r = el.getBoundingClientRect(); if (r.bottom > 0 && r.top < window.innerHeight) showRuns(el); });
+      closeImgMenu();
+      if (RUNS[S.tool]) els.forEach((el) => { const r = el.getBoundingClientRect(); if (r.bottom > 0 && r.top < window.innerHeight) showRuns(el); });
     });
   });
 
@@ -1351,4 +1508,4 @@ function init() {
 
 init();
 // Exposed for tests.
-window.__pe = { S, buildPdf, pageMatrix, viewSize, baselineOffset, rotatePage };
+window.__pe = { S, buildPdf, pageMatrix, viewSize, baselineOffset, rotatePage, imageRuns, textRuns };

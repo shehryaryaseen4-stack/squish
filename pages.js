@@ -816,6 +816,7 @@ const EDITOR_FAQ = [
   ['Is the PDF editor free?', 'Yes. Editing and downloading are free, with no sign-up and no watermark.'],
   ['Is my PDF uploaded to a server?', 'No. The editor runs in your browser, so the PDF is opened, edited and saved on your own device and never sent to us.'],
   ['Can I change the existing text in a PDF?', 'Yes. Choose Edit text and click a line of text. It is covered and retyped so you can change it. The replacement uses Helvetica, Times or Courier, so a special font may look slightly different, and the original text stays hidden underneath in the file. Scanned PDFs only contain pictures of text; type over them with the Text tool instead.'],
+  ['Can I replace or move an image in a PDF?', 'Yes. Choose Edit image and click a picture in the PDF. You can replace it with your own image, move or resize it, or remove it.'],
   ['How do I sign a PDF?', 'Click Sign, draw your signature with the mouse or your finger, or type your name, then place and resize it on the page and download the PDF.'],
   ['Can I add, delete, rotate or reorder pages?', 'Yes. Use the buttons on each page in the side bar, drag pages to reorder them, add blank pages or image pages, and use Merge to add the pages of another PDF.'],
   ['Can I create a new PDF from scratch?', 'Yes. Choose Create a new PDF, pick the page size, then add text, images, shapes and more pages.'],
@@ -825,18 +826,19 @@ const EDITOR_FAQ = [
 function editorPage(base) {
   const p = '/edit-pdf';
   const title = `Edit PDF Online Free - PDF Editor | ${SITE}`;
-  const desc = 'Free online PDF editor. Add and change text, sign, highlight, draw, insert images and add, delete, rotate or reorder pages. Files stay on your device.';
+  const desc = 'Free online PDF editor. Change text and images, sign, highlight, draw and add, delete, rotate or reorder pages. Files stay on your device.';
   const crumbs = [['Home', '/'], ['Edit PDF', p]];
   const info = `<div class="pe-info">
     <h2>How to edit a PDF</h2>
     <ol class="steps">
       <li><strong>Open your PDF</strong> or create a blank one. It opens in your browser; nothing is uploaded.</li>
-      <li><strong>Choose a tool</strong> from the bar: Edit text, Text, Draw, Highlight, Whiteout, Shapes, Image or Sign, then click on the page.</li>
+      <li><strong>Choose a tool</strong> from the bar: Edit text, Edit image, Text, Draw, Highlight, Whiteout, Shapes, Image or Sign, then click on the page.</li>
       <li><strong>Download</strong> the edited PDF, with page numbers or a watermark if you like.</li>
     </ol>
     <h2>Everything you can do</h2>
     <ul class="feat">
       <li><strong>Change existing text</strong>Click a line in the PDF and retype it.</li>
+      <li><strong>Replace images</strong>Swap, move, resize or remove the pictures already in the PDF.</li>
       <li><strong>Add text</strong>Choose the font, size, colour, bold and italic.</li>
       <li><strong>Sign</strong>Draw or type your signature and place it anywhere.</li>
       <li><strong>Highlight and whiteout</strong>Mark important lines or hide content.</li>
@@ -849,7 +851,7 @@ function editorPage(base) {
   return render(EDITOR_TPL, {
     ...baseFields(base, p, title, desc, {}),
     HEAD_TAGS: seo.headTags({ url: base + p, title: esc(title), desc: esc(desc), image: `${base}/og/home.png` }),
-    JSONLD: graph(base, p, 'PDF Editor', desc, EDITOR_FAQ, crumbs, { features: ['Edit existing text', 'Add text', 'Sign PDF', 'Highlight', 'Whiteout', 'Draw', 'Shapes', 'Insert images', 'Add, delete, rotate and reorder pages', 'Merge PDF', 'Page numbers', 'Watermark'] }),
+    JSONLD: graph(base, p, 'PDF Editor', desc, EDITOR_FAQ, crumbs, { features: ['Edit existing text', 'Replace images', 'Add text', 'Sign PDF', 'Highlight', 'Whiteout', 'Draw', 'Shapes', 'Insert images', 'Add, delete, rotate and reorder pages', 'Merge PDF', 'Page numbers', 'Watermark'] }),
     EDITOR: EDITOR_APP + `<div class="wrap">${info}</div>`,
     EDITOR_CSS_V: seo.ASSET_V.editorCss, EDITOR_JS_V: seo.ASSET_V.editorJs,
   });
