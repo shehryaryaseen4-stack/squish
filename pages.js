@@ -627,7 +627,7 @@ const TOOL_FEATURES = ['Batch conversion', 'Download all as ZIP', 'Adjustable qu
 function howToSteps(fromLabel, toLabel, verb = 'convert', image = true) {
   return `<section class="howto"><h2>How to ${verb} ${fromLabel}${toLabel ? ` to ${toLabel}` : ''}</h2><ol class="steps">
     <li><strong>Choose your files.</strong> Click <em>Select File</em> or drag your ${fromLabel} files into the upload box. You can add many at once.</li>
-    <li><strong>Pick the settings.</strong> ${toLabel ? `${toLabel} is already selected as the output format.` : 'Choose the output format.'}${image ? ' Adjust Quality and Max dimension if you want smaller files.' : ' The conversion starts as soon as a file is added.'}</li>
+    <li><strong>Pick the settings.</strong> ${toLabel ? `${toLabel} is already selected as the output format.` : 'Choose the output format.'}${image ? (verb === 'compress' ? ' Open Options to choose how much smaller each file should be (50% by default) and an optional maximum size.' : ' Adjust Quality and Max dimension if you want smaller files.') : ' The conversion starts as soon as a file is added.'}</li>
     <li><strong>Download.</strong> Each file appears in the list with its new size. Download them one by one, or all together as a ZIP.</li>
   </ol></section>`;
 }
@@ -729,11 +729,11 @@ function compressPage(slug, base) {
     const name = kwCase(kw.primary), alt = kw.secondary.find((x) => x.startsWith('reduce'));
     title = `${name}${alt ? ` - ${kwCase(alt)}` : ''} Online Free | ${SITE}`;
     description = `${name} online for free with our ${kwCase(kw.secondary[0], false)}. ${isImageFmt(slug)
-      ? 'Set the quality and maximum size' : 'Images inside are reduced to 150 dpi'}, compress many files at once and download a ZIP. No sign-up.`;
+      ? 'Make files up to 90% smaller' : 'Images inside are reduced to 150 dpi'}, compress many files at once and download a ZIP. No sign-up.`;
   }
   const faq = [
     ...(kw && kw.faq ? kw.faq : []),
-    [`How do I compress a ${f.label} file?`, `Click Select File or drop your ${f.name} files onto the upload box, choose a Quality and Max dimension, and the smaller versions appear below with a download button. Lower quality and a smaller maximum size give smaller files.`],
+    [`How do I compress a ${f.label} file?`, `Click Select File or drop your ${f.name} files onto the upload box, open Options to choose how much smaller each file should be (50% by default) and, if you like, a maximum size. The list shows the original and new size of every file.`],
     [`How much smaller will my ${f.label} be?`, 'It depends on the image and your settings. Photographs usually shrink the most and simple graphics the least. The list shows the exact before and after size for every file.'],
     ...FAQ_COMMON,
   ];
@@ -743,7 +743,7 @@ function compressPage(slug, base) {
     DEFAULT_FORMAT: f.select,
     HERO: hero({ h1: meta.h1, crumbs: meta.breadcrumbs,
       intro: isImageFmt(slug)
-        ? `Make your ${f.name} images smaller without fuss. Upload one file or many, set the quality and maximum size, and download the compressed versions individually or as a ZIP. No sign-up needed.`
+        ? `Make your ${f.name} images smaller without fuss. Upload one file or many, choose how much smaller they should be, and download the compressed versions individually or as a ZIP. No sign-up needed.`
         : `Make your ${f.name} files smaller without fuss. Upload one file or many and download the compressed versions individually or as a ZIP. Images inside are downsampled to 150 dpi. No sign-up needed.`,
       widget, withSelect: true }),
     TOOL: toolHtml({ inputs: [slug], outputs: [slug], compress: true, dropTitle: `Drop your ${f.label} files here`, dropSub: `or click to choose ${f.label} files` }),

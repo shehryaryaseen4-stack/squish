@@ -244,13 +244,14 @@ module.exports = [
 <li><strong>Never</strong> use PNG for large photos: it is lossless, so photos become huge.</li>
 </ul>
 <p>Not sure? Read <a href="/guides/jpg-vs-png-vs-webp">JPG vs PNG vs WebP</a>.</p>`],
-      ['3. Compress at a sensible quality', `<ul>
-<li><a href="/compress-jpg">Compress JPG</a>: Quality 70 to 80 for photos.</li>
-<li><a href="/compress-png">Compress PNG</a>: reduces the number of colours; Quality 70 to 85 keeps graphics clean.</li>
-<li><a href="/compress-webp">Compress WebP</a>: Quality 70 to 80.</li>
+      ['3. Compress by a sensible amount', `<p>Each compressor has a <strong>Reduce size by</strong> setting under <strong>Options</strong> (50 percent by default). It finds the best quality that reaches that size, and only shrinks the pixel dimensions when quality alone is not enough.</p>
+<ul>
+<li><a href="/compress-jpg">Compress JPG</a>: 50 to 70 percent smaller is usually invisible on photos straight from a camera.</li>
+<li><a href="/compress-png">Compress PNG</a>: reduces the number of colours; 30 to 60 percent keeps graphics clean.</li>
+<li><a href="/compress-webp">Compress WebP</a>: 30 to 50 percent, since WebP is already efficient.</li>
 </ul>
-<p>All compressors handle many files at once and give you a ZIP. Camera data such as GPS location is removed too, which also saves a few kilobytes.</p>`],
-      ['4. Check the result', `<p>Open the original and the compressed image side by side at 100 percent zoom. If you cannot see a difference, try a lower Quality; if you can, go higher. After uploading, test your page with a speed test such as PageSpeed Insights.</p>`],
+<p>The list shows the original and the new size of every file. All compressors handle many files at once and give you a ZIP. Camera data such as GPS location is removed too, which also saves a few kilobytes.</p>`],
+      ['4. Check the result', `<p>Open the original and the compressed image side by side at 100 percent zoom. If you cannot see a difference, compress a little more; if you can, choose a smaller reduction. After uploading, test your page with a speed test such as PageSpeed Insights.</p>`],
       ['A quick checklist', `<ul>
 <li>Resize to the displayed size.</li>
 <li>WebP for photos, PNG or WebP for graphics.</li>

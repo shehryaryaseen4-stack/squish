@@ -12,6 +12,7 @@ const rateLimit = require('express-rate-limit');
 const pages = require('./pages');
 const registry = require('./registry');
 const { getHandler } = require('./engines');
+const { compressToSize, SIZE_TARGET_FORMATS } = require('./engines/size-target');
 const seo = require('./seo');
 
 const PORT = process.env.PORT || 3000;
@@ -175,10 +176,17 @@ app.post('/api/compress', upload.single('file'), async (req, res) => {
       return res.status(415).json({ error: `${inFormat.label} to ${outFormat.label} isn't available on this server yet.` });
     }
 
-    const result = await getHandler(converter.handler)(
-      { buffer: req.file.buffer, inputExt, format: outFormat.apiFormat, quality, maxDim, from: inFormat, to: outFormat, filename: originalName },
+    const handler = getHandler(converter.handler);
+    const job = (q, dim) => handler(
+      { buffer: req.file.buffer, inputExt, format: outFormat.apiFormat, quality: q, maxDim: dim, from: inFormat, to: outFormat, filename: originalName },
       converter
     );
+    // Compressing an image with "Reduce size by N%": aim for that size instead of a fixed quality.
+    const reduce = Math.min(90, Math.max(0, parseInt(req.body.reduce, 10) || 0));
+    const sizeTarget = reduce && inFormat.id === outFormat.id && SIZE_TARGET_FORMATS.has(outFormat.apiFormat);
+    const result = sizeTarget
+      ? await compressToSize(job, req.file.buffer, Math.floor(originalSize * (1 - reduce / 100)), maxDim, outFormat.apiFormat)
+      : await job(quality, maxDim);
     const out = Buffer.isBuffer(result) ? { buffer: result, ext: outFormat.extension } : result;
     const ext = out.ext || outFormat.extension;
     const mime = ext === 'zip' && outFormat.id !== 'zip' ? MIME_ZIP : (out.mime || outFormat.mimeType);

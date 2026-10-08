@@ -249,7 +249,7 @@
   function addFiles(files){
     files.forEach(file => {
       const fmt = formatOf(file.name);
-      const row = { id: ++seq, file, name: file.name, size: file.size, fmt, state: "ready", quality: 75, maxDim: 0, optionsOpen: false };
+      const row = { id: ++seq, file, name: file.name, size: file.size, fmt, state: "ready", quality: 75, reduce: 50, maxDim: 0, optionsOpen: false };
       if (!fmt){ row.state = "error"; row.error = "This file type isn't supported here."; }
       else if (MAX_BYTES && file.size > MAX_BYTES){ row.state = "error"; row.error = tooBig(file.size); }
       else {
@@ -327,6 +327,7 @@
       form.append("file", row.file);
       form.append("format", t ? t[2] : row.target);
       form.append("quality", String(row.quality));
+      if (compressMode) form.append("reduce", String(row.reduce)); // "make it N% smaller"
       form.append("maxDim", String(row.maxDim));
       const xhr = new XMLHttpRequest();
       xhr.open("POST", "/api/compress");
@@ -466,7 +467,9 @@
     }
     const removable = !["waiting", "uploading", "converting"].includes(row.state);
     const options = row.optionsOpen && row.state === "ready" ? `<div class="file-options">
-        <label>Quality <input type="range" class="q-range" min="10" max="100" value="${row.quality}"><span class="q-val">${row.quality}%</span></label>
+        ${compressMode
+          ? `<label>Reduce size by <input type="range" class="r-range" min="10" max="90" step="5" value="${row.reduce}"><span class="q-val">${row.reduce}%</span></label>`
+          : `<label>Quality <input type="range" class="q-range" min="10" max="100" value="${row.quality}"><span class="q-val">${row.quality}%</span></label>`}
         <label>Resize <select class="dim-sel">${[[0, "Keep original size"], [2560, "Max 2560px"], [1920, "Max 1920px"], [1280, "Max 1280px"], [800, "Max 800px"]]
           .map(([v, l]) => `<option value="${v}"${v === row.maxDim ? " selected" : ""}>${l}</option>`).join("")}</select></label>
       </div>` : "";
@@ -488,6 +491,8 @@
     if (opt) opt.addEventListener("click", () => { row.optionsOpen = !row.optionsOpen; render(); });
     const q = el.querySelector(".q-range");
     if (q) q.addEventListener("input", () => { row.quality = Number(q.value); el.querySelector(".q-val").textContent = q.value + "%"; });
+    const r = el.querySelector(".r-range");
+    if (r) r.addEventListener("input", () => { row.reduce = Number(r.value); el.querySelector(".q-val").textContent = r.value + "%"; });
     const dim = el.querySelector(".dim-sel");
     if (dim) dim.addEventListener("change", () => { row.maxDim = Number(dim.value); });
     el.querySelector(".remove-btn").addEventListener("click", () => { rows.splice(rows.indexOf(row), 1); render(); });

@@ -603,7 +603,7 @@ function getCompressMetadata(format, opts = {}) {
   return {
     type: 'compress', path: c.route, canonicalPath: c.route, from: f, to: f, category: getCategory(f.category),
     title: `Compress ${f.label} - Free Online ${f.label} Compressor | ${site}`,
-    description: `Reduce the file size of ${f.label} ${noun} online. Set the quality and maximum size, compress many files at once and download them as a ZIP. Free, no sign-up.`,
+    description: `Reduce the file size of ${f.label} ${noun} online. Choose how much smaller, compress many files at once and download them as a ZIP. Free, no sign-up.`,
     h1: `Compress ${f.label} ${image ? 'Images' : 'Files'} Online`, schemaName: `${f.label} Compressor`,
     breadcrumbs: [['Home', '/'], ['Converters', '/converters'], [`Compress ${f.label}`, c.route]],
     keywords: [`compress ${f.label}`, `${f.label} compressor`, `reduce ${f.label} size`],
