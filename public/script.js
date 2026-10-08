@@ -367,6 +367,9 @@
         updateRow(row);
       }).then(res => {
         row.state = "finished"; row.blob = res.blob; row.outExt = res.ext; row.outName = res.name; row.outSize = res.blob.size;
+        // Compressing must never hand back a bigger file: keep the original when re-encoding
+        // did not help (unless the visitor asked for a resize, which changes the image).
+        if (compressMode && !row.maxDim && row.outSize >= row.size) { row.blob = row.file; row.outSize = row.size; }
       }).catch(err => {
         row.state = "error"; row.error = err.message;
       }).finally(() => { active--; render(); pump(); });
@@ -420,9 +423,12 @@
     else if (row.state === "converting") text = `<span class="spinner" aria-hidden="true"></span><span class="muted">${compressMode ? "Compressing…" : `Converting to ${esc(labelOf(row.target))}…`}</span>`;
     else if (row.state === "waiting") text = `<span class="muted">Waiting in queue…</span>`;
     else if (row.state === "finished") {
+      // Converting: name only (a new format's size says little and is easy to misread).
+      // Compressing: original and compressed size side by side, plus the saving.
       const pct = Math.round((1 - row.outSize / row.size) * 100);
-      text = `<span class="out-name">${esc(row.outName)}</span><span class="muted"> · ${fmtBytes(row.outSize)}</span>`
-        + (compressMode ? (pct > 0 ? `<span class="saved">${pct}% smaller</span>` : `<span class="muted">already well compressed</span>`) : "");
+      text = `<span class="out-name">${esc(row.outName)}</span>`
+        + (compressMode ? `<span class="muted"> · ${fmtBytes(row.size)} &rarr; ${fmtBytes(row.outSize)}</span>`
+          + (pct > 0 ? `<span class="saved">${pct}% smaller</span>` : `<span class="muted"> · already well compressed</span>`) : "");
     }
     else if (row.state === "error") text = `<span class="err-text">${esc(row.error)}</span>`;
     const action = row.state === "finished" ? `<button class="btn btn-success btn-sm dl-btn" type="button">${DL_ICON}Download</button>` : "";
