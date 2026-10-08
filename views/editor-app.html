@@ -38,6 +38,12 @@
         <li>Files stay on your device</li>
       </ul>
     </div>
+    <div class="pe-tpl-panel">
+      <div class="pe-tpl-head">
+        <div><h2>Start from a template</h2><p>Resumes, invoices, certificates, flyers and more. Every word, colour and shape can be changed.</p></div>
+      </div>
+      <div class="pe-tpl-gallery" data-gallery="start"></div>
+    </div>
   </section>
 
   <!-- Editor -->
@@ -53,6 +59,7 @@
           <button type="button" class="pe-ibtn" data-act="filemenu" title="File" aria-label="File menu" aria-haspopup="true"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg></button>
           <div class="pe-pop" role="menu">
             <button type="button" role="menuitem" data-act="new"><svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 11v6m-3-3h6"/></svg>New blank PDF</button>
+            <button type="button" role="menuitem" data-act="templates"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>Templates</button>
             <button type="button" role="menuitem" data-act="open"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Open another PDF</button>
             <button type="button" role="menuitem" data-act="addpdf"><svg viewBox="0 0 24 24"><rect x="8" y="3" width="12" height="15" rx="2"/><path d="M16 21H6a2 2 0 0 1-2-2V7"/><path d="M14 8v5m-2.5-2.5h5"/></svg>Merge: add a PDF at the end</button>
             <button type="button" role="menuitem" data-act="imgpage"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>Add image as a page</button>
@@ -101,6 +108,7 @@
         <ol class="pe-thumbs" id="peThumbs"></ol>
         <div class="pe-side-add">
           <button type="button" class="pe-add" data-act="addpage"><svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg>Blank page</button>
+          <button type="button" class="pe-add" data-act="templates"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>Template</button>
           <button type="button" class="pe-add" data-act="imgpage"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>Image page</button>
           <button type="button" class="pe-add" data-act="addpdf"><svg viewBox="0 0 24 24"><rect x="8" y="3" width="12" height="15" rx="2"/><path d="M16 21H6a2 2 0 0 1-2-2V7"/></svg>Merge PDF</button>
         </div>
@@ -150,9 +158,11 @@
         <canvas class="pe-ruler pe-ruler-x" id="peRulerX" aria-hidden="true"></canvas>
         <canvas class="pe-ruler pe-ruler-y" id="peRulerY" aria-hidden="true"></canvas>
         <span class="pe-ruler-corner" aria-hidden="true"></span>
-        <div class="pe-view" id="peView" tabindex="-1"></div>
+        <div class="pe-view" id="peView" tabindex="-1" data-tool="select"></div>
         <div class="pe-zoombar">
           <button type="button" class="pe-ibtn pe-sm" data-act="rulers" title="Show or hide rulers (Shift+R)" aria-label="Rulers"><svg viewBox="0 0 24 24"><path d="M3 15l12-12 6 6-12 12z"/><path d="M7 11l2 2m1-5l2 2m1-5l2 2"/></svg></button>
+          <button type="button" class="pe-ibtn pe-sm" data-act="guides" aria-pressed="true" title="Show or hide guide lines (Ctrl+;). Drag a line out of a ruler to add one." aria-label="Guide lines"><svg viewBox="0 0 24 24"><path d="M3 8h18M8 3v18" stroke-dasharray="2.5 2.5"/><rect x="11" y="11" width="9" height="9" rx="1.5"/></svg></button>
+          <button type="button" class="pe-ibtn pe-sm" data-act="clearguides" title="Remove all guide lines" aria-label="Remove all guide lines"><svg viewBox="0 0 24 24"><path d="M3 8h9M8 3v9" stroke-dasharray="2.5 2.5"/><path d="M14 14l7 7m0-7l-7 7"/></svg></button>
           <select id="peUnit" class="pe-unit" aria-label="Units" title="Units for rulers and sizes"><option value="mm">mm</option><option value="cm">cm</option><option value="in">in</option><option value="pt">pt</option><option value="px">px</option></select>
           <span class="pe-zsep" aria-hidden="true"></span>
           <button type="button" class="pe-ibtn pe-sm" data-act="zoomout" title="Zoom out" aria-label="Zoom out"><svg viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button>
@@ -288,6 +298,14 @@
     </form>
   </dialog>
 
+  <dialog class="pe-dialog pe-tpl-dlg" id="peTplDlg" aria-labelledby="peTplTitle">
+    <form method="dialog" class="pe-dlg-inner">
+      <div class="pe-tpl-dlg-head"><h2 id="peTplTitle">Templates</h2><button type="button" class="pe-ibtn pe-sm" data-close aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      <p class="pe-tpl-note">The template is added as a new page after the current one.</p>
+      <div class="pe-tpl-gallery" data-gallery="dialog"></div>
+    </form>
+  </dialog>
+
   <dialog class="pe-dialog" id="peHelpDlg" aria-labelledby="peHelpTitle">
     <form method="dialog" class="pe-dlg-inner">
       <h2 id="peHelpTitle">Keyboard shortcuts</h2>
@@ -295,7 +313,7 @@
         <dl>
           <dt>V</dt><dd>Select</dd><dt>E</dt><dd>Edit text</dd><dt>I</dt><dd>Edit image</dd><dt>T</dt><dd>Add text</dd>
           <dt>P</dt><dd>Draw</dd><dt>H</dt><dd>Highlight</dd><dt>W</dt><dd>Whiteout</dd><dt>R</dt><dd>Rectangle</dd>
-          <dt>Shift+R</dt><dd>Rulers on or off</dd><dt>Ctrl + scroll</dt><dd>Zoom</dd>
+          <dt>Shift+R</dt><dd>Rulers on or off</dd><dt>Drag from ruler</dt><dd>Add a guide line</dd><dt>Ctrl+;</dt><dd>Guides on or off</dd><dt>Ctrl + scroll</dt><dd>Zoom</dd>
         </dl>
         <dl>
           <dt>Ctrl+Z / Ctrl+Y</dt><dd>Undo / redo</dd><dt>Ctrl+C / X / V</dt><dd>Copy / cut / paste</dd><dt>Ctrl+D</dt><dd>Duplicate</dd>

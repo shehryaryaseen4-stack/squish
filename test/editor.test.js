@@ -46,3 +46,30 @@ test('font catalogue: 150+ unique Google families, and only listed fonts can be 
   assert.equal(await fonts.fontFile('roboto', 'bold'), null);
   assert.equal(await fonts.fontMeta('not-a-font'), null);
 });
+
+test('templates: 20+ editable designs, every font and object valid', async () => {
+  const { TEMPLATES, TEMPLATE_CATS } = await import('../public/editor-templates.js');
+  const fonts = new Set(['helv', 'times', 'courier', ...require('../public/editor-fonts.json').map((f) => f.id)]);
+  const cats = new Set(TEMPLATE_CATS.map(([id]) => id));
+  assert.ok(TEMPLATES.length >= 20, `${TEMPLATES.length} templates`);
+  assert.equal(new Set(TEMPLATES.map((t) => t.id)).size, TEMPLATES.length, 'unique ids');
+  for (const t of TEMPLATES) {
+    assert.ok(cats.has(t.cat), `${t.id} category`);
+    assert.ok(t.size[0] > 200 && t.size[1] > 200, `${t.id} size`);
+    assert.ok(t.items.length >= 8, `${t.id} has content`);
+    for (const it of t.items) {
+      assert.ok(['text', 'rect', 'ellipse', 'line'].includes(it.type), `${t.id}: ${it.type}`);
+      for (const k of ['x', 'y', 'w', 'h']) assert.ok(Number.isFinite(it[k]), `${t.id}: ${it.type} ${k}`);
+      if (it.type === 'text') {
+        assert.ok(fonts.has(it.font), `${t.id}: unknown font ${it.font}`);
+        // standard PDF fonts only cover Latin-1, so template text must stay inside it
+        assert.ok(/^[\x0a\x20-\x7e\xa0-\xff]*$/.test(it.text), `${t.id}: "${it.text}" has characters outside Latin-1`);
+      }
+    }
+  }
+});
+
+test('top bar: Edit PDF button replaces "Convert now"', () => {
+  const pages = require('../pages');
+  assert.ok(!pages.homePage('https://example.test').includes('Convert now'));
+});

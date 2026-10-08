@@ -349,7 +349,6 @@ async function paintPage(el) {
 function drawItems(index) {
   const p = S.pages[index];
   if (!p) return;
-  drawThumbItems(p);
   const el = $(`.pe-page[data-id="${p.id}"]`);
   if (!el) return;
   const layer = el.querySelector('.pe-layer');
@@ -360,11 +359,20 @@ function drawItems(index) {
   if (S.sel && S.sel.page === p.id) decorateSelection();
   if (layersPage() === p) renderLayers();
   // Text boxes size themselves; remember the size so selection and export agree with the screen.
+  // Centred or right-aligned text from a template keeps its anchor (ax) until it is moved.
   p.items.forEach((it) => {
     if (it.type !== 'text') return;
     const o = layer.querySelector(`[data-id="${it.id}"]`);
-    if (o) { it.w = o.offsetWidth / S.zoom; it.h = o.offsetHeight / S.zoom; }
+    if (!o) return;
+    it.w = o.offsetWidth / S.zoom; it.h = o.offsetHeight / S.zoom;
+    if (it.ax != null && (it.align === 'center' || it.align === 'right')) {
+      it.x = it.align === 'center' ? it.ax - it.w / 2 : it.ax - it.w;
+      o.style.left = `${it.x * S.zoom}px`;
+    }
   });
+  if (S.sel && S.sel.page === p.id) decorateSelection();
+  renderUserGuides(el, p);
+  drawThumbItems(p);
 }
 
 function drawThumbItems(p) {
@@ -585,6 +593,7 @@ function duplicateSelected() {
 function frontSelected() { arrange('tofront'); }
 function moveItem(it, dx, dy) {
   it.x += dx; it.y += dy;
+  delete it.ax;
   if (it.type === 'line' || it.type === 'arrow') { it.x1 += dx; it.x2 += dx; it.y1 += dy; it.y2 += dy; }
 }
 
@@ -868,7 +877,8 @@ function onPointerDown(e) {
     finishEditing();
     snapshot();
     const d = DEFAULTS.text;
-    const t = { id: uid(), type: 'text', text: '', ...d, x: pt.x, y: pt.y - baselineOffset(d.font, d.size), w: 4, h: d.size * LINE };
+    const sp = snapToGuides(p, pt);
+    const t = { id: uid(), type: 'text', text: '', ...d, x: sp.x, y: sp.y - baselineOffset(d.font, d.size), w: 4, h: d.size * LINE };
     p.items.push(t);
     S.editing = null;
     drawItems(pageIndex(p.id));
@@ -911,7 +921,8 @@ function onPointerDown(e) {
   const rub = document.createElement('div');
   rub.className = 'pe-rubber';
   pageEl.querySelector('.pe-layer').append(rub);
-  drag = { kind: 'shape', tool, page: p, start: pt, end: pt, rub };
+  const sp = snapToGuides(p, pt);
+  drag = { kind: 'shape', tool, page: p, start: sp, end: sp, rub };
   drawRubber(drag);
 }
 
@@ -999,7 +1010,10 @@ function onPointerMove(e) {
     drag.tmp.firstChild.setAttribute('d', drag.pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x * S.zoom} ${y * S.zoom}`).join(' '));
     return;
   }
-  if (drag.kind === 'shape') { drag.end = { x: clamp(pt.x, 0, vw), y: clamp(pt.y, 0, vh) }; drawRubber(drag); }
+  if (drag.kind === 'shape') {
+    const sp = e.altKey ? pt : snapToGuides(drag.page, pt);
+    drag.end = { x: clamp(sp.x, 0, vw), y: clamp(sp.y, 0, vh) }; drawRubber(drag);
+  }
 }
 
 // Snap a moving object's edges and centre to the page and to other objects (Alt turns it off).
@@ -1008,6 +1022,7 @@ function snapMove(p, it, nx, ny) {
   const th = 5 / S.zoom;
   const xs = [0, vw / 2, vw], ys = [0, vh / 2, vh];
   p.items.forEach((o) => { if (o !== it && !o.hidden) { xs.push(o.x, o.x + o.w / 2, o.x + o.w); ys.push(o.y, o.y + o.h / 2, o.y + o.h); } });
+  if (guidesOn() && p.guides) { xs.push(...p.guides.v); ys.push(...p.guides.h); }
   const pick = (pos, size, lines) => {
     let best = null;
     for (const off of [0, size / 2, size]) for (const c of lines) {
@@ -1093,6 +1108,7 @@ function setTool(tool) {
   $$('[data-tool]').forEach((b) => b.setAttribute('aria-pressed', String(b === more ? SHAPES.has(tool) : b.dataset.tool === tool)));
   moveToolIndicator();
   $$('.pe-layer').forEach((l) => { l.className = `pe-layer tool-${tool}`; });
+  $('#peView').dataset.tool = tool; // guides can be grabbed with the Select tool only
   hideRuns();
   S.runToast = false;
   if (RUNS[tool]) $$('.pe-page').forEach((el) => { if (el.getBoundingClientRect().bottom > 0 && el.getBoundingClientRect().top < window.innerHeight) showRuns(el); });
@@ -1483,6 +1499,16 @@ function drawRulers() {
       }
     }
     ctx.stroke();
+    if (pr && p.guides && guidesOn()) {
+      ctx.fillStyle = GUIDE_COLOR;
+      (axis === 'x' ? p.guides.v : p.guides.h).forEach((g) => {
+        const pos = origin + g * S.zoom;
+        ctx.beginPath();
+        if (axis === 'x') { ctx.moveTo(pos - 4, thick - 6); ctx.lineTo(pos + 4, thick - 6); ctx.lineTo(pos, thick); }
+        else { ctx.moveTo(thick - 6, pos - 4); ctx.lineTo(thick - 6, pos + 4); ctx.lineTo(thick, pos); }
+        ctx.fill();
+      });
+    }
     if (rulerMouse) {
       const m = axis === 'x' ? rulerMouse.x - r.left : rulerMouse.y - r.top;
       ctx.strokeStyle = '#E5322D'; ctx.beginPath();
@@ -1496,6 +1522,241 @@ function setRulers(on) {
   $('#peStage').classList.toggle('rulers', on);
   try { localStorage.setItem('pe-rulers', on ? '1' : '0'); } catch { /* storage off */ }
   drawRulersSoon();
+}
+
+// --------------------------------------------------------------- templates --
+// Ready-made pages (public/editor-templates.js): ordinary objects, so everything stays editable.
+let TPL = null;
+function loadTemplates() {
+  if (!TPL) TPL = import(new URL(ROOT.dataset.templates || 'editor-templates.js', document.baseURI).href).catch(() => ({ TEMPLATES: [], TEMPLATE_CATS: [] }));
+  return TPL;
+}
+function templatePage(t) {
+  const p = blankPage(t.size[0], t.size[1]);
+  p.items = JSON.parse(JSON.stringify(t.items)).map((it) => {
+    it.id = uid();
+    if (it.type === 'line' || it.type === 'arrow') lineBox(it);
+    return it;
+  });
+  return p;
+}
+const isEmptyDoc = () => S.pages.length === 1 && !S.pages[0].src && !S.pages[0].items.length && !S.undo.length;
+function useTemplate(t, where) {
+  const page = templatePage(t);
+  if (where === 'start' || $('#peApp').hidden || isEmptyDoc()) {
+    resetDoc([page], `${t.id}.pdf`, t.name);
+    hideQuick();
+    setTool('select');
+    toast('Click any text to change it. Drag a line out of a ruler to line things up.');
+    return;
+  }
+  finishEditing();
+  snapshot();
+  S.pages.splice(S.current + 1, 0, page);
+  S.current += 1;
+  rebuild(); scrollToPage(S.current);
+  toast(`${t.name} added as page ${S.current + 1}.`);
+}
+function openTemplates() {
+  const dlg = $('#peTplDlg');
+  buildGallery($('[data-gallery="dialog"]'), 'dialog');
+  dlg.showModal();
+}
+// draws a template's objects into a preview box; centred text needs its width, so it is measured here
+function renderPreview(box, t) {
+  const z = box.clientWidth / t.size[0];
+  if (!z) return;
+  box.textContent = '';
+  const fake = { items: t.items };
+  renderObjects(box, fake, z, false);
+  const els = Array.from(box.children);
+  t.items.forEach((it, i) => {
+    const o = els[i];
+    if (!o || it.type !== 'text' || it.ax == null) return;
+    const w = o.offsetWidth / z;
+    o.style.left = `${(it.align === 'center' ? it.ax - w / 2 : it.ax - w) * z}px`;
+  });
+}
+let galleryIO = null;
+async function buildGallery(host, where) {
+  if (!host) return;
+  const { TEMPLATES, TEMPLATE_CATS } = await loadTemplates();
+  if (!TEMPLATES.length) { host.closest('.pe-tpl-panel, dialog')?.setAttribute('data-empty', ''); return; }
+  if (host.dataset.built) return;
+  host.dataset.built = '1';
+  let cat = 'all';
+  const chips = document.createElement('div');
+  chips.className = 'pe-tpl-cats'; chips.setAttribute('role', 'tablist');
+  chips.innerHTML = TEMPLATE_CATS.filter(([id]) => id === 'all' || TEMPLATES.some((t) => t.cat === id))
+    .map(([id, name]) => `<button type="button" role="tab" data-cat="${id}" aria-selected="${id === 'all'}">${name}</button>`).join('');
+  const grid = document.createElement('div');
+  grid.className = 'pe-tpl-grid';
+  grid.innerHTML = TEMPLATES.map((t) => `<button type="button" class="pe-tpl" data-tpl="${t.id}" data-cat="${t.cat}">
+    <span class="pe-tpl-frame"><span class="pe-tpl-page ${t.size[0] > t.size[1] ? 'land' : 'port'}" style="aspect-ratio:${t.size[0]} / ${t.size[1]}"></span></span>
+    <span class="pe-tpl-name">${t.name}</span></button>`).join('');
+  host.append(chips, grid);
+  chips.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-cat]'); if (!b) return;
+    cat = b.dataset.cat;
+    $$('[data-cat]', chips).forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+    $$('.pe-tpl', grid).forEach((c) => { c.hidden = cat !== 'all' && c.dataset.cat !== cat; });
+    $$('.pe-tpl:not([hidden]) .pe-tpl-page', grid).forEach(paintCard);
+  });
+  grid.addEventListener('click', (e) => {
+    const c = e.target.closest('.pe-tpl'); if (!c) return;
+    const t = TEMPLATES.find((x) => x.id === c.dataset.tpl);
+    if (where === 'dialog') $('#peTplDlg').close();
+    useTemplate(t, where);
+  });
+  // previews are drawn when they scroll into view; their fonts load then, and the card is redrawn
+  function paintCard(pageEl) {
+    const t = TEMPLATES.find((x) => x.id === pageEl.closest('.pe-tpl').dataset.tpl);
+    renderPreview(pageEl, t);
+    if (pageEl.dataset.fonts) return;
+    pageEl.dataset.fonts = '1';
+    const fonts = [...new Set(t.items.filter((it) => it.type === 'text' && !isStd(it.font)).map((it) => `${it.font}|${it.bold ? 1 : 0}|${it.italic ? 1 : 0}`))];
+    Promise.all(fonts.map((f) => { const [id, b, i] = f.split('|'); return ensureFont(id, b === '1', i === '1'); })).then(() => renderPreview(pageEl, t));
+  }
+  if (!galleryIO) galleryIO = new IntersectionObserver((entries) => entries.forEach((en) => { if (en.isIntersecting && en.target.clientWidth) { galleryIO.unobserve(en.target); en.target._paint(en.target); } }), { rootMargin: '200px' });
+  $$('.pe-tpl-page', grid).forEach((el) => { el._paint = paintCard; galleryIO.observe(el); });
+}
+
+// ------------------------------------------------------------------ guides --
+// Guide lines, as in design programs: drag one out of the top ruler (horizontal line) or the
+// left ruler (vertical line), drop it on a page, then draw and move objects against it; they
+// snap to it. Drag a guide to move it, back onto a ruler (or double-click) to remove it.
+// Guides belong to their page (view points, like objects), are undoable and never exported.
+const GUIDE_COLOR = '#0EA5E9';
+let gdrag = null;
+const guidesOn = () => !$('#peStage').classList.contains('noguides');
+function setGuidesOn(on) {
+  $('#peStage').classList.toggle('noguides', !on);
+  localStorageSet('pe-guides', on ? '1' : '0');
+  const b = $('[data-act="guides"]'); if (b) b.setAttribute('aria-pressed', String(on));
+  drawRulersSoon();
+}
+function renderUserGuides(el, p) {
+  let box = el.querySelector('.pe-uguides');
+  if (!box) { box = document.createElement('div'); box.className = 'pe-uguides'; el.append(box); }
+  box.textContent = '';
+  if (!p.guides) return;
+  [['h', p.guides.h], ['v', p.guides.v]].forEach(([axis, list]) => list.forEach((pos, i) => {
+    const g = document.createElement('div');
+    g.className = `pe-ug ${axis}`; g.dataset.axis = axis; g.dataset.i = i;
+    g.title = 'Drag to move. Drag onto a ruler or double-click to remove.';
+    if (axis === 'h') g.style.top = `${pos * S.zoom}px`; else g.style.left = `${pos * S.zoom}px`;
+    box.append(g);
+  }));
+}
+function snapToGuides(p, pt) {
+  if (!guidesOn() || !p.guides) return pt;
+  const th = 6 / S.zoom;
+  const near = (v, list) => list.reduce((b, g) => (Math.abs(g - v) < th && (b === null || Math.abs(g - v) < Math.abs(b - v)) ? g : b), null);
+  const gx = near(pt.x, p.guides.v), gy = near(pt.y, p.guides.h);
+  return { x: gx ?? pt.x, y: gy ?? pt.y };
+}
+// snap a guide being placed to the page edges and centre and to object edges
+function snapGuide(p, axis, v) {
+  const [vw, vh] = viewSize(p);
+  const th = 5 / S.zoom;
+  const c = axis === 'h' ? [0, vh / 2, vh] : [0, vw / 2, vw];
+  p.items.forEach((o) => { if (!o.hidden) c.push(...(axis === 'h' ? [o.y, o.y + o.h / 2, o.y + o.h] : [o.x, o.x + o.w / 2, o.x + o.w])); });
+  let best = v;
+  for (const x of c) if (Math.abs(x - v) < th && Math.abs(x - v) < Math.abs(best - v || Infinity)) best = x;
+  return round(best);
+}
+function pageUnder(x, y) {
+  return $$('.pe-page').find((el) => { const r = el.getBoundingClientRect(); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; }) || null;
+}
+function startGuideDrag(e, axis, from) {
+  e.preventDefault(); e.stopPropagation();
+  finishEditing();
+  const stage = $('#peStage');
+  const line = document.createElement('div');
+  line.className = `pe-gline ${axis}`;
+  const tag = document.createElement('span');
+  tag.className = 'pe-gtag';
+  stage.append(line, tag);
+  gdrag = { axis, from, line, tag, target: e.currentTarget, id: e.pointerId };
+  e.currentTarget.setPointerCapture(e.pointerId);
+  if (from) $(`.pe-page[data-id="${from.page}"] .pe-ug.${axis}[data-i="${from.i}"]`)?.classList.add('moving');
+  moveGuideDrag(e);
+}
+function moveGuideDrag(e) {
+  if (!gdrag) return;
+  const st = $('#peStage').getBoundingClientRect();
+  const { axis, line, tag } = gdrag;
+  const pageEl = pageUnder(e.clientX, e.clientY);
+  let label = 'Drop on a page';
+  let screen = axis === 'h' ? e.clientY : e.clientX;
+  gdrag.drop = null;
+  if (pageEl) {
+    const p = pageById(pageEl.dataset.id);
+    const r = pageEl.getBoundingClientRect();
+    const v = snapGuide(p, axis, axis === 'h' ? (e.clientY - r.top) / S.zoom : (e.clientX - r.left) / S.zoom);
+    screen = (axis === 'h' ? r.top : r.left) + v * S.zoom;
+    gdrag.drop = { page: p, v };
+    label = `${toU(v)} ${UNIT}`;
+  } else if (gdrag.from) label = 'Release to remove';
+  if (axis === 'h') { line.style.top = `${screen - st.top}px`; } else { line.style.left = `${screen - st.left}px`; }
+  line.classList.toggle('off', !pageEl);
+  tag.textContent = label;
+  tag.style.left = `${e.clientX - st.left + 12}px`; tag.style.top = `${e.clientY - st.top + 14}px`;
+  drawRulersSoon({ x: e.clientX, y: e.clientY });
+}
+function endGuideDrag() {
+  if (!gdrag) return;
+  const { axis, from, line, tag, drop } = gdrag;
+  gdrag = null;
+  line.remove(); tag.remove();
+  const changed = new Set();
+  if (from || drop) snapshot();
+  if (from) {
+    const fp = pageById(from.page);
+    if (fp && fp.guides) { fp.guides[axis].splice(from.i, 1); changed.add(fp); }
+  }
+  if (drop) {
+    if (!drop.page.guides) drop.page.guides = { h: [], v: [] };
+    if (!drop.page.guides[axis].includes(drop.v)) drop.page.guides[axis].push(drop.v);
+    changed.add(drop.page);
+    if (!guidesOn()) setGuidesOn(true);
+  }
+  changed.forEach((p) => drawItems(pageIndex(p.id)));
+  if (!from && drop && !localStorageGet('pe-guide-tip')) { toast('Guide added. Objects now snap to it. Drag it back onto the ruler to remove it.'); localStorageSet('pe-guide-tip', '1'); }
+  drawRulersSoon();
+}
+function clearGuides() {
+  const p = S.pages[S.current];
+  const all = S.pages.filter((x) => x.guides && (x.guides.h.length || x.guides.v.length));
+  if (!all.length) { toast('There are no guides yet. Drag one out of a ruler.'); return; }
+  snapshot();
+  all.forEach((x) => { x.guides = { h: [], v: [] }; drawItems(pageIndex(x.id)); });
+  drawRulersSoon();
+  toast(all.length > 1 || all[0] !== p ? 'All guides removed.' : 'Guides removed.');
+}
+function localStorageGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
+function localStorageSet(k, v) { try { localStorage.setItem(k, v); } catch { /* storage off */ } }
+function bindGuides() {
+  $('#peRulerX').addEventListener('pointerdown', (e) => { if (e.button === 0) startGuideDrag(e, 'h', null); });
+  $('#peRulerY').addEventListener('pointerdown', (e) => { if (e.button === 0) startGuideDrag(e, 'v', null); });
+  // existing guides: capture before the page's own pointerdown (which would deselect)
+  $('#peView').addEventListener('pointerdown', (e) => {
+    const g = e.target.closest('.pe-ug');
+    if (!g || e.button > 0) return;
+    startGuideDrag(e, g.dataset.axis, { page: g.closest('.pe-page').dataset.id, i: Number(g.dataset.i) });
+  }, true);
+  $('#peView').addEventListener('dblclick', (e) => {
+    const g = e.target.closest('.pe-ug');
+    if (!g) return;
+    const p = pageById(g.closest('.pe-page').dataset.id);
+    snapshot(); p.guides[g.dataset.axis].splice(Number(g.dataset.i), 1); drawItems(pageIndex(p.id)); drawRulersSoon();
+  });
+  for (const el of [$('#peRulerX'), $('#peRulerY'), $('#peView')]) {
+    el.addEventListener('pointermove', moveGuideDrag);
+    el.addEventListener('pointerup', endGuideDrag);
+    el.addEventListener('pointercancel', endGuideDrag);
+  }
+  setGuidesOn(localStorageGet('pe-guides') !== '0');
 }
 
 // ------------------------------------------------------------ context menu --
@@ -1600,6 +1861,12 @@ function rotatePage(p, dir) {
     if (it.type === 'highlight' || it.type === 'whiteout' || it.type === 'rect' || it.type === 'ellipse') [it.w, it.h] = [it.h, it.w];
     it.x = cx - it.w / 2; it.y = cy - it.h / 2;
   });
+  p.items.forEach((it) => { delete it.ax; });
+  if (p.guides) {
+    // a horizontal guide becomes vertical and the other way round
+    const { v, h } = p.guides;
+    p.guides = dir > 0 ? { v: h.map((y) => round(vh - y)), h: v.slice() } : { v: h.slice(), h: v.map((x) => round(vw - x)) };
+  }
   p.rot = (p.rot + (dir > 0 ? 90 : 270)) % 360;
 }
 
@@ -1818,6 +2085,21 @@ function fontFile(id, v) {
   }
   return fontFiles.get(key);
 }
+// Whether pdf-lib can write this font unsubsetted (tried once in a scratch document).
+const wholeOk = new Map();
+function embedsWhole(key, fk, bytes) {
+  if (!wholeOk.has(key)) {
+    wholeOk.set(key, (async () => {
+      const d = await PDFLib().PDFDocument.create();
+      d.registerFontkit(fk);
+      const f = await d.embedFont(bytes, { subset: false });
+      d.addPage([50, 50]).drawText('Ag', { font: f, size: 10 });
+      await d.save();
+      return true;
+    })().catch(() => false));
+  }
+  return wholeOk.get(key);
+}
 const RTL_RE = /[֐-ࣿיִ-﷿ﹰ-﻿]/;
 
 async function buildPdf(opts = {}) {
@@ -1844,8 +2126,9 @@ async function buildPdf(opts = {}) {
       const fk = await loadFontkit();
       if (!fkReady) { out.registerFontkit(fk); fkReady = true; }
       const bytes = await fontFile(f, variantOf(bold, italic));
-      // whole font: subsetting drops glyphs of fonts with ligatures and alternates (Lobster, scripts)
-      const ft = await out.embedFont(bytes, { subset: false });
+      // whole font: subsetting drops glyphs of fonts with ligatures and alternates (Lobster, scripts).
+      // A few fonts (Bebas Neue, Dancing Script) break the writer when embedded whole: subset those.
+      const ft = await out.embedFont(bytes, { subset: !(await embedsWhole(key, fk, bytes)) });
       fonts.set(key, { ft, chars: new Set(ft.getCharacterSet()), fk: fk.create(bytes) });
     }
     return fonts.get(key);
@@ -2047,6 +2330,7 @@ function onKey(e) {
   if (mod && (e.code === 'BracketRight' || e.code === 'BracketLeft')) { e.preventDefault(); arrange(e.code === 'BracketRight' ? (e.shiftKey ? 'tofront' : 'forward') : (e.shiftKey ? 'toback' : 'backward')); return; }
   if (e.key === '?') { $('#peHelpDlg').showModal(); return; }
   if (e.shiftKey && !mod && e.key.toLowerCase() === 'r') { setRulers(!$('#peStage').classList.contains('rulers')); return; }
+  if (mod && e.key === ';') { e.preventDefault(); setGuidesOn(!guidesOn()); return; }
   if ((e.key === 'Delete' || e.key === 'Backspace') && S.sel) { e.preventDefault(); removeSelected(); return; }
   if (e.key === 'Escape') { closeImgMenu(); closeCtx(); closeFontPicker(); select(null, null); setTool('select'); return; }
   if (S.sel && e.key.startsWith('Arrow') && !(selIt && selIt.locked)) {
@@ -2175,7 +2459,10 @@ function init() {
     tofront: () => arrange('tofront'), forward: () => arrange('forward'), backward: () => arrange('backward'), toback: () => arrange('toback'),
     lock: () => toggleFlag(S.sel, 'locked'), rotl: () => rotateSel(-90), rotr: () => rotateSel(90),
     help: () => $('#peHelpDlg').showModal(),
+    templates: openTemplates,
     rulers: () => setRulers(!$('#peStage').classList.contains('rulers')),
+    guides: () => setGuidesOn(!guidesOn()),
+    clearguides: clearGuides,
     panel: () => $('.pe-body').classList.toggle('show-right'),
     export: () => { finishEditing(); $('#peExportNote').textContent = ''; $('#peExportDlg').showModal(); },
   };
@@ -2185,6 +2472,7 @@ function init() {
   $('#peWatermark').addEventListener('change', () => { $('#peWatermarkOpts').hidden = !$('#peWatermark').checked; });
 
   const view = $('#peView');
+  bindGuides();
   view.addEventListener('pointerdown', onPointerDown);
   view.addEventListener('pointermove', (e) => { onPointerMove(e); drawRulersSoon({ x: e.clientX, y: e.clientY }); });
   view.addEventListener('pointerleave', () => drawRulersSoon(null));
@@ -2282,7 +2570,7 @@ function init() {
   let resizeT = 0;
   window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (!$('#peApp').hidden) { buildThumbs(); drawRulersSoon(); moveToolIndicator(); } }, 200); });
   setTool('select');
-  loadCatalog();
+  loadCatalog().then(() => buildGallery($('[data-gallery="start"]'), 'start'));
   lib().catch(() => {}); // start loading pdf.js while the visitor picks a file
 }
 

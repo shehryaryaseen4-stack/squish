@@ -70,7 +70,8 @@ a{color:inherit;}
 .nav-menu > summary::-webkit-details-marker{display:none;}
 .nav-menu > summary:focus-visible{outline:2px solid var(--brand); outline-offset:2px;}
 .top-actions{display:flex; align-items:center; gap:10px; justify-self:end;}
-/* "Convert now" and #convert links stop below the sticky header instead of under it. */
+.btn-edit-pdf{white-space:nowrap;}
+/* #convert links stop below the sticky header instead of under it. */
 #convert{scroll-margin-top:88px;}
 .caret{display:inline-block; width:7px; height:7px; margin-left:2px; border:solid currentColor; border-width:0 2px 2px 0; transform:rotate(45deg) translateY(-2px); opacity:.7;}
 
@@ -297,7 +298,9 @@ input[type=range]{width:150px; accent-color:var(--brand);}
 @media (max-width:860px){
   .top-row{gap:12px; grid-template-columns:auto 1fr auto;}
   .main-nav{justify-content:flex-start;}
-  .nav-link, .top-actions .btn{display:none;}
+  .nav-link{display:none;}
+  .top-actions .btn-edit-pdf{padding:7px 11px; font-size:.85rem;}
+  .top-actions .btn-edit-pdf .ico{display:none;}
   .nav-simple{display:none;}
   .fmt-panel.mega{position:fixed; top:64px; left:8px; right:8px; width:auto; max-width:none;}
   .fmt-panel.mega .fmt-body{height:min(60vh,440px);}

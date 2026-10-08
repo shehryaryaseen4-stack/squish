@@ -170,6 +170,7 @@ const ICON_PATHS = {
   compress: '<path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/>',
   upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>',
   download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
+  edit: '<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/><path d="m10 17 5.5-5.5 1.5 1.5L11.5 18.5H10z"/>',
   convert: '<path d="M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2"/><path d="M21 4v5h-5M3 20v-5h5"/>',
 };
 const icon = (name, cls = 'ico') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[name] || ICON_PATHS.file}</svg>`;
@@ -288,10 +289,10 @@ function topbar(full = false) {
       ${toolsMenu}
       <details class="nav-menu nav-simple" data-menu><summary class="nav-item">Convert<span class="caret" aria-hidden="true"></span></summary><div class="dropdown"><ul>${convertList}</ul></div></details>
       <details class="nav-menu nav-simple" data-menu><summary class="nav-item">Compress<span class="caret" aria-hidden="true"></span></summary><div class="dropdown"><ul>${compress}</ul></div></details>
-      <a class="nav-item nav-link" href="/converters">Formats</a>${PDF_EDITOR ? '\n      <a class="nav-item nav-link" href="/edit-pdf">Edit PDF</a>' : ''}
+      <a class="nav-item nav-link" href="/converters">Formats</a>
     </nav>
-    <div class="top-actions">
-      <a class="btn btn-brand btn-sm" href="/#convert">Convert now</a>
+    <div class="top-actions">${PDF_EDITOR ? `
+      <a class="btn btn-brand btn-sm btn-edit-pdf" href="/edit-pdf">${icon('edit')}Edit PDF</a>` : ''}
     </div>
   </div></header>`;
   return topbarCache[key];
@@ -893,7 +894,7 @@ function editorPage(base) {
     HEAD_TAGS: seo.headTags({ url: base + p, title: esc(title), desc: esc(desc), image: `${base}/og/home.png` }),
     JSONLD: graph(base, p, 'PDF Editor', desc, EDITOR_FAQ, crumbs, { features: ['Edit existing text', 'Replace images', 'Add text', '150+ fonts', 'Layers', 'Rulers and alignment', 'Rotate objects', 'Sign PDF', 'Highlight', 'Whiteout', 'Draw', 'Shapes', 'Insert images', 'Add, delete, rotate and reorder pages', 'Merge PDF', 'Page numbers', 'Watermark'] }),
     EDITOR: EDITOR_APP + `<div class="wrap">${info}</div>`,
-    EDITOR_CSS_V: seo.ASSET_V.editorCss, EDITOR_JS_V: seo.ASSET_V.editorJs,
+    EDITOR_CSS_V: seo.ASSET_V.editorCss, EDITOR_JS_V: seo.ASSET_V.editorJs, EDITOR_TPL_V: seo.ASSET_V.editorTpl,
   });
 }
 
