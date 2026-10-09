@@ -14,7 +14,7 @@ function fetchPath(p) {
   const clean = p.split('#')[0].split('?')[0];
   if (clean === '/') return { html: pages.homePage(BASE) };
   if (clean === '/converters') return { html: pages.hubPage(BASE) };
-  let m = /^\/(about|privacy|terms|contact)$/.exec(clean);
+  let m = /^\/(about|privacy|terms|contact|pricing|refund-policy)$/.exec(clean);
   if (m) return pages.resolveInfo(m[1], BASE);
   m = /^\/guides(?:\/([a-z0-9-]+))?$/.exec(clean);
   if (m) return pages.resolveGuide(m[1], BASE);

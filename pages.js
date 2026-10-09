@@ -28,6 +28,13 @@ const brand = require('./brand');
 const GUIDES = { ...require('./content/guides'), ...require('./content/guides-more') };
 const ARTICLES = require('./content/articles');
 const KEYWORDS = require('./content/keywords');
+const PRICING = require('./content/pricing');
+// The company that sells Pro on our behalf (merchant of record): it takes the payment, adds
+// the right tax and sends the receipt. Checkout links come from that company's dashboard.
+const PAY_PARTNER = process.env.PAYMENT_PROVIDER || 'Lemon Squeezy';
+const CHECKOUT = Object.fromEntries(['monthly', 'yearly', 'day'].map((k) => [k, process.env[`PRO_${k.toUpperCase()}_URL`] || ''])
+  .map(([k, u]) => [k, /^https:\/\/[^\s"<>]+$/.test(u) ? u : '']));
+const PRO_ON = !!(CHECKOUT.monthly || CHECKOUT.yearly || CHECKOUT.day);
 
 const SITE = process.env.SITE_NAME || brand.NAME;
 const CONTACT_EMAIL = process.env.CONTACT_EMAIL || '';
@@ -308,7 +315,7 @@ function footer() {
     <div><h4>Converters</h4><ul>${cats}</ul></div>
     <div><h4>Popular</h4><ul>${pop}</ul></div>
     <div><h4>Tools</h4><ul>${comp}<li>${link('/converters', 'All formats')}</li></ul></div>
-    <div><h4>Company</h4><ul><li>${link('/about', 'About')}</li><li>${link('/guides', 'Guides')}</li><li>${link('/privacy', 'Privacy Policy')}</li><li>${link('/terms', 'Terms of Use')}</li><li>${link('/contact', 'Contact')}</li>${CONTACT_EMAIL ? `<li>${mailLink}</li>` : ''}</ul></div>
+    <div><h4>Company</h4><ul><li>${link('/about', 'About')}</li><li>${link('/guides', 'Guides')}</li><li>${link('/privacy', 'Privacy Policy')}</li><li>${link('/terms', 'Terms of Use')}</li><li>${link('/pricing', 'Pricing')}</li><li>${link('/refund-policy', 'Refund Policy')}</li><li>${link('/contact', 'Contact')}</li>${CONTACT_EMAIL ? `<li>${mailLink}</li>` : ''}</ul></div>
   </div><div class="footer-bottom">&copy; ${new Date().getFullYear()} ${SITE}. Files are deleted as soon as they are converted.</div></footer>`;
 }
 
@@ -993,9 +1000,11 @@ const INFO_PAGES = {
       <h2>Data we process</h2>
       <p>Like every website, our server receives your IP address and basic request information (browser type, the page requested). We use your IP address only to apply a rate limit that protects the service from abuse; it is held in memory for up to 15 minutes.</p>
       <h2>Cookies and local storage</h2>
-      <p>${SITE} itself sets no cookies and stores nothing in your browser.</p>
+      <p>${SITE} itself sets no cookies. The PDF editor remembers a few settings in your browser's local storage (such as rulers on or off and recently used fonts); they never leave your device.</p>
       <h2>Advertising</h2>
       <p>If advertising is shown, it is provided by Google AdSense. Google and its partners may use cookies to show ads based on your visits to this and other websites. Visitors in the European Economic Area, the UK and Switzerland are asked for their consent through Google's consent message before personalised ads are shown. You can opt out of personalised advertising at <a href="https://adssettings.google.com/" rel="noopener">Google Ads Settings</a>. See <a href="https://policies.google.com/technologies/partner-sites" rel="noopener">how Google uses information from sites that use its services</a>.</p>
+      <h2>Accounts and payments</h2>
+      <p>Using the converters needs no account. If you buy ${SITE} Pro, the payment is handled by ${esc(PAY_PARTNER)}, which acts as our reseller (merchant of record). ${esc(PAY_PARTNER)} collects your name, email address, country and payment details to process the payment, calculate tax and send receipts, under its own privacy policy. We never see or store your card details. We receive your email address, country, plan and subscription status so that we can give you Pro features and answer your questions, and we keep these records for as long as you have Pro and afterwards as required for accounting.</p>
       <h2>Third-party services</h2>
       <p>Fonts are served from this site; no third-party scripts are loaded unless advertising is enabled.</p>
       <h2>Your rights</h2>
@@ -1009,12 +1018,57 @@ const INFO_PAGES = {
       <p>${SITE} is free to use. You may convert files that you own or have the right to convert. Do not upload unlawful content or use the service to infringe anyone's rights.</p>
       <h2>Fair use</h2>
       <p>To keep the service available for everyone, there is a ${MAX_MB}MB limit per file and a limit on how many files one connection can process in a short period. Automated bulk use may be blocked.</p>
+      <h2>Free and paid plans</h2>
+      <p>All converters and compressors are free. ${SITE} Pro is an optional paid plan with extra features for the PDF editor, described on the ${link('/pricing', 'pricing page')}. Prices are shown in US dollars; tax is added at checkout where it applies.</p>
+      <h2>Payments and billing</h2>
+      <p>Orders are processed by ${esc(PAY_PARTNER)}, our online reseller and merchant of record, which handles payment, tax, receipts and order questions. By buying, you also agree to ${esc(PAY_PARTNER)}'s terms of sale. Monthly and yearly plans renew automatically at the end of each period at the price shown when you subscribed, until you cancel. A Day Pass is a single payment for 24 hours of Pro and does not renew. If a renewal payment fails, Pro features stop until the payment succeeds.</p>
+      <h2>Cancelling</h2>
+      <p>You can cancel a subscription at any time from the link in your receipt email or in your account. Pro stays active until the end of the period you have paid for, and you will not be charged again. We may change prices for future periods; we will tell you by email before a change applies to you, and you can cancel before it does.</p>
+      <h2>Refunds</h2>
+      <p>Refunds are covered by our ${link('/refund-policy', 'refund policy')}.</p>
       <h2>No warranty</h2>
       <p>The service is provided &ldquo;as is&rdquo;. We work to make conversions accurate, but we cannot guarantee that every file converts perfectly. Keep a copy of your originals.</p>
       <h2>Liability</h2>
       <p>To the extent permitted by law, ${SITE} is not liable for any loss resulting from the use of the service.</p>
       <h2>Changes</h2>
       <p>We may update these terms; the date above shows the latest version. Questions: ${CONTACT_EMAIL ? `email ${mailLink} or see the ${link('/contact', 'contact page')}` : link('/contact', 'contact us')}.</p></section>`,
+  },
+  pricing: {
+    title: `Pricing - Free and Pro Plans | ${SITE}`, h1: 'Pricing',
+    desc: `${SITE} converters are free. Pro adds unlimited PDF editor downloads without a watermark, from $4.99 a month or a $1.99 day pass.`,
+    intro: 'Converting and compressing files is free, always. Pro is for people who use the PDF editor a lot.',
+    faq: PRICING.faq,
+    body: () => `${PRO_ON ? '' : '<p class="pricing-note"><strong>Pro is coming soon.</strong> Until it launches, every feature, the PDF editor included, is free and without any mark.</p>'}
+      <section class="pricing" aria-label="Plans">${PRICING.plans.map((pl) => `<article class="plan${pl.featured ? ' plan-featured' : ''}">
+        ${pl.featured ? '<span class="plan-badge">Most popular</span>' : ''}
+        <h2>${esc(pl.name)}</h2><p class="plan-blurb">${esc(pl.blurb)}</p>
+        <p class="plan-price"><strong>${esc(pl.price)}</strong> <span>${esc(pl.period)}</span></p>
+        ${pl.alt ? `<p class="plan-alt">${esc(pl.alt)}</p>` : '<p class="plan-alt">&nbsp;</p>'}
+        <ul>${pl.features.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>
+        <div class="plan-cta">${pl.checkout
+    ? pl.checkout.map(([k, label], i) => (CHECKOUT[k]
+      ? `<a class="btn ${i ? 'btn-ghost' : 'btn-brand'}" href="${esc(CHECKOUT[k])}" rel="nofollow">${esc(label)}</a>`
+      : (i ? '' : '<span class="btn btn-ghost is-disabled" aria-disabled="true">Coming soon</span>'))).join('')
+    : `<a class="btn btn-ghost" href="/">Start converting</a>`}</div>
+      </article>`).join('')}</section>
+      <p class="pricing-small">Prices in US dollars. VAT or sales tax is added at checkout where it applies. Payments are handled by ${esc(PAY_PARTNER)}, our merchant of record. ${link('/refund-policy', '14-day refund policy')}.</p>
+      ${faqHtml(PRICING.faq.map(([q, a]) => [esc(q), esc(a)]))}`,
+  },
+  'refund-policy': {
+    title: `Refund Policy | ${SITE}`, h1: 'Refund Policy',
+    desc: `${SITE} Pro comes with a 14-day money-back guarantee. How to cancel a subscription and how to ask for a refund.`,
+    body: () => `<section class="prose"><p class="muted">Last updated: ${LEGAL_UPDATED}</p>
+      <p>We want you to be happy with ${SITE} Pro. If it is not right for you, you can get your money back.</p>
+      <h2>Subscriptions (monthly and yearly)</h2>
+      <p>If you ask within <strong>14 days</strong> of your first payment, we refund it in full, no questions asked. After that, you can cancel at any time: Pro keeps working until the end of the period you have paid for and you are not charged again, but the current period is not refunded. A yearly renewal can be refunded if you ask within 14 days of the renewal date and have not used Pro since.</p>
+      <h2>Day Pass</h2>
+      <p>If a Day Pass did not work because of a problem on our side, tell us within 14 days and we will refund it.</p>
+      <h2>Charged by mistake</h2>
+      <p>Double charges, charges after you cancelled, or payments you did not make are always refunded in full.</p>
+      <h2>How to ask for a refund</h2>
+      <p>${CONTACT_EMAIL ? `Email ${mailLink}` : link('/contact', 'Contact us')} with the email address you used to pay and your order number (it is in your receipt). You can also reply to the receipt email from ${esc(PAY_PARTNER)}, which processes our payments. Refunds go back to the card or account you paid with, usually within 5 to 10 working days depending on your bank.</p>
+      <h2>Free features</h2>
+      <p>The converters, compressors and free PDF editor cost nothing, so there is nothing to refund for them.</p></section>`,
   },
   contact: {
     title: `Contact | ${SITE}`, h1: `Contact ${SITE}`,
@@ -1040,8 +1094,8 @@ function infoPage(key, base) {
   const p = `/${key}`;
   const crumbs = [['Home', '/'], [pg.h1, p]];
   return renderPage(HUB_TPL, baseFields(base, p, pg.title, pg.desc, {
-    JSONLD: graph(base, p, pg.h1, pg.desc, null, crumbs, { type: key === 'about' ? 'AboutPage' : key === 'contact' ? 'ContactPage' : 'WebPage' }),
-    HERO: hero({ h1: pg.h1, crumbs, intro: pg.desc, short: true }),
+    JSONLD: graph(base, p, pg.h1, pg.desc, pg.faq || null, crumbs, { type: key === 'about' ? 'AboutPage' : key === 'contact' ? 'ContactPage' : 'WebPage' }),
+    HERO: hero({ h1: pg.h1, crumbs, intro: pg.intro || pg.desc, short: true }),
     BODY: pg.body(),
   }));
 }
