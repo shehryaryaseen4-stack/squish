@@ -201,7 +201,8 @@ body.is-editing .pe-app{height:auto;}
 @keyframes peIn{from{opacity:0; transform:translate(-50%,8px);}}
 
 /* SEO content under the start screen */
-.pe-info{max-width:900px; margin:0 auto; padding:44px 20px 64px;}
+.editor-body > main > .wrap{max-width:1160px;} /* same width as the templates panel above */
+.pe-info{padding:44px 0 24px;}
 .pe-info h2{font-size:1.45rem; margin:28px 0 12px;}
 .pe-info p,.pe-info li{line-height:1.6;}
 .pe-info .feat{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; list-style:none; padding:0;}

@@ -850,7 +850,7 @@ function hubPage(base) {
 
 // PDF editor: the app itself is static markup (views/editor-app.html) driven by public/editor.js.
 const EDITOR_FAQ = [
-  ['Is the PDF editor free?', 'Yes. Editing and downloading are free, with no sign-up and no watermark.'],
+  ['Is the PDF editor free?', process.env.ACCOUNTS === '1' ? 'Yes. Editing is free and needs no account. To download your PDF you create a free account with your email or Google; there is no watermark and nothing to pay.' : 'Yes. Editing and downloading are free, with no sign-up and no watermark.'],
   ['Is my PDF uploaded to a server?', 'No. The editor runs in your browser, so the PDF is opened, edited and saved on your own device and never sent to us.'],
   ['Can I change the existing text in a PDF?', 'Yes. Choose Edit text and click a line of text. It is covered and retyped so you can change it. The replacement uses Helvetica, Times or Courier, so a special font may look slightly different, and the original text stays hidden underneath in the file. Scanned PDFs only contain pictures of text; type over them with the Text tool instead.'],
   ['Can I replace or move an image in a PDF?', 'Yes. Choose Edit image and click a picture in the PDF. You can replace it with your own image, move or resize it, or remove it.'],
@@ -893,7 +893,7 @@ function editorPage(base) {
     ...baseFields(base, p, title, desc, {}),
     HEAD_TAGS: seo.headTags({ url: base + p, title: esc(title), desc: esc(desc), image: `${base}/og/home.png` }),
     JSONLD: graph(base, p, 'PDF Editor', desc, EDITOR_FAQ, crumbs, { features: ['Edit existing text', 'Replace images', 'Add text', '150+ fonts', 'Layers', 'Rulers and alignment', 'Rotate objects', 'Sign PDF', 'Highlight', 'Whiteout', 'Draw', 'Shapes', 'Insert images', 'Add, delete, rotate and reorder pages', 'Merge PDF', 'Page numbers', 'Watermark'] }),
-    EDITOR: EDITOR_APP + `<div class="wrap">${info}</div>`,
+    EDITOR: (ACCOUNTS ? EDITOR_APP.replace('<li>Free, no sign-up</li>', '<li>Free account to download</li>') : EDITOR_APP) + `<div class="wrap">${info}</div>`,
     ACCOUNTS_ATTR: ACCOUNTS ? ` data-accounts="1"${process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? ' data-google="1"' : ''}` : '',
     EDITOR_CSS_V: seo.ASSET_V.editorCss, EDITOR_JS_V: seo.ASSET_V.editorJs, EDITOR_TPL_V: seo.ASSET_V.editorTpl,
   });
