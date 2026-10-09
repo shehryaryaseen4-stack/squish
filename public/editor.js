@@ -284,6 +284,9 @@ function resetDoc(pages, name, title) {
   showQuick();
   requestAnimationFrame(moveToolIndicator);
   $('#peView').scrollTop = 0;
+  // landing pages such as /highlight-pdf pick their tool for the first document
+  const st = $('#pe').dataset.startTool;
+  if (st) { delete $('#pe').dataset.startTool; requestAnimationFrame(() => setTool(st)); }
 }
 
 // --------------------------------------------------------------- rendering --
@@ -2000,6 +2003,9 @@ async function buildGallery(host, where) {
     <span class="pe-tpl-frame"><span class="pe-tpl-page ${t.size[0] > t.size[1] ? 'land' : 'port'}" style="aspect-ratio:${t.size[0]} / ${t.size[1]}"></span></span>
     <span class="pe-tpl-name">${t.name}</span></button>`).join('');
   host.append(chips, grid);
+  // landing pages such as /resume-maker show their own category first
+  const startCat = where === 'start' && $('#pe').dataset.startCat;
+  if (startCat) requestAnimationFrame(() => { const b = $(`[data-cat="${startCat}"]`, chips); if (b) b.click(); });
   chips.addEventListener('click', (e) => {
     const b = e.target.closest('[data-cat]'); if (!b) return;
     cat = b.dataset.cat;
@@ -3151,7 +3157,12 @@ function init() {
   let resizeT = 0;
   window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (!$('#peApp').hidden) { buildThumbs(); drawRulersSoon(); moveToolIndicator(); } }, 200); });
   setTool('select');
-  loadCatalog().then(() => buildGallery($('[data-gallery="start"]'), 'start'));
+  loadCatalog().then(() => {
+    buildGallery($('[data-gallery="start"]'), 'start');
+    // /edit-pdf?template=invoice opens that template straight away (links from the landing pages)
+    const tq = new URLSearchParams(location.search).get('template');
+    if (tq) loadTemplates().then(({ TEMPLATES }) => { const t = TEMPLATES.find((x) => x.id === tq); if (t) useTemplate(t, 'start'); });
+  });
   lib().catch(() => {}); // start loading pdf.js while the visitor picks a file
 }
 

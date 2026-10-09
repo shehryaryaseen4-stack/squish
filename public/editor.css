@@ -531,3 +531,17 @@ body.is-editing .pe-app{height:auto;}
 .pe-link:hover{text-decoration:underline;}
 .pe-auth-small{margin:0; color:var(--dim); font-size:.8rem; text-align:center;}
 .pe-auth-small a{color:var(--dim);}
+
+/* Landing pages (resume maker, sign PDF ...) and the links between them */
+.pe-landing section{margin-bottom:8px;}
+.pe-landing ol,.pe-landing ul{padding-left:22px;}
+.pe-landing li{margin:6px 0;}
+.pe-landing a,.pe-more a{color:var(--brand); font-weight:600;}
+.pe-more{margin-top:36px; padding:22px 24px; background:#fff; border:1px solid var(--border); border-radius:14px;}
+.pe-more h2{margin-top:0;}
+.pe-more h3{font-size:1rem; margin:16px 0 8px; color:var(--dim);}
+.pe-links{display:flex; flex-wrap:wrap; gap:8px; list-style:none; padding:0 !important; margin:0;}
+.pe-links li{margin:0;}
+.pe-links a{display:inline-block; padding:7px 14px; border:1px solid var(--border); border-radius:99px; background:var(--bg-soft, #F4F5F7); color:var(--ink); font-weight:600; text-decoration:none; font-size:.93rem;}
+.pe-links a:hover{border-color:var(--brand); color:var(--brand);}
+.pe-landing p + p{margin-top:12px;}

@@ -246,6 +246,11 @@ app.get('/', (req, res) => sendHtml(res, pages.homePage(baseOf(req))));
 app.get('/converters', (req, res) => sendHtml(res, pages.hubPage(baseOf(req))));
 
 // Format ids can contain hyphens (tar-gz), so the split happens in the registry, not here.
+// PDF editor landing pages (/resume-maker, /invoice-generator, /sign-pdf ...): the editor with
+// its own text. Before the X-to-Y route, since some of them (add-text-to-pdf) look like pairs.
+if (pages.PDF_EDITOR && pages.EDITOR_LANDINGS.length) {
+  app.get(new RegExp(`^/(${pages.EDITOR_LANDINGS.map((l) => l.slug).join('|')})$`), (req, res) => sendHtml(res, pages.editorPage(baseOf(req), req.params[0])));
+}
 app.get(/^\/([a-z0-9-]+?)-to-([a-z0-9-]+)$/, (req, res, next) => {
   const r = pages.resolvePair(req.params[0], req.params[1], baseOf(req));
   if (!r) return next();

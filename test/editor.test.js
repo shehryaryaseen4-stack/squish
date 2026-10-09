@@ -81,3 +81,30 @@ test('top bar: Edit PDF button replaces "Convert now"', () => {
   const pages = require('../pages');
   assert.ok(!pages.homePage('https://example.test').includes('Convert now'));
 });
+
+test('PDF editor landing pages: unique titles and descriptions, in the sitemap, with og images', () => {
+  const [out, extra] = (execFileSync(process.execPath, ['-e', `
+    const pages = require('./pages');
+    const paths = pages.allPaths();
+    console.log(JSON.stringify(pages.EDITOR_LANDINGS.map((l) => {
+      const html = pages.editorPage('https://example.test', l.slug);
+      return { slug: l.slug, title: /<title>([^<]*)/.exec(html)[1], desc: /<meta name="description" content="([^"]*)"/.exec(html)[1],
+        h1: (html.match(/<h1[^>]*>([^<]*)/) || [])[1], h1s: (html.match(/<h1[^>]*>/g) || []).length, canon: /<link rel="canonical" href="([^"]*)"/.exec(html)[1],
+        inSitemap: paths.includes('/' + l.slug), og: !!pages.ogSpec(l.slug), faq: html.includes('"FAQPage"'), cat: /data-start-cat="([a-z]+)"/.test(html), kind: l.kind, words: html.replace(/<[^>]+>/g, ' ').split(/\\s+/).length };
+    })));
+    console.log(JSON.stringify({ unknown: pages.editorPage('https://example.test', 'nope') }));
+  `], { cwd: ROOT, env: { ...process.env, PDF_EDITOR: '1' } }).toString().trim().split('\n').map((x) => JSON.parse(x)));
+  assert.equal(extra.unknown, null);
+  assert.ok(out.length >= 20);
+  const titles = new Set(out.map((x) => x.title)), descs = new Set(out.map((x) => x.desc));
+  assert.equal(titles.size, out.length);
+  assert.equal(descs.size, out.length);
+  for (const x of out) {
+    assert.ok(x.desc.length >= 90 && x.desc.length <= 160, `${x.slug} description is ${x.desc.length} chars`);
+    assert.ok(x.title.length <= 75, `${x.slug} title is ${x.title.length} chars`);
+    assert.equal(x.h1s, 1, x.slug);
+    assert.equal(x.canon, `https://example.test/${x.slug}`);
+    assert.ok(x.inSitemap && x.og && x.faq, x.slug);
+    assert.equal(x.cat, x.kind === 'template', x.slug);
+  }
+});

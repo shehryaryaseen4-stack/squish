@@ -302,11 +302,14 @@ function footer() {
   const pop = POPULAR.slice(0, 10).map(([f, t]) => `<li>${link(pairPath(f, t), pairLabel(f, t))}</li>`).join('');
   const cats = CATS.map((c) => `<li>${link(categoryPath(c.id), c.converterName)}</li>`).join('');
   const comp = COMPRESSIBLE.map((s) => `<li>${link(compressPath(s), `Compress ${F(s).label}`)}</li>`).join('');
-  return `<footer class="site-footer"><div class="footer-inner">
+  const pdf = PDF_EDITOR ? `<div><h4>PDF tools</h4><ul><li>${link('/edit-pdf', 'Edit PDF')}</li>${['resume-maker', 'invoice-generator', 'certificate-maker', 'cover-letter-maker', 'sign-pdf', 'fill-pdf', 'merge-pdf', 'add-text-to-pdf']
+    .filter((x) => LANDING_BY_SLUG.has(x)).map((x) => `<li>${link(`/${x}`, LANDING_BY_SLUG.get(x).short)}</li>`).join('')}</ul></div>` : '';
+  return `<footer class="site-footer"><div class="footer-inner${pdf ? ' footer-6' : ''}">
     <div class="footer-brand">${BRAND_LINK}
       <p>Free online file converter. ${LIVE_COUNT.toLocaleString('en-US')} conversions across ${LIVE_CAT_NAMES.length} categories, free and without sign-up.</p></div>
     <div><h4>Converters</h4><ul>${cats}</ul></div>
     <div><h4>Popular</h4><ul>${pop}</ul></div>
+    ${pdf}
     <div><h4>Tools</h4><ul>${comp}<li>${link('/converters', 'All formats')}</li></ul></div>
     <div><h4>Company</h4><ul><li>${link('/about', 'About')}</li><li>${link('/guides', 'Guides')}</li><li>${link('/privacy', 'Privacy Policy')}</li><li>${link('/terms', 'Terms of Use')}</li><li>${link('/contact', 'Contact')}</li>${CONTACT_EMAIL ? `<li>${mailLink}</li>` : ''}</ul></div>
   </div><div class="footer-bottom">&copy; ${new Date().getFullYear()} ${SITE}. Files are deleted as soon as they are converted.</div></footer>`;
@@ -860,13 +863,43 @@ const EDITOR_FAQ = [
   ['Can I use whiteout to remove private information?', 'No. Whiteout and Edit text cover content so it is not visible, but the original text is still inside the file and can be copied out. Do not use them to remove passwords, account numbers or other private data.'],
   ['Which fonts can I use?', 'More than 150: Helvetica, Times and Courier plus popular Google Fonts such as Roboto, Montserrat, Playfair Display, Lobster and Dancing Script. The font you pick is embedded in the PDF, so it looks the same on every device.'],
   ['Can I type in Urdu or Arabic?', 'Yes. Type Urdu, Arabic or Hebrew and choose Noto Naskh Arabic or Noto Sans Arabic (Urdu & more in the font list); the letters are joined correctly in the downloaded PDF. Chinese, Japanese and Hindi are not supported yet.'],
+  ['How do I edit a PDF without Adobe Acrobat?', 'Open the PDF here in any browser, on Windows, Mac, Linux, Android or iPhone. You can change text, add images, sign and rearrange pages without installing Acrobat or any other program.'],
+  ['Can I edit a PDF on my phone?', 'Yes. The editor works in mobile browsers such as Chrome and Safari. Tap to add text, draw your signature with your finger and download the PDF to your phone.'],
+  ['Can I make a resume, invoice or certificate?', 'Yes. Start from one of more than 20 ready-made templates: resumes, cover letters, invoices, quotations, receipts, letterheads, certificates, flyers, menus, invitations, business cards and planners. Every word and colour can be changed.'],
+  ['Can I edit a scanned PDF?', 'A scanned PDF is a picture of the page, so its words cannot be retyped directly. Cover them with Whiteout and type new text on top, or add text, signatures and images anywhere on the page.'],
   ['Does it have layers like Figma?', 'Yes. The Layers panel lists everything on the page. Drag layers to change their order, hide or lock them, and use Bring to front or Send to back. You can also set exact position, size and rotation, align objects to the page, and turn on rulers.'],
 ];
-function editorPage(base) {
-  const p = '/edit-pdf';
-  const title = `Edit PDF Online Free - PDF Editor | ${SITE}`;
-  const desc = 'Free online PDF editor. Change text and images, sign, highlight, draw and add, delete, rotate or reorder pages. Files stay on your device.';
-  const crumbs = [['Home', '/'], ['Edit PDF', p]];
+// Landing pages that are the editor plus their own text (content/editor-landings.js).
+const EDITOR_LANDINGS = PDF_EDITOR ? require('./content/editor-landings') : [];
+const LANDING_BY_SLUG = new Map(EDITOR_LANDINGS.map((l) => [l.slug, l]));
+const landingLinks = (except) => {
+  const group = (kind, h) => `<h3>${h}</h3><ul class="pe-links">${EDITOR_LANDINGS.filter((l) => l.kind === kind && l.slug !== except)
+    .map((l) => `<li>${link(`/${l.slug}`, esc(l.short))}</li>`).join('')}</ul>`;
+  return `<section class="pe-more"><h2>${except ? 'More free PDF tools and makers' : 'Free templates and PDF tools'}</h2>
+    ${group('template', 'Make a document from a template')}${group('tool', 'Work on an existing PDF')}
+    ${except ? `<p class="more-link">${link('/edit-pdf', 'Open the full PDF editor')}</p>` : ''}</section>`;
+};
+// The start screen's hero and template panel carry the landing's own words; the editor reads
+// data-start-cat (template category to show first) and data-start-tool (tool to pick once a
+// PDF is open) from #pe.
+function editorApp(l) {
+  let app = ACCOUNTS ? EDITOR_APP.replace('<li>Free, no sign-up</li>', '<li>Free account to download</li>') : EDITOR_APP;
+  if (!l) return app;
+  app = app.replace('<div class="pe" id="pe">', `<div class="pe" id="pe"${l.cat ? ` data-start-cat="${l.cat}"` : ''}${l.tool ? ` data-start-tool="${l.tool}"` : ''}>`)
+    .replace('<p class="pe-kicker">Free PDF editor</p>', `<p class="pe-kicker">${esc(l.kicker)}</p>`)
+    .replace('<h1>Edit PDF</h1>', `<h1>${esc(l.h1)}</h1>`)
+    .replace(/<p class="pe-lede">[^<]*<\/p>/, `<p class="pe-lede">${esc(l.lede)}</p>`);
+  if (l.panel) app = app.replace(/<h2>Start from a template<\/h2><p>[^<]*<\/p>/, `<h2>${esc(l.panel[0])}</h2><p>${esc(l.panel[1])}</p>`);
+  return app;
+}
+function editorPage(base, slug) {
+  const l = slug ? LANDING_BY_SLUG.get(slug) : null;
+  if (slug && !l) return null;
+  const p = l ? `/${l.slug}` : '/edit-pdf';
+  const title = l ? `${l.title} | ${SITE}` : `Edit PDF Online Free - PDF Editor | ${SITE}`;
+  const desc = l ? l.desc : 'Free online PDF editor: edit PDF text and images, sign, fill forms, highlight and add pages. Resume, invoice and certificate templates. No watermark.';
+  const crumbs = l ? [['Home', '/'], ['Edit PDF', '/edit-pdf'], [l.short, p]] : [['Home', '/'], ['Edit PDF', p]];
+  const faq = l ? l.faq : EDITOR_FAQ;
   const info = `<div class="pe-info">
     <h2>How to edit a PDF</h2>
     <ol class="steps">
@@ -887,13 +920,17 @@ function editorPage(base) {
       <li><strong>Images</strong>Insert PNG, JPG or WebP pictures, or add them as new pages.</li>
       <li><strong>Pages</strong>Add, delete, duplicate, rotate and reorder pages, or merge another PDF.</li>
       <li><strong>Page numbers and watermark</strong>Added when you download.</li>
-    </ul>
-  </div>${faqHtml(EDITOR_FAQ)}`;
+      <li><strong>Ready-made templates</strong>Resumes, cover letters, invoices, quotations, receipts, certificates, flyers, menus and more.</li>
+      <li><strong>Tables</strong>Real tables with rows and columns for invoices, price lists and agendas.</li>
+    </ul>`;
+  const body = l
+    ? `<div class="pe-info pe-landing">${l.sections.map(([h, html]) => `<section><h2>${esc(h)}</h2>${html}</section>`).join('')}${landingLinks(l.slug)}</div>${faqHtml(faq)}`
+    : `${info}${landingLinks('')}</div>${faqHtml(faq)}`;
   return render(EDITOR_TPL, {
     ...baseFields(base, p, title, desc, {}),
-    HEAD_TAGS: seo.headTags({ url: base + p, title: esc(title), desc: esc(desc), image: `${base}/og/home.png` }),
-    JSONLD: graph(base, p, 'PDF Editor', desc, EDITOR_FAQ, crumbs, { features: ['Edit existing text', 'Replace images', 'Add text', '150+ fonts', 'Layers', 'Rulers and alignment', 'Rotate objects', 'Sign PDF', 'Highlight', 'Whiteout', 'Draw', 'Shapes', 'Insert images', 'Add, delete, rotate and reorder pages', 'Merge PDF', 'Page numbers', 'Watermark'] }),
-    EDITOR: (ACCOUNTS ? EDITOR_APP.replace('<li>Free, no sign-up</li>', '<li>Free account to download</li>') : EDITOR_APP) + `<div class="wrap">${info}</div>`,
+    HEAD_TAGS: seo.headTags({ url: base + p, title: esc(title), desc: esc(desc), image: `${base}/og/${ogKey(p)}.png` }),
+    JSONLD: graph(base, p, l ? l.h1 : 'PDF Editor', desc, faq, crumbs, { features: ['Edit existing text', 'Replace images', 'Add text', '150+ fonts', 'Resume and invoice templates', 'Certificates and flyers', 'Tables', 'Layers', 'Rulers and alignment', 'Sign PDF', 'Fill PDF forms', 'Highlight', 'Whiteout', 'Draw', 'Shapes', 'Insert images', 'Add, delete, rotate and reorder pages', 'Merge PDF', 'Page numbers', 'Watermark'] }),
+    EDITOR: editorApp(l) + `<div class="wrap">${body}</div>`,
     ACCOUNTS_ATTR: ACCOUNTS ? ` data-accounts="1"${process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? ' data-google="1"' : ''}` : '',
     EDITOR_CSS_V: seo.ASSET_V.editorCss, EDITOR_JS_V: seo.ASSET_V.editorJs, EDITOR_TPL_V: seo.ASSET_V.editorTpl,
   });
@@ -1146,6 +1183,8 @@ function ogSpec(rawKey) {
     const a = ARTICLE_BY_SLUG.get(key.slice(7));
     return a ? { title: a.h1.length > 48 ? `${a.h1.slice(0, 46).replace(/\s+\S*$/, '')}...` : a.h1, subtitle: 'Guide' } : null;
   }
+  if (key === 'edit-pdf') return { title: 'Free PDF Editor', subtitle: 'Edit, sign and fill PDFs. Resume and invoice templates' };
+  if (LANDING_BY_SLUG.has(key)) { const l = LANDING_BY_SLUG.get(key); return { title: l.h1, subtitle: l.kicker }; }
   if (key === 'home') return { title: 'Free Online File Converter', subtitle: `${LIVE_COUNT.toLocaleString('en-US')} conversions \u00b7 Video, audio, documents, images` };
   if (key === 'converters') return { title: 'All File Formats', subtitle: `${FORMAT_COUNT} formats in ${CATS.length} categories` };
   if (INFO_PAGES[key]) return { title: INFO_PAGES[key].h1, subtitle: 'Free online file converter' };
@@ -1199,7 +1238,7 @@ function allPaths() {
     ...COMPRESSIBLE.map((s) => compressPath(s)),
     ...Object.keys(INFO_PAGES).map((k) => `/${k}`),
     '/guides', ...ARTICLES.map((a) => articlePath(a.slug)),
-    ...(PDF_EDITOR ? ['/edit-pdf'] : []),
+    ...(PDF_EDITOR ? ['/edit-pdf', ...EDITOR_LANDINGS.map((l) => `/${l.slug}`)] : []),
   ];
 }
 
@@ -1207,7 +1246,7 @@ function allPaths() {
 // (Google ignores priority/changefreq; Bing and others still read them.)
 function sitemapPriority(p) {
   if (p === '/') return '1.0';
-  if (/-to-|^\/compress-|^\/edit-pdf$/.test(p)) return '0.9';
+  if (/-to-|^\/compress-|^\/edit-pdf$/.test(p) || LANDING_BY_SLUG.has(p.slice(1))) return '0.9';
   if (/-converter$/.test(p) || p === '/converters') return '0.8';
   if (p.startsWith('/guides')) return '0.6';
   return '0.3';
@@ -1223,4 +1262,4 @@ const robots = (base) => `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: $
 module.exports = {
   megaMenu,
   ACCOUNTS, authPage, accountPage, authDonePage,
-  editorPage, PDF_EDITOR, homePage, resolveGuide, hubPage, notFoundPage, resolvePair, resolveCompress, resolveConverter, resolveInfo, ogSpec, sitemap, robots, allPaths, adsTxt, ADS_ENABLED: !!ADS_CLIENT };
+  editorPage, PDF_EDITOR, EDITOR_LANDINGS, homePage, resolveGuide, hubPage, notFoundPage, resolvePair, resolveCompress, resolveConverter, resolveInfo, ogSpec, sitemap, robots, allPaths, adsTxt, ADS_ENABLED: !!ADS_CLIENT };
