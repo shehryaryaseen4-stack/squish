@@ -494,3 +494,12 @@ body.is-editing .pe-app{height:auto;}
 .pe-tblgrid i.on{background:#DBEAFE; border-color:var(--sel);}
 .pe-tblsize{display:block; margin-top:8px; font-size:.82rem; font-weight:700; color:var(--ink-2); text-align:center;}
 .pe-ctx [hidden]{display:none !important;}
+
+/* --------------------------------------------------------- images in shapes -- */
+.pe-obj.pe-clip{overflow:hidden;}
+.pe-obj.pe-clip img{object-fit:cover;}
+.pe-clip-border{position:absolute; inset:0; box-sizing:border-box; pointer-events:none;}
+.pe-imgprop{gap:6px;}
+.pe-imgborder{display:inline-flex; align-items:center; gap:6px;}
+.pe-imgborder[hidden]{display:none;}
+.pe-imgborder select{height:30px; border:1px solid var(--line); border-radius:8px; background:#fff; font:600 .8rem inherit; padding:0 6px; color:var(--ink);}

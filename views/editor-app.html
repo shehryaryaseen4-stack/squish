@@ -151,6 +151,18 @@
               <span class="pe-lbl">Header</span><span class="pe-swatch" title="Header colour"><input type="color" id="tHeadFill" value="#1f2937" aria-label="Header colour"></span>
             </span>
             <label class="pe-prop" data-for="opacity" title="Opacity"><span class="pe-lbl">Opacity</span><input type="range" id="pOpacity" min="10" max="100" value="100"><output id="pOpacityOut">100%</output></label>
+            <span class="pe-prop pe-imgprop" data-for="imgshape">
+              <span class="pe-lbl">Shape</span>
+              <span class="pe-tbl-grp">
+                <button type="button" class="pe-toggle" data-imgshape="none" title="Original picture"><svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12"/><path d="M4 16l5-5 4 4 2-2 5 5"/></svg></button>
+                <button type="button" class="pe-toggle" data-imgshape="rect" title="Fill a rectangle"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/></svg></button>
+                <button type="button" class="pe-toggle" data-imgshape="rounded" title="Rounded corners"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="5"/></svg></button>
+                <button type="button" class="pe-toggle" data-imgshape="ellipse" title="Circle or ellipse"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg></button>
+              </span>
+              <button type="button" class="pe-toggle pe-tbl-txt" id="iIntoShape" title="Put the picture into the circle or rectangle under it">Into shape</button>
+              <span id="iBorderWrap" class="pe-imgborder" hidden><span class="pe-lbl">Border</span><span class="pe-swatch" title="Border colour"><input type="color" id="iBorder" value="#ffffff" aria-label="Border colour"></span>
+                <select id="iBorderW" class="pe-select" aria-label="Border width"><option value="0">None</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="5">5</option><option value="8">8</option></select></span>
+            </span>
             <span class="pe-prop" data-for="replace"><button type="button" class="pe-chip" data-act="replaceimg"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M4 20v-5h5"/></svg>Replace</button></span>
             <span class="pe-prop" data-for="layer">
               <button type="button" class="pe-ibtn pe-sm" data-act="front" title="Bring to front" aria-label="Bring to front"><svg viewBox="0 0 24 24"><path d="M12 20V9m-5 5 5-5 5 5"/><path d="M5 4h14"/></svg></button>
@@ -252,6 +264,10 @@
       <button type="button" role="menuitem" data-ctx="paste">Paste<kbd>Ctrl+V</kbd></button>
       <button type="button" role="menuitem" data-ctx="dup">Duplicate<kbd>Ctrl+D</kbd></button>
       <hr class="pe-ctx-table">
+      <button type="button" role="menuitem" class="pe-ctx-image" data-ctx="intoshape">Put into shape below</button>
+      <button type="button" role="menuitem" class="pe-ctx-image" data-ctx="shape-ellipse">Crop to circle</button>
+      <button type="button" role="menuitem" class="pe-ctx-image" data-ctx="shape-rounded">Rounded corners</button>
+      <button type="button" role="menuitem" class="pe-ctx-image" data-ctx="shape-none">Original shape</button>
       <button type="button" role="menuitem" class="pe-ctx-table" data-ctx="t-rowabove">Insert row above</button>
       <button type="button" role="menuitem" class="pe-ctx-table" data-ctx="t-rowbelow">Insert row below</button>
       <button type="button" role="menuitem" class="pe-ctx-table" data-ctx="t-colleft">Insert column left</button>

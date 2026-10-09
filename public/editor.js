@@ -123,7 +123,7 @@ const PROPS = {
   pen: ['color', 'width', 'dash', 'opacity'], line: ['color', 'width', 'dash', 'opacity'], arrow: ['color', 'width', 'dash', 'opacity'],
   check: ['color', 'width'], cross: ['color', 'width'],
   rect: ['color', 'width', 'dash', 'fill', 'radius', 'opacity'], ellipse: ['color', 'width', 'dash', 'fill', 'opacity'],
-  highlight: ['color', 'opacity'], whiteout: ['color'], image: ['opacity', 'replace'],
+  highlight: ['color', 'opacity'], whiteout: ['color'], image: ['imgshape', 'opacity', 'replace'],
   table: ['font', 'size', 'color', 'align', 'table', 'opacity'],
 };
 const DEFAULTS = {
@@ -439,6 +439,13 @@ function renderObjects(layer, p, z, live) {
       if (it.type === 'image') {
         const a = S.assets.get(it.asset);
         const img = document.createElement('img'); img.alt = ''; img.src = a ? a.url : ''; o.append(img);
+        // an image in a shape fills it (cover) and is cut to an ellipse or a rounded rectangle
+        if (it.clip) {
+          o.classList.add('pe-clip');
+          const rad = it.clip === 'ellipse' ? '50%' : it.clip === 'rounded' ? `${Math.min(it.r || 0, it.w / 2, it.h / 2) * z}px` : '0';
+          o.style.borderRadius = rad;
+          if (it.sw > 0) { const b = document.createElement('span'); b.className = 'pe-clip-border'; Object.assign(b.style, { borderRadius: rad, border: `${it.sw * z}px solid ${it.stroke}` }); o.append(b); }
+        }
       } else if (it.type === 'whiteout') {
         o.style.background = it.color;
       } else if (it.type === 'highlight') {
@@ -503,6 +510,49 @@ function arrowHead(it) {
   const ang = Math.atan2(it.y2 - it.y1, it.x2 - it.x1);
   const len = Math.max(10, (it.width || 2) * 4.5);
   return [ang + Math.PI - 0.45, ang + Math.PI + 0.45].map((a) => [it.x2 + Math.cos(a) * len, it.y2 + Math.sin(a) * len]);
+}
+
+// ------------------------------------------------------- images in shapes --
+// Put a picture in a circle, ellipse or rounded box: the picture fills the shape and the rest
+// is cut away, on screen and in the PDF. Two ways: pick a shape for a selected image, or place
+// the image over a circle or rectangle and choose "Into shape" (it takes the shape's place,
+// size, corners and outline).
+function setImageShape(kind) {
+  const it = itemOf(S.sel);
+  if (!it || it.type !== 'image') return;
+  snapshot();
+  if (kind === 'none') { delete it.clip; delete it.r; it.sw = 0; }
+  else {
+    // a circle from a rectangular picture: square box around the same centre (stretch it later for an ellipse)
+    if (kind === 'ellipse' && !it.clip) { const d = Math.min(it.w, it.h); it.x += (it.w - d) / 2; it.y += (it.h - d) / 2; it.w = d; it.h = d; }
+    it.clip = kind;
+    if (kind === 'rounded' && !it.r) it.r = Math.round(Math.min(it.w, it.h) / 8);
+  }
+  drawItems(pageIndex(S.sel.page)); updateProps();
+}
+function imageIntoShape() {
+  const it = itemOf(S.sel);
+  if (!it || it.type !== 'image') return;
+  const p = pageById(S.sel.page);
+  const cx = it.x + it.w / 2, cy = it.y + it.h / 2;
+  const area = (o) => Math.max(0, Math.min(it.x + it.w, o.x + o.w) - Math.max(it.x, o.x)) * Math.max(0, Math.min(it.y + it.h, o.y + o.h) - Math.max(it.y, o.y));
+  const cands = p.items.filter((o) => (o.type === 'ellipse' || o.type === 'rect') && !o.hidden && !o.locked && area(o) > 0);
+  // the shape under the middle of the picture, else the one it overlaps most
+  const shape = cands.find((o) => cx >= o.x && cx <= o.x + o.w && cy >= o.y && cy <= o.y + o.h && o === cands.filter((q) => cx >= q.x && cx <= q.x + q.w && cy >= q.y && cy <= q.y + q.h).pop())
+    || cands.sort((a, b) => area(b) - area(a))[0];
+  if (!shape) { toast('Place the picture over a circle or rectangle first (Shapes), then choose Into shape.'); return; }
+  snapshot();
+  Object.assign(it, { x: shape.x, y: shape.y, w: shape.w, h: shape.h, rot: shape.rot || 0 });
+  it.clip = shape.type === 'ellipse' ? 'ellipse' : shape.radius > 0 ? 'rounded' : 'rect';
+  it.r = shape.radius || 0;
+  // a visible outline on the shape becomes the picture's border
+  const outline = shape.width > 0 && !(shape.fillOn && shape.fill === shape.color);
+  it.sw = outline ? shape.width : 0; it.stroke = shape.color;
+  // the picture takes the shape's place in the layer order
+  p.items = p.items.filter((o) => o !== it);
+  p.items.splice(p.items.indexOf(shape), 1, it);
+  drawItems(pageIndex(p.id)); select(p.id, it.id);
+  toast('The picture is now in the shape. Drag the handles to change its size; it stays filled.');
 }
 
 // ------------------------------------------------------------------ tables --
@@ -1306,7 +1356,7 @@ function onPointerMove(e) {
       if (drag.h.includes('e')) R += lx; if (drag.h.includes('w')) L += lx;
       if (drag.h.includes('s')) B += ly; if (drag.h.includes('n')) T += ly;
       let w = R - L, h = B - T;
-      if ((it.type === 'image' || it.type === 'check' || it.type === 'cross' || it.type === 'text') && !e.shiftKey) {
+      if (((it.type === 'image' && !it.clip) || it.type === 'check' || it.type === 'cross' || it.type === 'text') && !e.shiftKey) {
         const k = Math.max(w / o.w, h / o.h);
         w = o.w * k; h = o.h * k;
         if (drag.h.includes('w')) L = R - w; else R = L + w;
@@ -1486,6 +1536,11 @@ function updateProps() {
     if ('underline' in o) FIELDS.underline.setAttribute('aria-pressed', String(!!o.underline));
     const al = o.type === 'table' ? o.align[S.cell && S.cell.id === o.id ? S.cell.c : 0] : o.align;
     $$('[data-align]').forEach((b) => b.setAttribute('aria-pressed', String((al || 'left') === b.dataset.align)));
+    if (o.type === 'image') {
+      $$('[data-imgshape]').forEach((b) => b.setAttribute('aria-pressed', String((o.clip || 'none') === b.dataset.imgshape)));
+      $('#iBorderWrap').hidden = !o.clip;
+      $('#iBorder').value = o.stroke || '#ffffff'; $('#iBorderW').value = String(o.sw || 0);
+    }
     if (o.type === 'table') {
       $('#tHead').setAttribute('aria-pressed', String(!!o.head));
       $('#tStripe').setAttribute('aria-pressed', String(!!o.stripe));
@@ -1534,6 +1589,11 @@ function bindProps() {
     else { setProp('align', b.dataset.align); end(); }
     updateProps();
   }));
+  $$('[data-imgshape]').forEach((b) => b.addEventListener('click', () => setImageShape(b.dataset.imgshape)));
+  $('#iIntoShape').addEventListener('click', imageIntoShape);
+  $('#iBorder').addEventListener('input', () => { if (!(Number($('#iBorderW').value) > 0)) { $('#iBorderW').value = '3'; setProp('sw', 3); } setProp('stroke', $('#iBorder').value); });
+  $('#iBorderW').addEventListener('change', () => { setProp('sw', Number($('#iBorderW').value)); if (!itemOf(S.sel).stroke) setProp('stroke', '#ffffff'); end(); });
+  $('#iBorder').addEventListener('change', end);
   $$('[data-tbl]').forEach((b) => { b.addEventListener('mousedown', (e) => e.preventDefault()); b.addEventListener('click', () => tableOp(b.dataset.tbl)); });
   $('#tBorders').addEventListener('change', () => { setProp('borders', $('#tBorders').value); end(); });
   $('#tBorder').addEventListener('input', () => setProp('border', $('#tBorder').value));
@@ -2114,6 +2174,7 @@ function openCtx(e) {
   const cellEl = e.target.closest('.pe-cell');
   if (it && it.type === 'table' && cellEl) { S.cell = { id: it.id, r: Number(cellEl.dataset.r), c: Number(cellEl.dataset.c) }; drawItems(pageIndex(p.id)); }
   $$('.pe-ctx-table', m).forEach((x) => { x.hidden = !(it && it.type === 'table'); });
+  $$('.pe-ctx-image', m).forEach((x) => { x.hidden = !(it && it.type === 'image'); });
   $('[data-ctx="delete"]', m).firstChild.textContent = it && it.type === 'table' ? 'Delete table' : 'Delete';
   m.hidden = false;
   m.style.left = `${clamp(e.clientX, 8, window.innerWidth - m.offsetWidth - 8)}px`;
@@ -2130,6 +2191,8 @@ function ctxAction(a) {
   else if (a === 'lock') toggleFlag(S.sel, 'locked');
   else if (a === 'hide') toggleFlag(S.sel, 'hidden');
   else if (a.startsWith('t-')) tableOp(a.slice(2));
+  else if (a === 'intoshape') imageIntoShape();
+  else if (a.startsWith('shape-')) setImageShape(a.slice(6));
   else arrange(a);
 }
 
@@ -2447,7 +2510,20 @@ const RTL_RE = /[֐-ࣿיִ-﷿ﹰ-﻿]/;
 
 async function buildPdf(opts = {}) {
   const L = PDFLib();
-  const { PDFDocument, StandardFonts, rgb, degrees, pushGraphicsState, popGraphicsState, concatTransformationMatrix, BlendMode, LineCapStyle } = L;
+  const { PDFDocument, StandardFonts, rgb, degrees, pushGraphicsState, popGraphicsState, concatTransformationMatrix, BlendMode, LineCapStyle, moveTo, lineTo, appendBezierCurve, closePath, clip, endPath } = L;
+  // a clipping path for an image in a shape, in PDF points (y up)
+  const K = 0.5523; // bezier handle length for quarter circles
+  const shapePath = (x, y, w, h, kind, r) => {
+    if (kind === 'ellipse') {
+      const cx = x + w / 2, cy = y + h / 2, rx = w / 2, ry = h / 2;
+      return [moveTo(cx + rx, cy), appendBezierCurve(cx + rx, cy + ry * K, cx + rx * K, cy + ry, cx, cy + ry), appendBezierCurve(cx - rx * K, cy + ry, cx - rx, cy + ry * K, cx - rx, cy),
+        appendBezierCurve(cx - rx, cy - ry * K, cx - rx * K, cy - ry, cx, cy - ry), appendBezierCurve(cx + rx * K, cy - ry, cx + rx, cy - ry * K, cx + rx, cy), closePath()];
+    }
+    const q = kind === 'rounded' ? Math.max(0, Math.min(r || 0, w / 2, h / 2)) : 0, k = q * (1 - K);
+    return [moveTo(x + q, y), lineTo(x + w - q, y), appendBezierCurve(x + w - k, y, x + w, y + k, x + w, y + q), lineTo(x + w, y + h - q),
+      appendBezierCurve(x + w, y + h - k, x + w - k, y + h, x + w - q, y + h), lineTo(x + q, y + h), appendBezierCurve(x + k, y + h, x, y + h - k, x, y + h - q),
+      lineTo(x, y + q), appendBezierCurve(x, y + k, x + k, y, x + q, y), closePath()];
+  };
   // text placement needs each font's metrics: make sure they are known
   await Promise.all(S.pages.flatMap((p) => p.items.filter((it) => it.type === 'text' && !it.hidden).map((it) => ensureFont(it.font, it.bold, it.italic))));
   const out = await PDFDocument.create();
@@ -2610,7 +2686,20 @@ async function buildPdf(opts = {}) {
             const bytes = Uint8Array.from(atob(a.url.split(',')[1]), (ch) => ch.charCodeAt(0));
             images.set(a.id, a.mime === 'image/jpeg' ? await out.embedJpg(bytes) : await out.embedPng(bytes));
           }
-          page.drawImage(images.get(a.id), { x: it.x, y: VH - it.y - it.h, width: it.w, height: it.h, opacity: op });
+          if (it.clip) {
+            // cover the shape, cut away what sticks out, then the border on top
+            const s0 = Math.max(it.w / a.w, it.h / a.h), dw = a.w * s0, dh = a.h * s0;
+            const bx = it.x, by = VH - it.y - it.h;
+            page.pushOperators(pushGraphicsState(), ...shapePath(bx, by, it.w, it.h, it.clip, it.r), clip(), endPath());
+            page.drawImage(images.get(a.id), { x: bx + (it.w - dw) / 2, y: by + (it.h - dh) / 2, width: dw, height: dh, opacity: op });
+            page.pushOperators(popGraphicsState());
+            if (it.sw > 0) {
+              const sw = it.sw;
+              if (it.clip === 'ellipse') page.drawEllipse({ x: bx + it.w / 2, y: by + it.h / 2, xScale: Math.max(0, it.w / 2 - sw / 2), yScale: Math.max(0, it.h / 2 - sw / 2), borderColor: color(it.stroke), borderWidth: sw, borderOpacity: op });
+              else if (it.clip === 'rounded' && it.r > 0) page.drawSvgPath(roundRect(it.w, it.h, it.r, sw / 2), { x: it.x, y: VH - it.y, borderColor: color(it.stroke), borderWidth: sw, borderOpacity: op });
+              else page.drawRectangle({ x: bx + sw / 2, y: by + sw / 2, width: Math.max(0, it.w - sw), height: Math.max(0, it.h - sw), borderColor: color(it.stroke), borderWidth: sw, borderOpacity: op });
+            }
+          } else page.drawImage(images.get(a.id), { x: it.x, y: VH - it.y - it.h, width: it.w, height: it.h, opacity: op });
         }
       }
       if (it.rot && !isLine(it)) page.pushOperators(popGraphicsState());
