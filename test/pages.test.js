@@ -95,7 +95,7 @@ test('sitemap only lists pages that are indexable', () => {
   for (const c of registry.getConverters({ type: 'all' })) assert.ok(paths.includes(c.route), c.route);
   assert.ok(paths.includes('/image-converter') && paths.includes('/png-converter') && paths.includes('/jfif-to-png'));
   assert.ok(!paths.includes('/mp4-to-mp3') && !paths.includes('/video-converter') && !paths.includes('/mp4-converter'));
-  for (const p of paths.filter((x) => x !== '/' && x !== '/converters' && !/^\/(about|privacy|terms|contact|pricing|refund-policy|guides)(\/|$)/.test(x))) {
+  for (const p of paths.filter((x) => x !== '/' && x !== '/converters' && !/^\/(about|privacy|terms|contact|guides)(\/|$)/.test(x))) {
     const m = /^\/(.+)-converter$/.exec(p);
     const r = m ? null : registry.parseConverterRoute(p);
     const html = m ? pages.resolveConverter(m[1], BASE).html

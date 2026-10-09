@@ -2757,7 +2757,80 @@ async function doExport() {
     S.dirty = false;
     toast(replaced ? `Downloaded. ${replaced} character${replaced === 1 ? '' : 's'} not in the standard PDF fonts became "?".` : 'Your PDF is downloading.');
     window.dispatchEvent(new CustomEvent('pe:exported', { detail: { bytes, name: a.download } }));
+    if (ACCOUNTS) postJson('/api/me/event', { type: 'download' }).catch(() => {});
   } catch (e) { console.error(e); toast(`The PDF could not be saved: ${e.message}`, true); } finally { busy(false); }
+}
+
+// ----------------------------------------------------------- sign-up gate --
+// With accounts on (data-accounts on <html>), downloading needs a free account. The sign-up
+// box opens over the editor, and Google sign-in runs in a popup, so the PDF being edited is
+// never lost.
+const ACCOUNTS = document.documentElement.dataset.accounts === '1';
+let me = null;
+const postJson = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+async function signedIn() {
+  if (me) return true;
+  try { me = (await (await fetch('/api/me', { cache: 'no-store' })).json()).user; } catch { me = null; }
+  return !!me;
+}
+async function openExport() {
+  finishEditing();
+  if (ACCOUNTS && !(await signedIn())) {
+    setAuthMode('signup');
+    $('#peAuthDlg').showModal();
+    postJson('/api/me/event', { type: 'wall' }).catch(() => {});
+    return;
+  }
+  $('#peExportNote').textContent = '';
+  $('#peExportDlg').showModal();
+}
+function setAuthMode(mode) {
+  const dlg = $('#peAuthDlg');
+  dlg.dataset.mode = mode;
+  dlg.querySelectorAll('[data-t-signup]').forEach((el) => { el.textContent = el.dataset[mode === 'signup' ? 'tSignup' : 'tLogin']; });
+  $('#peAuthPass').autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
+  $('#peAuthPass').placeholder = mode === 'signup' ? 'At least 8 characters' : '';
+  $('.pe-auth-msg').hidden = true;
+}
+function authed(user) {
+  me = user;
+  $('#peAuthDlg').close();
+  toast(`Signed in as ${user.email}.`);
+  $('#peExportNote').textContent = '';
+  $('#peExportDlg').showModal();
+}
+function bindAuth() {
+  if (!ACCOUNTS) return;
+  const dlg = $('#peAuthDlg'), msg = $('.pe-auth-msg'), go = $('.pe-auth-go');
+  const say = (t) => { msg.textContent = t; msg.hidden = !t; };
+  if (document.documentElement.dataset.google === '1') dlg.querySelectorAll('[data-google]').forEach((el) => { el.hidden = false; });
+  $('[data-auth-switch]').addEventListener('click', () => setAuthMode(dlg.dataset.mode === 'signup' ? 'login' : 'signup'));
+  $('.pe-auth').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const signup = dlg.dataset.mode === 'signup';
+    const email = $('#peAuthEmail').value.trim(), password = $('#peAuthPass').value;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { say('Please enter a valid email address.'); $('#peAuthEmail').focus(); return; }
+    if (signup ? password.length < 8 : !password) { say(signup ? 'Use at least 8 characters for your password.' : 'Please enter your password.'); $('#peAuthPass').focus(); return; }
+    say(''); go.disabled = true;
+    try {
+      const r = await postJson(`/api/auth/${signup ? 'signup' : 'login'}`, { email, password });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.user) { $('#peAuthPass').value = ''; authed(j.user); return; }
+      if (j.login) setAuthMode('login');
+      say(j.error || 'Something went wrong. Please try again.');
+    } catch { say('Network error. Check your connection and try again.'); } finally { go.disabled = false; }
+  });
+  $('.pe-auth-google').addEventListener('click', () => {
+    const w = 480, h = 640;
+    const win = window.open('/auth/google?popup=1', 'ffgoogle', `width=${w},height=${h},left=${Math.max(0, (screen.width - w) / 2)},top=${Math.max(0, (screen.height - h) / 2)}`);
+    if (!win) say('Your browser blocked the Google window. Allow pop-ups for this site, or use your email.');
+  });
+  window.addEventListener('message', async (e) => {
+    if (e.origin !== location.origin || !e.data || e.data.type !== 'ff-auth') return;
+    if (!e.data.ok) { say('Google sign-in did not work. Please try again or use your email.'); return; }
+    me = null;
+    if (await signedIn()) authed(me);
+  });
 }
 
 // --------------------------------------------------------------------- misc --
@@ -2932,7 +3005,7 @@ function init() {
     guides: () => setGuidesOn(!guidesOn()),
     clearguides: clearGuides,
     panel: () => $('.pe-body').classList.toggle('show-right'),
-    export: () => { finishEditing(); $('#peExportNote').textContent = ''; $('#peExportDlg').showModal(); },
+    export: openExport,
   };
   $$('[data-act]').forEach((b) => b.addEventListener('click', () => { const f = acts[b.dataset.act]; if (f) f(); }));
   $('#peExportOk').addEventListener('click', doExport);
@@ -2942,6 +3015,7 @@ function init() {
   const view = $('#peView');
   bindGuides();
   bindTables();
+  bindAuth();
   view.addEventListener('pointerdown', onPointerDown);
   view.addEventListener('pointermove', (e) => { onPointerMove(e); drawRulersSoon({ x: e.clientX, y: e.clientY }); });
   view.addEventListener('pointerleave', () => drawRulersSoon(null));

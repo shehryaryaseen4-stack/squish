@@ -43,6 +43,9 @@ COPY . .
 
 # Conversions run as an unprivileged user; their temp folders live in /tmp.
 RUN useradd --create-home --shell /usr/sbin/nologin squish
+# Accounts live in /data, a Docker volume (deploy/update.sh), so they survive rebuilds.
+RUN mkdir -p /data && chown squish /data
+ENV DATA_DIR=/data
 USER squish
 
 ENV PORT=3000

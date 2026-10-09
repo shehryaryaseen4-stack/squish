@@ -11,7 +11,7 @@ git -C "$APP_DIR" fetch --depth 1 origin "$BRANCH"
 git -C "$APP_DIR" reset --hard FETCH_HEAD
 docker build -t "$IMAGE" "$APP_DIR"
 docker rm -f "$IMAGE" >/dev/null 2>&1 || true
-docker run -d --name "$IMAGE" --restart unless-stopped --env-file "$APP_DIR/.env" \
+docker run -d --name "$IMAGE" --restart unless-stopped -v flipfree-data:/data --env-file "$APP_DIR/.env" \
   -p 127.0.0.1:3000:3000 "$IMAGE"
 docker image prune -f >/dev/null
 sleep 5

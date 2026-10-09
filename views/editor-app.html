@@ -321,6 +321,24 @@
     </form>
   </dialog>
 
+  <!-- Sign-up before download (only when accounts are on) -->
+  <dialog class="pe-dialog pe-auth-dlg" id="peAuthDlg" aria-labelledby="peAuthTitle">
+    <form class="pe-dlg-inner pe-auth" novalidate>
+      <button type="button" class="pe-auth-x" data-close aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      <span class="pe-auth-ico"><svg viewBox="0 0 24 24"><path d="M12 4v12m-5-5 5 5 5-5M5 20h14"/></svg></span>
+      <h2 id="peAuthTitle" data-t-signup="Create a free account to download" data-t-login="Sign in to download">Create a free account to download</h2>
+      <p class="pe-auth-lede">It is free and takes a few seconds. Your PDF stays open right here.</p>
+      <button type="button" class="pe-auth-google" data-google hidden><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#4285F4" d="M45 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2.1 5-4.4 6.6v5.5h7.1c4.2-3.9 6.5-9.6 6.5-16.1z"/><path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.5-5.4l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7C8.1 41.1 15.5 46 24 46z"/><path fill="#FBBC05" d="M11.8 28.2c-.4-1.3-.7-2.7-.7-4.2s.3-2.9.7-4.2v-5.7H4.5C3 17.1 2 20.4 2 24s1 6.9 2.5 9.9z"/><path fill="#EA4335" d="M24 10.8c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 4.2 29.9 2 24 2 15.5 2 8.1 6.9 4.5 14.1l7.3 5.7c1.7-5.2 6.5-9 12.2-9z"/></svg>Continue with Google</button>
+      <div class="pe-auth-or" data-google hidden><span>or</span></div>
+      <label class="pe-field">Email address <input type="email" id="peAuthEmail" autocomplete="email" placeholder="you@example.com"></label>
+      <label class="pe-field">Password <input type="password" id="peAuthPass" autocomplete="new-password" placeholder="At least 8 characters"></label>
+      <p class="pe-auth-msg" role="alert" hidden></p>
+      <button type="submit" class="btn btn-brand pe-auth-go" data-t-signup="Create account and download" data-t-login="Sign in and download">Create account and download</button>
+      <p class="pe-auth-switch"><span data-t-signup="Already have an account?" data-t-login="New here?">Already have an account?</span> <button type="button" class="pe-link" data-auth-switch data-t-signup="Sign in" data-t-login="Create a free account">Sign in</button></p>
+      <p class="pe-auth-small">By continuing you agree to our <a href="/terms" target="_blank" rel="noopener">Terms</a> and <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</p>
+    </form>
+  </dialog>
+
   <!-- Download options -->
   <dialog class="pe-dialog" id="peExportDlg" aria-labelledby="peExportTitle">
     <form method="dialog" class="pe-dlg-inner">

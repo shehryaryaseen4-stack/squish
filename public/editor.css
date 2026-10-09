@@ -503,3 +503,27 @@ body.is-editing .pe-app{height:auto;}
 .pe-imgborder{display:inline-flex; align-items:center; gap:6px;}
 .pe-imgborder[hidden]{display:none;}
 .pe-imgborder select{height:30px; border:1px solid var(--line); border-radius:8px; background:#fff; font:600 .8rem inherit; padding:0 6px; color:var(--ink);}
+
+/* Sign-up before download */
+.pe-auth-dlg{width:min(420px, calc(100vw - 32px));}
+.pe-auth{position:relative; display:grid; gap:10px; text-align:left;}
+.pe-auth-x{position:absolute; top:-4px; right:-4px; width:34px; height:34px; display:grid; place-items:center; border:0; border-radius:8px; background:none; color:var(--dim); cursor:pointer;}
+.pe-auth-x:hover{background:var(--btn-bg, #F1F2F4); color:var(--ink);}
+.pe-auth-x svg,.pe-auth-ico svg{width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
+.pe-auth-ico{display:grid; place-items:center; width:48px; height:48px; border-radius:50%; background:#FDE8E7; color:var(--brand);}
+.pe-auth h2{font-size:1.3rem; margin:2px 0 0;}
+.pe-auth-lede{margin:-4px 0 4px; color:var(--dim); font-size:.95rem;}
+.pe-auth-google{display:flex; align-items:center; justify-content:center; gap:10px; width:100%; padding:11px 14px; border:1px solid var(--border); border-radius:10px; background:#fff; color:var(--ink); font:inherit; font-weight:700; cursor:pointer;}
+.pe-auth-google:hover{border-color:#B9BEC7; box-shadow:0 2px 8px rgba(17,20,28,.08);}
+.pe-auth-google svg{width:20px; height:20px;}
+.pe-auth-google[hidden],.pe-auth-or[hidden]{display:none;}
+.pe-auth-or{display:flex; align-items:center; gap:12px; color:var(--dim); font-size:.85rem;}
+.pe-auth-or::before,.pe-auth-or::after{content:""; flex:1; height:1px; background:var(--border);}
+.pe-auth .pe-field input{padding:11px 12px; font-size:1rem;}
+.pe-auth-msg{margin:0; padding:8px 11px; border-radius:8px; background:#FDECEC; color:#B42318; font-size:.9rem;}
+.pe-auth-go{justify-content:center; padding:12px; font-size:1rem;}
+.pe-auth-switch{margin:2px 0 0; text-align:center; font-size:.93rem;}
+.pe-link{border:0; background:none; padding:0; font:inherit; font-weight:700; color:var(--brand); cursor:pointer;}
+.pe-link:hover{text-decoration:underline;}
+.pe-auth-small{margin:0; color:var(--dim); font-size:.8rem; text-align:center;}
+.pe-auth-small a{color:var(--dim);}

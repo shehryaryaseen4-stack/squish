@@ -9,6 +9,7 @@ const multer = require('multer');
 const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
+const accounts = require('./accounts');
 const pages = require('./pages');
 const registry = require('./registry');
 const { getHandler } = require('./engines');
@@ -286,20 +287,15 @@ if (pages.PDF_EDITOR) {
 }
 
 // The Tools menu for pages that load it on demand (see topbar() in pages.js); versioned, so cached for a year.
+// Accounts (ACCOUNTS=1): sign up / sign in, the account page and the owner's dashboard.
+accounts.mount(app, { pages, baseOf });
+
 app.get('/menu.html', (_req, res) => res.set({ 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Robots-Tag': 'noindex' }).type('html').send(pages.megaMenu()));
 app.get('/formats', (_req, res) => res.redirect(301, '/converters'));
-app.get(/^\/(about|privacy|terms|contact|pricing|refund-policy)$/, (req, res, next) => {
+app.get(/^\/(about|privacy|terms|contact)$/, (req, res, next) => {
   const r = pages.resolveInfo(req.params[0], baseOf(req));
   return r ? sendHtml(res, r.html) : next();
 });
-
-// Accounts and checkout (off unless ACCOUNTS=1; sign-in itself is not wired up yet).
-if (pages.ACCOUNTS) {
-  app.get('/login', (req, res) => sendHtml(res, pages.authPage(req.query.sent ? 'sent' : 'login', baseOf(req))));
-  app.get('/signup', (req, res) => sendHtml(res, pages.authPage('signup', baseOf(req))));
-  app.get('/checkout', (req, res) => sendHtml(res, pages.checkoutPage(String(req.query.plan || ''), baseOf(req))));
-  app.get('/account', (req, res) => sendHtml(res, pages.accountPage(baseOf(req))));
-}
 
 // How-to articles: /guides lists them, /guides/<slug> is one article.
 app.get(/^\/guides(?:\/([a-z0-9-]+))?$/, (req, res, next) => {

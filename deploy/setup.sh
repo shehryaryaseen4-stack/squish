@@ -87,7 +87,7 @@ ADSENSE_CLIENT=$ADS
 # IndexNow key: lets Bing and others index new pages within minutes (made once, then kept).
 INDEXNOW_KEY=${INDEXNOW_KEY:-$(old INDEXNOW_KEY | grep . || head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')}
 EOF
-for k in ADSENSE_SLOT_TOP ADSENSE_SLOT_BOTTOM ADSENSE_SLOT_LEFT ADSENSE_SLOT_RIGHT TWITTER_SITE PDF_EDITOR SOCIAL_LINKS; do
+for k in ADSENSE_SLOT_TOP ADSENSE_SLOT_BOTTOM ADSENSE_SLOT_LEFT ADSENSE_SLOT_RIGHT TWITTER_SITE PDF_EDITOR SOCIAL_LINKS ACCOUNTS ADMIN_EMAIL ADMIN_PASSWORD ADMIN_PATH GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET SESSION_SECRET; do
   v="$(old "$k")"; [ -n "$v" ] && echo "$k=$v" >> "$ENV_FILE"
 done
 chmod 600 "$ENV_FILE"
@@ -96,7 +96,7 @@ say "4/6 Building the site (first time: 10-20 minutes, it installs every convers
 docker build -t "$IMAGE" "$APP_DIR"
 docker rm -f "$IMAGE" >/dev/null 2>&1 || true
 # Published on localhost only: the outside world reaches it through Caddy.
-docker run -d --name "$IMAGE" --restart unless-stopped --env-file "$ENV_FILE" \
+docker run -d --name "$IMAGE" --restart unless-stopped -v flipfree-data:/data --env-file "$ENV_FILE" \
   -p 127.0.0.1:3000:3000 "$IMAGE"
 
 say "5/6 Setting up HTTPS (Caddy) and the firewall"

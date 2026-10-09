@@ -43,7 +43,7 @@ const crypto = require('crypto');
 function assetVersion(file) {
   try { return crypto.createHash('sha1').update(fs.readFileSync(path.join(__dirname, 'public', file))).digest('hex').slice(0, 10); } catch { return '1'; }
 }
-const ASSET_V = { css: assetVersion('style.css'), js: assetVersion('script.js'), editorCss: assetVersion('editor.css'), editorJs: assetVersion('editor.js'), editorTpl: assetVersion('editor-templates.js'), account: assetVersion('account.js') };
+const ASSET_V = { css: assetVersion('style.css'), js: assetVersion('script.js'), editorCss: assetVersion('editor.css'), editorJs: assetVersion('editor.js'), editorTpl: assetVersion('editor-templates.js'), account: assetVersion('account.js'), adminCss: assetVersion('admin.css'), adminJs: assetVersion('admin.js') };
 
 /**
  * Head tags shared by every page.

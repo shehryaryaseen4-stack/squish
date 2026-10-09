@@ -196,6 +196,13 @@ and earning links from other sites.
 | `BASE_URL` | derived from request | Public site URL used in canonical tags, sitemap and robots.txt. Set this in production. |
 | `SITE_NAME` | `Flipit Free` | Brand name used in page titles and footer. |
 | `TRUST_PROXY` | unset | Number of reverse proxies in front of the app (usually `1`). Needed for correct visitor IPs behind a proxy. |
+| `ACCOUNTS` | unset | `1` turns on free accounts (/signup, /login, /account). Downloading from the PDF editor then needs an account. |
+| `DATA_DIR` | `./data` (`/data` in Docker) | Where accounts are stored (`accounts.json`). In Docker it is the `flipfree-data` volume. |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | unset | The owner's sign-in for the dashboard (users, sign-ups, downloads, CSV export). Both must be set. |
+| `ADMIN_PATH` | `admin` | Address of the dashboard. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | unset | Adds "Continue with Google". Redirect URI: `<BASE_URL>/auth/google/callback`. |
+| `SESSION_SECRET` | made once, kept in `DATA_DIR` | Signs the sign-in cookies. |
+| `DASHBOARD_TZ` | `Asia/Karachi` | Time zone of the dashboard's days and times. |
 | `FORCE_CANONICAL_HOST` | unset | `1` = 301 every request to `BASE_URL`'s exact protocol and host. |
 | `CONTACT_EMAIL` | unset | Shown on `/contact` and `/privacy` and in structured data. |
 | `GOOGLE_SITE_VERIFICATION`, `BING_SITE_VERIFICATION`, `YANDEX_VERIFICATION`, `PINTEREST_VERIFICATION` | unset | Ownership verification meta tags. |

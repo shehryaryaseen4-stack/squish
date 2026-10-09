@@ -28,13 +28,6 @@ const brand = require('./brand');
 const GUIDES = { ...require('./content/guides'), ...require('./content/guides-more') };
 const ARTICLES = require('./content/articles');
 const KEYWORDS = require('./content/keywords');
-const PRICING = require('./content/pricing');
-// The company that sells Pro on our behalf (merchant of record): it takes the payment, adds
-// the right tax and sends the receipt. Checkout links come from that company's dashboard.
-const PAY_PARTNER = process.env.PAYMENT_PROVIDER || 'Lemon Squeezy';
-const CHECKOUT = Object.fromEntries(['monthly', 'yearly', 'day'].map((k) => [k, process.env[`PRO_${k.toUpperCase()}_URL`] || ''])
-  .map(([k, u]) => [k, /^https:\/\/[^\s"<>]+$/.test(u) ? u : '']));
-const PRO_ON = !!(CHECKOUT.monthly || CHECKOUT.yearly || CHECKOUT.day);
 
 const SITE = process.env.SITE_NAME || brand.NAME;
 const CONTACT_EMAIL = process.env.CONTACT_EMAIL || '';
@@ -315,7 +308,7 @@ function footer() {
     <div><h4>Converters</h4><ul>${cats}</ul></div>
     <div><h4>Popular</h4><ul>${pop}</ul></div>
     <div><h4>Tools</h4><ul>${comp}<li>${link('/converters', 'All formats')}</li></ul></div>
-    <div><h4>Company</h4><ul><li>${link('/about', 'About')}</li><li>${link('/guides', 'Guides')}</li><li>${link('/privacy', 'Privacy Policy')}</li><li>${link('/terms', 'Terms of Use')}</li><li>${link('/pricing', 'Pricing')}</li><li>${link('/refund-policy', 'Refund Policy')}</li><li>${link('/contact', 'Contact')}</li>${CONTACT_EMAIL ? `<li>${mailLink}</li>` : ''}</ul></div>
+    <div><h4>Company</h4><ul><li>${link('/about', 'About')}</li><li>${link('/guides', 'Guides')}</li><li>${link('/privacy', 'Privacy Policy')}</li><li>${link('/terms', 'Terms of Use')}</li><li>${link('/contact', 'Contact')}</li>${CONTACT_EMAIL ? `<li>${mailLink}</li>` : ''}</ul></div>
   </div><div class="footer-bottom">&copy; ${new Date().getFullYear()} ${SITE}. Files are deleted as soon as they are converted.</div></footer>`;
 }
 
@@ -901,6 +894,7 @@ function editorPage(base) {
     HEAD_TAGS: seo.headTags({ url: base + p, title: esc(title), desc: esc(desc), image: `${base}/og/home.png` }),
     JSONLD: graph(base, p, 'PDF Editor', desc, EDITOR_FAQ, crumbs, { features: ['Edit existing text', 'Replace images', 'Add text', '150+ fonts', 'Layers', 'Rulers and alignment', 'Rotate objects', 'Sign PDF', 'Highlight', 'Whiteout', 'Draw', 'Shapes', 'Insert images', 'Add, delete, rotate and reorder pages', 'Merge PDF', 'Page numbers', 'Watermark'] }),
     EDITOR: EDITOR_APP + `<div class="wrap">${info}</div>`,
+    ACCOUNTS_ATTR: ACCOUNTS ? ` data-accounts="1"${process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? ' data-google="1"' : ''}` : '',
     EDITOR_CSS_V: seo.ASSET_V.editorCss, EDITOR_JS_V: seo.ASSET_V.editorJs, EDITOR_TPL_V: seo.ASSET_V.editorTpl,
   });
 }
@@ -969,106 +963,68 @@ function resolveGuide(slug, base) {
   return a ? { html: articlePage(a, base) } : null;
 }
 
-
-// ------------------------------------------------------------- accounts --
-// Sign in / sign up (one email field: we send a sign-in link, no password), the first checkout
-// step and the account page. Off unless ACCOUNTS=1; never indexed. The payment itself happens
-// on the payment partner's secure checkout (the Pro buttons link there).
-const ACCOUNTS = process.env.ACCOUNTS === '1';
-const GOOGLE_SIGNIN = !!process.env.GOOGLE_CLIENT_ID;
-const ACCOUNT_V = seo.ASSET_V.account;
-const PLAN_INFO = {
-  monthly: { name: 'Pro monthly', price: '$4.99', per: 'per month', note: 'Renews every month. Cancel any time.' },
-  yearly: { name: 'Pro yearly', price: '$29', per: 'per year', note: 'Renews every year. That is $2.42 a month, half the monthly price.' },
-  day: { name: 'Day Pass', price: '$1.99', per: 'one time', note: 'All Pro features for 24 hours. Nothing renews.' },
-};
-const ICON_MAIL = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>';
-const GOOGLE_G = '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#4285F4" d="M45 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2.1 5-4.4 6.6v5.5h7.1c4.2-3.9 6.5-9.6 6.5-16.1z"/><path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.5-5.4l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7C8.1 41.1 15.5 46 24 46z"/><path fill="#FBBC05" d="M11.8 28.2c-.4-1.3-.7-2.7-.7-4.2s.3-2.9.7-4.2v-5.7H4.5C3 17.1 2 20.4 2 24s1 6.9 2.5 9.9z"/><path fill="#EA4335" d="M24 10.8c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 4.2 29.9 2 24 2 15.5 2 8.1 6.9 4.5 14.1l7.3 5.7c1.7-5.2 6.5-9 12.2-9z"/></svg>';
-function accountShell(base, p, title, desc, body) {
-  return renderPage(HUB_TPL, { ...baseFields(base, p, title, desc, {
-    JSONLD: '{}', HERO: '',
-    BODY: `<div class="acct">${body}</div><script src="/account.js?v=${ACCOUNT_V}" defer></script>`,
-  }), ROBOTS: 'noindex, nofollow', CANONICAL_TAG: '', _noindex: true });
-}
-// kind: 'login' | 'signup' | 'sent'
-function authPage(kind, base) {
-  const signup = kind === 'signup';
-  const p = signup ? '/signup' : '/login';
-  if (kind === 'sent') {
-    return accountShell(base, '/login', `Check your email | ${SITE}`, 'We sent you a sign-in link.', `<section class="auth-card auth-sent">
-      <span class="auth-ico">${ICON_MAIL}</span>
-      <h1>Check your email</h1>
-      <p>We sent a sign-in link to <strong data-email>your email address</strong>. Open it on this device to continue. The link works for 15 minutes.</p>
-      <p class="auth-small">No email after a minute? Look in your spam or promotions folder, or <a href="/login">send a new link</a>.</p>
-    </section>`);
-  }
-  return accountShell(base, p, `${signup ? 'Create your account' : 'Sign in'} | ${SITE}`, signup ? `Create a free ${SITE} account.` : `Sign in to ${SITE}.`, `<section class="auth-card">
-    <a class="auth-brand" href="/">${BRAND_SVG}<span>${brandName(SITE)}</span></a>
-    <h1>${signup ? 'Create your free account' : 'Welcome back'}</h1>
-    <p class="auth-lede">${signup ? 'Save your Pro plan and use it on every device. No password to remember.' : 'Sign in to use your Pro plan. No password needed.'}</p>
-    ${GOOGLE_SIGNIN || !ACCOUNTS ? `<a class="auth-google" href="/auth/google">${GOOGLE_G}Continue with Google</a>
-    <div class="auth-or"><span>or</span></div>` : ''}
-    <form class="auth-form" data-auth="${signup ? 'signup' : 'login'}" novalidate>
-      <label for="authEmail">Email address</label>
-      <input type="email" id="authEmail" name="email" autocomplete="email" placeholder="you@example.com" required>
-      <button type="submit" class="btn btn-brand">${ICON_MAIL}Continue with email</button>
-      <p class="auth-msg" role="alert" hidden></p>
-    </form>
-    <p class="auth-small">We email you a link to ${signup ? 'finish signing up' : 'sign in'}. By continuing you agree to our ${link('/terms', 'Terms')} and ${link('/privacy', 'Privacy Policy')}.</p>
-    <p class="auth-switch">${signup ? `Already have an account? ${link('/login', 'Sign in')}` : `New to ${esc(SITE)}? ${link('/signup', 'Create an account')}`}</p>
-  </section>
-  ${signup ? `<ul class="auth-perks"><li>Converters stay free, no account needed</li><li>Pro works on all your devices</li><li>Cancel any time, 14-day refund</li></ul>` : ''}`);
-}
-function checkoutPage(plan, base) {
-  const key = PLAN_INFO[plan] ? plan : 'monthly';
-  const pl = PLAN_INFO[key];
-  const pro = PRICING.plans.find((x) => x.id === (key === 'day' ? 'day' : 'pro'));
-  const opt = (k) => `<label class="co-opt${k === key ? ' on' : ''}"><input type="radio" name="plan" value="${k}"${k === key ? ' checked' : ''} data-href="${esc(CHECKOUT[k] || '')}">
-    <span class="co-opt-main"><strong>${PLAN_INFO[k].name}</strong><span>${PLAN_INFO[k].note}</span></span>
-    <span class="co-opt-price"><strong>${PLAN_INFO[k].price}</strong><span>${PLAN_INFO[k].per}</span></span></label>`;
-  return accountShell(base, '/checkout', `Checkout | ${SITE}`, `Get ${SITE} Pro.`, `<div class="co">
-    <section class="co-main">
-      <a class="co-back" href="/pricing">&larr; Back to pricing</a>
-      <h1>Get ${esc(SITE)} Pro</h1>
-      <div class="co-opts" role="radiogroup" aria-label="Choose a plan">${['monthly', 'yearly', 'day'].map(opt).join('')}</div>
-      <h2>What you get</h2>
-      <ul class="co-feats">${pro.features.filter((f) => !/^Everything in/.test(f)).map((f) => `<li>${esc(f)}</li>`).join('')}</ul>
-    </section>
-    <aside class="co-side">
-      <h2>Order summary</h2>
-      <dl class="co-sum"><dt data-sum-name>${pl.name}</dt><dd data-sum-price>${pl.price}</dd><dt>Tax</dt><dd>Added at payment if it applies in your country</dd></dl>
-      <label for="coEmail">Email for your receipt and sign-in</label>
-      <input type="email" id="coEmail" autocomplete="email" placeholder="you@example.com">
-      <a class="btn btn-brand co-pay${CHECKOUT[key] ? '' : ' is-disabled'}" href="${esc(CHECKOUT[key] || '#')}" rel="nofollow" data-pay>${CHECKOUT[key] ? 'Continue to secure payment' : 'Payments open soon'}</a>
-      <ul class="co-trust"><li>Card, PayPal, Apple Pay and Google Pay</li><li>14-day money-back guarantee</li><li>Cancel any time in one click</li></ul>
-      <p class="co-small">Payment is processed securely by ${esc(PAY_PARTNER)}, our merchant of record. We never see your card details. ${link('/refund-policy', 'Refund policy')} &middot; ${link('/terms', 'Terms')}</p>
-    </aside>
-  </div>`);
-}
-function accountPage(base) {
-  return accountShell(base, '/account', `Your account | ${SITE}`, 'Your plan and billing.', `<div class="ac">
-    <h1>Your account</h1>
-    <p class="ac-email">Signed in as <strong>you@example.com</strong> &middot; <a href="/logout">Sign out</a></p>
-    <section class="ac-card ac-plan">
-      <div><span class="ac-label">Plan</span><h2>Free</h2><p>All converters and the PDF editor, with a small mark on editor downloads.</p></div>
-      <a class="btn btn-brand" href="/checkout?plan=monthly">Upgrade to Pro</a>
-    </section>
-    <section class="ac-card">
-      <span class="ac-label">Billing</span>
-      <p>No payments yet. When you have Pro, your receipts and the link to change or cancel your plan appear here.</p>
-    </section>
-    <section class="ac-card ac-danger">
-      <span class="ac-label">Delete account</span>
-      <p>Remove your account and email address from ${esc(SITE)}. Cancel Pro first if you have it.</p>
-      <button type="button" class="btn btn-ghost">Delete my account</button>
-    </section>
-  </div>`);
-}
-
 // ------------------------------------------------------------ trust pages --
 // About / Privacy / Terms / Contact. Google's quality guidelines and AdSense both expect a
 // site to say who runs it and how it treats data. The privacy text describes what this
 // code actually does; review it (and add your company details) before going live.
+// ------------------------------------------------------------- accounts --
+// Sign up / sign in (email + password, or Google when it is set up) and the account page.
+// A free account is needed to download from the PDF editor. Off unless ACCOUNTS=1 (see
+// accounts/index.js); never indexed.
+const ACCOUNTS = process.env.ACCOUNTS === '1';
+const GOOGLE_G = '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#4285F4" d="M45 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2.1 5-4.4 6.6v5.5h7.1c4.2-3.9 6.5-9.6 6.5-16.1z"/><path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.5-5.4l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7C8.1 41.1 15.5 46 24 46z"/><path fill="#FBBC05" d="M11.8 28.2c-.4-1.3-.7-2.7-.7-4.2s.3-2.9.7-4.2v-5.7H4.5C3 17.1 2 20.4 2 24s1 6.9 2.5 9.9z"/><path fill="#EA4335" d="M24 10.8c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 4.2 29.9 2 24 2 15.5 2 8.1 6.9 4.5 14.1l7.3 5.7c1.7-5.2 6.5-9 12.2-9z"/></svg>';
+function accountShell(base, p, title, desc, body) {
+  return renderPage(HUB_TPL, {
+    ...noindex(baseFields(base, p, title, desc, {})), ROBOTS: 'noindex, nofollow', HERO: '',
+    BODY: `<div class="acct">${body}</div><script src="/account.js?v=${seo.ASSET_V.account}" defer></script>`,
+  });
+}
+// kind: 'login' | 'signup'
+function authPage(kind, base, { google = false, next = '', error = '' } = {}) {
+  const signup = kind === 'signup';
+  const q = next ? `?next=${encodeURIComponent(next)}` : '';
+  return accountShell(base, signup ? '/signup' : '/login', `${signup ? 'Create your free account' : 'Sign in'} | ${SITE}`, signup ? `Create a free ${SITE} account.` : `Sign in to ${SITE}.`, `<section class="auth-card">
+    <a class="auth-brand" href="/">${BRAND_SVG}<span>${brandName(SITE)}</span></a>
+    <h1>${signup ? 'Create your free account' : 'Welcome back'}</h1>
+    <p class="auth-lede">${signup ? 'Free forever. You need it to download from the PDF editor.' : `Sign in to your ${esc(SITE)} account.`}</p>
+    ${google ? `<a class="auth-google" href="/auth/google${q}">${GOOGLE_G}Continue with Google</a>
+    <div class="auth-or"><span>or</span></div>` : ''}
+    <form class="auth-form" data-auth="${signup ? 'signup' : 'login'}" data-next="${esc(next)}" novalidate>
+      <label for="authEmail">Email address</label>
+      <input type="email" id="authEmail" name="email" autocomplete="email" placeholder="you@example.com" required>
+      <label for="authPass">Password</label>
+      <input type="password" id="authPass" name="password" autocomplete="${signup ? 'new-password' : 'current-password'}" minlength="8" placeholder="${signup ? 'At least 8 characters' : ''}" required>
+      <button type="submit" class="btn btn-brand">${signup ? 'Create account' : 'Sign in'}</button>
+      <p class="auth-msg" role="alert"${error ? '' : ' hidden'}>${esc(error)}</p>
+    </form>
+    ${signup ? `<p class="auth-small">By creating an account you agree to our ${link('/terms', 'Terms')} and ${link('/privacy', 'Privacy Policy')}.</p>`
+    : `<p class="auth-small">Forgot your password? ${CONTACT_EMAIL ? `Email ${mailLink} from your account address and we will help.` : link('/contact', 'Contact us') + ' and we will help.'}</p>`}
+    <p class="auth-switch">${signup ? `Already have an account? ${link(`/login${q}`, 'Sign in')}` : `New to ${esc(SITE)}? ${link(`/signup${q}`, 'Create a free account')}`}</p>
+  </section>
+  ${signup ? '<ul class="auth-perks"><li>Download your edited PDFs</li><li>Converters stay free without an account</li><li>We never share or sell your email</li></ul>' : ''}`);
+}
+function accountPage(base, u) {
+  const joined = new Date(u.created).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  return accountShell(base, '/account', `Your account | ${SITE}`, 'Your account.', `<div class="ac">
+    <h1>Your account</h1>
+    <p class="ac-email">Signed in as <strong>${esc(u.email)}</strong> &middot; <a href="/logout">Sign out</a></p>
+    <section class="ac-card ac-plan">
+      <div><span class="ac-label">Free account</span><h2>${u.downloads ? `${u.downloads} PDF${u.downloads === 1 ? '' : 's'} downloaded` : 'Ready to edit'}</h2><p>Member since ${esc(joined)}${u.via === 'google' ? ' &middot; signs in with Google' : ''}.</p></div>
+      <a class="btn btn-brand" href="/edit-pdf">${icon('edit')}Edit a PDF</a>
+    </section>
+    <section class="ac-card ac-danger">
+      <span class="ac-label">Delete account</span>
+      <p>Remove your account and your email address from ${esc(SITE)} for good.</p>
+      <button type="button" class="btn btn-ghost" data-delete>Delete my account</button>
+    </section>
+  </div>`);
+}
+// Last page of Google sign-in opened from the editor: tells the editor and closes itself.
+function authDonePage(ok) {
+  return `<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="robots" content="noindex"><title>${ok ? 'Signed in' : 'Sign-in failed'}</title></head>
+<body data-ok="${ok ? 1 : 0}" style="font:16px system-ui,sans-serif;text-align:center;padding:48px 16px"><p>${ok ? 'Signed in. You can close this window.' : 'Google sign-in did not work. Close this window and try again.'}</p><script src="/account.js?v=${seo.ASSET_V.account}"></script></body></html>`;
+}
+
 const LEGAL_UPDATED = seo.LASTMOD;
 const contactLine = CONTACT_EMAIL
   ? `email <a href="mailto:${esc(CONTACT_EMAIL)}">${esc(CONTACT_EMAIL)}</a>`
@@ -1095,16 +1051,17 @@ const INFO_PAGES = {
       <p>Files are sent to our server only to be converted. Images are processed in memory. Other files (video, audio, documents, ebooks, archives) are written to a private temporary folder for the conversion, and that folder is deleted as soon as the conversion finishes, whether it succeeds or not. Files are never logged or kept after the result has been returned to you. We do not look at, copy or share your files.</p>
       <h2>Data we process</h2>
       <p>Like every website, our server receives your IP address and basic request information (browser type, the page requested). We use your IP address only to apply a rate limit that protects the service from abuse; it is held in memory for up to 15 minutes.</p>
-      <h2>Cookies and local storage</h2>
-      <p>${SITE} itself sets no cookies. The PDF editor remembers a few settings in your browser's local storage (such as rulers on or off and recently used fonts); they never leave your device.</p>
+${ACCOUNTS ? `      <h2>Your account</h2>
+      <p>You need a free account to download PDFs from the ${link('/edit-pdf', 'PDF editor')}; the converters work without one. For an account we keep your email address, your name if you signed in with Google, your password in scrambled (hashed) form so nobody can read it, when you joined and last signed in, the country your connection comes from, and how many PDFs you downloaded from the editor. We use this only to run your account and to understand how the site is used. We never sell it or share it, and we do not send marketing email without asking you first.</p>
+      <p>If you choose Continue with Google, Google tells us your email address and name; we receive nothing else from your Google account. You can delete your account at any time on your ${link('/account', 'account page')}, which removes everything we hold about you.</p>
+` : ''}      <h2>Cookies and local storage</h2>
+      <p>${ACCOUNTS ? `When you sign in, ${SITE} sets one cookie that keeps you signed in. It is needed for the account to work and is not used for tracking. Without an account, ${SITE} sets no cookies of its own.` : `${SITE} itself sets no cookies and stores nothing in your browser.`}</p>
       <h2>Advertising</h2>
       <p>If advertising is shown, it is provided by Google AdSense. Google and its partners may use cookies to show ads based on your visits to this and other websites. Visitors in the European Economic Area, the UK and Switzerland are asked for their consent through Google's consent message before personalised ads are shown. You can opt out of personalised advertising at <a href="https://adssettings.google.com/" rel="noopener">Google Ads Settings</a>. See <a href="https://policies.google.com/technologies/partner-sites" rel="noopener">how Google uses information from sites that use its services</a>.</p>
-      <h2>Accounts and payments</h2>
-      <p>Using the converters needs no account. If you buy ${SITE} Pro, the payment is handled by ${esc(PAY_PARTNER)}, which acts as our reseller (merchant of record). ${esc(PAY_PARTNER)} collects your name, email address, country and payment details to process the payment, calculate tax and send receipts, under its own privacy policy. We never see or store your card details. We receive your email address, country, plan and subscription status so that we can give you Pro features and answer your questions, and we keep these records for as long as you have Pro and afterwards as required for accounting.</p>
       <h2>Third-party services</h2>
       <p>Fonts are served from this site; no third-party scripts are loaded unless advertising is enabled.</p>
       <h2>Your rights</h2>
-      <p>Because we do not store your files or create accounts, we hold no personal data about you beyond the short-lived rate-limit record. For any privacy question, ${contactLine}.</p></section>`,
+      <p>${ACCOUNTS ? 'We do not store your files. If you have an account, you can delete it and all its data yourself, or ask us to show, correct or delete what we hold' : 'Because we do not store your files or create accounts, we hold no personal data about you beyond the short-lived rate-limit record'}. For any privacy question, ${contactLine}.</p></section>`,
   },
   terms: {
     title: `Terms of Use | ${SITE}`, h1: 'Terms of Use',
@@ -1112,59 +1069,16 @@ const INFO_PAGES = {
     body: () => `<section class="prose"><p class="muted">Last updated: ${LEGAL_UPDATED}</p>
       <h2>Using the service</h2>
       <p>${SITE} is free to use. You may convert files that you own or have the right to convert. Do not upload unlawful content or use the service to infringe anyone's rights.</p>
-      <h2>Fair use</h2>
+${ACCOUNTS ? `      <h2>Accounts</h2>
+      <p>The converters need no account. To download from the PDF editor you need a free account. Give a real email address you can use, keep your password to yourself, and use one account per person. We may close accounts that are used for abuse or automated downloading.</p>
+` : ''}      <h2>Fair use</h2>
       <p>To keep the service available for everyone, there is a ${MAX_MB}MB limit per file and a limit on how many files one connection can process in a short period. Automated bulk use may be blocked.</p>
-      <h2>Free and paid plans</h2>
-      <p>All converters and compressors are free. ${SITE} Pro is an optional paid plan with extra features for the PDF editor, described on the ${link('/pricing', 'pricing page')}. Prices are shown in US dollars; tax is added at checkout where it applies.</p>
-      <h2>Payments and billing</h2>
-      <p>Orders are processed by ${esc(PAY_PARTNER)}, our online reseller and merchant of record, which handles payment, tax, receipts and order questions. By buying, you also agree to ${esc(PAY_PARTNER)}'s terms of sale. Monthly and yearly plans renew automatically at the end of each period at the price shown when you subscribed, until you cancel. A Day Pass is a single payment for 24 hours of Pro and does not renew. If a renewal payment fails, Pro features stop until the payment succeeds.</p>
-      <h2>Cancelling</h2>
-      <p>You can cancel a subscription at any time from the link in your receipt email or in your account. Pro stays active until the end of the period you have paid for, and you will not be charged again. We may change prices for future periods; we will tell you by email before a change applies to you, and you can cancel before it does.</p>
-      <h2>Refunds</h2>
-      <p>Refunds are covered by our ${link('/refund-policy', 'refund policy')}.</p>
       <h2>No warranty</h2>
       <p>The service is provided &ldquo;as is&rdquo;. We work to make conversions accurate, but we cannot guarantee that every file converts perfectly. Keep a copy of your originals.</p>
       <h2>Liability</h2>
       <p>To the extent permitted by law, ${SITE} is not liable for any loss resulting from the use of the service.</p>
       <h2>Changes</h2>
       <p>We may update these terms; the date above shows the latest version. Questions: ${CONTACT_EMAIL ? `email ${mailLink} or see the ${link('/contact', 'contact page')}` : link('/contact', 'contact us')}.</p></section>`,
-  },
-  pricing: {
-    title: `Pricing - Free and Pro Plans | ${SITE}`, h1: 'Pricing',
-    desc: `${SITE} converters are free. Pro adds unlimited PDF editor downloads without a watermark, from $4.99 a month or a $1.99 day pass.`,
-    intro: 'Converting and compressing files is free, always. Pro is for people who use the PDF editor a lot.',
-    faq: PRICING.faq,
-    body: () => `${PRO_ON ? '' : '<p class="pricing-note"><strong>Pro is coming soon.</strong> Until it launches, every feature, the PDF editor included, is free and without any mark.</p>'}
-      <section class="pricing" aria-label="Plans">${PRICING.plans.map((pl) => `<article class="plan${pl.featured ? ' plan-featured' : ''}">
-        ${pl.featured ? '<span class="plan-badge">Most popular</span>' : ''}
-        <h2>${esc(pl.name)}</h2><p class="plan-blurb">${esc(pl.blurb)}</p>
-        <p class="plan-price"><strong>${esc(pl.price)}</strong> <span>${esc(pl.period)}</span></p>
-        ${pl.alt ? `<p class="plan-alt">${esc(pl.alt)}</p>` : '<p class="plan-alt">&nbsp;</p>'}
-        <ul>${pl.features.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>
-        <div class="plan-cta">${pl.checkout
-    ? pl.checkout.map(([k, label], i) => (CHECKOUT[k]
-      ? `<a class="btn ${i ? 'btn-ghost' : 'btn-brand'}" href="${esc(CHECKOUT[k])}" rel="nofollow">${esc(label)}</a>`
-      : (i ? '' : '<span class="btn btn-ghost is-disabled" aria-disabled="true">Coming soon</span>'))).join('')
-    : `<a class="btn btn-ghost" href="/">Start converting</a>`}</div>
-      </article>`).join('')}</section>
-      <p class="pricing-small">Prices in US dollars. VAT or sales tax is added at checkout where it applies. Payments are handled by ${esc(PAY_PARTNER)}, our merchant of record. ${link('/refund-policy', '14-day refund policy')}.</p>
-      ${faqHtml(PRICING.faq.map(([q, a]) => [esc(q), esc(a)]))}`,
-  },
-  'refund-policy': {
-    title: `Refund Policy | ${SITE}`, h1: 'Refund Policy',
-    desc: `${SITE} Pro comes with a 14-day money-back guarantee. How to cancel a subscription and how to ask for a refund.`,
-    body: () => `<section class="prose"><p class="muted">Last updated: ${LEGAL_UPDATED}</p>
-      <p>We want you to be happy with ${SITE} Pro. If it is not right for you, you can get your money back.</p>
-      <h2>Subscriptions (monthly and yearly)</h2>
-      <p>If you ask within <strong>14 days</strong> of your first payment, we refund it in full, no questions asked. After that, you can cancel at any time: Pro keeps working until the end of the period you have paid for and you are not charged again, but the current period is not refunded. A yearly renewal can be refunded if you ask within 14 days of the renewal date and have not used Pro since.</p>
-      <h2>Day Pass</h2>
-      <p>If a Day Pass did not work because of a problem on our side, tell us within 14 days and we will refund it.</p>
-      <h2>Charged by mistake</h2>
-      <p>Double charges, charges after you cancelled, or payments you did not make are always refunded in full.</p>
-      <h2>How to ask for a refund</h2>
-      <p>${CONTACT_EMAIL ? `Email ${mailLink}` : link('/contact', 'Contact us')} with the email address you used to pay and your order number (it is in your receipt). You can also reply to the receipt email from ${esc(PAY_PARTNER)}, which processes our payments. Refunds go back to the card or account you paid with, usually within 5 to 10 working days depending on your bank.</p>
-      <h2>Free features</h2>
-      <p>The converters, compressors and free PDF editor cost nothing, so there is nothing to refund for them.</p></section>`,
   },
   contact: {
     title: `Contact | ${SITE}`, h1: `Contact ${SITE}`,
@@ -1178,7 +1092,7 @@ const INFO_PAGES = {
       <h2>Request a format</h2>
       <p>Missing a conversion? Let us know which formats you need; the most requested ones are added first.</p>
       <h2>Privacy and data requests</h2>
-      <p>We do not keep uploaded files or create accounts. See the ${link('/privacy', 'Privacy Policy')} for details, and write to us with any question about your data.</p>
+      <p>We do not keep uploaded files${ACCOUNTS ? '; account holders can delete their account at any time' : ' or create accounts'}. See the ${link('/privacy', 'Privacy Policy')} for details, and write to us with any question about your data.</p>
       <h2>Copyright or abuse reports</h2>
       <p>If you believe the service is being misused, email us with the details and we will look into it promptly.</p></section>`,
   },
@@ -1190,8 +1104,8 @@ function infoPage(key, base) {
   const p = `/${key}`;
   const crumbs = [['Home', '/'], [pg.h1, p]];
   return renderPage(HUB_TPL, baseFields(base, p, pg.title, pg.desc, {
-    JSONLD: graph(base, p, pg.h1, pg.desc, pg.faq || null, crumbs, { type: key === 'about' ? 'AboutPage' : key === 'contact' ? 'ContactPage' : 'WebPage' }),
-    HERO: hero({ h1: pg.h1, crumbs, intro: pg.intro || pg.desc, short: true }),
+    JSONLD: graph(base, p, pg.h1, pg.desc, null, crumbs, { type: key === 'about' ? 'AboutPage' : key === 'contact' ? 'ContactPage' : 'WebPage' }),
+    HERO: hero({ h1: pg.h1, crumbs, intro: pg.desc, short: true }),
     BODY: pg.body(),
   }));
 }
@@ -1281,5 +1195,6 @@ function sitemap(base) {
 const robots = (base) => `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${base}/sitemap.xml\n`;
 
 module.exports = {
-  megaMenu, ACCOUNTS, authPage, checkoutPage, accountPage,
+  megaMenu,
+  ACCOUNTS, authPage, accountPage, authDonePage,
   editorPage, PDF_EDITOR, homePage, resolveGuide, hubPage, notFoundPage, resolvePair, resolveCompress, resolveConverter, resolveInfo, ogSpec, sitemap, robots, allPaths, adsTxt, ADS_ENABLED: !!ADS_CLIENT };
