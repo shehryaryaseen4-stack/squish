@@ -112,7 +112,7 @@ module.exports = {
     longtail: ['photo to pdf online free', 'jpg to pdf without watermark', 'convert jpg to pdf on phone', 'jpg to pdf without changing size'],
     more: ['jpg to pdf for online form', 'photo to pdf for upload', 'convert id card photo to pdf', 'convert certificate jpg to pdf', 'jpg to pdf for email', 'jpg to pdf on iphone', 'jpg to pdf on android', 'convert scanned jpg to pdf'],
     lsi: ['document', 'scan', 'photo', 'print', 'a4', 'send by email', 'attachment', 'upload form', 'pdf file'],
-    faq: [['Can I convert JPG to PDF on my phone?', 'Yes. Open this page in your phone browser, tap Select File and choose photos from your gallery. Each photo becomes a PDF you can download.'], ["How do I convert a photo to PDF for an online form?", "Select the photo here and download the PDF. If the form has a size limit, compress the JPG first with a lower Quality or a Resize option, then convert it to PDF."]] },
+    faq: [['Can I convert JPG to PDF on my phone?', 'Yes. Open this page in your phone browser, tap Select File and choose photos from your gallery. With several photos, Download all lets you save them as one PDF or as separate PDFs.'], ["How do I convert a photo to PDF for an online form?", "Select the photo here and download the PDF. If the form has a size limit, compress the JPG first with a lower Quality or a Resize option, then convert it to PDF."]] },
   '/png-to-pdf': { priority: 2, primary: 'png to pdf',
     secondary: ['png to pdf converter', 'convert png to pdf', 'image to pdf'],
     longtail: ['screenshot to pdf', 'png to pdf multiple files', 'png to pdf online free'],

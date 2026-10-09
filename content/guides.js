@@ -309,12 +309,12 @@ module.exports = {
     why: 'PDF is the expected format for sending photographed documents, receipts, certificates, ID cards and assignments. A PDF opens the same on every device and is accepted by most official portals and email-based applications.',
     keep: 'Keep the JPG if you only want to share the picture; PDF adds nothing for ordinary photos.',
     tips: [
-      'Each JPG becomes its own PDF, with one page the same size as the picture.',
+      'Each JPG becomes a page the same size as the picture. With several JPGs, Download all asks whether you want one PDF or separate PDFs.',
       'Crop and straighten document photos in your phone gallery first for a cleaner PDF.',
       'Phone photos are turned upright automatically.',
     ],
     problems: [
-      ['I wanted all pictures in one PDF.', 'Each image is converted to a separate PDF. Use a PDF tool that merges files if you need a single document.'],
+      ['I wanted all pictures in one PDF.', 'Convert all the pictures together, then choose Download all and pick One PDF. The pages follow the order of the list.'],
       ['The PDF is large.', 'The PDF contains the full JPG. Make the JPG smaller first with Compress JPG, then convert.'],
     ],
     faq: [
@@ -333,7 +333,7 @@ module.exports = {
     ],
     problems: [
       ['The page size is unusual.', 'The page matches the picture. For an A4 page, place the image on an A4 document in a word processor and use DOCX to PDF.'],
-      ['I need several PNGs in one PDF.', 'Each image becomes a separate PDF; merge them with a PDF tool.'],
+      ['I need several PNGs in one PDF.', 'Convert them together and choose Download all, then One PDF: every PNG becomes a page.'],
     ],
     faq: [
       ['Is the transparent background kept?', 'Transparent areas show as white on the PDF page, which is what printing would show too.'],

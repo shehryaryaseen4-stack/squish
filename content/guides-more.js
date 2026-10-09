@@ -144,14 +144,14 @@ module.exports = {
     tips: [
       ONE_PAGE,
       'The photo is stored without extra compression, so the PDF can be large. If a portal has a size limit, convert HEIC to JPG first, then JPG to PDF, which keeps the JPG compression and makes a much smaller PDF.',
-      'Each HEIC file becomes its own PDF.',
+      'Several photos? Convert them together, then Download all gives you one PDF with every photo as a page, or separate PDFs.',
     ],
     problems: [
       ['The PDF is too big to upload.', 'Use HEIC to JPG with Resize set to Max 1920px, then convert the JPG to PDF. The result is usually well under 1MB.'],
       ['The page is very large when printed.', 'The page is the size of the photo. Choose Fit to page in the print dialog to print it on A4 or Letter paper.'],
     ],
     faq: [
-      ['Can I combine several iPhone photos into one PDF?', 'Not with this tool: each photo becomes a separate PDF. Many free PDF readers and online tools can merge PDFs afterwards.'],
+      ['Can I combine several iPhone photos into one PDF?', 'Yes. Add all the photos, convert them, then choose Download all and pick One PDF: every photo becomes a page, in the order of the list.'],
       ['Is the text in the PDF searchable?', 'No. The PDF contains the photo as a picture; text in it cannot be selected unless you run text recognition (OCR) software.'],
     ],
   },
@@ -234,7 +234,7 @@ module.exports = {
     keep: 'Keep the TIFF if you need the scan for professional editing or archiving at full quality.',
     tips: [
       ONE_PAGE,
-      'Each TIFF file becomes its own PDF.',
+      'Converting several TIFFs? Download all lets you choose one combined PDF or separate PDFs.',
       'Large scans make large PDFs. If a size limit applies, convert TIFF to JPG first and then JPG to PDF.',
     ],
     problems: [
@@ -324,7 +324,7 @@ module.exports = {
     keep: 'Keep the WebP if you only need the picture, for example to post it online, where a PDF would be awkward to view.',
     tips: [
       ONE_PAGE,
-      'Each WebP becomes its own PDF.',
+      'Converting several WebP images? Download all lets you choose one combined PDF or separate PDFs.',
       'If the PDF must be small, convert WebP to JPG first and then JPG to PDF.',
     ],
     problems: [

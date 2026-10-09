@@ -629,7 +629,7 @@ function howToSteps(fromLabel, toLabel, verb = 'convert', image = true) {
   return `<section class="howto"><h2>How to ${verb} ${fromLabel}${toLabel ? ` to ${toLabel}` : ''}</h2><ol class="steps">
     <li><strong>Choose your files.</strong> Click <em>Select File</em> or drag your ${fromLabel} files into the upload box. You can add many at once.</li>
     <li><strong>Pick the settings.</strong> ${toLabel ? `${toLabel} is already selected as the output format.` : 'Choose the output format.'}${image ? (verb === 'compress' ? ' Open Options to choose how much smaller each file should be (50% by default) and an optional maximum size.' : ' Adjust Quality and Max dimension if you want smaller files.') : ' The conversion starts as soon as a file is added.'}</li>
-    <li><strong>Download.</strong> Each file appears in the list with its new size. Download them one by one, or all together as a ZIP.</li>
+    <li><strong>Download.</strong> Each file appears in the list when it is ready. Download them one by one, or all together with Download all.</li>
   </ol></section>`;
 }
 

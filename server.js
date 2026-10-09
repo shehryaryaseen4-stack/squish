@@ -269,6 +269,9 @@ app.get(/^\/([a-z0-9-]+)-converter$/, (req, res, next) => {
 
 // PDF editor: switched on with PDF_EDITOR=1. pdf.js (rendering) and pdf-lib (saving) are served
 // from node_modules, like JSZip, so the page needs no third-party scripts.
+// PDF writer for the browser: the editor, and "one PDF" when several images are converted to PDF.
+app.get('/vendor/pdf-lib.min.js', (_req, res) => res.set('Cache-Control', 'public, max-age=604800')
+  .sendFile(require.resolve('pdf-lib/dist/pdf-lib.min.js')));
 if (pages.PDF_EDITOR) {
   const pdfjsDir = path.dirname(require.resolve('pdfjs-dist/package.json'));
   const vendorOpts = { index: false, maxAge: '7d' };
@@ -276,8 +279,6 @@ if (pages.PDF_EDITOR) {
     // the legacy build includes the polyfills that older (but still common) browsers need
     app.use(`/vendor/pdfjs${dir === 'build' ? '' : `/${dir}`}`, express.static(path.join(pdfjsDir, dir === 'build' ? 'legacy/build' : dir), vendorOpts));
   }
-  app.get('/vendor/pdf-lib.min.js', (_req, res) => res.set('Cache-Control', 'public, max-age=604800')
-    .sendFile(require.resolve('pdf-lib/dist/pdf-lib.min.js')));
   app.get('/vendor/fontkit.umd.min.js', (_req, res) => res.set('Cache-Control', 'public, max-age=604800')
     .sendFile(require.resolve('@pdf-lib/fontkit/dist/fontkit.umd.min.js')));
   require('./fonts').routes(app);

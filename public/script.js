@@ -390,11 +390,76 @@
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   }
 
+  // Several images converted to PDF: ask whether to download one PDF (every image a page, in
+  // the order of the list) or separate PDFs. The PDFs are joined here in the browser.
+  let pdfLibLoad = null;
+  const loadPdfLib = () => pdfLibLoad || (pdfLibLoad = new Promise((resolve, reject) => {
+    if (window.PDFLib) return resolve(window.PDFLib);
+    const s = document.createElement("script");
+    s.src = "/vendor/pdf-lib.min.js";
+    s.onload = () => resolve(window.PDFLib);
+    s.onerror = () => { pdfLibLoad = null; reject(new Error("The PDF tool could not be loaded. Check your connection and try again.")); };
+    document.head.appendChild(s);
+  }));
+  async function joinPdfs(list){
+    const { PDFDocument } = await loadPdfLib();
+    const out = await PDFDocument.create();
+    for (const r of list) {
+      const src = await PDFDocument.load(await r.blob.arrayBuffer(), { ignoreEncryption: true });
+      (await out.copyPages(src, src.getPageIndices())).forEach(p => out.addPage(p));
+    }
+    return new Blob([await out.save()], { type: "application/pdf" });
+  }
+  const isImagesToPdf = done => !compressMode && done.length > 1
+    && done.every(r => r.outExt === "pdf" && r.fmt && catOfExt(r.fmt.ext) === "image");
+  let pdfDlg = null;
+  function askPdfMode(n){
+    if (!pdfDlg) {
+      pdfDlg = document.createElement("dialog");
+      pdfDlg.className = "pdf-choice";
+      pdfDlg.setAttribute("aria-labelledby", "pdfChoiceTitle");
+      pdfDlg.innerHTML = `<form method="dialog">
+        <button class="pdf-choice-x" value="cancel" aria-label="Close">&times;</button>
+        <h2 id="pdfChoiceTitle">How do you want your PDF?</h2>
+        <p class="pdf-choice-sub"></p>
+        <div class="pdf-choice-opts">
+          <button class="pdf-choice-opt" value="one"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M14 6h15l9 9v27H14z" fill="#FDE8E7" stroke="#E5322D" stroke-width="2.4" stroke-linejoin="round"/><path d="M29 6v9h9" fill="none" stroke="#E5322D" stroke-width="2.4" stroke-linejoin="round"/><path d="M19 23h14M19 28h14M19 33h9" stroke="#E5322D" stroke-width="2.4" stroke-linecap="round"/></svg>
+            <strong>One PDF</strong><span class="one-text"></span></button>
+          <button class="pdf-choice-opt" value="many"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 10h11l6 6v18H8z" fill="#EEF2FF" stroke="#4F46E5" stroke-width="2.4" stroke-linejoin="round"/><path d="M23 16h11l6 6v18H23z" fill="#EEF2FF" stroke="#4F46E5" stroke-width="2.4" stroke-linejoin="round"/></svg>
+            <strong>Separate PDFs</strong><span class="many-text"></span></button>
+        </div></form>`;
+      document.body.appendChild(pdfDlg);
+    }
+    pdfDlg.querySelector(".pdf-choice-sub").textContent = `You converted ${n} images to PDF.`;
+    pdfDlg.querySelector(".one-text").textContent = `All ${n} images in one file, one per page, in the order of the list.`;
+    pdfDlg.querySelector(".many-text").textContent = `${n} PDF files, downloaded together in a ZIP.`;
+    pdfDlg.returnValue = "cancel";
+    return new Promise(resolve => {
+      pdfDlg.addEventListener("close", () => resolve(pdfDlg.returnValue), { once: true });
+      pdfDlg.showModal();
+      pdfDlg.querySelector('[value="one"]').focus();
+    });
+  }
+
   // Download all: one ZIP with every finished file (names made unique).
   zipBtn.addEventListener("click", async () => {
     const done = rows.filter(r => r.state === "finished");
     if (!done.length) return;
     if (done.length === 1) return save(done[0].blob, done[0].outName);
+    if (isImagesToPdf(done)) {
+      const mode = await askPdfMode(done.length);
+      if (mode === "cancel" || !mode) return;
+      if (mode === "one") {
+        const label = zipBtn.lastChild.textContent;
+        zipBtn.disabled = true; zipBtn.lastChild.textContent = "Joining\u2026";
+        try {
+          save(await joinPdfs(done), done[0].outName.replace(/\.pdf$/i, "") + "-combined.pdf");
+        } catch (e) {
+          barStatus.innerHTML = `<span class="err-text">${esc(e.message || "The PDFs could not be joined.")}</span>`;
+        } finally { zipBtn.disabled = false; zipBtn.lastChild.textContent = label; }
+        return;
+      }
+    }
     if (typeof JSZip === "undefined") return;
     zipBtn.disabled = true;
     const label = zipBtn.lastChild.textContent;
