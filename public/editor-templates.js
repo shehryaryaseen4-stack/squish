@@ -40,7 +40,7 @@ function table({ x, y, w, cols, head, rows, rowH = 26, headFill, headColor = '#f
   rows.forEach((r, j) => {
     const top = y + rowH * (j + 1);
     if (zebra && j % 2) out.push(R(x, top, w, rowH, { fill: zebra }));
-    r.forEach((t, i) => out.push(cell(t, cols[i], top + (rowH - size * 1.2) / 2, { font })));
+    r.forEach((t, i) => { if (t) out.push(cell(t, cols[i], top + (rowH - size * 1.2) / 2, { font })); }); // blank rows stay free to fill
     out.push(L(x, top + rowH, x + w, top + rowH, { color: line }));
   });
   return out;

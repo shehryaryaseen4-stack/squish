@@ -61,6 +61,7 @@ test('templates: 20+ editable designs, every font and object valid', async () =>
       assert.ok(['text', 'rect', 'ellipse', 'line'].includes(it.type), `${t.id}: ${it.type}`);
       for (const k of ['x', 'y', 'w', 'h']) assert.ok(Number.isFinite(it[k]), `${t.id}: ${it.type} ${k}`);
       if (it.type === 'text') {
+        assert.ok(it.text.trim(), `${t.id}: empty text box`);
         assert.ok(fonts.has(it.font), `${t.id}: unknown font ${it.font}`);
         // standard PDF fonts only cover Latin-1, so template text must stay inside it
         assert.ok(/^[\x0a\x20-\x7e\xa0-\xff]*$/.test(it.text), `${t.id}: "${it.text}" has characters outside Latin-1`);
