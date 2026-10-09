@@ -162,6 +162,7 @@ body.is-editing .pe-app{height:auto;}
 .pe-sel{outline:1.5px solid var(--sel); outline-offset:2px;}
 .pe-handle{position:absolute; width:12px; height:12px; margin:-6px 0 0 -6px; background:#fff; border:2px solid var(--sel); border-radius:50%; box-shadow:0 1px 3px rgba(0,0,0,.2); z-index:5; touch-action:none;}
 .pe-handle[data-h="nw"],.pe-handle[data-h="se"]{cursor:nwse-resize;}
+.pe-handle[data-h="e"],.pe-handle[data-h="w"]{cursor:ew-resize; width:8px; height:18px; margin:-9px 0 0 -4px; border-radius:4px;}
 .pe-handle[data-h="ne"],.pe-handle[data-h="sw"]{cursor:nesw-resize;}
 .pe-handle[data-h="p1"],.pe-handle[data-h="p2"]{cursor:move;}
 .pe-runs{position:absolute; inset:0; pointer-events:none;}

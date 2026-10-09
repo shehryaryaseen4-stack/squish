@@ -655,9 +655,11 @@ function addRow(it, at) {
   if (it.rmin) it.rmin.splice(at, 0, h);
   fixTable(it);
 }
+// New and deleted columns keep the others in proportion (equal columns stay equal) and the
+// table keeps its width.
 function addCol(it, at) {
-  const from = Math.min(at, it.cols - 1), half = it.cw[from] / 2;
-  it.cw[from] = half; it.cw.splice(at, 0, half);
+  const from = Math.min(at, it.cols - 1), f = 1 / (it.cols + 1);
+  it.cw = it.cw.map((x) => x * (1 - f)); it.cw.splice(at, 0, f);
   it.align.splice(at, 0, it.align[from] || 'left');
   it.cells.forEach((row, r) => row.splice(at, 0, isHeadRow(it, r) ? 'Heading' : ''));
   fixTable(it);
@@ -685,12 +687,18 @@ function tableOp(op) {
   } else if (op === 'delcol') {
     if (it.cols < 2) { toast('A table needs at least one column. Use Delete to remove the whole table.'); return; }
     snapshot();
-    const w = it.cw[c]; it.cw.splice(c, 1); it.cw[Math.min(c, it.cw.length - 1)] += w;
+    it.cw.splice(c, 1); const sum = it.cw.reduce((a, b) => a + b, 0); it.cw = it.cw.map((x) => x / sum);
     it.align.splice(c, 1); it.cells.forEach((row) => row.splice(c, 1)); fixTable(it);
     if (cur) S.cell = { id: it.id, r, c: Math.min(c, it.cols - 1) };
   } else if (op === 'head') { snapshot(); it.head = !it.head; }
   else if (op === 'stripe') { snapshot(); it.stripe = it.stripe ? '' : '#f3f4f6'; }
   else if (op === 'equal') { snapshot(); it.cw = it.cw.map(() => 1 / it.cols); }
+  else if (op === 'fitwidth') {
+    // from margin to margin (40 pt, about 14 mm, on each side)
+    snapshot();
+    const [vw] = viewSize(pageById(S.sel.page));
+    it.x = 40; it.w = round(vw - 80); delete it.ax;
+  }
   drawItems(pageIndex(S.sel.page)); updateProps(); updatePanel();
 }
 // Insert: a size picker under the Table button, like in word processors
@@ -771,6 +779,8 @@ function decorateSelection() {
   if (it.locked) box.classList.add('no-rot');
   else {
     [['nw', '0%', '0%'], ['ne', '100%', '0%'], ['sw', '0%', '100%'], ['se', '100%', '100%']].forEach(([h, x, y]) => handle(h, box, x, y));
+    // tables also get side handles: drag them to make the table wider or narrower only
+    if (it.type === 'table') [['w', '0%', '50%'], ['e', '100%', '50%']].forEach(([h, x, y]) => handle(h, box, x, y));
     handle('rot', box, '50%', 0);
     if (it.type === 'table' && !it.rot) {
       // drag the lines between columns and under rows to resize them
@@ -1485,7 +1495,7 @@ function updateProps() {
     if ('radius' in o) { FIELDS.radius.value = o.radius || 0; $('#pRadiusOut').textContent = o.radius || 0; }
     if ('opacity' in o) { FIELDS.opacity.value = o.opacity; $('#pOpacityOut').textContent = `${o.opacity}%`; }
   }
-  $('#peHint').textContent = t && t.item ? (t.kind === 'table' ? 'Double-click a cell to type. Tab moves to the next cell. Drag the lines between columns and rows to resize them.' : 'Delete key removes the selected object.') : HINTS[S.tool] || '';
+  $('#peHint').textContent = t && t.item ? (t.kind === 'table' ? 'Double-click a cell to type, Tab for the next cell. Click a cell, then Delete removes its row. Drag the side handles to make the table wider.' : 'Delete key removes the selected object.') : HINTS[S.tool] || '';
   updatePanel();
 }
 let propSnap = false;
@@ -2104,6 +2114,7 @@ function openCtx(e) {
   const cellEl = e.target.closest('.pe-cell');
   if (it && it.type === 'table' && cellEl) { S.cell = { id: it.id, r: Number(cellEl.dataset.r), c: Number(cellEl.dataset.c) }; drawItems(pageIndex(p.id)); }
   $$('.pe-ctx-table', m).forEach((x) => { x.hidden = !(it && it.type === 'table'); });
+  $('[data-ctx="delete"]', m).firstChild.textContent = it && it.type === 'table' ? 'Delete table' : 'Delete';
   m.hidden = false;
   m.style.left = `${clamp(e.clientX, 8, window.innerWidth - m.offsetWidth - 8)}px`;
   m.style.top = `${clamp(e.clientY, 8, window.innerHeight - m.offsetHeight - 8)}px`;
@@ -2688,6 +2699,9 @@ function onKey(e) {
   if (e.shiftKey && !mod && e.key.toLowerCase() === 'r') { setRulers(!$('#peStage').classList.contains('rulers')); return; }
   if (mod && e.key === ';') { e.preventDefault(); setGuidesOn(!guidesOn()); return; }
   if (e.key === 'Enter' && selIt && selIt.type === 'table') { e.preventDefault(); const c = S.cell && S.cell.id === selIt.id ? S.cell : { r: 0, c: 0 }; editCell(S.sel.page, selIt, c.r, c.c); return; }
+  if ((e.key === 'Delete' || e.key === 'Backspace') && selIt && selIt.type === 'table' && S.cell && S.cell.id === selIt.id && selIt.rows > 1) {
+    e.preventDefault(); tableOp('delrow'); toast('Row deleted. To remove the whole table, right-click it and choose Delete table.'); return;
+  }
   if ((e.key === 'Delete' || e.key === 'Backspace') && S.sel) { e.preventDefault(); removeSelected(); return; }
   if (e.key === 'Escape') { closeImgMenu(); closeCtx(); closeFontPicker(); select(null, null); setTool('select'); return; }
   if (S.sel && e.key.startsWith('Arrow') && !(selIt && selIt.locked)) {
