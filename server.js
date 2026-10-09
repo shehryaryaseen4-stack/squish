@@ -293,6 +293,14 @@ app.get(/^\/(about|privacy|terms|contact|pricing|refund-policy)$/, (req, res, ne
   return r ? sendHtml(res, r.html) : next();
 });
 
+// Accounts and checkout (off unless ACCOUNTS=1; sign-in itself is not wired up yet).
+if (pages.ACCOUNTS) {
+  app.get('/login', (req, res) => sendHtml(res, pages.authPage(req.query.sent ? 'sent' : 'login', baseOf(req))));
+  app.get('/signup', (req, res) => sendHtml(res, pages.authPage('signup', baseOf(req))));
+  app.get('/checkout', (req, res) => sendHtml(res, pages.checkoutPage(String(req.query.plan || ''), baseOf(req))));
+  app.get('/account', (req, res) => sendHtml(res, pages.accountPage(baseOf(req))));
+}
+
 // How-to articles: /guides lists them, /guides/<slug> is one article.
 app.get(/^\/guides(?:\/([a-z0-9-]+))?$/, (req, res, next) => {
   const r = pages.resolveGuide(req.params[0], baseOf(req));

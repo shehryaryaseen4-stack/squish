@@ -969,6 +969,102 @@ function resolveGuide(slug, base) {
   return a ? { html: articlePage(a, base) } : null;
 }
 
+
+// ------------------------------------------------------------- accounts --
+// Sign in / sign up (one email field: we send a sign-in link, no password), the first checkout
+// step and the account page. Off unless ACCOUNTS=1; never indexed. The payment itself happens
+// on the payment partner's secure checkout (the Pro buttons link there).
+const ACCOUNTS = process.env.ACCOUNTS === '1';
+const GOOGLE_SIGNIN = !!process.env.GOOGLE_CLIENT_ID;
+const ACCOUNT_V = seo.ASSET_V.account;
+const PLAN_INFO = {
+  monthly: { name: 'Pro monthly', price: '$4.99', per: 'per month', note: 'Renews every month. Cancel any time.' },
+  yearly: { name: 'Pro yearly', price: '$29', per: 'per year', note: 'Renews every year. That is $2.42 a month, half the monthly price.' },
+  day: { name: 'Day Pass', price: '$1.99', per: 'one time', note: 'All Pro features for 24 hours. Nothing renews.' },
+};
+const ICON_MAIL = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>';
+const GOOGLE_G = '<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#4285F4" d="M45 24.5c0-1.6-.1-3.1-.4-4.5H24v8.5h11.8c-.5 2.7-2.1 5-4.4 6.6v5.5h7.1c4.2-3.9 6.5-9.6 6.5-16.1z"/><path fill="#34A853" d="M24 46c5.9 0 10.9-2 14.5-5.4l-7.1-5.5c-2 1.3-4.5 2.1-7.4 2.1-5.7 0-10.5-3.8-12.2-9H4.5v5.7C8.1 41.1 15.5 46 24 46z"/><path fill="#FBBC05" d="M11.8 28.2c-.4-1.3-.7-2.7-.7-4.2s.3-2.9.7-4.2v-5.7H4.5C3 17.1 2 20.4 2 24s1 6.9 2.5 9.9z"/><path fill="#EA4335" d="M24 10.8c3.2 0 6.1 1.1 8.4 3.3l6.3-6.3C34.9 4.2 29.9 2 24 2 15.5 2 8.1 6.9 4.5 14.1l7.3 5.7c1.7-5.2 6.5-9 12.2-9z"/></svg>';
+function accountShell(base, p, title, desc, body) {
+  return renderPage(HUB_TPL, { ...baseFields(base, p, title, desc, {
+    JSONLD: '{}', HERO: '',
+    BODY: `<div class="acct">${body}</div><script src="/account.js?v=${ACCOUNT_V}" defer></script>`,
+  }), ROBOTS: 'noindex, nofollow', CANONICAL_TAG: '', _noindex: true });
+}
+// kind: 'login' | 'signup' | 'sent'
+function authPage(kind, base) {
+  const signup = kind === 'signup';
+  const p = signup ? '/signup' : '/login';
+  if (kind === 'sent') {
+    return accountShell(base, '/login', `Check your email | ${SITE}`, 'We sent you a sign-in link.', `<section class="auth-card auth-sent">
+      <span class="auth-ico">${ICON_MAIL}</span>
+      <h1>Check your email</h1>
+      <p>We sent a sign-in link to <strong data-email>your email address</strong>. Open it on this device to continue. The link works for 15 minutes.</p>
+      <p class="auth-small">No email after a minute? Look in your spam or promotions folder, or <a href="/login">send a new link</a>.</p>
+    </section>`);
+  }
+  return accountShell(base, p, `${signup ? 'Create your account' : 'Sign in'} | ${SITE}`, signup ? `Create a free ${SITE} account.` : `Sign in to ${SITE}.`, `<section class="auth-card">
+    <a class="auth-brand" href="/">${BRAND_SVG}<span>${brandName(SITE)}</span></a>
+    <h1>${signup ? 'Create your free account' : 'Welcome back'}</h1>
+    <p class="auth-lede">${signup ? 'Save your Pro plan and use it on every device. No password to remember.' : 'Sign in to use your Pro plan. No password needed.'}</p>
+    ${GOOGLE_SIGNIN || !ACCOUNTS ? `<a class="auth-google" href="/auth/google">${GOOGLE_G}Continue with Google</a>
+    <div class="auth-or"><span>or</span></div>` : ''}
+    <form class="auth-form" data-auth="${signup ? 'signup' : 'login'}" novalidate>
+      <label for="authEmail">Email address</label>
+      <input type="email" id="authEmail" name="email" autocomplete="email" placeholder="you@example.com" required>
+      <button type="submit" class="btn btn-brand">${ICON_MAIL}Continue with email</button>
+      <p class="auth-msg" role="alert" hidden></p>
+    </form>
+    <p class="auth-small">We email you a link to ${signup ? 'finish signing up' : 'sign in'}. By continuing you agree to our ${link('/terms', 'Terms')} and ${link('/privacy', 'Privacy Policy')}.</p>
+    <p class="auth-switch">${signup ? `Already have an account? ${link('/login', 'Sign in')}` : `New to ${esc(SITE)}? ${link('/signup', 'Create an account')}`}</p>
+  </section>
+  ${signup ? `<ul class="auth-perks"><li>Converters stay free, no account needed</li><li>Pro works on all your devices</li><li>Cancel any time, 14-day refund</li></ul>` : ''}`);
+}
+function checkoutPage(plan, base) {
+  const key = PLAN_INFO[plan] ? plan : 'monthly';
+  const pl = PLAN_INFO[key];
+  const pro = PRICING.plans.find((x) => x.id === (key === 'day' ? 'day' : 'pro'));
+  const opt = (k) => `<label class="co-opt${k === key ? ' on' : ''}"><input type="radio" name="plan" value="${k}"${k === key ? ' checked' : ''} data-href="${esc(CHECKOUT[k] || '')}">
+    <span class="co-opt-main"><strong>${PLAN_INFO[k].name}</strong><span>${PLAN_INFO[k].note}</span></span>
+    <span class="co-opt-price"><strong>${PLAN_INFO[k].price}</strong><span>${PLAN_INFO[k].per}</span></span></label>`;
+  return accountShell(base, '/checkout', `Checkout | ${SITE}`, `Get ${SITE} Pro.`, `<div class="co">
+    <section class="co-main">
+      <a class="co-back" href="/pricing">&larr; Back to pricing</a>
+      <h1>Get ${esc(SITE)} Pro</h1>
+      <div class="co-opts" role="radiogroup" aria-label="Choose a plan">${['monthly', 'yearly', 'day'].map(opt).join('')}</div>
+      <h2>What you get</h2>
+      <ul class="co-feats">${pro.features.filter((f) => !/^Everything in/.test(f)).map((f) => `<li>${esc(f)}</li>`).join('')}</ul>
+    </section>
+    <aside class="co-side">
+      <h2>Order summary</h2>
+      <dl class="co-sum"><dt data-sum-name>${pl.name}</dt><dd data-sum-price>${pl.price}</dd><dt>Tax</dt><dd>Added at payment if it applies in your country</dd></dl>
+      <label for="coEmail">Email for your receipt and sign-in</label>
+      <input type="email" id="coEmail" autocomplete="email" placeholder="you@example.com">
+      <a class="btn btn-brand co-pay${CHECKOUT[key] ? '' : ' is-disabled'}" href="${esc(CHECKOUT[key] || '#')}" rel="nofollow" data-pay>${CHECKOUT[key] ? 'Continue to secure payment' : 'Payments open soon'}</a>
+      <ul class="co-trust"><li>Card, PayPal, Apple Pay and Google Pay</li><li>14-day money-back guarantee</li><li>Cancel any time in one click</li></ul>
+      <p class="co-small">Payment is processed securely by ${esc(PAY_PARTNER)}, our merchant of record. We never see your card details. ${link('/refund-policy', 'Refund policy')} &middot; ${link('/terms', 'Terms')}</p>
+    </aside>
+  </div>`);
+}
+function accountPage(base) {
+  return accountShell(base, '/account', `Your account | ${SITE}`, 'Your plan and billing.', `<div class="ac">
+    <h1>Your account</h1>
+    <p class="ac-email">Signed in as <strong>you@example.com</strong> &middot; <a href="/logout">Sign out</a></p>
+    <section class="ac-card ac-plan">
+      <div><span class="ac-label">Plan</span><h2>Free</h2><p>All converters and the PDF editor, with a small mark on editor downloads.</p></div>
+      <a class="btn btn-brand" href="/checkout?plan=monthly">Upgrade to Pro</a>
+    </section>
+    <section class="ac-card">
+      <span class="ac-label">Billing</span>
+      <p>No payments yet. When you have Pro, your receipts and the link to change or cancel your plan appear here.</p>
+    </section>
+    <section class="ac-card ac-danger">
+      <span class="ac-label">Delete account</span>
+      <p>Remove your account and email address from ${esc(SITE)}. Cancel Pro first if you have it.</p>
+      <button type="button" class="btn btn-ghost">Delete my account</button>
+    </section>
+  </div>`);
+}
+
 // ------------------------------------------------------------ trust pages --
 // About / Privacy / Terms / Contact. Google's quality guidelines and AdSense both expect a
 // site to say who runs it and how it treats data. The privacy text describes what this
@@ -1185,5 +1281,5 @@ function sitemap(base) {
 const robots = (base) => `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${base}/sitemap.xml\n`;
 
 module.exports = {
-  megaMenu,
+  megaMenu, ACCOUNTS, authPage, checkoutPage, accountPage,
   editorPage, PDF_EDITOR, homePage, resolveGuide, hubPage, notFoundPage, resolvePair, resolveCompress, resolveConverter, resolveInfo, ogSpec, sitemap, robots, allPaths, adsTxt, ADS_ENABLED: !!ADS_CLIENT };
