@@ -2790,7 +2790,9 @@ function setAuthMode(mode) {
   dlg.querySelectorAll('[data-t-signup]').forEach((el) => { el.textContent = el.dataset[mode === 'signup' ? 'tSignup' : 'tLogin']; });
   $('#peAuthPass').autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
   $('#peAuthPass').placeholder = mode === 'signup' ? 'At least 8 characters' : '';
-  $('.pe-auth-msg').hidden = true;
+  dlg.querySelectorAll('.pe-auth-msg').forEach((m) => { m.hidden = true; });
+  $('.pe-auth:not(.pe-auth-code)').hidden = false;
+  $('.pe-auth-code').hidden = true;
 }
 function authed(user) {
   me = user;
@@ -2816,10 +2818,44 @@ function bindAuth() {
       const r = await postJson(`/api/auth/${signup ? 'signup' : 'login'}`, { email, password });
       const j = await r.json().catch(() => ({}));
       if (r.ok && j.user) { $('#peAuthPass').value = ''; authed(j.user); return; }
+      if (r.ok && j.verify) { $('#peAuthPass').value = ''; showCodeStep(j.email || email); return; }
       if (j.login) setAuthMode('login');
       say(j.error || 'Something went wrong. Please try again.');
     } catch { say('Network error. Check your connection and try again.'); } finally { go.disabled = false; }
   });
+  // Email confirmation: the account is created once the emailed 6-digit code is entered.
+  const cf = $('.pe-auth-code'), cmsg = $('.pe-auth-msg', cf), cgo = $('.pe-auth-go', cf), code = $('#peAuthCode');
+  let codeEmail = '';
+  const csay = (t) => { cmsg.textContent = t; cmsg.hidden = !t; };
+  function showCodeStep(email) {
+    codeEmail = email;
+    $('[data-code-email]', cf).textContent = email;
+    $('.pe-auth:not(.pe-auth-code)').hidden = true;
+    cf.hidden = false; csay(''); code.value = ''; code.focus();
+  }
+  code.addEventListener('input', () => { code.value = code.value.replace(/\D/g, '').slice(0, 6); });
+  cf.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (code.value.length !== 6) { csay('Enter the 6-digit code from the email.'); code.focus(); return; }
+    csay(''); cgo.disabled = true;
+    try {
+      const r = await postJson('/api/auth/verify', { email: codeEmail, code: code.value });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.user) { authed(j.user); return; }
+      csay(j.error || 'Something went wrong. Please try again.');
+    } catch { csay('Network error. Check your connection and try again.'); } finally { cgo.disabled = false; }
+  });
+  $('[data-code-resend]', cf).addEventListener('click', async (e) => {
+    e.target.disabled = true;
+    try {
+      const r = await postJson('/api/auth/resend', { email: codeEmail, purpose: 'signup' });
+      const j = await r.json().catch(() => ({}));
+      csay(r.ok ? 'A new code is on its way.' : (j.error || 'Could not send a new code.'));
+    } catch { csay('Network error. Check your connection and try again.'); }
+    setTimeout(() => { e.target.disabled = false; }, 30000);
+  });
+  $('[data-code-back]', cf).addEventListener('click', () => setAuthMode('signup'));
+
   $('.pe-auth-google').addEventListener('click', () => {
     const w = 480, h = 640;
     const win = window.open('/auth/google?popup=1', 'ffgoogle', `width=${w},height=${h},left=${Math.max(0, (screen.width - w) / 2)},top=${Math.max(0, (screen.height - h) / 2)}`);

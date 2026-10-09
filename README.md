@@ -201,6 +201,8 @@ and earning links from other sites.
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD` | unset | The owner's sign-in for the dashboard (users, sign-ups, downloads, CSV export). Both must be set. |
 | `ADMIN_PATH` | `admin` | Address of the dashboard. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | unset | Adds "Continue with Google". Redirect URI: `<BASE_URL>/auth/google/callback`. |
+| `BREVO_API_KEY` or `RESEND_API_KEY` | unset | Turns on email confirmation: a sign-up becomes an account only after the 6-digit code sent by email is entered, and "Forgot your password?" works. Without a key, sign-ups are not confirmed. |
+| `MAIL_FROM` | `Flipit Free <no-reply@your-domain>` | Sender of those emails. Its domain must be verified with Brevo or Resend. |
 | `SESSION_SECRET` | made once, kept in `DATA_DIR` | Signs the sign-in cookies. |
 | `DASHBOARD_TZ` | `Asia/Karachi` | Time zone of the dashboard's days and times. |
 | `FORCE_CANONICAL_HOST` | unset | `1` = 301 every request to `BASE_URL`'s exact protocol and host. |

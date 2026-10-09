@@ -71,3 +71,5 @@ h1,h2,p{margin:0;}
 .sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0);}
 @media (max-width:860px){ .ad-tiles{grid-template-columns:repeat(2,minmax(0,1fr));} }
 @media (max-width:520px){ .ad-main{padding:16px;} .ad-top{padding:12px 16px;} .ad-tiles{gap:10px;} .ad-tile strong{font-size:1.6rem;} .ad-users-head .ad-search{max-width:none;} }
+.ad-ok{margin-left:6px; color:#1E9E5A; font-weight:800;}
+.ad-unv{margin-left:8px; padding:1px 7px; border-radius:99px; background:#FFF4D6; color:#7A5A00; font-size:.72rem; font-weight:700;}

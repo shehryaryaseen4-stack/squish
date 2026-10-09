@@ -25,7 +25,7 @@ function load() {
     if (e.code !== 'ENOENT') throw e;
     db = { users: [], daily: {} };
   }
-  db.users ||= []; db.daily ||= {};
+  db.users ||= []; db.daily ||= {}; db.codes ||= {};
   // Signs the session cookies. SESSION_SECRET wins; otherwise one is made once and kept here.
   if (!db.secret) { db.secret = crypto.randomBytes(32).toString('hex'); saveNow(); }
   return db;
@@ -61,15 +61,16 @@ function hashPassword(pw) {
 function checkPassword(pw, stored) {
   const [v, salt, hash] = String(stored || '').split('$');
   if (v !== 's1' || !salt || !hash) return Promise.resolve(false);
-  return new Promise((res) => crypto.scrypt(pw, Buffer.from(salt, 'hex'), 32, (err, key) => res(!err && crypto.timingSafeEqual(key, Buffer.from(hash, 'hex')))));
+  const want = Buffer.from(hash, 'hex');
+  return new Promise((res) => crypto.scrypt(pw, Buffer.from(salt, 'hex'), 32, (err, key) => res(!err && want.length === key.length && crypto.timingSafeEqual(key, want))));
 }
 
 const byId = (id) => load().users.find((u) => u.id === id) || null;
 const byEmail = (email) => load().users.find((u) => u.email === normEmail(email)) || null;
 const byGoogle = (sub) => load().users.find((u) => u.google === sub) || null;
 
-function create({ email, name = '', pw, google, via, country }) {
-  const u = { id: crypto.randomBytes(9).toString('base64url'), email: normEmail(email), name: String(name).slice(0, 80), via, country: country || '', created: now(), lastSeen: now(), logins: 1, downloads: 0 };
+function create({ email, name = '', pw, google, via, country, verified = false }) {
+  const u = { id: crypto.randomBytes(9).toString('base64url'), email: normEmail(email), name: String(name).slice(0, 80), via, verified, country: country || '', created: now(), lastSeen: now(), logins: 1, downloads: 0 };
   if (pw) u.pw = pw;
   if (google) u.google = google;
   load().users.push(u); save();
@@ -91,13 +92,21 @@ function count(field, n = 1) {
   day[field] = (day[field] || 0) + n; save();
 }
 
+// One-time email codes, by email: { purpose, hash, exp, tries, sent: [times], pw? }.
+const getCode = (email) => {
+  const c = load().codes[normEmail(email)];
+  return c && c.exp > Date.now() - 864e5 ? c : null; // kept a day after expiry for the resend limit
+};
+function setCode(email, rec) { const d = load(); d.codes[normEmail(email)] = rec; prune(d); save(); }
+function delCode(email) { delete load().codes[normEmail(email)]; save(); }
+function prune(d) { for (const [k, c] of Object.entries(d.codes)) if (c.exp < Date.now() - 864e5) delete d.codes[k]; }
 const users = () => load().users;
 const daily = () => load().daily;
 // Public fields only (never the password hash).
-const publicUser = (u) => u && { email: u.email, name: u.name, via: u.via, created: u.created, downloads: u.downloads || 0 };
+const publicUser = (u) => u && { email: u.email, name: u.name, via: u.via, verified: !!u.verified, created: u.created, downloads: u.downloads || 0 };
 
 module.exports = {
   load, flush, secret, normEmail, okEmail, hashPassword, checkPassword,
-  byId, byEmail, byGoogle, create, update, remove, signedIn, seen, count, users, daily, publicUser, today, dayOf, TZ, DATA_DIR,
+  byId, byEmail, byGoogle, create, update, remove, signedIn, seen, count, users, daily, publicUser, getCode, setCode, delCode, today, dayOf, TZ, DATA_DIR,
   _reset: () => { db = null; clearTimeout(timer); timer = null; },
 };

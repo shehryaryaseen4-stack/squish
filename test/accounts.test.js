@@ -82,3 +82,8 @@ test('owner dashboard is private', async () => {
   const u = cookieOf(await post('/api/auth/login', { email: 'a@example.com', password: 'password-1' }));
   assert.match(await (await fetch(`${B}/admin`, { headers: { cookie: u.replace('ff_s', 'ff_a') } })).text(), /ad-login-form/);
 });
+
+test('signing in with an unknown email does not crash the server', async () => {
+  assert.strictEqual((await post('/api/auth/login', { email: 'nobody@example.com', password: 'whatever-1' })).status, 401);
+  assert.strictEqual((await fetch(`${B}/api/health`)).status, 200);
+});

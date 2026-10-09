@@ -15,6 +15,7 @@ const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const store = require('./store');
 const admin = require('./admin');
+const mail = require('./mail');
 
 const ON = process.env.ACCOUNTS === '1';
 const GOOGLE_ID = process.env.GOOGLE_CLIENT_ID || '';
@@ -86,6 +87,37 @@ function sameOrigin(req, res, next) {
   next();
 }
 
+// ------------------------------------------------------------ email codes --
+// 6 digits, valid 15 minutes, 5 wrong tries, at most one email a minute and 5 an hour per address.
+const CODE_MS = 15 * 60000;
+const codeHash = (email, code) => crypto.createHmac('sha256', store.secret()).update(`${email}:${code}`).digest('hex');
+async function issueCode(email, purpose, extra) {
+  const old = store.getCode(email);
+  const sent = ((old && old.sent) || []).filter((t) => t > Date.now() - 36e5);
+  if (sent.length && Date.now() - sent[sent.length - 1] < 60000) return { status: 429, error: 'We just sent a code. Please wait a minute before asking for another.' };
+  if (sent.length >= 5) return { status: 429, error: 'Too many codes for this email. Please try again in an hour.' };
+  const code = String(crypto.randomInt(0, 1e6)).padStart(6, '0');
+  try { await mail.sendCode(email, code, purpose); } catch (e) {
+    console.error('Email failed:', e.message);
+    return { status: 502, error: 'We could not send the email. Please check the address or try again in a minute.' };
+  }
+  store.setCode(email, { purpose, hash: codeHash(email, code), exp: Date.now() + CODE_MS, tries: 0, sent: [...sent, Date.now()], ...extra });
+  return null;
+}
+function checkCode(email, purpose, code) {
+  const rec = store.getCode(email);
+  const bad = { error: 'That code is not right. Check the email and try again.' };
+  if (!rec || rec.purpose !== purpose) return { error: 'This code has expired. Ask for a new one.' };
+  if (rec.exp < Date.now()) return { error: 'This code has expired. Ask for a new one.' };
+  if (rec.tries >= 5) return { error: 'Too many wrong codes. Ask for a new one.' };
+  const want = Buffer.from(rec.hash), got = Buffer.from(codeHash(email, String(code || '').replace(/\D/g, '')));
+  if (want.length !== got.length || !crypto.timingSafeEqual(want, got)) { rec.tries += 1; store.setCode(email, rec); return bad; }
+  return { rec };
+}
+
+// A real-looking hash for unknown emails, so they take as long to check as real ones.
+const DUMMY_HASH = `s1$${'0'.repeat(32)}$${'0'.repeat(64)}`;
+
 const noStore = (res) => res.set({ 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' });
 
 function mount(app, { pages, baseOf }) {
@@ -98,12 +130,13 @@ function mount(app, { pages, baseOf }) {
   // ----------------------------------------------------------------- pages --
   app.get('/signup', (req, res) => {
     if (currentUser(req)) return res.redirect(safeNext(req.query.next) || '/account');
-    html(res, pages.authPage('signup', baseOf(req), { google: GOOGLE, next: safeNext(req.query.next) }));
+    html(res, pages.authPage('signup', baseOf(req), { google: GOOGLE, mail: mail.ON, next: safeNext(req.query.next) }));
   });
   app.get('/login', (req, res) => {
     if (currentUser(req)) return res.redirect(safeNext(req.query.next) || '/account');
-    html(res, pages.authPage('login', baseOf(req), { google: GOOGLE, next: safeNext(req.query.next), error: req.query.error ? 'Google sign-in did not work. Please try again or use your email.' : '' }));
+    html(res, pages.authPage('login', baseOf(req), { google: GOOGLE, mail: mail.ON, next: safeNext(req.query.next), error: req.query.error ? 'Google sign-in did not work. Please try again or use your email.' : '' }));
   });
+  app.get('/forgot', (req, res) => html(res, pages.authPage('forgot', baseOf(req), { mail: mail.ON, next: safeNext(req.query.next) })));
   app.get('/account', (req, res) => {
     const u = currentUser(req);
     if (!u) return res.redirect('/login?next=/account');
@@ -120,7 +153,62 @@ function mount(app, { pages, baseOf }) {
     if (old) {
       return res.status(409).json({ error: old.pw ? 'You already have an account with this email. Sign in instead.' : 'This email is linked to Google. Use Continue with Google.', field: 'email', login: true });
     }
-    const u = store.create({ email, name: String(req.body.name || '').trim(), pw: await store.hashPassword(pw), via: 'email', country: country(req) });
+    const hash = await store.hashPassword(pw);
+    // With email set up, the account is only created once the emailed code is entered.
+    if (mail.ON) {
+      const err = await issueCode(email, 'signup', { pw: hash });
+      if (err) return res.status(err.status).json({ error: err.error });
+      return noStore(res).json({ verify: true, email });
+    }
+    const u = store.create({ email, name: String(req.body.name || '').trim(), pw: hash, via: 'email', country: country(req) });
+    startSession(req, res, u);
+    noStore(res).json({ user: store.publicUser(u) });
+  });
+
+  // Enter the emailed code: finishes a sign-up.
+  app.post('/api/auth/verify', authLimit, json, sameOrigin, (req, res) => {
+    const email = store.normEmail(req.body.email);
+    const c = checkCode(email, 'signup', req.body.code);
+    if (c.error) return res.status(400).json({ error: c.error });
+    store.delCode(email);
+    let u = store.byEmail(email);
+    if (u) store.update(u, { verified: true }); // signed up twice in parallel, or via Google meanwhile
+    else u = store.create({ email, pw: c.rec.pw, via: 'email', verified: true, country: country(req) });
+    startSession(req, res, u);
+    noStore(res).json({ user: store.publicUser(u) });
+  });
+
+  app.post('/api/auth/resend', authLimit, json, sameOrigin, async (req, res) => {
+    const email = store.normEmail(req.body.email);
+    const old = store.getCode(email);
+    if (!old || old.purpose !== req.body.purpose) return res.status(400).json({ error: 'Start again: the code request has expired.' });
+    const err = await issueCode(email, old.purpose, { pw: old.pw });
+    if (err) return res.status(err.status).json({ error: err.error });
+    noStore(res).json({ ok: true });
+  });
+
+  // Forgot password: email a code, then set a new password with it. The answer is the same
+  // whether or not the email has an account, so nobody can find out who is signed up.
+  app.post('/api/auth/forgot', authLimit, json, sameOrigin, async (req, res) => {
+    const email = store.normEmail(req.body.email);
+    if (!store.okEmail(email)) return res.status(400).json({ error: 'Please enter a valid email address.' });
+    if (!mail.ON) return res.status(503).json({ error: 'Password reset by email is not available yet. Please contact us.' });
+    if (store.byEmail(email)) {
+      const err = await issueCode(email, 'reset', {});
+      if (err && err.status !== 429) return res.status(err.status).json({ error: err.error });
+    }
+    noStore(res).json({ verify: true, email });
+  });
+  app.post('/api/auth/reset', authLimit, json, sameOrigin, async (req, res) => {
+    const email = store.normEmail(req.body.email);
+    const pw = String(req.body.password || '');
+    if (pw.length < 8 || pw.length > 200) return res.status(400).json({ error: 'Use at least 8 characters for your new password.', field: 'password' });
+    const c = checkCode(email, 'reset', req.body.code);
+    const u = store.byEmail(email);
+    if (c.error || !u) return res.status(400).json({ error: c.error || 'That code is not right. Check the email and try again.' });
+    store.delCode(email);
+    store.update(u, { pw: await store.hashPassword(pw), verified: true });
+    store.signedIn(u);
     startSession(req, res, u);
     noStore(res).json({ user: store.publicUser(u) });
   });
@@ -129,7 +217,7 @@ function mount(app, { pages, baseOf }) {
     const u = store.byEmail(req.body.email);
     const pw = String(req.body.password || '');
     // Check a password even for unknown emails, so the response time does not reveal who has an account.
-    const ok = await store.checkPassword(pw, u ? u.pw : 's1$00$00');
+    const ok = await store.checkPassword(pw, (u && u.pw) || DUMMY_HASH);
     if (!u || !ok) {
       if (u && !u.pw) return res.status(401).json({ error: 'This email signs in with Google. Use Continue with Google.' });
       return res.status(401).json({ error: 'Wrong email or password.' });
@@ -196,10 +284,10 @@ function mount(app, { pages, baseOf }) {
         if (!r.ok || p.aud !== GOOGLE_ID || !/^(https:\/\/)?accounts\.google\.com$/.test(p.iss) || !p.sub || !p.email || p.email_verified === false) return done(false);
         let u = store.byGoogle(p.sub) || store.byEmail(p.email);
         if (u) {
-          store.update(u, { google: p.sub, name: u.name || p.name || '' });
+          store.update(u, { google: p.sub, name: u.name || p.name || '', verified: true });
           store.signedIn(u);
         } else {
-          u = store.create({ email: p.email, name: p.name || '', google: p.sub, via: 'google', country: country(req) });
+          u = store.create({ email: p.email, name: p.name || '', google: p.sub, via: 'google', verified: true, country: country(req) });
         }
         startSession(req, res, u);
         done(true);
@@ -232,4 +320,4 @@ function mount(app, { pages, baseOf }) {
   });
 }
 
-module.exports = { mount, ON, GOOGLE, ADMIN_PATH, _internals: { sign, unsign, safeNext } };
+module.exports = { mount, ON, GOOGLE, ADMIN_PATH, MAIL: mail.ON, _internals: { sign, unsign, safeNext } };

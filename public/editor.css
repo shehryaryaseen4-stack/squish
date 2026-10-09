@@ -507,8 +507,11 @@ body.is-editing .pe-app{height:auto;}
 
 /* Sign-up before download */
 .pe-auth-dlg{width:min(420px, calc(100vw - 32px));}
-.pe-auth{position:relative; display:grid; gap:10px; text-align:left;}
-.pe-auth-x{position:absolute; top:-4px; right:-4px; width:34px; height:34px; display:grid; place-items:center; border:0; border-radius:8px; background:none; color:var(--dim); cursor:pointer;}
+.pe-auth-dlg{position:relative;}
+.pe-auth{display:grid; gap:10px; text-align:left;}
+.pe-auth[hidden]{display:none;}
+.pe-auth-code-input{font-size:1.5rem !important; font-weight:800; letter-spacing:.4em; text-align:center;}
+.pe-auth-x{position:absolute; top:14px; right:14px; z-index:1; width:34px; height:34px; display:grid; place-items:center; border:0; border-radius:8px; background:none; color:var(--dim); cursor:pointer;}
 .pe-auth-x:hover{background:var(--btn-bg, #F1F2F4); color:var(--ink);}
 .pe-auth-x svg,.pe-auth-ico svg{width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
 .pe-auth-ico{display:grid; place-items:center; width:48px; height:48px; border-radius:50%; background:#FDE8E7; color:var(--brand);}

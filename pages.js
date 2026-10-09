@@ -979,27 +979,53 @@ function accountShell(base, p, title, desc, body) {
     BODY: `<div class="acct">${body}</div><script src="/account.js?v=${seo.ASSET_V.account}" defer></script>`,
   });
 }
-// kind: 'login' | 'signup'
-function authPage(kind, base, { google = false, next = '', error = '' } = {}) {
-  const signup = kind === 'signup';
+// kind: 'login' | 'signup' | 'forgot'. With email set up (mail), sign-up and password reset
+// continue with a 6-digit code sent by email (the .auth-code step, run by account.js).
+const ICON_MAIL = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>';
+function authPage(kind, base, { google = false, mail = false, next = '', error = '' } = {}) {
+  const signup = kind === 'signup', forgot = kind === 'forgot';
   const q = next ? `?next=${encodeURIComponent(next)}` : '';
-  return accountShell(base, signup ? '/signup' : '/login', `${signup ? 'Create your free account' : 'Sign in'} | ${SITE}`, signup ? `Create a free ${SITE} account.` : `Sign in to ${SITE}.`, `<section class="auth-card">
-    <a class="auth-brand" href="/">${BRAND_SVG}<span>${brandName(SITE)}</span></a>
-    <h1>${signup ? 'Create your free account' : 'Welcome back'}</h1>
-    <p class="auth-lede">${signup ? 'Free forever. You need it to download from the PDF editor.' : `Sign in to your ${esc(SITE)} account.`}</p>
-    ${google ? `<a class="auth-google" href="/auth/google${q}">${GOOGLE_G}Continue with Google</a>
-    <div class="auth-or"><span>or</span></div>` : ''}
-    <form class="auth-form" data-auth="${signup ? 'signup' : 'login'}" data-next="${esc(next)}" novalidate>
+  const T = {
+    signup: ['/signup', 'Create your free account', `Create a free ${SITE} account.`, 'Free forever. You need it to download from the PDF editor.', 'Create account'],
+    login: ['/login', 'Welcome back', `Sign in to ${SITE}.`, `Sign in to your ${esc(SITE)} account.`, 'Sign in'],
+    forgot: ['/forgot', 'Reset your password', `Reset your ${SITE} password.`, mail ? 'Enter your email and we will send you a code to set a new password.' : 'Password reset by email is not available yet.', 'Send code'],
+  }[kind];
+  const helpLine = CONTACT_EMAIL ? `email ${mailLink} from your account address and we will help` : `${link('/contact', 'contact us')} and we will help`;
+  const codeStep = mail && !(kind === 'login') ? `<form class="auth-code" data-purpose="${forgot ? 'reset' : 'signup'}" hidden novalidate>
+      <span class="auth-ico">${ICON_MAIL}</span>
+      <h1>Check your email</h1>
+      <p class="auth-lede">We sent a 6-digit code to <strong data-email></strong>. Enter it below. It works for 15 minutes.</p>
+      <label for="authCode">Code</label>
+      <input id="authCode" class="auth-code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" required>
+      ${forgot ? `<label for="authNewPass">New password</label>
+      <input type="password" id="authNewPass" autocomplete="new-password" minlength="8" placeholder="At least 8 characters" required>` : ''}
+      <button type="submit" class="btn btn-brand">${forgot ? 'Set new password' : 'Verify and create account'}</button>
+      <p class="auth-msg" role="alert" hidden></p>
+      <p class="auth-small">No email? Look in your spam or promotions folder. <button type="button" class="auth-link" data-resend>Send a new code</button> &middot; <button type="button" class="auth-link" data-back>Use a different email</button></p>
+    </form>` : '';
+  const form = forgot && !mail
+    ? `<p class="auth-small">Forgot your password? Please ${helpLine}.</p>`
+    : `<form class="auth-form" data-auth="${kind}" data-next="${esc(next)}" novalidate>
       <label for="authEmail">Email address</label>
       <input type="email" id="authEmail" name="email" autocomplete="email" placeholder="you@example.com" required>
-      <label for="authPass">Password</label>
-      <input type="password" id="authPass" name="password" autocomplete="${signup ? 'new-password' : 'current-password'}" minlength="8" placeholder="${signup ? 'At least 8 characters' : ''}" required>
-      <button type="submit" class="btn btn-brand">${signup ? 'Create account' : 'Sign in'}</button>
+      ${forgot ? '' : `<label for="authPass">Password</label>
+      <input type="password" id="authPass" name="password" autocomplete="${signup ? 'new-password' : 'current-password'}" minlength="8" placeholder="${signup ? 'At least 8 characters' : ''}" required>`}
+      <button type="submit" class="btn btn-brand">${T[4]}</button>
       <p class="auth-msg" role="alert"${error ? '' : ' hidden'}>${esc(error)}</p>
-    </form>
-    ${signup ? `<p class="auth-small">By creating an account you agree to our ${link('/terms', 'Terms')} and ${link('/privacy', 'Privacy Policy')}.</p>`
-    : `<p class="auth-small">Forgot your password? ${CONTACT_EMAIL ? `Email ${mailLink} from your account address and we will help.` : link('/contact', 'Contact us') + ' and we will help.'}</p>`}
-    <p class="auth-switch">${signup ? `Already have an account? ${link(`/login${q}`, 'Sign in')}` : `New to ${esc(SITE)}? ${link(`/signup${q}`, 'Create a free account')}`}</p>
+    </form>`;
+  return accountShell(base, T[0], `${forgot ? 'Reset password' : signup ? 'Create your free account' : 'Sign in'} | ${SITE}`, T[2], `<section class="auth-card">
+    <a class="auth-brand" href="/">${BRAND_SVG}<span>${brandName(SITE)}</span></a>
+    <div class="auth-step1">
+    <h1>${T[1]}</h1>
+    <p class="auth-lede">${T[3]}</p>
+    ${google && !forgot ? `<a class="auth-google" href="/auth/google${q}">${GOOGLE_G}Continue with Google</a>
+    <div class="auth-or"><span>or</span></div>` : ''}
+    ${form}
+    ${signup ? `<p class="auth-small">${mail ? 'We will email you a code to confirm your address. ' : ''}By creating an account you agree to our ${link('/terms', 'Terms')} and ${link('/privacy', 'Privacy Policy')}.</p>`
+    : kind === 'login' ? `<p class="auth-small">${mail ? `${link(`/forgot${q}`, 'Forgot your password?')}` : `Forgot your password? Please ${helpLine}.`}</p>` : ''}
+    <p class="auth-switch">${signup ? `Already have an account? ${link(`/login${q}`, 'Sign in')}` : forgot ? `Remembered it? ${link(`/login${q}`, 'Sign in')}` : `New to ${esc(SITE)}? ${link(`/signup${q}`, 'Create a free account')}`}</p>
+    </div>
+    ${codeStep}
   </section>
   ${signup ? '<ul class="auth-perks"><li>Download your edited PDFs</li><li>Converters stay free without an account</li></ul>' : ''}`);
 }
@@ -1052,7 +1078,7 @@ const INFO_PAGES = {
       <h2>Data we process</h2>
       <p>Like every website, our server receives your IP address and basic request information (browser type, the page requested). We use your IP address only to apply a rate limit that protects the service from abuse; it is held in memory for up to 15 minutes.</p>
 ${ACCOUNTS ? `      <h2>Your account</h2>
-      <p>You need a free account to download PDFs from the ${link('/edit-pdf', 'PDF editor')}; the converters work without one. For an account we keep your email address, your name if you signed in with Google, your password in scrambled (hashed) form so nobody can read it, when you joined and last signed in, the country your connection comes from, and how many PDFs you downloaded from the editor. We use this only to run your account and to understand how the site is used. We never sell it or share it, and we do not send marketing email without asking you first.</p>
+      <p>You need a free account to download PDFs from the ${link('/edit-pdf', 'PDF editor')}; the converters work without one. For an account we keep your email address, your name if you signed in with Google, your password in scrambled (hashed) form so nobody can read it, when you joined and last signed in, the country your connection comes from, and how many PDFs you downloaded from the editor. We use this only to run your account and to understand how the site is used. The only emails we send are the codes that confirm your address or reset your password; they are delivered by our email delivery provider. We never sell it or share it, and we do not send marketing email without asking you first.</p>
       <p>If you choose Continue with Google, Google tells us your email address and name; we receive nothing else from your Google account. You can delete your account at any time on your ${link('/account', 'account page')}, which removes everything we hold about you.</p>
 ` : ''}      <h2>Cookies and local storage</h2>
       <p>${ACCOUNTS ? `When you sign in, ${SITE} sets one cookie that keeps you signed in. It is needed for the account to work and is not used for tracking. Without an account, ${SITE} sets no cookies of its own.` : `${SITE} itself sets no cookies and stores nothing in your browser.`}</p>

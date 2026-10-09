@@ -92,6 +92,7 @@ function dashboard({ users, daily, path, store }) {
   const sum = (a, n = a.length) => a.slice(-n).reduce((x, y) => x + y, 0);
   const totalDownloads = users.reduce((a, u) => a + (u.downloads || 0), 0);
   const google = users.filter((u) => u.via === 'google').length;
+  const verified = users.filter((u) => u.verified).length;
   // Of the visitors who met the sign-up box in the editor (30 days), how many signed up.
   const conv = walls ? `${Math.round((100 * Math.min(sum(signups), walls)) / walls)}%` : '–';
 
@@ -99,7 +100,7 @@ function dashboard({ users, daily, path, store }) {
   const list = [...users].sort((a, b) => (a.created < b.created ? 1 : -1));
   const SHOW = 2000, PAGE = 50;
   const rows = list.slice(0, SHOW).map((u, i) => `<tr${i >= PAGE ? ' hidden data-more' : ''} data-id="${esc(u.id)}" data-q="${esc(`${u.email} ${u.name} ${u.country}`.toLowerCase())}">
-      <td class="ad-email">${esc(u.email)}${u.name ? `<span>${esc(u.name)}</span>` : ''}</td>
+      <td class="ad-email">${esc(u.email)}${u.verified ? '<b class="ad-ok" title="Email confirmed">&#10003;</b>' : '<b class="ad-unv" title="Email not confirmed">not confirmed</b>'}${u.name ? `<span>${esc(u.name)}</span>` : ''}</td>
       <td><span class="ad-pill ad-pill-${u.via === 'google' ? 'g' : 'e'}">${u.via === 'google' ? 'Google' : 'Email'}</span></td>
       <td>${u.country ? `${flag(u.country)} ${esc(u.country)}` : '<span class="ad-dim">–</span>'}</td>
       <td>${esc(when(u.created, tz))}</td>
@@ -117,7 +118,7 @@ function dashboard({ users, daily, path, store }) {
 </header>
 <main class="ad-main">
   <div class="ad-tiles">
-    ${tile('Users', fmt(users.length), `${fmt(users.length - google)} email &middot; ${fmt(google)} Google`)}
+    ${tile('Users', fmt(users.length), `${fmt(verified)} confirmed &middot; ${fmt(google)} via Google`)}
     ${tile('New today', fmt(signupsBy[today] || 0), `${fmt(sum(signups, 7))} in the last 7 days`)}
     ${tile('PDF downloads today', fmt((daily[today] && daily[today].downloads) || 0), `${fmt(totalDownloads)} by all users so far`)}
     ${tile('Sign-up rate', conv, `of ${fmt(walls)} who saw the sign-up box (30 days)`)}
@@ -142,8 +143,8 @@ function dashboard({ users, daily, path, store }) {
 
 function csv(users) {
   const cell = (v) => { const s = String(v ?? ''); return /[",\n\r]/.test(s) || /^[=+\-@]/.test(s) ? `"${s.replace(/^([=+\-@])/, "'$1").replace(/"/g, '""')}"` : s; };
-  const head = ['email', 'name', 'signed_up_with', 'country', 'joined', 'last_seen', 'logins', 'pdf_downloads'];
-  const lines = users.map((u) => [u.email, u.name, u.via, u.country, u.created, u.lastSeen, u.logins, u.downloads || 0].map(cell).join(','));
+  const head = ['email', 'name', 'signed_up_with', 'email_confirmed', 'country', 'joined', 'last_seen', 'logins', 'pdf_downloads'];
+  const lines = users.map((u) => [u.email, u.name, u.via, u.verified ? 'yes' : 'no', u.country, u.created, u.lastSeen, u.logins, u.downloads || 0].map(cell).join(','));
   return `${head.join(',')}\n${lines.join('\n')}\n`;
 }
 

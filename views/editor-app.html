@@ -323,8 +323,8 @@
 
   <!-- Sign-up before download (only when accounts are on) -->
   <dialog class="pe-dialog pe-auth-dlg" id="peAuthDlg" aria-labelledby="peAuthTitle">
+    <button type="button" class="pe-auth-x" data-close aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     <form class="pe-dlg-inner pe-auth" novalidate>
-      <button type="button" class="pe-auth-x" data-close aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
       <span class="pe-auth-ico"><svg viewBox="0 0 24 24"><path d="M12 4v12m-5-5 5 5 5-5M5 20h14"/></svg></span>
       <h2 id="peAuthTitle" data-t-signup="Create a free account to download" data-t-login="Sign in to download">Create a free account to download</h2>
       <p class="pe-auth-lede">It is free and takes a few seconds. Your PDF stays open right here.</p>
@@ -336,6 +336,15 @@
       <button type="submit" class="btn btn-brand pe-auth-go" data-t-signup="Create account and download" data-t-login="Sign in and download">Create account and download</button>
       <p class="pe-auth-switch"><span data-t-signup="Already have an account?" data-t-login="New here?">Already have an account?</span> <button type="button" class="pe-link" data-auth-switch data-t-signup="Sign in" data-t-login="Create a free account">Sign in</button></p>
       <p class="pe-auth-small">By continuing you agree to our <a href="/terms" target="_blank" rel="noopener">Terms</a> and <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</p>
+    </form>
+    <form class="pe-dlg-inner pe-auth pe-auth-code" hidden novalidate>
+      <span class="pe-auth-ico"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span>
+      <h2>Check your email</h2>
+      <p class="pe-auth-lede">We sent a 6-digit code to <strong data-code-email></strong>. Enter it to create your account and download.</p>
+      <label class="pe-field">Code <input id="peAuthCode" class="pe-auth-code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"></label>
+      <p class="pe-auth-msg" role="alert" hidden></p>
+      <button type="submit" class="btn btn-brand pe-auth-go">Verify and download</button>
+      <p class="pe-auth-small">No email? Check spam or promotions. <button type="button" class="pe-link" data-code-resend>Send a new code</button> &middot; <button type="button" class="pe-link" data-code-back>Change email</button></p>
     </form>
   </dialog>
 
