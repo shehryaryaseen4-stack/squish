@@ -58,7 +58,14 @@ test('templates: 20+ editable designs, every font and object valid', async () =>
     assert.ok(t.size[0] > 200 && t.size[1] > 200, `${t.id} size`);
     assert.ok(t.items.length >= 8, `${t.id} has content`);
     for (const it of t.items) {
-      assert.ok(['text', 'rect', 'ellipse', 'line'].includes(it.type), `${t.id}: ${it.type}`);
+      assert.ok(['text', 'rect', 'ellipse', 'line', 'table'].includes(it.type), `${t.id}: ${it.type}`);
+      if (it.type === 'table') {
+        assert.ok(fonts.has(it.font), `${t.id}: table font`);
+        assert.equal(it.cells.length, it.rows); assert.equal(it.rh.length, it.rows);
+        assert.ok(it.cells.every((r) => r.length === it.cols), `${t.id}: ragged table`);
+        assert.ok(Math.abs(it.cw.reduce((a, b) => a + b, 0) - 1) < 1e-6, `${t.id}: column widths`);
+        assert.equal(it.h, it.rh.reduce((a, b) => a + b, 0));
+      }
       for (const k of ['x', 'y', 'w', 'h']) assert.ok(Number.isFinite(it[k]), `${t.id}: ${it.type} ${k}`);
       if (it.type === 'text') {
         assert.ok(it.text.trim(), `${t.id}: empty text box`);

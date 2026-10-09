@@ -32,18 +32,15 @@ const L = (x1, y1, x2, y2, o = {}) => {
 };
 const BOX = (x, y, color = '#9ca3af', s = 11) => R(x, y, s, s, { stroke: color, sw: 1.2, r: 2 });
 
-// a table: header row and body rows with column texts; cols = [[x, align, width], ...]
+// a real table object (editable in the editor: rows, columns, header, lines);
+// cols = [[width fraction, align], ...]
 function table({ x, y, w, cols, head, rows, rowH = 26, headFill, headColor = '#ffffff', line = '#e5e7eb', size = 10, font = 'helv', zebra }) {
-  const out = [R(x, y, w, rowH, { fill: headFill })];
-  const cell = (txt, c, top, o) => (c[1] === 'right' ? RT(txt, c[0], top, size, o) : c[1] === 'center' ? C(txt, c[0], top, size, o) : T(txt, c[0], top, size, o));
-  head.forEach((h, i) => out.push(cell(h, cols[i], y + (rowH - size * 1.2) / 2, { bold: true, color: headColor, font })));
-  rows.forEach((r, j) => {
-    const top = y + rowH * (j + 1);
-    if (zebra && j % 2) out.push(R(x, top, w, rowH, { fill: zebra }));
-    r.forEach((t, i) => { if (t) out.push(cell(t, cols[i], top + (rowH - size * 1.2) / 2, { font })); }); // blank rows stay free to fill
-    out.push(L(x, top + rowH, x + w, top + rowH, { color: line }));
-  });
-  return out;
+  const cells = [head, ...rows];
+  return {
+    type: 'table', x, y, w, h: rowH * cells.length, rows: cells.length, cols: cols.length,
+    cw: cols.map((c) => c[0]), align: cols.map((c) => c[1]), rh: cells.map(() => rowH), rmin: cells.map(() => rowH), cells,
+    head: true, font, size, color: '#1f2937', headFill, headColor, stripe: zebra || '', borders: 'rows', border: line, bw: 1, opacity: 100,
+  };
 }
 
 const lorem = 'Write a short summary here. Two or three sentences about\nwho you are, what you do best and what you are looking for.';
@@ -145,9 +142,9 @@ export const TEMPLATES = [
         T('Client Name\nClient Company Ltd\n45 Market Street, City\nclient@email.com', 50, 162, 10, { color: '#374151' }),
         T('PAYMENT', 330, 146, 9, { bold: true, color: blue }),
         T('Bank: City Bank\nAccount: 0123 4567 8910\nIBAN: XX00 CITY 0123 4567', 330, 162, 10, { color: '#374151' }),
-        ...table({
+        table({
           x: 50, y: 250, w: 495, headFill: blue, zebra: '#f8fafc',
-          cols: [[62, 'left'], [370, 'center'], [450, 'right'], [533, 'right']],
+          cols: [[0.56, 'left'], [0.12, 'center'], [0.16, 'right'], [0.16, 'right']],
           head: ['Description', 'Qty', 'Price', 'Amount'],
           rows: [['Website design', '1', '1,200.00', '1,200.00'], ['Logo and brand kit', '1', '450.00', '450.00'], ['Hosting (12 months)', '12', '15.00', '180.00'], ['Content writing, per page', '6', '40.00', '240.00'], ['', '', '', '']],
         }),
@@ -174,9 +171,9 @@ export const TEMPLATES = [
         R(50, 150, 495, 70, { fill: '#f0fdf4', stroke: '#bbf7d0', r: 6 }),
         T('PREPARED FOR', 64, 162, 8.5, { bold: true, color: green }),
         T('Mr. Daniel Lee\nLee Properties, 8 Hill Road, City', 64, 178, 10.5, { color: '#111827' }),
-        ...table({
+        table({
           x: 50, y: 244, w: 495, headFill: '#14532d', line: '#d1fae5',
-          cols: [[62, 'left'], [360, 'center'], [445, 'right'], [533, 'right']],
+          cols: [[0.52, 'left'], [0.14, 'center'], [0.17, 'right'], [0.17, 'right']],
           head: ['Service', 'Hours', 'Rate', 'Total'],
           rows: [['Garden design plan', '6', '50.00', '300.00'], ['Lawn installation', '16', '35.00', '560.00'], ['Planting and mulching', '10', '30.00', '300.00'], ['Irrigation system', '8', '45.00', '360.00']],
         }),
@@ -395,9 +392,9 @@ export const TEMPLATES = [
       ...[['Date', 'Monday, 12 October 2026'], ['Time', '10:00 - 11:30'], ['Place', 'Meeting room 3 / Video call'], ['Chair', 'Emma Wilson']].flatMap(([k, v], i) => [
         T(k, 50 + (i % 2) * 250, 124 + Math.floor(i / 2) * 22, 9.5, { bold: true, color: '#f97316' }), T(v, 95 + (i % 2) * 250, 124 + Math.floor(i / 2) * 22, 9.5, { color: '#374151' }),
       ]),
-      ...table({
+      table({
         x: 50, y: 190, w: 495, headFill: '#1f2937', rowH: 34, size: 10,
-        cols: [[62, 'left'], [140, 'left'], [440, 'left']],
+        cols: [[0.16, 'left'], [0.62, 'left'], [0.22, 'left']],
         head: ['Time', 'Topic', 'Lead'],
         rows: [['10:00', 'Welcome and goals for today', 'Emma'], ['10:10', 'Review of last month\'s actions', 'Raj'], ['10:30', 'Sales update and new targets', 'Sofia'], ['10:50', 'Product launch plan', 'Liam'], ['11:15', 'Questions and next steps', 'All'], ['', '', '']],
       }),

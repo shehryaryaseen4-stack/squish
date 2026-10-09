@@ -82,7 +82,7 @@ function ensureFont(id, bold = false, italic = false) {
   })().catch(() => {});
   fontLoads.set(key, job);
   // once the font is there, text boxes using it change size: redraw those pages
-  job.then(() => S.pages.forEach((p, i) => { if (p.items.some((it) => it.type === 'text' && it.font === id)) drawItems(i); }));
+  job.then(() => S.pages.forEach((p, i) => { if (p.items.some((it) => (it.type === 'text' || it.type === 'table') && it.font === id)) drawItems(i); }));
   return job;
 }
 let recentFonts = [];
@@ -124,6 +124,7 @@ const PROPS = {
   check: ['color', 'width'], cross: ['color', 'width'],
   rect: ['color', 'width', 'dash', 'fill', 'radius', 'opacity'], ellipse: ['color', 'width', 'dash', 'fill', 'opacity'],
   highlight: ['color', 'opacity'], whiteout: ['color'], image: ['opacity', 'replace'],
+  table: ['font', 'size', 'color', 'align', 'table', 'opacity'],
 };
 const DEFAULTS = {
   text: { color: '#111827', font: 'helv', size: 14, bold: false, italic: false, underline: false, align: 'left', opacity: 100 },
@@ -137,6 +138,7 @@ const DEFAULTS = {
   highlight: { color: '#ffe14d', opacity: 100 },
   whiteout: { color: '#ffffff', opacity: 100 },
   image: { opacity: 100 },
+  table: { font: 'helv', size: 10, color: '#1f2937', head: true, headFill: '#1f2937', headColor: '#ffffff', stripe: '#f3f4f6', borders: 'all', border: '#cbd5e1', bw: 0.75, opacity: 100 },
 };
 const defaultsFor = (tool) => DEFAULTS[tool === 'edittext' ? 'text' : tool];
 
@@ -150,6 +152,8 @@ const S = {
   editing: null,      // id of the text item being typed in
   undo: [], redo: [], dirty: false,
   runs: new Map(),    // pageId:rot -> text runs for "Edit text"
+  cell: null,         // { id, r, c }: the table cell rows and columns are added next to
+  cellEdit: null,     // { page, id, r, c }: the table cell being typed in
 };
 
 // ------------------------------------------------------------ libraries --
@@ -205,7 +209,7 @@ function snapshot() {
 function restore(json) {
   const before = structureKey();
   S.pages = JSON.parse(json);
-  S.sel = null; S.editing = null;
+  S.sel = null; S.editing = null; S.cell = null; S.cellEdit = null;
   S.current = clamp(S.current, 0, S.pages.length - 1);
   if (structureKey() !== before) rebuild(); else { S.pages.forEach((_, i) => drawItems(i)); updateProps(); }
   updateUndo();
@@ -370,6 +374,28 @@ function drawItems(index) {
       o.style.left = `${it.x * S.zoom}px`;
     }
   });
+  // table rows fit their text: never lower than the height the row was given (rmin), taller when
+  // the text needs it, and back down when the text gets shorter or the column wider
+  let grew = false;
+  p.items.forEach((it) => {
+    if (it.type !== 'table' || it.hidden) return;
+    const o = layer.querySelector(`.pe-obj[data-id="${it.id}"]`);
+    if (!o) return;
+    const min = minRowH(it);
+    const need = it.rh.map((h, r) => Math.max(min, it.rmin ? it.rmin[r] : h));
+    o.querySelectorAll('.pe-cell-text').forEach((sp) => {
+      const r = Number(sp.parentNode.dataset.r);
+      need[r] = Math.max(need[r], Math.ceil((sp.offsetHeight / S.zoom + TPAD.y * 2) * 2) / 2);
+    });
+    let g = false;
+    need.forEach((h, r) => { if (Math.abs(h - it.rh[r]) > 0.5) { it.rh[r] = h; g = true; } });
+    if (g) { fixTable(it); grew = true; }
+  });
+  if (grew && !drawItems.again) {
+    if (S.cellEdit) S.cellEdit.busy = true;
+    drawItems.again = true; drawItems(index); drawItems.again = false;
+    return;
+  }
   if (S.sel && S.sel.page === p.id) decorateSelection();
   renderUserGuides(el, p);
   drawThumbItems(p);
@@ -418,11 +444,17 @@ function renderObjects(layer, p, z, live) {
       } else if (it.type === 'highlight') {
         o.style.background = it.color; o.style.mixBlendMode = 'multiply';
         o.style.opacity = 0.45 * ((it.opacity ?? 100) / 100);
+      } else if (it.type === 'table') {
+        o.classList.add('pe-table');
+        o.style.fontFamily = cssFamily(it.font); o.style.fontSize = `${it.size * z}px`;
+        o.innerHTML = tableHtml(it, z, live);
+        if (!isStd(it.font)) { ensureFont(it.font, false, false); if (it.head) ensureFont(it.font, true, false); }
       } else {
         o.innerHTML = svgFor(it);
       }
     }
     layer.append(o);
+    if (it.type === 'table' && live && S.cellEdit && S.cellEdit.id === it.id) startCellEditing(o, it);
   });
   S.zoom = zoomSave;
 }
@@ -473,10 +505,242 @@ function arrowHead(it) {
   return [ang + Math.PI - 0.45, ang + Math.PI + 0.45].map((a) => [it.x2 + Math.cos(a) * len, it.y2 + Math.sin(a) * len]);
 }
 
+// ------------------------------------------------------------------ tables --
+// A table is one object: column widths (fractions of its width), row heights (points), the
+// text of every cell, an optional header row and a style. Text wraps inside its cell, and a
+// row grows when its text needs more room. Screen and PDF use the same lines and padding.
+const TPAD = { x: 6, y: 4 };
+const minRowH = (it) => it.size * LINE + TPAD.y * 2;
+const colXs = (it) => { const xs = [0]; it.cw.forEach((f) => xs.push(xs[xs.length - 1] + f * it.w)); return xs; };
+const rowYs = (it) => { const ys = [0]; it.rh.forEach((h) => ys.push(ys[ys.length - 1] + h)); return ys; };
+const isHeadRow = (it, r) => !!it.head && r === 0;
+const rowFill = (it, r) => (isHeadRow(it, r) ? it.headFill : it.stripe && (r - (it.head ? 1 : 0)) % 2 === 1 ? it.stripe : '');
+const escHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function fixTable(it) { it.rows = it.rh.length; it.cols = it.cw.length; it.h = round(it.rh.reduce((a, b) => a + b, 0)); }
+function newTable(rows, cols, x, y, w) {
+  const it = { id: uid(), type: 'table', ...DEFAULTS.table, x, y, w, cw: Array(cols).fill(1 / cols), align: Array(cols).fill('left') };
+  it.cells = Array.from({ length: rows }, (_, r) => Array.from({ length: cols }, (_, c) => (it.head && r === 0 ? `Heading ${c + 1}` : '')));
+  it.rh = Array(rows).fill(Math.ceil(minRowH(it) + 8));
+  it.rmin = it.rh.slice();
+  fixTable(it);
+  return it;
+}
+// the border lines in table points: [x1, y1, x2, y2]
+function tableLines(it) {
+  const xs = colXs(it), ys = rowYs(it), W = it.w, H = it.h, m = it.borders, out = [];
+  if (m === 'all' || m === 'outer') out.push([0, 0, W, 0], [W, 0, W, H], [W, H, 0, H], [0, H, 0, 0]);
+  if (m === 'all' || m === 'rows') for (let r = 1; r < it.rows; r++) out.push([0, ys[r], W, ys[r]]);
+  if (m === 'rows') out.push([0, H, W, H]);
+  if (m === 'all') for (let c = 1; c < it.cols; c++) out.push([xs[c], 0, xs[c], H]);
+  return out;
+}
+function tableHtml(it, z, live) {
+  const xs = colXs(it), ys = rowYs(it);
+  const just = { left: 'flex-start', center: 'center', right: 'flex-end' };
+  let html = '';
+  for (let r = 0; r < it.rows; r++) for (let c = 0; c < it.cols; c++) {
+    const head = isHeadRow(it, r), fill = rowFill(it, r), a = it.align[c] || 'left';
+    const active = live && S.cell && S.cell.id === it.id && S.cell.r === r && S.cell.c === c && S.sel && S.sel.id === it.id;
+    html += `<div class="pe-cell${active ? ' active' : ''}" data-r="${r}" data-c="${c}" style="left:${xs[c] * z}px;top:${ys[r] * z}px;width:${(xs[c + 1] - xs[c]) * z}px;height:${it.rh[r] * z}px;`
+      + `padding:${TPAD.y * z}px ${TPAD.x * z}px;${fill ? `background:${fill};` : ''}justify-content:${just[a]};text-align:${a};color:${head ? it.headColor : it.color};font-weight:${head ? 700 : 400}">`
+      + `<span class="pe-cell-text" dir="auto">${escHtml(it.cells[r][c])}</span></div>`;
+  }
+  return html + tableLinesSvg(it, z);
+}
+function tableLinesSvg(it, z) {
+  const lines = tableLines(it);
+  if (!lines.length) return '';
+  return `<svg class="pe-tlines" viewBox="0 0 ${it.w * z} ${it.h * z}"><path d="${lines.map(([a, b, c, d]) => `M${round(a * z)} ${round(b * z)}L${round(c * z)} ${round(d * z)}`).join('')}" fill="none" stroke="${it.border}" stroke-width="${it.bw * z}" stroke-linecap="square"/></svg>`;
+}
+// lines of one paragraph that fit maxW (long words are broken, like the screen does)
+async function wrapText(page, fo, para, size, maxW, measure) {
+  if (!para) return [''];
+  const width = async (t) => (await measure(page, fo, t, size)).width;
+  const out = [];
+  let cur = '';
+  for (const tok of para.split(/(\s+)/)) {
+    if (!tok) continue;
+    const next = cur + tok;
+    if (!cur || (await width(next.trimEnd())) <= maxW) { cur = next; continue; }
+    out.push(cur.trimEnd());
+    cur = tok.trimStart();
+  }
+  const res = [];
+  for (const line of [...out, cur.trimEnd()]) {
+    if (line.length < 2 || (await width(line)) <= maxW) { res.push(line); continue; }
+    let part = '';
+    for (const ch of Array.from(line)) { if (part && (await width(part + ch)) > maxW) { res.push(part); part = ''; } part += ch; }
+    res.push(part);
+  }
+  return res;
+}
+
+// typing in a cell
+function caretOffset(el) {
+  const sel = window.getSelection();
+  if (!sel.rangeCount || !el.contains(sel.anchorNode)) return null;
+  const end = sel.getRangeAt(0), r = end.cloneRange();
+  r.selectNodeContents(el); r.setEnd(end.endContainer, end.endOffset);
+  return r.toString().length;
+}
+function placeCaret(el, off) {
+  const range = document.createRange();
+  const t = el.firstChild;
+  if (t && t.nodeType === 3 && off != null) { range.setStart(t, Math.min(off, t.length)); range.collapse(true); } else { range.selectNodeContents(el); range.collapse(false); }
+  const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+}
+// new row heights without rebuilding the cells (keeps the one being typed in)
+function relayoutTable(o, it) {
+  const z = S.zoom, ys = rowYs(it);
+  o.style.height = `${it.h * z}px`;
+  o.querySelectorAll('.pe-cell').forEach((el) => { const r = Number(el.dataset.r); el.style.top = `${ys[r] * z}px`; el.style.height = `${it.rh[r] * z}px`; });
+  const old = o.querySelector('.pe-tlines');
+  if (old) old.remove();
+  o.insertAdjacentHTML('beforeend', tableLinesSvg(it, z));
+}
+function markActiveCell(it) {
+  $$(`.pe-page .pe-obj[data-id="${it.id}"] .pe-cell`).forEach((el) => el.classList.toggle('active', !!S.cell && S.cell.id === it.id && Number(el.dataset.r) === S.cell.r && Number(el.dataset.c) === S.cell.c));
+}
+function editCell(pageId, it, r, c) {
+  if (it.locked) return;
+  if (!(S.cellEdit && S.cellEdit.id === it.id)) { finishEditing(); snapshot(); }
+  S.sel = { page: pageId, id: it.id };
+  S.cell = { id: it.id, r, c };
+  S.cellEdit = { page: pageId, id: it.id, r, c, busy: true };
+  clearSelectionUi();
+  drawItems(pageIndex(pageId));
+  updateProps(); renderLayers();
+}
+function startCellEditing(o, it) {
+  const ce = S.cellEdit;
+  const span = o.querySelector(`.pe-cell[data-r="${ce.r}"][data-c="${ce.c}"] .pe-cell-text`);
+  if (!span) return;
+  span.parentNode.classList.add('editing');
+  span.contentEditable = 'plaintext-only';
+  if (span.contentEditable !== 'plaintext-only') span.contentEditable = 'true';
+  span.spellcheck = false;
+  // focus now (keys typed right after Tab must land here), and again after layout settles
+  const focusIt = () => { if (S.cellEdit !== ce || !span.isConnected) return; span.focus({ preventScroll: true }); placeCaret(span, ce.caret); };
+  focusIt();
+  requestAnimationFrame(() => { focusIt(); ce.busy = false; });
+  span.oninput = () => {
+    it.cells[ce.r][ce.c] = span.innerText.replace(/\n$/, '');
+    // a taller row moves the cells below in place, so the caret and the typing are not disturbed
+    const need = span.offsetHeight / S.zoom + TPAD.y * 2;
+    if (need > it.rh[ce.r] + 0.5) { it.rh[ce.r] = Math.ceil(need * 2) / 2; fixTable(it); relayoutTable(o, it); }
+    drawThumbItems(pageById(ce.page));
+  };
+  span.onkeydown = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finishEditing(); select(ce.page, it.id); return; }
+    if (e.key === 'Tab') { e.preventDefault(); moveCell(it, e.shiftKey ? -1 : 1); }
+  };
+  span.onblur = () => setTimeout(() => { if (S.cellEdit === ce && !ce.busy && !(document.activeElement && document.activeElement.closest('.pe-cell'))) finishEditing(); }, 0);
+  span.onpaste = (e) => { e.preventDefault(); document.execCommand('insertText', false, (e.clipboardData || window.clipboardData).getData('text/plain')); };
+}
+// Tab / Shift+Tab: next or previous cell; Tab in the last cell adds a row, as in Word
+function moveCell(it, d) {
+  const ce = S.cellEdit;
+  let n = ce.r * it.cols + ce.c + d;
+  if (n < 0) return;
+  if (n >= it.rows * it.cols) { addRow(it, it.rows); n = it.rows * it.cols - it.cols; }
+  S.cellEdit = { ...ce, r: Math.floor(n / it.cols), c: n % it.cols, caret: null, busy: true };
+  S.cell = { id: it.id, r: S.cellEdit.r, c: S.cellEdit.c };
+  drawItems(pageIndex(ce.page));
+}
+function addRow(it, at) {
+  it.cells.splice(at, 0, Array(it.cols).fill(''));
+  const ref = it.rh[Math.min(at, it.rows - 1)] || minRowH(it) + 8;
+  const h = Math.max(minRowH(it), Math.min(ref, minRowH(it) + 8));
+  it.rh.splice(at, 0, h);
+  if (it.rmin) it.rmin.splice(at, 0, h);
+  fixTable(it);
+}
+function addCol(it, at) {
+  const from = Math.min(at, it.cols - 1), half = it.cw[from] / 2;
+  it.cw[from] = half; it.cw.splice(at, 0, half);
+  it.align.splice(at, 0, it.align[from] || 'left');
+  it.cells.forEach((row, r) => row.splice(at, 0, isHeadRow(it, r) ? 'Heading' : ''));
+  fixTable(it);
+}
+function tableOp(op) {
+  const it = itemOf(S.sel);
+  if (!it || it.type !== 'table') return;
+  const cur = S.cell && S.cell.id === it.id ? S.cell : null;
+  const r = cur ? cur.r : it.rows - 1, c = cur ? cur.c : it.cols - 1;
+  finishEditing();
+  if (op.startsWith('align-')) {
+    snapshot();
+    const a = op.slice(6);
+    if (cur) it.align[c] = a; else it.align = it.align.map(() => a);
+  } else if (op === 'rowabove' || op === 'rowbelow') {
+    snapshot(); addRow(it, op === 'rowabove' ? r : r + 1);
+    if (cur) S.cell = { id: it.id, r: op === 'rowabove' ? r : r + 1, c };
+  } else if (op === 'colleft' || op === 'colright') {
+    snapshot(); addCol(it, op === 'colleft' ? c : c + 1);
+    if (cur) S.cell = { id: it.id, r, c: op === 'colleft' ? c : c + 1 };
+  } else if (op === 'delrow') {
+    if (it.rows < 2) { toast('A table needs at least one row. Use Delete to remove the whole table.'); return; }
+    snapshot(); it.cells.splice(r, 1); it.rh.splice(r, 1); if (it.rmin) it.rmin.splice(r, 1); fixTable(it);
+    if (cur) S.cell = { id: it.id, r: Math.min(r, it.rows - 1), c };
+  } else if (op === 'delcol') {
+    if (it.cols < 2) { toast('A table needs at least one column. Use Delete to remove the whole table.'); return; }
+    snapshot();
+    const w = it.cw[c]; it.cw.splice(c, 1); it.cw[Math.min(c, it.cw.length - 1)] += w;
+    it.align.splice(c, 1); it.cells.forEach((row) => row.splice(c, 1)); fixTable(it);
+    if (cur) S.cell = { id: it.id, r, c: Math.min(c, it.cols - 1) };
+  } else if (op === 'head') { snapshot(); it.head = !it.head; }
+  else if (op === 'stripe') { snapshot(); it.stripe = it.stripe ? '' : '#f3f4f6'; }
+  else if (op === 'equal') { snapshot(); it.cw = it.cw.map(() => 1 / it.cols); }
+  drawItems(pageIndex(S.sel.page)); updateProps(); updatePanel();
+}
+// Insert: a size picker under the Table button, like in word processors
+function toggleTablePicker() {
+  const pop = $('#peTblPop');
+  if (!pop.hidden) { pop.hidden = true; return; }
+  const btn = $('[data-act="tablepick"]').getBoundingClientRect();
+  pop.hidden = false;
+  pop.style.left = `${clamp(btn.left, 8, window.innerWidth - pop.offsetWidth - 8)}px`;
+  pop.style.top = `${btn.bottom + 6}px`;
+  showTableSize(3, 3);
+}
+function showTableSize(r, c) {
+  $$('#peTblGrid i').forEach((cell) => cell.classList.toggle('on', Number(cell.dataset.r) <= r && Number(cell.dataset.c) <= c));
+  $('#peTblSize').textContent = `${r} ${r === 1 ? 'row' : 'rows'} x ${c} ${c === 1 ? 'column' : 'columns'}`;
+}
+function insertTable(rows, cols) {
+  $('#peTblPop').hidden = true;
+  const p = S.pages[S.current];
+  if (!p) return;
+  finishEditing();
+  const [vw, vh] = viewSize(p);
+  const w = Math.min(vw - 96, Math.max(160, cols * 110));
+  const pageEl = $(`.pe-page[data-id="${p.id}"]`);
+  const view = $('#peView').getBoundingClientRect();
+  const visTop = pageEl ? Math.max(0, (view.top - pageEl.getBoundingClientRect().top) / S.zoom) : 0;
+  const it = newTable(rows, cols, round((vw - w) / 2), 0, w);
+  it.y = round(clamp(visTop + 60, 24, Math.max(24, vh - it.h - 24)));
+  snapshot();
+  p.items.push(it);
+  setTool('select');
+  drawItems(pageIndex(p.id));
+  select(p.id, it.id);
+  toast('Double-click a cell to type. Use the table buttons above to add rows and columns.');
+}
+function bindTables() {
+  const grid = $('#peTblGrid');
+  let html = '';
+  for (let r = 1; r <= 10; r++) for (let c = 1; c <= 8; c++) html += `<i data-r="${r}" data-c="${c}"></i>`;
+  grid.innerHTML = html;
+  grid.addEventListener('pointerover', (e) => { const i = e.target.closest('i'); if (i) showTableSize(Number(i.dataset.r), Number(i.dataset.c)); });
+  grid.addEventListener('click', (e) => { const i = e.target.closest('i'); if (i) insertTable(Number(i.dataset.r), Number(i.dataset.c)); });
+  document.addEventListener('click', (e) => { if (!e.target.closest('#peTblPop') && !e.target.closest('[data-act="tablepick"]')) $('#peTblPop').hidden = true; });
+}
+
 // --------------------------------------------------------------- selection --
 function select(pageId, id) {
   finishEditing();
   S.sel = id ? { page: pageId, id } : null;
+  if (!S.cell || S.cell.id !== id) S.cell = null;
   clearSelectionUi();
   if (S.sel) decorateSelection();
   updateProps(); renderLayers();
@@ -508,6 +772,12 @@ function decorateSelection() {
   else {
     [['nw', '0%', '0%'], ['ne', '100%', '0%'], ['sw', '0%', '100%'], ['se', '100%', '100%']].forEach(([h, x, y]) => handle(h, box, x, y));
     handle('rot', box, '50%', 0);
+    if (it.type === 'table' && !it.rot) {
+      // drag the lines between columns and under rows to resize them
+      const xs = colXs(it), ys = rowYs(it);
+      for (let c = 1; c < it.cols; c++) { const g = document.createElement('div'); g.className = 'pe-handle pe-tgrip col'; g.dataset.h = 'col'; g.dataset.i = c; g.style.left = `${xs[c] * z}px`; g.title = 'Drag to change the column width'; box.append(g); }
+      for (let r = 0; r < it.rows; r++) { const g = document.createElement('div'); g.className = 'pe-handle pe-tgrip row'; g.dataset.h = 'row'; g.dataset.i = r; g.style.top = `${ys[r + 1] * z}px`; g.title = 'Drag to change the row height'; box.append(g); }
+    }
   }
   layer.append(box);
 }
@@ -625,6 +895,13 @@ function editText(pageId, it) {
   updateProps();
 }
 function finishEditing() {
+  if (S.cellEdit) {
+    const ce = S.cellEdit;
+    S.cellEdit = null;
+    const i = pageIndex(ce.page);
+    if (i >= 0) drawItems(i);
+    updateProps();
+  }
   if (!S.editing) return;
   const id = S.editing;
   S.editing = null;
@@ -835,6 +1112,7 @@ async function editRunAt(p, pt) {
 
 // ------------------------------------------------------------ pointer input --
 let drag = null;
+let lastCellDown = null;
 
 function ptOf(e, pageEl) {
   const r = pageEl.getBoundingClientRect();
@@ -852,12 +1130,26 @@ function onPointerDown(e) {
   const it = objEl ? p.items.find((i) => i.id === objEl.dataset.id) : null;
 
   if (it && S.editing === it.id) return; // typing: let the browser place the caret
+  const cellEl = it && it.type === 'table' ? e.target.closest('.pe-cell') : null;
+  const rc = cellEl ? { r: Number(cellEl.dataset.r), c: Number(cellEl.dataset.c) } : null;
+  if (it && S.cellEdit && S.cellEdit.id === it.id && rc) {
+    if (rc.r === S.cellEdit.r && rc.c === S.cellEdit.c) return; // typing in this cell
+    e.preventDefault(); editCell(p.id, it, rc.r, rc.c); return;
+  }
+  // double-click (or double-tap) on a cell: type in it. Pointer events carry no click count,
+  // and the first click redraws the cell, so the two presses are matched here.
+  const now = performance.now(), prev = lastCellDown;
+  lastCellDown = rc ? { id: it.id, r: rc.r, c: rc.c, t: now } : null;
+  if (rc && prev && prev.id === it.id && prev.r === rc.r && prev.c === rc.c && now - prev.t < 450 && S.tool === 'select') {
+    lastCellDown = null; e.preventDefault(); editCell(p.id, it, rc.r, rc.c); return;
+  }
 
   if (handle) {
     e.preventDefault();
     const sel = itemOf(S.sel);
     if (!sel) return;
-    drag = { kind: handle.dataset.h === 'rot' ? 'rotate' : 'resize', h: handle.dataset.h, page: p, it: sel, start: pt, orig: JSON.parse(JSON.stringify(sel)), moved: false };
+    const hk = handle.dataset.h;
+    drag = { kind: hk === 'rot' ? 'rotate' : hk === 'col' || hk === 'row' ? 'tgrip' : 'resize', h: hk, i: Number(handle.dataset.i), page: p, it: sel, start: pt, orig: JSON.parse(JSON.stringify(sel)), moved: false };
     pageEl.setPointerCapture(e.pointerId);
     return;
   }
@@ -867,13 +1159,14 @@ function onPointerDown(e) {
     if (!it) { select(null, null); return; }
     e.preventDefault();
     if (!(S.sel && S.sel.id === it.id)) select(p.id, it.id);
-    drag = { kind: 'move', page: p, it, start: pt, orig: { x: it.x, y: it.y }, moved: false, pageEl };
+    drag = { kind: 'move', page: p, it, start: pt, orig: { x: it.x, y: it.y }, moved: false, pageEl, rc };
     pageEl.setPointerCapture(e.pointerId);
     return;
   }
   if (tool === 'text') {
     e.preventDefault();
     if (it && it.type === 'text') { editText(p.id, it); return; }
+    if (it && it.type === 'table' && rc) { setTool('select'); editCell(p.id, it, rc.r, rc.c); return; }
     finishEditing();
     snapshot();
     const d = DEFAULTS.text;
@@ -960,6 +1253,22 @@ function onPointerMove(e) {
     updatePanel();
     return;
   }
+  if (drag.kind === 'tgrip') {
+    if (!drag.moved) { snapshot(); drag.moved = true; }
+    const it = drag.it, o = drag.orig, i = drag.i;
+    if (drag.h === 'col') {
+      const pair = (o.cw[i - 1] + o.cw[i]) * it.w, min = Math.min(28, pair / 2 - 1);
+      const left = clamp(o.cw[i - 1] * it.w + pt.x - drag.start.x, min, pair - min);
+      it.cw[i - 1] = left / it.w; it.cw[i] = (pair - left) / it.w;
+    } else {
+      it.rh[i] = Math.max(minRowH(it), round(o.rh[i] + pt.y - drag.start.y));
+      it.rmin = (o.rmin || o.rh).slice(); it.rmin[i] = it.rh[i];
+      fixTable(it);
+    }
+    drawItems(pageIndex(drag.page.id));
+    updatePanel();
+    return;
+  }
   if (drag.kind === 'rotate') {
     if (!drag.moved) { snapshot(); drag.moved = true; }
     const it = drag.it;
@@ -998,6 +1307,7 @@ function onPointerMove(e) {
       const cx = o.x + o.w / 2 + mx * cs - my * sn, cy = o.y + o.h / 2 + mx * sn + my * cs;
       if (it.type === 'text') it.size = clamp(Math.round(o.size * (w / o.w) * 10) / 10, 4, 400);
       Object.assign(it, { x: cx - w / 2, y: cy - h / 2, w, h });
+      if (it.type === 'table') { it.rh = o.rh.map((rh) => Math.max(minRowH(it), round(rh * (h / o.h)))); it.rmin = it.rh.slice(); fixTable(it); }
     }
     drawItems(pageIndex(drag.page.id));
     updatePanel();
@@ -1059,10 +1369,11 @@ function onPointerUp() {
   if (!drag) return;
   const d = drag; drag = null;
   const p = d.page, idx = pageIndex(p.id);
-  if (d.kind === 'move' || d.kind === 'resize' || d.kind === 'rotate') {
+  if (d.kind === 'move' || d.kind === 'resize' || d.kind === 'rotate' || d.kind === 'tgrip') {
     showGuides(null);
     if (d.moved) { drawItems(idx); updateProps(); updatePanel(); }
     else if (d.kind === 'move' && d.it.type === 'text' && S.tool !== 'select') editText(p.id, d.it);
+    else if (d.kind === 'move' && d.it.type === 'table' && d.rc) { S.cell = { id: d.it.id, ...d.rc }; markActiveCell(d.it); updateProps(); }
     return;
   }
   if (d.kind === 'pen') {
@@ -1108,7 +1419,7 @@ function setTool(tool) {
   $$('[data-tool]').forEach((b) => b.setAttribute('aria-pressed', String(b === more ? SHAPES.has(tool) : b.dataset.tool === tool)));
   moveToolIndicator();
   $$('.pe-layer').forEach((l) => { l.className = `pe-layer tool-${tool}`; });
-  $('#peView').dataset.tool = tool; // guides can be grabbed with the Select tool only
+  $('#peView').dataset.curTool = tool; // guides can be grabbed with the Select tool only
   hideRuns();
   S.runToast = false;
   if (RUNS[tool]) $$('.pe-page').forEach((el) => { if (el.getBoundingClientRect().bottom > 0 && el.getBoundingClientRect().top < window.innerHeight) showRuns(el); });
@@ -1163,12 +1474,18 @@ function updateProps() {
     if ('bold' in o) FIELDS.bold.setAttribute('aria-pressed', String(!!o.bold));
     if ('italic' in o) FIELDS.italic.setAttribute('aria-pressed', String(!!o.italic));
     if ('underline' in o) FIELDS.underline.setAttribute('aria-pressed', String(!!o.underline));
-    $$('[data-align]').forEach((b) => b.setAttribute('aria-pressed', String((o.align || 'left') === b.dataset.align)));
+    const al = o.type === 'table' ? o.align[S.cell && S.cell.id === o.id ? S.cell.c : 0] : o.align;
+    $$('[data-align]').forEach((b) => b.setAttribute('aria-pressed', String((al || 'left') === b.dataset.align)));
+    if (o.type === 'table') {
+      $('#tHead').setAttribute('aria-pressed', String(!!o.head));
+      $('#tStripe').setAttribute('aria-pressed', String(!!o.stripe));
+      $('#tBorders').value = o.borders; $('#tBorder').value = o.border; $('#tHeadFill').value = o.headFill;
+    }
     if ('dash' in o) FIELDS.dash.value = o.dash || 'solid';
     if ('radius' in o) { FIELDS.radius.value = o.radius || 0; $('#pRadiusOut').textContent = o.radius || 0; }
     if ('opacity' in o) { FIELDS.opacity.value = o.opacity; $('#pOpacityOut').textContent = `${o.opacity}%`; }
   }
-  $('#peHint').textContent = t && t.item ? 'Delete key removes the selected object.' : HINTS[S.tool] || '';
+  $('#peHint').textContent = t && t.item ? (t.kind === 'table' ? 'Double-click a cell to type. Tab moves to the next cell. Drag the lines between columns and rows to resize them.' : 'Delete key removes the selected object.') : HINTS[S.tool] || '';
   updatePanel();
 }
 let propSnap = false;
@@ -1201,7 +1518,17 @@ function bindProps() {
   FIELDS.bold.addEventListener('click', () => { const t = propTarget(); if (t && t.item && t.obj.type === 'text') ensureFont(t.obj.font, !t.obj.bold, t.obj.italic); toggleProp('bold'); });
   FIELDS.italic.addEventListener('click', () => { const t = propTarget(); if (t && t.item && t.obj.type === 'text') ensureFont(t.obj.font, t.obj.bold, !t.obj.italic); toggleProp('italic'); });
   FIELDS.underline.addEventListener('click', () => toggleProp('underline'));
-  $$('[data-align]').forEach((b) => b.addEventListener('click', () => { setProp('align', b.dataset.align); end(); updateProps(); }));
+  $$('[data-align]').forEach((b) => b.addEventListener('click', () => {
+    const t = propTarget();
+    if (t && t.item && t.obj.type === 'table') tableOp(`align-${b.dataset.align}`);
+    else { setProp('align', b.dataset.align); end(); }
+    updateProps();
+  }));
+  $$('[data-tbl]').forEach((b) => { b.addEventListener('mousedown', (e) => e.preventDefault()); b.addEventListener('click', () => tableOp(b.dataset.tbl)); });
+  $('#tBorders').addEventListener('change', () => { setProp('borders', $('#tBorders').value); end(); });
+  $('#tBorder').addEventListener('input', () => setProp('border', $('#tBorder').value));
+  $('#tHeadFill').addEventListener('input', () => setProp('headFill', $('#tHeadFill').value));
+  [$('#tBorder'), $('#tHeadFill')].forEach((f) => f.addEventListener('change', end));
   FIELDS.dash.addEventListener('change', () => { setProp('dash', FIELDS.dash.value); end(); });
   FIELDS.radius.addEventListener('input', () => { $('#pRadiusOut').textContent = FIELDS.radius.value; setProp('radius', Number(FIELDS.radius.value)); });
   $('#pFontBtn').addEventListener('click', (e) => { e.stopPropagation(); if ($('#peFontPop').hidden) openFontPicker(); else closeFontPicker(); });
@@ -1363,11 +1690,12 @@ function rotateSel(deg) {
   drawItems(pageIndex(S.sel.page)); updatePanel();
 }
 
-const LAYER_NAMES = { image: 'Image', pen: 'Drawing', highlight: 'Highlight', whiteout: 'Whiteout', rect: 'Rectangle', ellipse: 'Circle', line: 'Line', arrow: 'Arrow', check: 'Check mark', cross: 'Cross' };
+const LAYER_NAMES = { table: 'Table', image: 'Image', pen: 'Drawing', highlight: 'Highlight', whiteout: 'Whiteout', rect: 'Rectangle', ellipse: 'Circle', line: 'Line', arrow: 'Arrow', check: 'Check mark', cross: 'Cross' };
 const LAYER_ICONS = {
   text: '<path d="M5 6V4h14v2M12 4v16m-3 0h6"/>', image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>',
   pen: '<path d="M3 21c3-1 4-4 7-7l7-7a2.1 2.1 0 0 0-3-3l-7 7c-3 3-6 4-7 7z"/>', highlight: '<path d="M9 11l-5 5v4h4l5-5"/><path d="M9 11l6-6 4 4-6 6z"/>',
   whiteout: '<rect x="3" y="6" width="18" height="12" rx="1.5"/>', rect: '<rect x="4" y="5" width="16" height="14" rx="1"/>', ellipse: '<ellipse cx="12" cy="12" rx="8" ry="7"/>',
+  table: '<rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 15h18M9 4v16M15 4v16"/>',
   line: '<path d="M5 19L19 5"/>', arrow: '<path d="M5 19L19 5m-8 0h8v8"/>', check: '<path d="M5 12l5 5L20 7"/>', cross: '<path d="M6 6l12 12M18 6L6 18"/>',
 };
 const EYE = '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>';
@@ -1773,6 +2101,9 @@ function openCtx(e) {
   const m = $('#peCtx');
   $$('[data-ctx]', m).forEach((b) => { b.disabled = b.dataset.ctx === 'paste' ? !clip : !it; });
   const lock = $('[data-ctx="lock"]', m); lock.firstChild.textContent = it && it.locked ? 'Unlock' : 'Lock';
+  const cellEl = e.target.closest('.pe-cell');
+  if (it && it.type === 'table' && cellEl) { S.cell = { id: it.id, r: Number(cellEl.dataset.r), c: Number(cellEl.dataset.c) }; drawItems(pageIndex(p.id)); }
+  $$('.pe-ctx-table', m).forEach((x) => { x.hidden = !(it && it.type === 'table'); });
   m.hidden = false;
   m.style.left = `${clamp(e.clientX, 8, window.innerWidth - m.offsetWidth - 8)}px`;
   m.style.top = `${clamp(e.clientY, 8, window.innerHeight - m.offsetHeight - 8)}px`;
@@ -1787,6 +2118,7 @@ function ctxAction(a) {
   else if (a === 'delete') removeSelected();
   else if (a === 'lock') toggleFlag(S.sel, 'locked');
   else if (a === 'hide') toggleFlag(S.sel, 'hidden');
+  else if (a.startsWith('t-')) tableOp(a.slice(2));
   else arrange(a);
 }
 
@@ -2209,6 +2541,30 @@ async function buildPdf(opts = {}) {
           ln.draw(x, y, color(it.color), op);
           if (it.underline) page.drawLine({ start: { x, y: y - it.size * 0.12 }, end: { x: x + ln.width, y: y - it.size * 0.12 }, thickness: Math.max(0.5, it.size / 16), color: color(it.color), opacity: op });
         }
+      } else if (it.type === 'table') {
+        const xs = colXs(it), ys = rowYs(it);
+        for (let r = 0; r < it.rows; r++) {
+          const fill = rowFill(it, r);
+          if (fill) page.drawRectangle({ x: it.x, y: VH - it.y - ys[r + 1], width: it.w, height: it.rh[r], color: color(fill), opacity: op });
+        }
+        for (let r = 0; r < it.rows; r++) for (let c = 0; c < it.cols; c++) {
+          const txt = it.cells[r][c];
+          if (!txt) continue;
+          const head = isHeadRow(it, r);
+          const fo = await font(it.font, head, false);
+          const maxW = xs[c + 1] - xs[c] - TPAD.x * 2;
+          const lines = [];
+          for (const para of txt.split('\n')) lines.push(...await wrapText(page, fo, para, it.size, maxW, textLine));
+          const top = ys[r] + (it.rh[r] - lines.length * LINE * it.size) / 2;
+          const a = it.align[c] || 'left';
+          for (let i = 0; i < lines.length; i++) {
+            if (!lines[i]) continue;
+            const ln = await textLine(page, fo, lines[i], it.size);
+            const x = it.x + xs[c] + TPAD.x + (a === 'center' ? (maxW - ln.width) / 2 : a === 'right' ? maxW - ln.width : 0);
+            ln.draw(x, VH - (it.y + top + baselineOffset(it.font, it.size) + i * LINE * it.size), color(head ? it.headColor : it.color), op);
+          }
+        }
+        tableLines(it).forEach(([ax, ay, bx, by]) => page.drawLine({ start: { x: it.x + ax, y: VH - it.y - ay }, end: { x: it.x + bx, y: VH - it.y - by }, thickness: it.bw, color: color(it.border), opacity: op, lineCap: LineCapStyle.Projecting }));
       } else if (it.type === 'whiteout') {
         page.drawRectangle({ x: it.x, y: VH - it.y - it.h, width: it.w, height: it.h, color: color(it.color), opacity: op });
       } else if (it.type === 'highlight') {
@@ -2315,7 +2671,7 @@ function setZoom(z) {
 
 function onKey(e) {
   if ($('#peApp').hidden) return;
-  const typing = S.editing || /^(input|select|textarea)$/i.test(e.target.tagName) || e.target.isContentEditable;
+  const typing = S.editing || S.cellEdit || /^(input|select|textarea)$/i.test(e.target.tagName) || e.target.isContentEditable;
   const mod = e.ctrlKey || e.metaKey;
   if (mod && e.key.toLowerCase() === 'z' && !typing) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
   if (mod && e.key.toLowerCase() === 'y' && !typing) { e.preventDefault(); redo(); return; }
@@ -2331,6 +2687,7 @@ function onKey(e) {
   if (e.key === '?') { $('#peHelpDlg').showModal(); return; }
   if (e.shiftKey && !mod && e.key.toLowerCase() === 'r') { setRulers(!$('#peStage').classList.contains('rulers')); return; }
   if (mod && e.key === ';') { e.preventDefault(); setGuidesOn(!guidesOn()); return; }
+  if (e.key === 'Enter' && selIt && selIt.type === 'table') { e.preventDefault(); const c = S.cell && S.cell.id === selIt.id ? S.cell : { r: 0, c: 0 }; editCell(S.sel.page, selIt, c.r, c.c); return; }
   if ((e.key === 'Delete' || e.key === 'Backspace') && S.sel) { e.preventDefault(); removeSelected(); return; }
   if (e.key === 'Escape') { closeImgMenu(); closeCtx(); closeFontPicker(); select(null, null); setTool('select'); return; }
   if (S.sel && e.key.startsWith('Arrow') && !(selIt && selIt.locked)) {
@@ -2460,6 +2817,7 @@ function init() {
     lock: () => toggleFlag(S.sel, 'locked'), rotl: () => rotateSel(-90), rotr: () => rotateSel(90),
     help: () => $('#peHelpDlg').showModal(),
     templates: openTemplates,
+    tablepick: toggleTablePicker,
     rulers: () => setRulers(!$('#peStage').classList.contains('rulers')),
     guides: () => setGuidesOn(!guidesOn()),
     clearguides: clearGuides,
@@ -2473,6 +2831,7 @@ function init() {
 
   const view = $('#peView');
   bindGuides();
+  bindTables();
   view.addEventListener('pointerdown', onPointerDown);
   view.addEventListener('pointermove', (e) => { onPointerMove(e); drawRulersSoon({ x: e.clientX, y: e.clientY }); });
   view.addEventListener('pointerleave', () => drawRulersSoon(null));
@@ -2522,6 +2881,8 @@ function init() {
     if (!o || !pageEl) return;
     const p = pageById(pageEl.dataset.id), it = p.items.find((i) => i.id === o.dataset.id);
     if (it && it.type === 'text') editText(p.id, it);
+    const cell = e.target.closest('.pe-cell');
+    if (it && it.type === 'table' && cell) editCell(p.id, it, Number(cell.dataset.r), Number(cell.dataset.c));
   });
   let scrollRaf = 0;
   view.addEventListener('scroll', () => {
