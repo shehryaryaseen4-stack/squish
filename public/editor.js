@@ -106,7 +106,7 @@ function catalogMatch(name) {
 
 const SHAPES = new Set(['rect', 'ellipse', 'line', 'arrow', 'check', 'cross']);
 const HINTS = {
-  select: 'Click an object to select it. Drag to move, use the corners to resize.',
+  select: 'Click an object to select it. Drag to move, use the corners to resize (hold Ctrl to resize both sides equally).',
   edittext: 'Click on any text in the PDF to change it.',
   editimage: 'Click on an image in the PDF to replace, move or remove it.',
   text: 'Click anywhere on a page to add text.',
@@ -1353,14 +1353,21 @@ function onPointerMove(e) {
       const th = ((o.rot || 0) * Math.PI) / 180, cs = Math.cos(th), sn = Math.sin(th);
       const lx = dx * cs + dy * sn, ly = -dx * sn + dy * cs;
       let L = -o.w / 2, R = o.w / 2, T = -o.h / 2, B = o.h / 2;
-      if (drag.h.includes('e')) R += lx; if (drag.h.includes('w')) L += lx;
-      if (drag.h.includes('s')) B += ly; if (drag.h.includes('n')) T += ly;
+      // Ctrl (Cmd on Mac) or Alt: resize from the centre, so both sides grow or shrink equally
+      const fromCentre = e.ctrlKey || e.metaKey || e.altKey;
+      if (drag.h.includes('e')) { R += lx; if (fromCentre) L -= lx; }
+      if (drag.h.includes('w')) { L += lx; if (fromCentre) R -= lx; }
+      if (drag.h.includes('s')) { B += ly; if (fromCentre) T -= ly; }
+      if (drag.h.includes('n')) { T += ly; if (fromCentre) B -= ly; }
       let w = R - L, h = B - T;
       if (((it.type === 'image' && !it.clip) || it.type === 'check' || it.type === 'cross' || it.type === 'text') && !e.shiftKey) {
         const k = Math.max(w / o.w, h / o.h);
         w = o.w * k; h = o.h * k;
-        if (drag.h.includes('w')) L = R - w; else R = L + w;
-        if (drag.h.includes('n')) T = B - h; else B = T + h;
+        if (fromCentre) { L = -w / 2; R = w / 2; T = -h / 2; B = h / 2; }
+        else {
+          if (drag.h.includes('w')) L = R - w; else R = L + w;
+          if (drag.h.includes('n')) T = B - h; else B = T + h;
+        }
       }
       if (w < 4 || h < 4) return;
       const mx = (L + R) / 2, my = (T + B) / 2;
