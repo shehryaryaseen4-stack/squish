@@ -1001,7 +1001,7 @@ function authPage(kind, base, { google = false, next = '', error = '' } = {}) {
     : `<p class="auth-small">Forgot your password? ${CONTACT_EMAIL ? `Email ${mailLink} from your account address and we will help.` : link('/contact', 'Contact us') + ' and we will help.'}</p>`}
     <p class="auth-switch">${signup ? `Already have an account? ${link(`/login${q}`, 'Sign in')}` : `New to ${esc(SITE)}? ${link(`/signup${q}`, 'Create a free account')}`}</p>
   </section>
-  ${signup ? '<ul class="auth-perks"><li>Download your edited PDFs</li><li>Converters stay free without an account</li><li>We never share or sell your email</li></ul>' : ''}`);
+  ${signup ? '<ul class="auth-perks"><li>Download your edited PDFs</li><li>Converters stay free without an account</li></ul>' : ''}`);
 }
 function accountPage(base, u) {
   const joined = new Date(u.created).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
