@@ -1114,6 +1114,8 @@ const INFO_PAGES = {
       <p>Files are sent to our server only to be converted. Images are processed in memory. Other files (video, audio, documents, ebooks, archives) are written to a private temporary folder for the conversion, and that folder is deleted as soon as the conversion finishes, whether it succeeds or not. Files are never logged or kept after the result has been returned to you. We do not look at, copy or share your files.</p>
       <h2>Data we process</h2>
       <p>Like every website, our server receives your IP address and basic request information (browser type, the page requested). We use your IP address only to apply a rate limit that protects the service from abuse; it is held in memory for up to 15 minutes.</p>
+      <h2>Visitor statistics</h2>
+      <p>To see how the site is used, we count page visits ourselves, without cookies and without any outside analytics company. For each visit we record the page, the website you came from (for example a search engine), your country and whether you use a phone, tablet or computer, plus which conversions were made. Your IP address is not stored: it is mixed with your browser type and a random value that changes every day into a short code, so we can count each visitor once a day but cannot recognise you on another day or find out who you are.</p>
 ${ACCOUNTS ? `      <h2>Your account</h2>
       <p>You need a free account to download PDFs from the ${link('/edit-pdf', 'PDF editor')}; the converters work without one. For an account we keep your email address, your name if you signed in with Google, your password in scrambled (hashed) form so nobody can read it, when you joined and last signed in, the country your connection comes from, and how many PDFs you downloaded from the editor. We use this only to run your account and to understand how the site is used. The only emails we send are the codes that confirm your address or reset your password; they are delivered by our email delivery provider. We never sell it or share it, and we do not send marketing email without asking you first.</p>
       <p>If you choose Continue with Google, Google tells us your email address and name; we receive nothing else from your Google account. You can delete your account at any time on your ${link('/account', 'account page')}, which removes everything we hold about you.</p>
@@ -1124,7 +1126,7 @@ ${ACCOUNTS ? `      <h2>Your account</h2>
       <h2>Third-party services</h2>
       <p>Fonts are served from this site; no third-party scripts are loaded unless advertising is enabled.</p>
       <h2>Your rights</h2>
-      <p>${ACCOUNTS ? 'We do not store your files. If you have an account, you can delete it and all its data yourself, or ask us to show, correct or delete what we hold' : 'Because we do not store your files or create accounts, we hold no personal data about you beyond the short-lived rate-limit record'}. For any privacy question, ${contactLine}.</p></section>`,
+      <p>${ACCOUNTS ? 'We do not store your files. If you have an account, you can delete it and all its data yourself, or ask us to show, correct or delete what we hold' : 'Because we do not store your files or create accounts, we hold no personal data about you beyond the short-lived rate-limit record and the anonymous visit counts described above'}. For any privacy question, ${contactLine}.</p></section>`,
   },
   terms: {
     title: `Terms of Use | ${SITE}`, h1: 'Terms of Use',

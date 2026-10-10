@@ -10,6 +10,7 @@ const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const accounts = require('./accounts');
+const analytics = require('./accounts/analytics');
 const pages = require('./pages');
 const registry = require('./registry');
 const { getHandler } = require('./engines');
@@ -90,6 +91,7 @@ app.use('/api/', (_req, res, next) => { res.set('X-Robots-Tag', 'noindex, nofoll
 app.use('/api/', rateLimit({
   windowMs: 15 * 60 * 1000,
   max: MAX_FILES_PER_WINDOW,
+  skip: (req) => req.path === '/p', // the page-view beacon has its own limit (accounts/index.js)
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests from this connection. Please wait a few minutes and try again.' },
@@ -144,7 +146,11 @@ function safeName(name, inFormat) {
 // Content-Disposition with an ASCII fallback plus the exact UTF-8 name (RFC 6266 / 5987).
 const disposition = (name) => `attachment; filename="${name.replace(/[^\x20-\x7e]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(name)}`;
 
+// The page the conversion was started from, for the dashboard's activity list.
+const fromPage = (req) => { try { return new URL(req.get('referer')).pathname; } catch { return ''; } };
+
 app.post('/api/compress', upload.single('file'), async (req, res) => {
+  let pair = '';
   try {
     if (!req.file) return res.status(400).json({ error: 'No file received.' });
 
@@ -177,6 +183,7 @@ app.post('/api/compress', upload.single('file'), async (req, res) => {
       return res.status(415).json({ error: `${inFormat.label} to ${outFormat.label} isn't available on this server yet.` });
     }
 
+    pair = `${inFormat.label} \u2192 ${outFormat.label}`;
     const handler = getHandler(converter.handler);
     const job = (q, dim) => handler(
       { buffer: req.file.buffer, inputExt, format: outFormat.apiFormat, quality: q, maxDim: dim, from: inFormat, to: outFormat, filename: originalName },
@@ -200,7 +207,9 @@ app.post('/api/compress', upload.single('file'), async (req, res) => {
       'X-Output-Ext': ext,
     });
     res.send(out.buffer);
+    analytics.event(req, inFormat.id === outFormat.id ? 'compress' : 'convert', { pair, p: fromPage(req) });
   } catch (err) {
+    if (pair) analytics.event(req, 'fail', { pair, p: fromPage(req) });
     if (err.userMessage) return res.status(err.statusCode || 422).json({ error: err.userMessage });
     if (/unsupported image format|Input buffer contains unsupported/i.test(err.message || '')) {
       return res.status(415).json({ error: 'This file could not be read. It may be damaged, or use a variant of the format this server does not support.' });

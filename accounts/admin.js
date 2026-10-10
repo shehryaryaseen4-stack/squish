@@ -1,5 +1,6 @@
 'use strict';
-// The owner's dashboard (ADMIN_PATH): sign-ups, PDF editor downloads and the list of users.
+// The owner's dashboard (ADMIN_PATH): traffic (visitors per hour, sources, pages, countries,
+// devices), conversions and PDF downloads, live activity, and, with accounts, the list of users.
 // Plain server-rendered HTML; public/admin.js adds the search box, delete and sign-out.
 
 const brand = require('../brand');
@@ -52,54 +53,105 @@ function flag(cc) {
   return /^[A-Z]{2}$/.test(cc || '') ? String.fromCodePoint(...[...cc].map((c) => 0x1F1A5 + c.charCodeAt(0))) : '';
 }
 
-// One series of daily counts as a bar chart: thin rounded bars, a recessive grid with three
-// labelled lines, and a tooltip per bar (bars carry data-tip; admin.js shows it on hover).
-function barChart(title, days, values, unit) {
-  const W = 960, H = 190, L = 34, B = 22, T = 10;
+// One series as a bar chart: thin rounded bars, a recessive grid with three labelled lines,
+// and a tooltip per bar (bars carry data-tip; admin.js shows it on hover). ticks: label or ''
+// for each bar; hi: index of a bar to mark (the current hour).
+function bars({ title, sub, values, tips, ticks, hi = -1 }) {
+  const W = 960, H = 190, L = 34, B = 22, T = 10, n = values.length;
   const max = Math.max(4, ...values);
   const step = Math.pow(10, Math.floor(Math.log10(max)));
   const top = Math.ceil(max / step) * step;
   const y = (v) => T + (H - T - B) * (1 - v / top);
-  const bw = (W - L) / days.length;
+  const bw = (W - L) / n;
   const grid = [0, top / 2, top].map((v) => `<line x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${fmt(Math.round(v))}</text>`).join('');
-  const bars = values.map((v, i) => {
+  const cols = values.map((v, i) => {
     const x = L + i * bw + 2, w = Math.max(2, bw - 4), h = Math.max(0, y(0) - y(v));
-    const label = new Date(`${days[i]}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-    const tip = `${label}: ${fmt(v)} ${unit}${v === 1 ? '' : 's'}`;
     const r = Math.min(4, w / 2, h);
-    const bar = h > 0 ? `<path class="ad-bar" d="M${x},${y(0)} v${-(h - r)} q0,${-r} ${r},${-r} h${w - 2 * r} q${r},0 ${r},${r} v${h - r} z"/>` : '';
-    return `<g class="ad-col" data-tip="${esc(tip)}"><rect class="ad-hit" x="${L + i * bw}" y="${T}" width="${bw}" height="${H - T - B}"/>${bar}</g>`;
+    const bar = h > 0 ? `<path class="ad-bar${i === hi ? ' ad-bar-hi' : ''}" d="M${x},${y(0)} v${-(h - r)} q0,${-r} ${r},${-r} h${w - 2 * r} q${r},0 ${r},${r} v${h - r} z"/>` : '';
+    return `<g class="ad-col" data-tip="${esc(tips[i])}"><rect class="ad-hit" x="${L + i * bw}" y="${T}" width="${bw}" height="${H - T - B}"/>${bar}</g>`;
   }).join('');
-  const ticks = days.map((d, i) => (i % 7 === days.length % 7 || i === days.length - 1
-    ? `<text x="${i === days.length - 1 ? W : L + i * bw + bw / 2}" y="${H - 6}" text-anchor="${i === days.length - 1 ? 'end' : 'middle'}">${new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })}</text>` : '')).join('');
-  const total = values.reduce((a, b) => a + b, 0);
+  const tk = ticks.map((t, i) => (t ? `<text x="${i === n - 1 && n > 12 ? W : L + i * bw + bw / 2}" y="${H - 6}" text-anchor="${i === n - 1 && n > 12 ? 'end' : 'middle'}">${esc(t)}</text>` : '')).join('');
   return `<section class="ad-card ad-chart">
-    <div class="ad-chart-head"><h2>${esc(title)}</h2><span class="ad-dim">${fmt(total)} in the last ${days.length} days</span></div>
-    <div class="ad-plot"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)}, last ${days.length} days"><g class="ad-grid">${grid}</g>${bars}<g class="ad-ticks">${ticks}</g></svg><div class="ad-tip" hidden></div></div>
+    <div class="ad-chart-head"><h2>${esc(title)}</h2><span class="ad-dim">${sub}</span></div>
+    <div class="ad-plot"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title)}"><g class="ad-grid">${grid}</g>${cols}<g class="ad-ticks">${tk}</g></svg><div class="ad-tip" hidden></div></div>
   </section>`;
 }
+const shortDay = (d) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const plural = (n, w) => `${fmt(n)} ${w}${n === 1 ? '' : 's'}`;
+// Daily counts over the last 30 days (accounts section).
+function barChart(title, days, values, unit) {
+  return bars({ title, sub: `${fmt(values.reduce((a, b) => a + b, 0))} in the last ${days.length} days`, values,
+    tips: values.map((v, i) => `${shortDay(days[i])}: ${plural(v, unit)}`),
+    ticks: days.map((d, i) => (i % 7 === days.length % 7 || i === days.length - 1 ? shortDay(d) : '')) });
+}
 
-function dashboard({ users, daily, path, store }) {
+// A ranked list with a bar behind each row, like "Top pages".
+const regionName = (() => { try { const dn = new Intl.DisplayNames(['en'], { type: 'region' }); return (cc) => { try { return dn.of(cc); } catch { return cc; } }; } catch { return (cc) => cc; } })();
+function rank(title, obj, { label = (k) => esc(k), limit = 10, empty = 'Nothing yet.', note = '' } = {}) {
+  const all = Object.entries(obj).sort((a, b) => b[1] - a[1]);
+  const total = all.reduce((a, [, n]) => a + n, 0);
+  const rows = all.slice(0, limit);
+  const max = rows.length ? rows[0][1] : 0;
+  return `<section class="ad-card ad-rank"><div class="ad-rank-head"><h2>${esc(title)}</h2>${note ? `<span class="ad-dim">${note}</span>` : ''}</div>
+    ${rows.length ? `<ol>${rows.map(([k, n]) => `<li><span class="ad-rk-bar" style="width:${Math.max(2, (100 * n) / max).toFixed(1)}%"></span><span class="ad-rk-label">${label(k)}</span><span class="ad-rk-n">${fmt(n)}<small>${total ? Math.round((100 * n) / total) : 0}%</small></span></li>`).join('')}</ol>${all.length > limit ? `<p class="ad-dim ad-rank-more">+ ${fmt(all.length - limit)} more</p>` : ''}`
+    : `<p class="ad-dim ad-rank-empty">${empty}</p>`}
+  </section>`;
+}
+const pageLabel = (p) => `<a href="${esc(p)}" target="_blank" rel="noopener">${esc(p)}</a>`;
+const countryLabel = (cc) => (cc === '??' || cc === '(other)' ? '<span class="ad-dim">Unknown</span>' : `${flag(cc)} ${esc(regionName(cc))}`);
+const EVENT_NAMES = { convert: 'Files converted', compress: 'Files compressed', pdf: 'PDFs downloaded from the editor', combine: 'Images saved as one PDF', fail: 'Conversions that failed' };
+function activityText(e) {
+  const page = e.p ? ` on ${pageLabel(e.p)}` : '';
+  switch (e.k) {
+    case 'arrive': return `Arrived from <b>${esc(e.s === 'Other sites' && e.ref ? e.ref : e.s)}</b>${page}`;
+    case 'convert': return `Converted <b>${esc(e.d)}</b>${page}`;
+    case 'compress': return `Compressed <b>${esc(e.d.split(' → ')[0])}</b>${page}`;
+    case 'pdf': return `<b>Downloaded a PDF</b> from the editor${page}`;
+    case 'combine': return `Saved <b>${esc(e.d || 'images')}</b> as one PDF${page}`;
+    case 'fail': return `<span class="ad-bad">Conversion failed</span>: ${esc(e.d)}${page}`;
+    default: return esc(e.k);
+  }
+}
+const visitorChip = (v) => `<span class="ad-vis" style="--h:${parseInt(String(v).slice(0, 4), 16) % 360}">#${esc(String(v).slice(0, 4))}</span>`;
+
+const RANGE_LABELS = [['today', 'Today'], ['yesterday', 'Yesterday'], ['7d', '7 days'], ['30d', '30 days'], ['90d', '90 days']];
+
+function dashboard({ users, daily, path, store, stats, range = 'today', accounts = false }) {
   const tz = store.TZ;
-  const today = store.today();
-  const days = [];
-  for (let i = 29; i >= 0; i--) days.push(store.dayOf(Date.now() - i * 864e5));
-  const signupsBy = {};
-  for (const u of users) { const d = store.dayOf(u.created); signupsBy[d] = (signupsBy[d] || 0) + 1; }
-  const signups = days.map((d) => signupsBy[d] || 0);
-  const downloads = days.map((d) => (daily[d] && daily[d].downloads) || 0);
-  const walls = days.reduce((a, d) => a + ((daily[d] && daily[d].walls) || 0), 0);
-  const sum = (a, n = a.length) => a.slice(-n).reduce((x, y) => x + y, 0);
-  const totalDownloads = users.reduce((a, u) => a + (u.downloads || 0), 0);
-  const google = users.filter((u) => u.via === 'google').length;
-  const verified = users.filter((u) => u.verified).length;
-  // Of the visitors who met the sign-up box in the editor (30 days), how many signed up.
-  const conv = walls ? `${Math.round((100 * Math.min(sum(signups), walls)) / walls)}%` : '–';
+  const S = stats;
+  const ev = (k) => S.events[k] || 0;
+  const conversions = ev('convert') + ev('compress');
+  const oneDay = S.days.length === 1;
+  const rangeName = RANGE_LABELS.find(([k]) => k === range)[1].toLowerCase();
+  const tile = (label, value, sub, cls = '') => `<div class="ad-card ad-tile ${cls}"><span class="ad-label">${label}</span><strong>${value}</strong><span class="ad-dim">${sub}</span></div>`;
 
-  const tile = (label, value, sub) => `<div class="ad-card ad-tile"><span class="ad-label">${label}</span><strong>${value}</strong><span class="ad-dim">${sub}</span></div>`;
-  const list = [...users].sort((a, b) => (a.created < b.created ? 1 : -1));
-  const SHOW = 2000, PAGE = 50;
-  const rows = list.slice(0, SHOW).map((u, i) => `<tr${i >= PAGE ? ' hidden data-more' : ''} data-id="${esc(u.id)}" data-q="${esc(`${u.email} ${u.name} ${u.country}`.toLowerCase())}">
+  // Visitors per hour for one day, per day otherwise.
+  const chart = oneDay
+    ? bars({ title: range === 'today' ? 'Visitors per hour today' : 'Visitors per hour yesterday', sub: `${plural(S.visitors, 'visitor')} &middot; ${plural(S.views, 'page view')}`,
+      values: S.hours.map(([, vs]) => vs),
+      tips: S.hours.map(([vw, vs], h) => `${String(h).padStart(2, '0')}:00–${String((h + 1) % 24).padStart(2, '0')}:00: ${plural(vs, 'visitor')}, ${plural(vw, 'view')}`),
+      ticks: S.hours.map((_, h) => (h % 3 === 0 ? `${String(h).padStart(2, '0')}:00` : '')), hi: range === 'today' ? S.hourNow : -1 })
+    : bars({ title: 'Visitors per day', sub: `${plural(S.visitors, 'visitor')} &middot; ${plural(S.views, 'page view')} in ${rangeName}`,
+      values: S.byDay.map(([, vs]) => vs),
+      tips: S.byDay.map(([d, vs, vw, act]) => `${shortDay(d)}: ${plural(vs, 'visitor')}, ${plural(vw, 'view')}, ${plural(act, 'action')}`),
+      ticks: S.byDay.map(([d], i) => (S.byDay.length <= 8 || i % Math.ceil(S.byDay.length / 6) === 0 || i === S.byDay.length - 1 ? shortDay(d) : '')) });
+
+  const activity = S.recent.length ? `<div class="ad-table-wrap"><table class="ad-table ad-activity">
+      <thead><tr><th>Time</th><th>Visitor</th><th>Country</th><th>Device</th><th>What happened</th></tr></thead>
+      <tbody>${S.recent.map((e, i) => `<tr class="ad-k-${esc(e.k)}"${i >= 30 ? ' hidden data-later' : ''}><td>${esc(new Date(e.t).toLocaleString('en-GB', { timeZone: tz, ...(oneDay ? {} : { day: 'numeric', month: 'short' }), hour: '2-digit', minute: '2-digit' }))}</td><td>${visitorChip(e.v)}</td><td>${e.cc ? `${flag(e.cc)} ${esc(e.cc)}` : '<span class="ad-dim">–</span>'}</td><td>${esc(e.dev || '')}</td><td class="ad-what">${activityText(e)}</td></tr>`).join('')}</tbody>
+    </table></div>${S.recent.length > 30 ? `<div class="ad-more-row"><button type="button" class="ad-btn" data-later-btn>Show ${fmt(S.recent.length - 30)} more</button></div>` : ''}` : '<p class="ad-empty">No activity yet in this period. Visits, conversions and PDF downloads appear here as they happen.</p>';
+
+  // Accounts (only when sign-up is on, or users exist from before).
+  let accountsHtml = '';
+  if (accounts || users.length) {
+    const days = [];
+    for (let i = 29; i >= 0; i--) days.push(store.dayOf(Date.now() - i * 864e5));
+    const signupsBy = {};
+    for (const u of users) { const d = store.dayOf(u.created); signupsBy[d] = (signupsBy[d] || 0) + 1; }
+    const verified = users.filter((u) => u.verified).length, google = users.filter((u) => u.via === 'google').length;
+    const list = [...users].sort((a, b) => (a.created < b.created ? 1 : -1));
+    const SHOW = 2000, PAGE = 50;
+    const rows = list.slice(0, SHOW).map((u, i) => `<tr${i >= PAGE ? ' hidden data-more' : ''} data-id="${esc(u.id)}" data-q="${esc(`${u.email} ${u.name} ${u.country}`.toLowerCase())}">
       <td class="ad-email">${esc(u.email)}${u.verified ? '<b class="ad-ok" title="Email confirmed">&#10003;</b>' : '<b class="ad-unv" title="Email not confirmed">not confirmed</b>'}${u.name ? `<span>${esc(u.name)}</span>` : ''}</td>
       <td><span class="ad-pill ad-pill-${u.via === 'google' ? 'g' : 'e'}">${u.via === 'google' ? 'Google' : 'Email'}</span></td>
       <td>${u.country ? `${flag(u.country)} ${esc(u.country)}` : '<span class="ad-dim">–</span>'}</td>
@@ -108,36 +160,55 @@ function dashboard({ users, daily, path, store }) {
       <td class="ad-num">${fmt(u.downloads)}</td>
       <td><button type="button" class="ad-del" data-del aria-label="Delete ${esc(u.email)}">Delete</button></td>
     </tr>`).join('');
+    accountsHtml = `<h2 class="ad-section">Accounts${accounts ? '' : ' <span class="ad-dim">(sign-up is switched off)</span>'}</h2>
+  ${barChart('New sign-ups per day', days, days.map((d) => signupsBy[d] || 0), 'sign-up')}
+  <section class="ad-card ad-users">
+    <div class="ad-users-head">
+      <h2>Users <span class="ad-dim">${fmt(users.length)} &middot; ${fmt(verified)} confirmed &middot; ${fmt(google)} via Google</span></h2>
+      <div class="ad-users-tools"><input type="search" class="ad-search" placeholder="Search email, name or country" aria-label="Search users"><a class="ad-btn" href="${esc(path)}/users.csv">CSV</a></div>
+    </div>
+    ${users.length ? `<div class="ad-table-wrap"><table class="ad-table ad-users-table">
+      <thead><tr><th>Email</th><th>Signed up with</th><th>Country</th><th>Joined</th><th>Last seen</th><th class="ad-num">Downloads</th><th><span class="sr">Actions</span></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>${list.length > PAGE ? '<div class="ad-more-row"><button type="button" class="ad-btn" data-more-btn>Show more users</button></div>' : ''}${list.length > SHOW ? `<p class="ad-dim ad-more">Showing the newest ${fmt(SHOW)}. Download the CSV for everyone.</p>` : ''}
+    <p class="ad-dim ad-none" hidden>No user matches your search.</p>`
+    : '<p class="ad-empty">No users yet. When someone signs up, they appear here.</p>'}
+  </section>`;
+  }
 
   return shell(`Dashboard | ${SITE}`, `<header class="ad-top">
   <div class="ad-brand">${MARK}<span>${esc(SITE)}</span><span class="ad-dim">Dashboard</span></div>
+  <nav class="ad-range" aria-label="Period">${RANGE_LABELS.map(([k, l]) => `<a href="${esc(path)}?range=${k}"${k === range ? ' aria-current="page"' : ''}>${l}</a>`).join('')}</nav>
   <div class="ad-actions">
-    <a class="ad-btn" href="${esc(path)}/users.csv">Download CSV</a>
+    <a class="ad-btn" href="${esc(path)}?range=${esc(range)}" title="Refresh">Refresh</a>
     <button type="button" class="ad-btn" data-logout>Sign out</button>
   </div>
 </header>
-<main class="ad-main">
-  <div class="ad-tiles">
-    ${tile('Users', fmt(users.length), `${fmt(verified)} confirmed &middot; ${fmt(google)} via Google`)}
-    ${tile('New today', fmt(signupsBy[today] || 0), `${fmt(sum(signups, 7))} in the last 7 days`)}
-    ${tile('PDF downloads today', fmt((daily[today] && daily[today].downloads) || 0), `${fmt(totalDownloads)} by all users so far`)}
-    ${tile('Sign-up rate', conv, `of ${fmt(walls)} who saw the sign-up box (30 days)`)}
+<main class="ad-main" data-range="${esc(range)}">
+  <div class="ad-tiles ad-tiles-5">
+    ${tile('Visitors', fmt(S.visitors), S.visitors ? `${(S.views / S.visitors).toFixed(1)} pages each` : 'People, counted once a day')}
+    ${tile('Page views', fmt(S.views), `${fmt(Object.values(S.sources).reduce((a, n) => a + n, 0))} visits started`)}
+    ${tile('Conversions', fmt(conversions), `${fmt(ev('convert'))} converted &middot; ${fmt(ev('compress'))} compressed${ev('fail') ? ` &middot; <span class="ad-bad">${fmt(ev('fail'))} failed</span>` : ''}`)}
+    ${tile('PDF downloads', fmt(ev('pdf') + ev('combine')), `${fmt(ev('pdf'))} from the editor &middot; ${fmt(ev('combine'))} combined`)}
+    ${tile('<i class="ad-live-dot"></i>Right now', fmt(S.live), 'active in the last 5 minutes', 'ad-tile-live')}
   </div>
-  ${barChart('New sign-ups per day', days, signups, 'sign-up')}
-  ${barChart('PDF editor downloads per day', days, downloads, 'download')}
+  ${chart}
+  <div class="ad-grid2">
+    ${rank('Where visitors come from', S.sources, { note: 'source of each visit', empty: 'No visits yet.' })}
+    ${rank('Top pages', S.pages, { label: pageLabel, note: 'page views', empty: 'No page views yet.' })}
+    ${rank('Conversions', S.pairs, { note: 'files converted or compressed', empty: 'No conversions yet.' })}
+    ${rank('Landing pages', S.landings, { label: pageLabel, note: 'first page of a visit', empty: 'No visits yet.' })}
+    ${rank('Countries', S.countries, { label: countryLabel, note: 'visitors', empty: 'No visitors yet.' })}
+    ${rank('What people did', Object.fromEntries(Object.entries(S.events).map(([k, n]) => [EVENT_NAMES[k] || k, n])), { empty: 'No conversions or downloads yet.' })}
+    ${rank('Devices', S.devices, { note: 'visitors', empty: 'No visitors yet.' })}
+    ${rank('Other websites', S.refs, { note: 'links from other sites', empty: 'No visits from other websites yet.' })}
+  </div>
   <section class="ad-card ad-users">
-    <div class="ad-users-head">
-      <h2>Users <span class="ad-dim">${fmt(users.length)}</span></h2>
-      <input type="search" class="ad-search" placeholder="Search email, name or country" aria-label="Search users">
-    </div>
-    ${users.length ? `<div class="ad-table-wrap"><table class="ad-table">
-      <thead><tr><th>Email</th><th>Signed up with</th><th>Country</th><th>Joined</th><th>Last seen</th><th class="ad-num">Downloads</th><th><span class="sr">Actions</span></th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table></div>${list.length > PAGE ? `<div class="ad-more-row"><button type="button" class="ad-btn" data-more-btn>Show more users</button></div>` : ''}${list.length > SHOW ? `<p class="ad-dim ad-more">Showing the newest ${fmt(SHOW)}. Download the CSV for everyone.</p>` : ''}
-    <p class="ad-dim ad-none" hidden>No user matches your search.</p>`
-    : '<p class="ad-empty">No users yet. When someone signs up, they appear here.</p>'}
+    <div class="ad-users-head"><h2>Live activity <span class="ad-dim">newest first${range === 'today' ? ' &middot; updates every minute' : ''}</span></h2></div>
+    ${activity}
   </section>
-  <p class="ad-dim ad-foot">Times are ${esc(tz.replace('_', ' '))} time.</p>
+  ${accountsHtml}
+  <p class="ad-dim ad-foot">Times are ${esc(tz.replace('_', ' '))} time. Visitors are counted without cookies: the same person on the same device counts once a day. Visitors who block scripts are not counted.</p>
 </main>`, path);
 }
 

@@ -198,7 +198,7 @@ and earning links from other sites.
 | `TRUST_PROXY` | unset | Number of reverse proxies in front of the app (usually `1`). Needed for correct visitor IPs behind a proxy. |
 | `ACCOUNTS` | unset | `1` turns on free accounts (/signup, /login, /account). Downloading from the PDF editor then needs an account. |
 | `DATA_DIR` | `./data` (`/data` in Docker) | Where accounts are stored (`accounts.json`). In Docker it is the `flipfree-data` volume. |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | unset | The owner's sign-in for the dashboard (users, sign-ups, downloads, CSV export). Both must be set. |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | unset | The owner's sign-in for the dashboard at `/admin`: visitors per hour and day, traffic sources, top and landing pages, countries, devices, conversions, PDF downloads and live activity, counted without cookies (`DATA_DIR/analytics.json`); plus users when accounts are on. Works with `ACCOUNTS` off. Both must be set. |
 | `ADMIN_PATH` | `admin` | Address of the dashboard. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | unset | Adds "Continue with Google". Redirect URI: `<BASE_URL>/auth/google/callback`. |
 | `BREVO_API_KEY` or `RESEND_API_KEY` | unset | Turns on email confirmation: a sign-up becomes an account only after the 6-digit code sent by email is entered, and "Forgot your password?" works. Without a key, sign-ups are not confirmed. |

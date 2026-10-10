@@ -1,6 +1,22 @@
 (function(){
   "use strict";
 
+  // Count this page view for the owner's dashboard. No cookies and nothing personal: the
+  // server keeps only the page, where the visit came from, country and device (accounts/analytics.js).
+  const track = (o) => {
+    try {
+      const body = JSON.stringify(o);
+      if (!(navigator.sendBeacon && navigator.sendBeacon("/api/p", new Blob([body], { type: "application/json" })))) {
+        fetch("/api/p", { method: "POST", body, keepalive: true, headers: { "Content-Type": "application/json" } }).catch(() => {});
+      }
+    } catch (_) { /* never let counting break the page */ }
+  };
+  if (!/^Page not found/.test(document.title)) {
+    let utm = null; try { utm = new URLSearchParams(location.search).get("utm_source"); } catch (_) { /* old browser */ }
+    track({ p: location.pathname, r: document.referrer, u: utm || undefined });
+  }
+  window.addEventListener("pe:exported", () => track({ e: "pdf", p: location.pathname }));
+
   // Ad slots: present only when ADSENSE_CLIENT and slot IDs are set on the server.
   document.querySelectorAll("ins.adsbygoogle").forEach(() => { (window.adsbygoogle = window.adsbygoogle || []).push({}); });
 
@@ -454,6 +470,7 @@
         zipBtn.disabled = true; zipBtn.lastChild.textContent = "Joining\u2026";
         try {
           save(await joinPdfs(done), done[0].outName.replace(/\.pdf$/i, "") + "-combined.pdf");
+          track({ e: "combine", p: location.pathname, d: done.length + " images" });
         } catch (e) {
           barStatus.innerHTML = `<span class="err-text">${esc(e.message || "The PDFs could not be joined.")}</span>`;
         } finally { zipBtn.disabled = false; zipBtn.lastChild.textContent = label; }

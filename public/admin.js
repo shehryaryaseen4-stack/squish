@@ -26,7 +26,7 @@
 
   // The table shows 50 users at a time; a search looks through all of them.
   const search = $(".ad-search"), more = $("[data-more-btn]");
-  const rows = () => [...document.querySelectorAll(".ad-table tbody tr")];
+  const rows = () => [...document.querySelectorAll(".ad-users-table tbody tr")];
   if (more) {
     more.addEventListener("click", () => {
       rows().filter((tr) => tr.hasAttribute("data-more")).slice(0, 50).forEach((tr) => { tr.removeAttribute("data-more"); tr.hidden = false; });
@@ -53,6 +53,17 @@
     const r = await post(base + "/delete", { id: tr.dataset.id });
     if (r.ok) tr.remove(); else { b.disabled = false; alert("Could not delete. Sign in again and retry."); }
   });
+
+  const later = $("[data-later-btn]");
+  if (later) later.addEventListener("click", () => { document.querySelectorAll("tr[data-later]").forEach((tr) => { tr.hidden = false; }); later.parentNode.remove(); });
+
+  // Today's numbers refresh every minute while the tab is visible and nobody is typing.
+  const main = $(".ad-main");
+  if (main && main.dataset.range === "today") {
+    setInterval(() => {
+      if (document.visibilityState === "visible" && !(document.activeElement && document.activeElement.matches("input"))) location.reload();
+    }, 60000);
+  }
 
   // Chart tooltips: follow the hovered bar.
   document.querySelectorAll(".ad-plot").forEach((plot) => {

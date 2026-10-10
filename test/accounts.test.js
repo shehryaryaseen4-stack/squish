@@ -24,7 +24,7 @@ test.before(async () => {
   }
   throw new Error('server did not start');
 });
-test.after(() => { srv.kill(); fs.rmSync(DATA, { recursive: true, force: true }); });
+test.after(async () => { srv.kill(); await new Promise((r) => (srv.exitCode !== null ? r() : srv.once('exit', r))); fs.rmSync(DATA, { recursive: true, force: true }); });
 
 const post = (p, body, cookie = '', headers = {}) => fetch(B + p, { method: 'POST', redirect: 'manual', headers: { 'Content-Type': 'application/json', cookie, ...headers }, body: JSON.stringify(body) });
 const cookieOf = (r) => (r.headers.get('set-cookie') || '').split(';')[0];

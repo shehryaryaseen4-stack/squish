@@ -16,6 +16,7 @@ const rateLimit = require('express-rate-limit');
 const store = require('./store');
 const admin = require('./admin');
 const mail = require('./mail');
+const analytics = require('./analytics');
 
 const ON = process.env.ACCOUNTS === '1';
 const GOOGLE_ID = process.env.GOOGLE_CLIENT_ID || '';
@@ -121,12 +122,30 @@ const DUMMY_HASH = `s1$${'0'.repeat(32)}$${'0'.repeat(64)}`;
 const noStore = (res) => res.set({ 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' });
 
 function mount(app, { pages, baseOf }) {
-  if (!ON) return;
   store.load();
   const json = express.json({ limit: '10kb' });
   const authLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false, message: { error: 'Too many attempts. Please wait 15 minutes and try again.' } });
   const html = (res, body) => noStore(res).type('html').send(body);
 
+  // --------------------------------------------------------------- statistics --
+  // The page-view beacon from public/script.js, and events such as an editor download. Always on
+  // (it feeds the owner's dashboard); it has its own rate limit, separate from conversions.
+  const beaconLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 600, standardHeaders: false, legacyHeaders: false });
+  const beaconJson = express.json({ limit: '2kb', type: () => true });
+  app.post('/api/p', beaconLimit, beaconJson, (req, res) => {
+    const b = req.body && typeof req.body === 'object' ? req.body : {};
+    const origin = req.get('origin');
+    if (origin) { try { if (new URL(origin).host !== req.get('host')) return res.status(204).end(); } catch { return res.status(204).end(); } }
+    if (b.e === 'pdf' || b.e === 'combine') analytics.event(req, b.e, { p: b.p, d: b.d });
+    else analytics.pageview(req, b, req.get('host'));
+    res.set('Cache-Control', 'no-store').status(204).end();
+  });
+
+  if (ON) mountAccounts();
+  mountAdmin();
+  return;
+
+  function mountAccounts() {
   // ----------------------------------------------------------------- pages --
   app.get('/signup', (req, res) => {
     if (currentUser(req)) return res.redirect(safeNext(req.query.next) || '/account');
@@ -298,10 +317,18 @@ function mount(app, { pages, baseOf }) {
     });
   }
 
+  }
+
   // ------------------------------------------------------------ dashboard --
+  // Works with or without accounts: traffic, sources, pages, conversions and (with accounts) users.
+  function mountAdmin() {
   if (!ADMIN_ON) return;
   const A = ADMIN_PATH;
-  app.get(A, (req, res) => html(res, isAdmin(req) ? admin.dashboard({ users: store.users(), daily: store.daily(), path: A, store }) : admin.loginPage(A)));
+  app.get(A, (req, res) => {
+    if (!isAdmin(req)) return html(res, admin.loginPage(A));
+    const range = analytics.RANGES[req.query.range] ? req.query.range : 'today';
+    html(res, admin.dashboard({ users: store.users(), daily: store.daily(), path: A, store, stats: analytics.summary(range), range, accounts: ON }));
+  });
   app.post(`${A}/login`, authLimit, json, sameOrigin, (req, res) => {
     const same = (a, b) => { const x = crypto.createHash('sha256').update(String(a)).digest(); return crypto.timingSafeEqual(x, crypto.createHash('sha256').update(String(b)).digest()); };
     const ok = same(String(req.body.email || '').trim().toLowerCase(), ADMIN_EMAIL) & same(req.body.password || '', ADMIN_PASSWORD);
@@ -318,6 +345,7 @@ function mount(app, { pages, baseOf }) {
     if (!isAdmin(req)) return res.redirect(A);
     noStore(res).type('text/csv').attachment(`flipitfree-users-${store.today()}.csv`).send(admin.csv(store.users()));
   });
+  }
 }
 
 module.exports = { mount, ON, GOOGLE, ADMIN_PATH, MAIL: mail.ON, _internals: { sign, unsign, safeNext } };
