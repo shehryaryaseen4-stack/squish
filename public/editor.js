@@ -1988,21 +1988,32 @@ function renderPreview(box, t) {
 let galleryIO = null;
 async function buildGallery(host, where) {
   if (!host) return;
-  const { TEMPLATES, TEMPLATE_CATS } = await loadTemplates();
+  const { TEMPLATES, TEMPLATE_CATS, RESUME_STYLES = [] } = await loadTemplates();
   if (!TEMPLATES.length) { host.closest('.pe-tpl-panel, dialog')?.setAttribute('data-empty', ''); return; }
   if (host.dataset.built) return;
   host.dataset.built = '1';
   let cat = 'all';
+  // The resume builder (/resume-maker) shows every resume, grouped by style, blank one first;
+  // other galleries show the main templates only (extra resume designs are marked "more").
+  const only = where === 'start' && $('#pe').dataset.onlyCat;
+  const list = only ? TEMPLATES.filter((t) => t.cat === only).sort((a, b) => (b.id === 'resume-blank') - (a.id === 'resume-blank')) : TEMPLATES.filter((t) => !t.more);
+  const groupOf = (t) => (only ? t.style || 'all' : t.cat);
   const chips = document.createElement('div');
   chips.className = 'pe-tpl-cats'; chips.setAttribute('role', 'tablist');
-  chips.innerHTML = TEMPLATE_CATS.filter(([id]) => id === 'all' || TEMPLATES.some((t) => t.cat === id))
-    .map(([id, name]) => `<button type="button" role="tab" data-cat="${id}" aria-selected="${id === 'all'}">${name}</button>`).join('');
+  chips.innerHTML = (only ? RESUME_STYLES : TEMPLATE_CATS).filter(([id]) => id === 'all' || list.some((t) => groupOf(t) === id))
+    .map(([id, name]) => `<button type="button" role="tab" data-cat="${id}" aria-selected="${id === 'all'}">${name}${only ? ` <span>${id === 'all' ? list.length : list.filter((t) => groupOf(t) === id).length}</span>` : ''}</button>`).join('');
   const grid = document.createElement('div');
   grid.className = 'pe-tpl-grid';
-  grid.innerHTML = TEMPLATES.map((t) => `<button type="button" class="pe-tpl" data-tpl="${t.id}" data-cat="${t.cat}">
+  grid.innerHTML = list.map((t) => `<button type="button" class="pe-tpl${t.id === 'resume-blank' ? ' pe-tpl-blank' : ''}" data-tpl="${t.id}" data-cat="${groupOf(t)}">
     <span class="pe-tpl-frame"><span class="pe-tpl-page ${t.size[0] > t.size[1] ? 'land' : 'port'}" style="aspect-ratio:${t.size[0]} / ${t.size[1]}"></span></span>
     <span class="pe-tpl-name">${t.name}</span></button>`).join('');
   host.append(chips, grid);
+  if (!only && where === 'start' && TEMPLATES.some((t) => t.more && t.cat === 'resume')) {
+    const more = document.createElement('p');
+    more.className = 'pe-tpl-more';
+    more.innerHTML = `<a href="/resume-maker">See all ${TEMPLATES.filter((t) => t.cat === 'resume' && t.id.startsWith('resume') && t.id !== 'resume-blank').length} resume templates \u2192</a>`;
+    host.append(more);
+  }
   // landing pages such as /resume-maker show their own category first
   const startCat = where === 'start' && $('#pe').dataset.startCat;
   if (startCat) requestAnimationFrame(() => { const b = $(`[data-cat="${startCat}"]`, chips); if (b) b.click(); });

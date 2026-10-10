@@ -545,3 +545,18 @@ body.is-editing .pe-app{height:auto;}
 .pe-links a{display:inline-block; padding:7px 14px; border:1px solid var(--border); border-radius:99px; background:var(--bg-soft, #F4F5F7); color:var(--ink); font-weight:600; text-decoration:none; font-size:.93rem;}
 .pe-links a:hover{border-color:var(--brand); color:var(--brand);}
 .pe-landing p + p{margin-top:12px;}
+
+/* Resume builder (/resume-maker): three ways in, and the full resume gallery */
+.pe-only .pe-start-inner{max-width:1040px;}
+.pe-choices-3{grid-template-columns:repeat(3,1fr);}
+.pe-choices-3 .pe-new[hidden]{display:none;}
+.pe-link-card{text-decoration:none; color:var(--ink);}
+.pe-link-card:hover{transform:translateY(-2px);}
+.pe-only .pe-tpl-panel{scroll-margin-top:80px;}
+.pe-only .pe-tpl-grid{grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:26px 20px;}
+.pe-tpl-cats button span{margin-left:4px; opacity:.6; font-weight:600;}
+.pe-tpl-blank .pe-tpl-frame{outline:2px dashed #cbd5e1; outline-offset:-6px;}
+.pe-tpl-more{margin:18px 0 0; text-align:center;}
+.pe-tpl-more a{color:var(--brand); font-weight:700; text-decoration:none;}
+.pe-tpl-more a:hover{text-decoration:underline;}
+@media (max-width:860px){ .pe-choices-3{grid-template-columns:1fr;} }

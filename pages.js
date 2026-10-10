@@ -258,6 +258,10 @@ function megaMenu() {
   const groups = [];
   groups.push(['popular', 'Popular', POPULAR.map(([f, t]) => ({ id: f, href: pairPath(f, t), text: `${F(f).label} &rarr; ${F(t).label}`, live: true })),
     `<a class="mega-head" href="/converters">All ${TOTAL_COUNT.toLocaleString('en-US')} conversions &rarr;</a>`]);
+  if (PDF_EDITOR) {
+    groups.push(['pdftools', 'PDF & Resume', [['/resume-maker', 'Resume Builder'], ['/edit-pdf', 'Edit PDF'], ['/invoice-generator', 'Invoice generator'], ['/certificate-maker', 'Certificate maker'], ['/sign-pdf', 'Sign PDF'], ['/fill-pdf', 'Fill PDF form'], ['/merge-pdf', 'Merge PDF'], ['/add-text-to-pdf', 'Add text to PDF']]
+      .map(([href, text]) => ({ id: 'pdf', href, text, live: true })), '<a class="mega-head" href="/resume-maker">Resume Builder: 30 templates &rarr;</a>']);
+  }
   CATS.forEach((c) => {
     const items = registry.getFormatsByCategory(c.id).map((f) => ({ id: f.id, href: formatPath(f.id), live: formatIsLive(f.id) }));
     groups.push([c.id, c.converterName, items, `<a class="mega-head" href="${categoryPath(c.id)}">${icon(c.icon)}${c.converterName} &rarr;</a>`]);
@@ -289,6 +293,7 @@ function topbar(full = false) {
       ${toolsMenu}
       <details class="nav-menu nav-simple" data-menu><summary class="nav-item">Convert<span class="caret" aria-hidden="true"></span></summary><div class="dropdown"><ul>${convertList}</ul></div></details>
       <details class="nav-menu nav-simple" data-menu><summary class="nav-item">Compress<span class="caret" aria-hidden="true"></span></summary><div class="dropdown"><ul>${compress}</ul></div></details>
+      ${PDF_EDITOR ? '<a class="nav-item nav-link" href="/resume-maker">Resume Builder</a>' : ''}
       <a class="nav-item nav-link" href="/converters">Formats</a>
     </nav>
     <div class="top-actions">${PDF_EDITOR ? `
@@ -890,6 +895,17 @@ function editorApp(l) {
     .replace('<h1>Edit PDF</h1>', `<h1>${esc(l.h1)}</h1>`)
     .replace(/<p class="pe-lede">[^<]*<\/p>/, `<p class="pe-lede">${esc(l.lede)}</p>`);
   if (l.panel) app = app.replace(/<h2>Start from a template<\/h2><p>[^<]*<\/p>/, `<h2>${esc(l.panel[0])}</h2><p>${esc(l.panel[1])}</p>`);
+  // The resume builder: every resume design, and three ways in (template, blank, own PDF).
+  // The blank-page card stays in the markup, hidden, because the editor script binds to it.
+  if (l.only) {
+    const card = (href, ico, title, text, btn, cls) => `<a class="pe-card pe-link-card" href="${href}"><span class="pe-card-ico ${cls}"><svg viewBox="0 0 24 24" aria-hidden="true">${ico}</svg></span><strong>${title}</strong><span>${text}</span><span class="btn ${cls === 'pe-card-ico-alt' ? 'btn-dark' : 'btn-brand'} btn-sm pe-card-btn">${btn}</span></a>`;
+    app = app.replace('<div class="pe" id="pe"', `<div class="pe pe-only" id="pe" data-only-cat="${l.only}"`)
+      .replace('<div class="pe-choices">', `<div class="pe-choices pe-choices-3">${card('#peTemplates', '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>', 'Use a template', '30 ready designs to choose from', 'See templates', '')}${card(`/${l.slug}?template=resume-blank`, '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 11v6m-3-3h6"/>', 'Start a blank resume', 'Headings ready, you fill in the rest', 'Start blank', 'pe-card-ico-alt')}`)
+      .replace('<strong>Open a PDF</strong>', '<strong>Edit your resume PDF</strong>')
+      .replace('<span>Drop it here or click to choose</span>', '<span>Open the resume you already have</span>')
+      .replace('<div class="pe-card pe-new">', '<div class="pe-card pe-new" hidden>')
+      .replace('<div class="pe-tpl-panel">', '<div class="pe-tpl-panel" id="peTemplates">');
+  }
   return app;
 }
 function editorPage(base, slug) {

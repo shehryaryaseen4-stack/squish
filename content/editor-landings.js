@@ -14,12 +14,12 @@ const T = (id, name) => `<a href="/edit-pdf?template=${id}">${name}</a>`;
 module.exports = [
   // --------------------------------------------------------------- templates --
   {
-    slug: 'resume-maker', kind: 'template', cat: 'resume', short: 'Resume maker',
-    title: 'Free Resume Maker - Create a Resume PDF Online',
-    desc: 'Free resume maker and CV builder. Pick a resume template, type your details and download a professional resume PDF. No watermark, works on any device.',
-    kicker: 'Free resume builder', h1: 'Free Resume Maker',
-    lede: 'Make a professional resume or CV in minutes. Pick a template, click any text to replace it with your own, and download a clean PDF that is ready to send.',
-    panel: ['Choose a resume template', 'Modern and classic layouts, plus a matching cover letter. Every word, colour and line can be changed.'],
+    slug: 'resume-maker', kind: 'template', cat: 'resume', only: 'resume', short: 'Resume builder',
+    title: 'Free Resume Builder - 30 Resume Templates, PDF Download',
+    desc: 'Free resume builder with 30 resume templates: modern, classic, simple, creative and ATS-friendly. Edit online, or start blank, and download your CV as PDF.',
+    kicker: 'Free resume builder', h1: 'Resume Builder',
+    lede: 'Pick one of 30 professional resume templates, click any text to replace it with your own, and download a clean PDF. Or start from a blank resume, or edit the resume you already have.',
+    panel: ['30 free resume templates', 'Modern, classic, simple, creative and ATS-friendly designs, plus a matching cover letter. Click one to open it; every word, colour and line can be changed.'],
     sections: [
       ['How to make a resume online', `<ol><li><strong>Pick a layout.</strong> The ${T('resume-modern', 'Modern resume')} has a coloured sidebar for contact details and skills; the ${T('resume-classic', 'Classic resume')} is a single clean column that suits banks, government jobs and academic posts.</li><li><strong>Replace the sample text.</strong> Click your name, job title, experience and education and type over them. Change fonts, sizes and colours from the bar above the page.</li><li><strong>Add or remove sections.</strong> Duplicate a job entry with Ctrl+D, delete what you do not need, and drag a guide line out of the ruler to keep everything aligned.</li><li><strong>Download your resume PDF.</strong> It opens the same on every computer and phone, which is what recruiters expect.</li></ol>`],
       ['What makes a good resume', '<p>Keep it to one page if you have less than ten years of experience, and two at most after that. Start with a two-line summary of who you are and what you want, then list jobs from newest to oldest with numbers wherever you can: "cut delivery time by 30%" says more than "responsible for delivery". Put the skills that match the job advert near the top, and use the same words the advert uses.</p><p>Applicant tracking systems (ATS) read text, not pictures, so this resume builder keeps your words as real text in the PDF. Use a standard font such as Helvetica, Roboto or Open Sans, avoid putting key details inside images, and save the file as <em>firstname-lastname-resume.pdf</em>.</p>'],

@@ -45,12 +45,359 @@ function table({ x, y, w, cols, head, rows, rowH = 26, headFill, headColor = '#f
 
 const lorem = 'Write a short summary here. Two or three sentences about\nwho you are, what you do best and what you are looking for.';
 
+// ------------------------------------------------------------ resume designs --
+// 28 resume designs made from 10 layouts, each with its own colours, fonts and sample person,
+// so the resume builder (/resume-maker) has 30 resumes with the two above. style groups them
+// in the gallery: modern, classic, simple, creative, ats.
+const PEOPLE = [
+  { name: 'Ayesha Khan', awards: 'Speaker at DevFest Karachi 2023 on fast React apps\nWinner, Bykea internal hackathon 2022\nMentor for 15 junior developers through Code for Pakistan', role: 'Software Engineer', phone: '+92 300 555 0101', email: 'ayesha.khan@email.com', city: 'Karachi, Pakistan', web: 'github.com/ayeshakhan',
+    summary: 'Full-stack engineer with five years of experience building fast,\nreliable web apps in JavaScript, Node.js and React.',
+    jobs: [['Senior Software Engineer', 'Bykea, Karachi', '2022 - Present', 'Built the rider tracking service used by 1 million people.\nCut page load time by 45 percent across the web app.'],
+      ['Software Engineer', 'Systems Ltd, Lahore', '2019 - 2022', 'Developed banking dashboards in React and Node.js.\nWrote tests that halved production bugs.'],
+      ['Intern', 'Arbisoft, Lahore', '2018 - 2019', 'Fixed bugs and built small features in Python and Django.']],
+    edu: [['BS Computer Science', 'FAST NUCES, Karachi', '2015 - 2019'], ['AWS Certified Developer', 'Amazon Web Services', '2023']],
+    skills: ['JavaScript, TypeScript', 'React and Next.js', 'Node.js, Express', 'PostgreSQL, MongoDB', 'AWS, Docker', 'Git and CI/CD'], langs: ['English', 'Urdu', 'Sindhi'] },
+  { name: 'Daniel Brooks', awards: "Marketing Week 'Rising Star' award, 2022\nCampaign of the Year shortlist, The Drum Awards 2021\nGuest lecturer on brand strategy, University of Leeds", role: 'Marketing Manager', phone: '+44 7700 900 123', email: 'daniel.brooks@email.com', city: 'London, UK', web: 'linkedin.com/in/dbrooks',
+    summary: 'Marketing manager who grows brands with clear stories and good data.\nLed campaigns with budgets of up to 2 million pounds.',
+    jobs: [['Marketing Manager', 'Greenleaf Foods, London', '2020 - Present', 'Grew online sales by 60 percent in two years.\nManage a team of six and four agencies.'],
+      ['Digital Marketing Lead', 'Brightside Media, Bristol', '2017 - 2020', 'Ran search and social campaigns for 20 clients.\nLowered cost per lead by 35 percent.'],
+      ['Marketing Executive', 'Northwind Travel, Bristol', '2015 - 2017', 'Wrote newsletters and managed the company blog.']],
+    edu: [['BA Marketing', 'University of Leeds', '2011 - 2015'], ['Google Ads Certification', 'Google', '2021']],
+    skills: ['Brand strategy', 'Google and Meta Ads', 'SEO and content', 'Email marketing', 'Analytics, GA4', 'Team leadership'], langs: ['English', 'French', 'German'] },
+  { name: 'Fatima Noor', awards: "Nurse of the Year, Shaukat Khanum Hospital, 2023\nLed the ward's hand-hygiene project: infections down 30 percent\nVolunteer nurse at free medical camps in South Punjab", role: 'Registered Nurse', phone: '+92 321 555 0147', email: 'fatima.noor@email.com', city: 'Lahore, Pakistan', web: 'PNC licence 123456',
+    summary: 'Caring registered nurse with seven years in busy medical and\nsurgical wards. Calm under pressure and kind to every patient.',
+    jobs: [['Senior Staff Nurse', 'Shaukat Khanum Hospital, Lahore', '2020 - Present', 'Lead a team of eight nurses on a 30-bed surgical ward.\nTrained 25 new nurses in patient safety.'],
+      ['Staff Nurse', 'Services Hospital, Lahore', '2017 - 2020', 'Cared for up to 12 patients per shift on a medical ward.\nGave medicines and kept accurate patient records.'],
+      ['Nursing Intern', 'Mayo Hospital, Lahore', '2016 - 2017', 'Rotated through emergency, children and maternity wards.']],
+    edu: [['BSc Nursing', 'University of Health Sciences', '2012 - 2016'], ['Basic Life Support (BLS)', 'American Heart Association', '2024']],
+    skills: ['Patient assessment', 'Wound care', 'IV and medication', 'Infection control', 'Electronic records', 'Teamwork'], langs: ['English', 'Urdu', 'Punjabi'] },
+  { name: 'Omar Siddiqui', awards: 'Delivered a 40-storey tower two months ahead of schedule\nZero lost-time accidents across 1.2 million work hours\nMember, Pakistan Engineering Council and Society of Engineers UAE', role: 'Civil Engineer', phone: '+971 50 555 0188', email: 'omar.siddiqui@email.com', city: 'Dubai, UAE', web: 'linkedin.com/in/omarsiddiqui',
+    summary: 'Civil engineer with nine years on roads, bridges and high-rise\nprojects. Delivers on time, on budget and safely.',
+    jobs: [['Senior Project Engineer', 'Al Futtaim Construction, Dubai', '2019 - Present', 'Manage a 40-storey tower worth 120 million dirhams.\nCoordinate 15 subcontractors and the design team.'],
+      ['Site Engineer', 'NLC, Islamabad', '2015 - 2019', 'Supervised 60 km of highway works and quality checks.\nPrepared bills of quantities and progress reports.'],
+      ['Graduate Engineer', 'Habib Construction, Karachi', '2014 - 2015', 'Assisted with surveying, drawings and site safety.']],
+    edu: [['BSc Civil Engineering', 'UET Lahore', '2010 - 2014'], ['PMP Certification', 'Project Management Institute', '2020']],
+    skills: ['AutoCAD, Revit', 'Primavera P6', 'Structural design', 'Cost estimation', 'Site safety', 'Contract management'], langs: ['English', 'Arabic', 'Urdu'] },
+  { name: 'Emily Carter', awards: "School's Outstanding Teacher award, 2022\nLed a reading programme adopted by four local schools\nFirst aid certified; Forest School practitioner", role: 'Primary School Teacher', phone: '+44 7700 900 456', email: 'emily.carter@email.com', city: 'Manchester, UK', web: 'QTS 2016',
+    summary: 'Enthusiastic primary teacher who makes lessons fun and helps\nevery child feel confident to learn.',
+    jobs: [['Year 4 Class Teacher', 'Oakwood Primary School', '2019 - Present', 'Raised reading results by 20 percent in one year.\nRun the school science club and the eco council.'],
+      ['Year 2 Class Teacher', 'St Mary\'s Primary School', '2016 - 2019', 'Planned lessons for 30 pupils with different needs.\nWorked closely with parents and teaching assistants.'],
+      ['Teaching Assistant', 'Hillside Primary School', '2014 - 2016', 'Supported small reading and maths groups.']],
+    edu: [['PGCE Primary Education', 'University of Manchester', '2015 - 2016'], ['BA English Literature', 'University of York', '2011 - 2014']],
+    skills: ['Lesson planning', 'Classroom management', 'Phonics teaching', 'Special needs support', 'Google Classroom', 'Parent communication'], langs: ['English', 'Spanish'] },
+  { name: 'Hamza Ali', awards: "Dean's Honour List, six semesters\nWinner, NUST case competition 2024 (finance track)\nVolunteer tutor for 30 students in maths and English", role: 'Business Graduate', phone: '+92 333 555 0199', email: 'hamza.ali@email.com', city: 'Islamabad, Pakistan', web: 'linkedin.com/in/hamzaali',
+    summary: 'Recent BBA graduate looking for a first role in finance or\noperations. Quick learner, organised and good with numbers.',
+    jobs: [['Finance Intern', 'Jazz, Islamabad', 'Jun - Aug 2025', 'Prepared weekly sales reports in Excel for the finance team.\nHelped reconcile 500 vendor invoices.'],
+      ['Operations Intern', 'Daraz, Lahore', 'Jun - Aug 2024', 'Tracked delivery delays and suggested fixes to managers.'],
+      ['President, Business Society', 'NUST Business School', '2023 - 2025', 'Organised three events with over 400 students each.']],
+    edu: [['BBA (Finance)', 'NUST Business School, Islamabad', '2021 - 2025'], ['Intermediate (ICS)', 'Punjab College, Rawalpindi', '2019 - 2021']],
+    skills: ['Microsoft Excel', 'Financial analysis', 'PowerPoint', 'Report writing', 'Teamwork', 'Public speaking'], langs: ['English', 'Urdu'] },
+  { name: 'Sophia Martinez', awards: "Two Laus awards for packaging design, 2020 and 2022\nWork featured in Behance's 'Best of Branding' gallery\nRuns a monthly typography workshop for beginners", role: 'Graphic Designer', phone: '+34 600 555 012', email: 'sophia.martinez@email.com', city: 'Barcelona, Spain', web: 'sophiamartinez.design',
+    summary: 'Graphic designer with a love for bold colour and clean layouts.\nBrand identities, packaging and social media for 50+ clients.',
+    jobs: [['Senior Graphic Designer', 'Estudio Luna, Barcelona', '2021 - Present', 'Created brand identities for restaurants, shops and apps.\nLead designer on a packaging range sold in 300 stores.'],
+      ['Graphic Designer', 'Pixel and Co, Madrid', '2018 - 2021', 'Designed social media posts, ads and websites.\nWon two national packaging design awards.'],
+      ['Junior Designer', 'Freelance', '2016 - 2018', 'Logos, flyers and menus for local businesses.']],
+    edu: [['BA Graphic Design', 'Escola Massana, Barcelona', '2012 - 2016'], ['Typography course', 'Domestika', '2020']],
+    skills: ['Adobe Illustrator', 'Photoshop, InDesign', 'Figma', 'Brand identity', 'Packaging', 'Typography'], langs: ['Spanish', 'English', 'Catalan'] },
+  { name: 'Bilal Hussain', awards: "Top sales executive in the region, 2022 and 2024\nOpened the company's first Riyadh hypermarket account\nCertified in consultative selling (Miller Heiman)", role: 'Sales Executive', phone: '+966 55 555 0123', email: 'bilal.hussain@email.com', city: 'Riyadh, Saudi Arabia', web: 'linkedin.com/in/bilalhussain',
+    summary: 'Results-driven sales executive who beat targets six years in\na row. Strong at building trust with B2B customers.',
+    jobs: [['Senior Sales Executive', 'Almarai, Riyadh', '2021 - Present', 'Manage 120 retail accounts worth 30 million riyals a year.\nReached 118 percent of target in 2024.'],
+      ['Sales Executive', 'Unilever Pakistan, Karachi', '2018 - 2021', 'Opened 85 new shops in the Karachi region.\nTrained five new sales officers.'],
+      ['Sales Officer', 'Engro Foods, Karachi', '2016 - 2018', 'Visited 40 shops a day and took orders.']],
+    edu: [['MBA Marketing', 'IBA Karachi', '2014 - 2016'], ['BBA', 'University of Karachi', '2010 - 2014']],
+    skills: ['Key account management', 'Negotiation', 'CRM (Salesforce)', 'Market research', 'Forecasting', 'Presentations'], langs: ['English', 'Arabic', 'Urdu'] },
+  { name: 'Zara Malik', awards: 'Built a churn model that saved 2 million dollars a year\nWinner, Toronto Open Data Hackathon 2021\nTableau Desktop Specialist certification', role: 'Data Analyst', phone: '+1 416 555 0175', email: 'zara.malik@email.com', city: 'Toronto, Canada', web: 'zaramalik.dev',
+    summary: 'Data analyst who turns messy data into clear answers.\nFour years with SQL, Python and dashboards for retail and banking.',
+    jobs: [['Data Analyst', 'TD Bank, Toronto', '2022 - Present', 'Built Power BI dashboards used by 200 branch managers.\nAutomated reports, saving 15 hours of work a week.'],
+      ['Junior Data Analyst', 'Loblaw, Toronto', '2020 - 2022', 'Analysed sales data to plan stock for 50 stores.\nWrote SQL queries for marketing and finance.'],
+      ['Research Assistant', 'University of Toronto', '2019 - 2020', 'Cleaned and analysed survey data in Python.']],
+    edu: [['MSc Data Science', 'University of Toronto', '2018 - 2020'], ['BS Statistics', 'LUMS, Lahore', '2014 - 2018']],
+    skills: ['SQL', 'Python, pandas', 'Power BI, Tableau', 'Excel, VBA', 'Statistics', 'Machine learning basics'], langs: ['English', 'Urdu', 'French'] },
+  { name: 'James Wilson', awards: 'Opened a new 300,000 sq ft warehouse on time and on budget\nCut overtime costs by 25 percent in one year\nCompany Leadership Award, 2021', role: 'Operations Manager', phone: '+1 212 555 0142', email: 'james.wilson@email.com', city: 'New York, USA', web: 'linkedin.com/in/jameswilson',
+    summary: 'Operations leader with twelve years in logistics and retail.\nBuilds teams and processes that run smoothly at scale.',
+    jobs: [['Operations Manager', 'Target, New York', '2018 - Present', 'Run a distribution centre with 250 staff.\nCut shipping errors by 40 percent with new checks.'],
+      ['Assistant Operations Manager', 'FedEx, Newark', '2014 - 2018', 'Managed night shifts handling 50,000 parcels.\nImproved on-time delivery to 98 percent.'],
+      ['Team Lead', 'Amazon, Edison', '2012 - 2014', 'Led a picking team of 30 associates.']],
+    edu: [['MBA Operations', 'Rutgers Business School', '2016 - 2018'], ['Lean Six Sigma Green Belt', 'ASQ', '2017']],
+    skills: ['Supply chain', 'Lean and Six Sigma', 'Budgeting', 'People management', 'SAP and WMS', 'Safety compliance'], langs: ['English', 'Spanish'] },
+];
+
+const W = 595.28, PH = 841.89;
+const initials = (n) => n.split(' ').map((s) => s[0]).join('').slice(0, 2);
+const lines = (t) => String(t).split('\n').length;
+
+// Each layout returns the page objects for one person p and one look c:
+// { acc: accent, dark, soft: light tint, ink, mute, hf: heading font, bf: body font }
+const LAYOUTS = {
+  // dark sidebar on the left with contact, skills and languages
+  sideLeft(p, c) {
+    const out = [], sx = 26, mx = 222, mr = 560;
+    out.push(R(0, 0, 196, PH, { fill: c.dark }));
+    out.push(E(48, 40, 100, 100, { fill: c.acc })); out.push(C(initials(p.name), 98, 72, 30, { color: '#ffffff', bold: true, font: c.hf }));
+    let y = 176;
+    const sh = (t) => { out.push(T(t, sx, y, 10, { bold: true, color: '#ffffff', font: c.hf }), L(sx, y + 17, 170, y + 17, { color: c.acc, w: 1.2 })); y += 28; };
+    sh('CONTACT'); out.push(T(`${p.phone}\n${p.email}\n${p.city}\n${p.web}`, sx, y, 9, { color: '#e5e7eb', font: c.bf })); y += 74;
+    sh('SKILLS'); out.push(T(p.skills.join('\n'), sx, y, 9, { color: '#e5e7eb', font: c.bf })); y += p.skills.length * 11 + 22;
+    sh('LANGUAGES'); out.push(T(p.langs.join('\n'), sx, y, 9, { color: '#e5e7eb', font: c.bf }));
+    out.push(T(p.name.toUpperCase(), mx, 52, 26, { bold: true, color: c.dark, font: c.hf }), T(p.role, mx, 88, 13, { color: c.acc, font: c.hf }));
+    y = 130;
+    const hd = (t) => { out.push(T(t, mx, y, 11.5, { bold: true, color: c.dark, font: c.hf }), L(mx, y + 19, mr, y + 19, { color: c.acc, w: 1.4 })); y += 30; };
+    hd('PROFILE'); out.push(T(p.summary, mx, y, 9.5, { color: c.ink, font: c.bf })); y += 46;
+    hd('EXPERIENCE');
+    for (const [t, co, d, txt] of p.jobs) { out.push(T(t, mx, y, 11, { bold: true, color: c.dark, font: c.bf }), RT(d, mr, y + 1, 9, { color: c.mute, font: c.bf }), T(co, mx, y + 15, 9.5, { italic: true, color: c.acc, font: c.bf }), T(txt, mx, y + 31, 9.5, { color: c.ink, font: c.bf })); y += 34 + lines(txt) * 12 + 14; }
+    hd('EDUCATION');
+    for (const [dg, sc, d] of p.edu) { out.push(T(dg, mx, y, 11, { bold: true, color: c.dark, font: c.bf }), RT(d, mr, y + 1, 9, { color: c.mute, font: c.bf }), T(sc, mx, y + 15, 9.5, { color: c.ink, font: c.bf })); y += 38; }
+    y += 4; hd('ACHIEVEMENTS'); out.push(T(p.awards.split('\n').map((a) => `-  ${a}`).join('\n'), mx, y, 9.5, { color: c.ink, font: c.bf }));
+    return out;
+  },
+  // light sidebar on the right
+  sideRight(p, c) {
+    const out = [], mx = 40, mr = 372, sx = 398;
+    out.push(R(380, 0, W - 380, PH, { fill: c.soft }));
+    out.push(T(p.name, mx, 50, 28, { bold: true, color: c.dark, font: c.hf }), T(p.role.toUpperCase(), mx, 90, 11, { color: c.acc, bold: true, font: c.hf }));
+    out.push(R(mx, 116, 46, 3, { fill: c.acc }));
+    let y = 140;
+    const hd = (t) => { out.push(T(t, mx, y, 12, { bold: true, color: c.acc, font: c.hf })); y += 24; };
+    hd('About me'); out.push(T(p.summary.replace('\n', ' ').replace(/(.{1,62})(\s|$)/g, '$1\n').trim(), mx, y, 9.5, { color: c.ink, font: c.bf })); y += 58;
+    hd('Work experience');
+    for (const [t, co, d, txt] of p.jobs) { out.push(T(t, mx, y, 11, { bold: true, color: c.dark, font: c.bf }), T(`${co}  |  ${d}`, mx, y + 15, 9, { color: c.mute, font: c.bf }), T(txt.replace(/\n/g, '\n'), mx, y + 31, 9, { color: c.ink, font: c.bf })); y += 31 + lines(txt) * 11 + 18; }
+    hd('Education');
+    for (const [dg, sc, d] of p.edu) { out.push(T(dg, mx, y, 11, { bold: true, color: c.dark, font: c.bf }), T(`${sc}  |  ${d}`, mx, y + 15, 9, { color: c.mute, font: c.bf })); y += 38; }
+    let sy = 50;
+    const sh = (t) => { out.push(T(t, sx, sy, 11, { bold: true, color: c.dark, font: c.hf }), L(sx, sy + 18, 570, sy + 18, { color: c.acc })); sy += 28; };
+    out.push(E(sx + 30, sy, 110, 110, { fill: '#ffffff', stroke: c.acc, sw: 2 }), C('PHOTO', sx + 85, sy + 49, 9, { color: c.mute, bold: true })); sy += 136;
+    sh('Contact'); out.push(T(`${p.phone}\n${p.email}\n${p.city}\n${p.web}`, sx, sy, 9, { color: c.ink, font: c.bf })); sy += 74;
+    sh('Skills'); out.push(T(p.skills.map((s) => `-  ${s}`).join('\n'), sx, sy, 9, { color: c.ink, font: c.bf })); sy += p.skills.length * 11 + 22;
+    sh('Languages'); out.push(T(p.langs.join('\n'), sx, sy, 9, { color: c.ink, font: c.bf }));
+    y += 6; hd('Achievements'); out.push(T(p.awards.split('\n').map((a) => `-  ${a}`).join('\n'), mx, y, 9, { color: c.ink, font: c.bf }));
+    return out;
+  },
+  // coloured header band, one column below
+  band(p, c) {
+    const out = [], x = 50, r = 545;
+    out.push(R(0, 0, W, 150, { fill: c.dark }));
+    out.push(T(p.name, x, 40, 30, { bold: true, color: '#ffffff', font: c.hf }), T(p.role, x, 80, 13, { color: c.soft, font: c.hf }));
+    out.push(T(`${p.phone}    ${p.email}    ${p.city}`, x, 112, 9, { color: '#ffffff', font: c.bf }));
+    let y = 180;
+    const hd = (t) => { out.push(R(x, y + 2, 4, 14, { fill: c.acc }), T(t, x + 12, y, 12, { bold: true, color: c.dark, font: c.hf })); y += 26; };
+    hd('Profile'); out.push(T(p.summary, x, y, 10, { color: c.ink, font: c.bf })); y += 48;
+    hd('Experience');
+    for (const [t, co, d, txt] of p.jobs) { out.push(T(`${t}, ${co}`, x, y, 11, { bold: true, color: c.dark, font: c.bf }), RT(d, r, y + 1, 9.5, { color: c.acc, bold: true, font: c.bf }), T(txt, x, y + 17, 9.5, { color: c.ink, font: c.bf })); y += 17 + lines(txt) * 12 + 16; }
+    hd('Education');
+    for (const [dg, sc, d] of p.edu) { out.push(T(`${dg}, ${sc}`, x, y, 10.5, { bold: true, color: c.dark, font: c.bf }), RT(d, r, y + 1, 9.5, { color: c.acc, bold: true, font: c.bf })); y += 22; }
+    y += 10; hd('Skills');
+    out.push(T(p.skills.slice(0, 3).join('     ·     '), x, y, 9.5, { color: c.ink, font: c.bf }), T(p.skills.slice(3).join('     ·     '), x, y + 15, 9.5, { color: c.ink, font: c.bf })); y += 42;
+    hd('Languages'); out.push(T(p.langs.join('   ·   '), x, y, 9.5, { color: c.ink, font: c.bf }));
+    y += 40; hd('Achievements'); out.push(T(p.awards.split('\n').map((a) => `-  ${a}`).join('\n'), x, y, 9.5, { color: c.ink, font: c.bf }));
+    return out;
+  },
+  // centred, traditional
+  centered(p, c) {
+    const out = [], mid = W / 2, x = 60, r = 535;
+    out.push(C(p.name, mid, 46, 30, { font: c.hf, color: c.dark }), C(p.role.toUpperCase(), mid, 88, 10.5, { color: c.acc, bold: true, font: c.bf }));
+    out.push(C(`${p.city}   |   ${p.phone}   |   ${p.email}`, mid, 108, 9, { color: c.mute, font: c.bf }));
+    out.push(L(x, 130, r, 130, { color: c.dark, w: 1.2 }), L(x, 134, r, 134, { color: c.dark, w: 0.5 }));
+    let y = 152;
+    const hd = (t) => { out.push(C(t, mid, y, 11, { bold: true, color: c.dark, font: c.hf }), L(mid - 40, y + 19, mid + 40, y + 19, { color: c.acc })); y += 30; };
+    hd('PROFESSIONAL SUMMARY'); out.push(C(p.summary, mid, y, 10, { color: c.ink, font: c.bf })); y += 46;
+    hd('EXPERIENCE');
+    for (const [t, co, d, txt] of p.jobs) { out.push(T(t, x, y, 11, { bold: true, color: c.dark, font: c.bf }), RT(d, r, y + 1, 9.5, { italic: true, color: c.mute, font: c.bf }), T(co, x, y + 15, 9.5, { italic: true, color: c.acc, font: c.bf }), T(txt, x, y + 31, 9.5, { color: c.ink, font: c.bf })); y += 31 + lines(txt) * 12 + 16; }
+    hd('EDUCATION');
+    for (const [dg, sc, d] of p.edu) { out.push(T(dg, x, y, 11, { bold: true, color: c.dark, font: c.bf }), RT(d, r, y + 1, 9.5, { italic: true, color: c.mute, font: c.bf }), T(sc, x, y + 15, 9.5, { color: c.ink, font: c.bf })); y += 38; }
+    hd('SKILLS'); out.push(C(p.skills.join('   ·   '), mid, y, 9.5, { color: c.ink, font: c.bf })); y += 30;
+    hd('LANGUAGES'); out.push(C(p.langs.join('   ·   '), mid, y, 9.5, { color: c.ink, font: c.bf }));
+    y += 30; hd('ACHIEVEMENTS'); out.push(C(p.awards, mid, y, 9.5, { color: c.ink, font: c.bf }));
+    return out;
+  },
+  // header on top, two columns below: details left, experience right
+  twoCol(p, c) {
+    const out = [], x = 40, r = 555, lx = 40, lr = 182, rx = 210;
+    out.push(T(p.name, x, 44, 28, { bold: true, color: c.dark, font: c.hf }), T(p.role, x, 82, 13, { color: c.acc, font: c.hf }));
+    out.push(RT(`${p.phone}\n${p.email}\n${p.city}`, r, 48, 9, { color: c.mute, font: c.bf }));
+    out.push(R(0, 112, W, 4, { fill: c.acc }));
+    out.push(L(196, 136, 196, 800, { color: c.soft, w: 1.2 }));
+    let ly = 140;
+    const lh = (t) => { out.push(T(t, lx, ly, 10.5, { bold: true, color: c.acc, font: c.hf })); ly += 22; };
+    lh('SKILLS'); out.push(T(p.skills.join('\n'), lx, ly, 9, { color: c.ink, font: c.bf })); ly += p.skills.length * 11 + 24;
+    lh('EDUCATION'); for (const [dg, sc, d] of p.edu) { out.push(T(dg, lx, ly, 9.5, { bold: true, color: c.dark, font: c.bf }), T(`${sc}\n${d}`, lx, ly + 13, 8.5, { color: c.mute, font: c.bf })); ly += 50; }
+    ly += 6; lh('LANGUAGES'); out.push(T(p.langs.join('\n'), lx, ly, 9, { color: c.ink, font: c.bf })); ly += p.langs.length * 11 + 24;
+    lh('LINKS'); out.push(T(p.web, lx, ly, 9, { color: c.ink, font: c.bf }));
+    let y = 140;
+    const hd = (t) => { out.push(T(t, rx, y, 10.5, { bold: true, color: c.acc, font: c.hf })); y += 22; };
+    hd('PROFILE'); out.push(T(p.summary, rx, y, 9.5, { color: c.ink, font: c.bf })); y += 48;
+    hd('EXPERIENCE');
+    for (const [t, co, d, txt] of p.jobs) { out.push(T(t, rx, y, 11, { bold: true, color: c.dark, font: c.bf }), RT(d, r, y + 1, 9, { color: c.mute, font: c.bf }), T(co, rx, y + 15, 9.5, { color: c.acc, font: c.bf }), T(txt, rx, y + 31, 9.5, { color: c.ink, font: c.bf })); y += 31 + lines(txt) * 12 + 20; }
+    y += 4; hd('ACHIEVEMENTS'); out.push(T(p.awards.split('\n').map((a) => `-  ${a}`).join('\n'), rx, y, 9.5, { color: c.ink, font: c.bf })); y += 56;
+    hd('REFERENCES'); out.push(T('Available on request.', rx, y, 9.5, { italic: true, color: c.mute, font: c.bf }));
+    return out;
+  },
+  // experience on a timeline with dots
+  timeline(p, c) {
+    const out = [], x = 50, r = 545, tx = 62, cx = 84;
+    out.push(T(p.name, x, 48, 30, { bold: true, color: c.dark, font: c.hf }), T(p.role, x, 88, 13, { color: c.acc, font: c.hf }));
+    out.push(T(`${p.phone}   ·   ${p.email}   ·   ${p.city}   ·   ${p.web}`, x, 112, 9, { color: c.mute, font: c.bf }));
+    let y = 146;
+    const hd = (t) => { out.push(T(t, x, y, 12, { bold: true, color: c.dark, font: c.hf }), L(x, y + 20, r, y + 20, { color: c.soft, w: 1.5 })); y += 32; };
+    hd('Summary'); out.push(T(p.summary, x, y, 10, { color: c.ink, font: c.bf })); y += 48;
+    hd('Experience');
+    const top = y + 4;
+    for (const [t, co, d, txt] of p.jobs) { out.push(E(tx - 5, y + 2, 10, 10, { fill: c.acc }), T(d, cx, y, 9, { bold: true, color: c.acc, font: c.bf }), T(t, cx, y + 14, 11, { bold: true, color: c.dark, font: c.bf }), T(co, cx, y + 29, 9.5, { italic: true, color: c.mute, font: c.bf }), T(txt, cx, y + 45, 9.5, { color: c.ink, font: c.bf })); y += 45 + lines(txt) * 12 + 16; }
+    out.unshift(L(tx, top, tx, y - 18, { color: c.soft, w: 2 }));
+    hd('Education');
+    for (const [dg, sc, d] of p.edu) { out.push(E(tx - 5, y + 2, 10, 10, { fill: '#ffffff', stroke: c.acc, sw: 2 }), T(d, cx, y, 9, { bold: true, color: c.acc, font: c.bf }), T(`${dg}, ${sc}`, cx, y + 14, 10.5, { bold: true, color: c.dark, font: c.bf })); y += 40; }
+    hd('Skills'); out.push(T(p.skills.join('   ·   '), x, y, 9.5, { color: c.ink, font: c.bf }));
+    y += 30; hd('Achievements'); out.push(T(p.awards.split('\n').map((a) => `-  ${a}`).join('\n'), x, y, 9.5, { color: c.ink, font: c.bf }));
+    return out;
+  },
+  // quiet design: labels in a narrow left column, content on the right
+  minimal(p, c) {
+    const out = [], lx = 50, x = 170, r = 545;
+    out.push(T(p.name, lx, 60, 32, { color: c.dark, font: c.hf }), T(p.role, lx, 102, 12, { color: c.acc, font: c.bf }));
+    out.push(RT(`${p.email}\n${p.phone}\n${p.city}`, r, 64, 9, { color: c.mute, font: c.bf }));
+    let y = 160;
+    const sec = (t) => { out.push(L(lx, y - 14, r, y - 14, { color: c.soft }), T(t.toUpperCase(), lx, y, 8.5, { bold: true, color: c.acc, font: c.bf })); };
+    sec('Profile'); out.push(T(p.summary, x, y, 9.5, { color: c.ink, font: c.bf })); y += 64;
+    sec('Experience');
+    for (const [t, co, d, txt] of p.jobs) { out.push(T(`${t} - ${co}`, x, y, 10.5, { bold: true, color: c.dark, font: c.bf }), T(d, x, y + 15, 9, { color: c.mute, font: c.bf }), T(txt, x, y + 30, 9.5, { color: c.ink, font: c.bf })); y += 30 + lines(txt) * 12 + 18; }
+    y += 6; sec('Education');
+    for (const [dg, sc, d] of p.edu) { out.push(T(dg, x, y, 10.5, { bold: true, color: c.dark, font: c.bf }), T(`${sc}, ${d}`, x, y + 15, 9, { color: c.mute, font: c.bf })); y += 38; }
+    y += 14; sec('Skills'); out.push(T(p.skills.slice(0, 3).join('\n'), x, y, 9.5, { color: c.ink, font: c.bf }), T(p.skills.slice(3).join('\n'), x + 190, y, 9.5, { color: c.ink, font: c.bf })); y += 58;
+    sec('Languages'); out.push(T(p.langs.join(', '), x, y, 9.5, { color: c.ink, font: c.bf }));
+    y += 34; sec('Achievements'); out.push(T(p.awards, x, y, 9.5, { color: c.ink, font: c.bf })); y += 64;
+    sec('References'); out.push(T('Available on request.', x, y, 9.5, { color: c.mute, font: c.bf }));
+    return out;
+  },
+  // big name next to an accent block, short bars under headings
+  bold(p, c) {
+    const out = [], x = 56, r = 545;
+    out.push(R(0, 36, 34, 92, { fill: c.acc }));
+    out.push(T(p.name.split(' ')[0].toUpperCase(), x, 32, 34, { bold: true, color: c.dark, font: c.hf }), T(p.name.split(' ').slice(1).join(' ').toUpperCase(), x, 72, 34, { bold: true, color: c.acc, font: c.hf }));
+    out.push(T(p.role, x, 116, 12, { color: c.mute, font: c.bf }));
+    out.push(RT(`${p.phone}\n${p.email}\n${p.city}\n${p.web}`, r, 52, 9, { color: c.ink, font: c.bf }));
+    let y = 160;
+    const hd = (t) => { out.push(T(t, x, y, 13, { bold: true, color: c.dark, font: c.hf }), R(x, y + 21, 32, 3, { fill: c.acc })); y += 34; };
+    hd('ABOUT'); out.push(T(p.summary, x, y, 10, { color: c.ink, font: c.bf })); y += 50;
+    hd('EXPERIENCE');
+    for (const [t, co, d, txt] of p.jobs) { out.push(T(t, x, y, 11.5, { bold: true, color: c.dark, font: c.bf }), RT(d, r, y + 1, 9.5, { bold: true, color: c.acc, font: c.bf }), T(co, x, y + 16, 9.5, { color: c.mute, font: c.bf }), T(txt, x, y + 32, 9.5, { color: c.ink, font: c.bf })); y += 32 + lines(txt) * 12 + 16; }
+    hd('EDUCATION');
+    for (const [dg, sc, d] of p.edu) { out.push(T(dg, x, y, 11, { bold: true, color: c.dark, font: c.bf }), RT(d, r, y + 1, 9.5, { bold: true, color: c.acc, font: c.bf }), T(sc, x, y + 15, 9.5, { color: c.mute, font: c.bf })); y += 38; }
+    hd('SKILLS'); out.push(T(p.skills.slice(0, 3).join('\n'), x, y, 9.5, { color: c.ink, font: c.bf }), T(p.skills.slice(3).join('\n'), x + 200, y, 9.5, { color: c.ink, font: c.bf }));
+    y += 58; hd('ACHIEVEMENTS'); out.push(T(p.awards.split('\n').map((a) => `-  ${a}`).join('\n'), x, y, 9.5, { color: c.ink, font: c.bf }));
+    return out;
+  },
+  // plain and dense, best for applicant tracking systems
+  ats(p, c) {
+    const out = [], x = 54, r = 541;
+    out.push(T(p.name, x, 46, 22, { bold: true, color: '#111111', font: c.hf }));
+    out.push(T(`${p.role}  |  ${p.city}  |  ${p.phone}  |  ${p.email}  |  ${p.web}`, x, 76, 8.8, { color: '#333333', font: c.bf }));
+    let y = 106;
+    const hd = (t) => { out.push(T(t, x, y, 10.5, { bold: true, color: c.dark, font: c.hf }), L(x, y + 16, r, y + 16, { color: '#9ca3af', w: 0.8 })); y += 24; };
+    hd('SUMMARY'); out.push(T(p.summary, x, y, 9.5, { color: '#222222', font: c.bf })); y += 40;
+    hd('WORK EXPERIENCE');
+    for (const [t, co, d, txt] of p.jobs) { out.push(T(`${t}, ${co}`, x, y, 10, { bold: true, color: '#111111', font: c.bf }), RT(d, r, y, 9.5, { color: '#333333', font: c.bf }), T(txt.split('\n').map((s) => `-  ${s}`).join('\n'), x, y + 15, 9.5, { color: '#222222', font: c.bf })); y += 15 + lines(txt) * 12 + 14; }
+    hd('EDUCATION');
+    for (const [dg, sc, d] of p.edu) { out.push(T(`${dg}, ${sc}`, x, y, 10, { bold: true, color: '#111111', font: c.bf }), RT(d, r, y, 9.5, { color: '#333333', font: c.bf })); y += 18; }
+    y += 8; hd('SKILLS'); out.push(T(p.skills.join(', '), x, y, 9.5, { color: '#222222', font: c.bf })); y += 30;
+    hd('LANGUAGES'); out.push(T(p.langs.join(', '), x, y, 9.5, { color: '#222222', font: c.bf }));
+    y += 30; hd('ACHIEVEMENTS'); out.push(T(p.awards.split('\n').map((a) => `-  ${a}`).join('\n'), x, y, 9.5, { color: '#222222', font: c.bf })); y += 52;
+    hd('REFERENCES'); out.push(T('Available on request.', x, y, 9.5, { color: '#222222', font: c.bf }));
+    return out;
+  },
+  // colourful: stripe, initials badge and skill bars
+  creative(p, c) {
+    const out = [], x = 44, r = 551, sx = 392;
+    out.push(R(0, 0, W, 10, { fill: c.acc }), R(0, PH - 10, W, 10, { fill: c.acc }));
+    out.push(E(x, 40, 84, 84, { fill: c.soft }), C(initials(p.name), x + 42, 66, 28, { bold: true, color: c.acc, font: c.hf }));
+    out.push(T(p.name, x + 104, 50, 27, { bold: true, color: c.dark, font: c.hf }), T(p.role, x + 104, 86, 13, { color: c.acc, font: c.bf }));
+    out.push(R(x, 146, r - x, 30, { fill: c.soft, r: 8 }), T(`${p.phone}     ${p.email}     ${p.city}`, x + 14, 155, 9, { color: c.dark, font: c.bf }));
+    let y = 200;
+    const hd = (t, hx = x) => { out.push(T(t, hx, y, 12.5, { bold: true, color: c.acc, font: c.hf })); };
+    hd('Hello!'); y += 24; out.push(T(p.summary.replace('\n', ' ').replace(/(.{1,55})(\s|$)/g, '$1\n').trim(), x, y, 9.5, { color: c.ink, font: c.bf }));
+    let ry = y + 70;
+    y = ry; hd('Experience'); y += 26;
+    for (const [t, co, d, txt] of p.jobs) { out.push(T(t, x, y, 11, { bold: true, color: c.dark, font: c.bf }), T(`${co}  ·  ${d}`, x, y + 15, 9, { color: c.mute, font: c.bf }), T(txt.replace(/\n/g, '\n'), x, y + 31, 9, { color: c.ink, font: c.bf })); y += 31 + lines(txt) * 11 + 16; }
+    hd('Education'); y += 26;
+    for (const [dg, sc, d] of p.edu) { out.push(T(dg, x, y, 10.5, { bold: true, color: c.dark, font: c.bf }), T(`${sc}  ·  ${d}`, x, y + 15, 9, { color: c.mute, font: c.bf })); y += 38; }
+    let sy = 200;
+    out.push(T('Skills', sx, sy, 12.5, { bold: true, color: c.acc, font: c.hf })); sy += 28;
+    p.skills.forEach((s, i) => { const lv = [0.9, 0.8, 0.85, 0.7, 0.75, 0.65][i % 6]; out.push(T(s, sx, sy, 9, { color: c.dark, font: c.bf }), R(sx, sy + 15, 159, 5, { fill: c.soft, r: 2.5 }), R(sx, sy + 15, Math.round(159 * lv), 5, { fill: c.acc, r: 2.5 })); sy += 32; });
+    sy += 12; out.push(T('Languages', sx, sy, 12.5, { bold: true, color: c.acc, font: c.hf })); sy += 26;
+    out.push(T(p.langs.join('\n'), sx, sy, 9.5, { color: c.ink, font: c.bf })); sy += p.langs.length * 12 + 20;
+    out.push(T('Online', sx, sy, 12.5, { bold: true, color: c.acc, font: c.hf }), T(p.web, sx, sy + 26, 9.5, { color: c.ink, font: c.bf }));
+    y += 6; hd('Achievements'); y += 26; out.push(T(p.awards.replace(/(.{1,52})(\s|$)/gm, '$1\n').trim().split('\n').slice(0, 6).join('\n'), x, y, 9, { color: c.ink, font: c.bf }));
+    return out;
+  },
+};
+
+// [layout, style, name, colours, heading font, body font]
+const LOOKS = [
+  ['sideLeft', 'modern', 'Navy sidebar', ['#2563eb', '#1e293b', '#dbeafe'], 'montserrat', 'open-sans'],
+  ['band', 'modern', 'Teal header', ['#0d9488', '#134e4a', '#ccfbf1'], 'poppins', 'lato'],
+  ['centered', 'classic', 'Elegant serif', ['#9a3412', '#1c1917', '#fde68a'], 'playfair-display', 'lora'],
+  ['twoCol', 'modern', 'Professional two-column', ['#4f46e5', '#1e1b4b', '#e0e7ff'], 'raleway', 'source-sans-3'],
+  ['timeline', 'modern', 'Timeline', ['#0891b2', '#0f172a', '#cffafe'], 'montserrat', 'roboto'],
+  ['minimal', 'simple', 'Minimal', ['#64748b', '#0f172a', '#e2e8f0'], 'raleway', 'lato'],
+  ['bold', 'creative', 'Bold name', ['#e11d48', '#111827', '#ffe4e6'], 'oswald', 'roboto'],
+  ['ats', 'ats', 'ATS simple', ['#111111', '#111111', '#e5e7eb'], 'helv', 'helv'],
+  ['creative', 'creative', 'Creative colour', ['#7c3aed', '#2e1065', '#ede9fe'], 'poppins', 'nunito'],
+  ['sideRight', 'modern', 'Right sidebar', ['#059669', '#064e3b', '#ecfdf5'], 'montserrat', 'inter'],
+  ['sideLeft', 'modern', 'Charcoal sidebar', ['#f59e0b', '#27272a', '#fef3c7'], 'raleway', 'roboto'],
+  ['band', 'modern', 'Royal blue header', ['#1d4ed8', '#1e3a8a', '#bfdbfe'], 'montserrat', 'open-sans'],
+  ['centered', 'classic', 'Classic Times', ['#1f2937', '#111827', '#e5e7eb'], 'times', 'times'],
+  ['twoCol', 'simple', 'Clean two-column', ['#0f766e', '#134e4a', '#ccfbf1'], 'work-sans', 'work-sans'],
+  ['timeline', 'creative', 'Coral timeline', ['#f97316', '#1c1917', '#ffedd5'], 'poppins', 'lato'],
+  ['minimal', 'classic', 'Minimal serif', ['#7f1d1d', '#1c1917', '#e7e5e4'], 'libre-baskerville', 'source-serif-4'],
+  ['bold', 'modern', 'Bold blue', ['#2563eb', '#0f172a', '#dbeafe'], 'bebas-neue', 'inter'],
+  ['ats', 'ats', 'ATS serif', ['#1f2937', '#1f2937', '#e5e7eb'], 'times', 'times'],
+  ['creative', 'creative', 'Creative teal', ['#0d9488', '#042f2e', '#ccfbf1'], 'montserrat', 'nunito'],
+  ['sideRight', 'classic', 'Burgundy sidebar', ['#9f1239', '#4c0519', '#fff1f2'], 'playfair-display', 'lato'],
+  ['sideLeft', 'creative', 'Purple sidebar', ['#c084fc', '#3b0764', '#f3e8ff'], 'poppins', 'nunito'],
+  ['band', 'classic', 'Executive header', ['#b45309', '#1c1917', '#fde68a'], 'playfair-display', 'source-sans-3'],
+  ['centered', 'simple', 'Centred clean', ['#2563eb', '#111827', '#dbeafe'], 'montserrat', 'open-sans'],
+  ['twoCol', 'modern', 'Green two-column', ['#16a34a', '#14532d', '#dcfce7'], 'poppins', 'roboto'],
+  ['timeline', 'simple', 'Grey timeline', ['#475569', '#0f172a', '#e2e8f0'], 'inter', 'inter'],
+  ['minimal', 'modern', 'Minimal blue', ['#0284c7', '#0c4a6e', '#e0f2fe'], 'dm-sans', 'dm-sans'],
+  ['ats', 'ats', 'ATS compact', ['#0f172a', '#0f172a', '#e5e7eb'], 'roboto', 'roboto'],
+  ['creative', 'creative', 'Creative pink', ['#db2777', '#500724', '#fce7f3'], 'raleway', 'lato'],
+];
+
+export const RESUME_STYLES = [['all', 'All resumes'], ['modern', 'Modern'], ['classic', 'Classic'], ['simple', 'Simple'], ['creative', 'Creative'], ['ats', 'ATS-friendly'], ['letter', 'Cover letter']];
+
+const RESUMES = LOOKS.map(([layout, style, name, [acc, dark, soft], hf, bf], i) => ({
+  id: `resume-${i + 1}`, name, cat: 'resume', style, size: A4, more: true,
+  items: LAYOUTS[layout](PEOPLE[(i * 3) % PEOPLE.length], { acc, dark, soft, ink: '#374151', mute: '#6b7280', hf, bf }),
+}));
+
+// A resume with headings and hints only, for "Start a blank resume".
+const RESUME_BLANK = {
+  id: 'resume-blank', name: 'Blank resume', cat: 'resume', style: 'simple', size: A4, more: true,
+  items: [
+    T('YOUR NAME', 50, 50, 28, { bold: true, color: '#111827', font: 'montserrat' }),
+    T('Job title', 50, 88, 13, { color: '#2563eb', font: 'montserrat' }),
+    T('Phone   |   Email   |   City, Country   |   LinkedIn or website', 50, 112, 9.5, { color: '#6b7280' }),
+    L(50, 136, 545, 136, { color: '#111827', w: 1.2 }),
+    T('PROFILE', 50, 156, 11, { bold: true, color: '#111827', font: 'montserrat' }),
+    T('Two or three sentences about who you are, what you are good at\nand the job you are looking for.', 50, 178, 10, { color: '#9ca3af' }),
+    T('EXPERIENCE', 50, 236, 11, { bold: true, color: '#111827', font: 'montserrat' }),
+    T('Job title, Company, City', 50, 258, 11, { bold: true, color: '#374151' }), RT('Year - Year', 545, 259, 9.5, { color: '#6b7280' }),
+    T('-  What you did and what changed because of it, with numbers.\n-  Another achievement.', 50, 276, 10, { color: '#9ca3af' }),
+    T('Job title, Company, City', 50, 322, 11, { bold: true, color: '#374151' }), RT('Year - Year', 545, 323, 9.5, { color: '#6b7280' }),
+    T('-  What you did and what changed because of it, with numbers.\n-  Another achievement.', 50, 340, 10, { color: '#9ca3af' }),
+    T('EDUCATION', 50, 396, 11, { bold: true, color: '#111827', font: 'montserrat' }),
+    T('Degree, School or university', 50, 418, 11, { bold: true, color: '#374151' }), RT('Year', 545, 419, 9.5, { color: '#6b7280' }),
+    T('SKILLS', 50, 462, 11, { bold: true, color: '#111827', font: 'montserrat' }),
+    T('Skill one   ·   Skill two   ·   Skill three   ·   Skill four', 50, 484, 10, { color: '#9ca3af' }),
+    T('LANGUAGES', 50, 524, 11, { bold: true, color: '#111827', font: 'montserrat' }),
+    T('Language (level)   ·   Language (level)', 50, 546, 10, { color: '#9ca3af' }),
+  ],
+};
+
 export const TEMPLATE_CATS = [['all', 'All'], ['resume', 'Resume & letters'], ['business', 'Business'], ['certificate', 'Certificates'], ['marketing', 'Flyers & posters'], ['planning', 'Planning'], ['personal', 'Cards & personal']];
 
 export const TEMPLATES = [
   // ------------------------------------------------------------- resumes --
   {
-    id: 'resume-modern', name: 'Modern resume', cat: 'resume', size: A4,
+    id: 'resume-modern', name: 'Modern resume', cat: 'resume', style: 'modern', size: A4,
     items: (() => {
       const navy = '#1e2a44', acc = '#3b82f6', side = '#cbd5e1';
       const sideHead = (t, y) => [T(t, 28, y, 10, { bold: true, color: '#ffffff', font: 'montserrat' }), L(28, y + 17, 172, y + 17, { color: '#3b4a6b' })];
@@ -81,7 +428,7 @@ export const TEMPLATES = [
     })(),
   },
   {
-    id: 'resume-classic', name: 'Classic resume', cat: 'resume', size: A4,
+    id: 'resume-classic', name: 'Classic resume', cat: 'resume', style: 'classic', size: A4,
     items: (() => {
       const ink = '#111827', mid = 297.64;
       const head = (t, y) => [T(t, 60, y, 11, { bold: true, font: 'times', color: ink }), L(60, y + 17, 535, y + 17, { color: '#111827', w: 0.8 })];
@@ -107,7 +454,7 @@ export const TEMPLATES = [
     })(),
   },
   {
-    id: 'cover-letter', name: 'Cover letter', cat: 'resume', size: A4,
+    id: 'cover-letter', name: 'Cover letter', cat: 'resume', style: 'letter', size: A4,
     items: [
       R(0, 0, 595.28, 10, { fill: '#0f766e' }),
       T('JAMES CARTER', 60, 56, 24, { bold: true, font: 'montserrat', color: '#0f766e' }),
@@ -484,4 +831,6 @@ export const TEMPLATES = [
       return out;
     })(),
   },
+  ...RESUMES,
+  RESUME_BLANK,
 ];
