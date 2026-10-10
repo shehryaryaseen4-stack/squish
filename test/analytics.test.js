@@ -66,12 +66,15 @@ test('visits, conversions and PDF downloads reach the dashboard', async () => {
   assert.strictEqual(login.status, 200);
   const cookie = login.headers.get('set-cookie').split(';')[0];
   const html = await (await fetch(`${B}/admin?range=today`, { headers: { cookie } })).text();
-  const tiles = [...html.matchAll(/<strong>([^<]*)<\/strong>/g)].map((m) => m[1]);
-  assert.strictEqual(tiles[0], '2', 'two visitors (bot and foreign origin ignored)');
-  assert.strictEqual(tiles[2], '1', 'one conversion');
-  assert.strictEqual(tiles[3], '1', 'one PDF download');
-  assert.match(html, /Arrived from <b>Google<\/b>/);
-  assert.match(html, /Converted <b>PNG → WEBP<\/b>/);
+  const tile = (label) => (new RegExp(`${label}</span><strong>([0-9,]+)`).exec(html) || [])[1];
+  assert.strictEqual(tile('Visitors'), '2', 'two visitors (bot and foreign origin ignored)');
+  assert.strictEqual(tile('Files converted'), '1', 'one conversion');
+  assert.strictEqual(tile('PDF downloads'), '1', 'one PDF download');
+  assert.strictEqual(tile('Used a tool'), '2', 'two people used a tool');
+  assert.match(html, /<b>2 people<\/b> visited today so far/);
+  assert.match(html, /class="ad-src">[^]*?Google</);
+  assert.match(html, /Converted PNG \u2192 WEBP/);
+  assert.match(html, />PNG to WEBP</);
   assert.match(html, /Pakistan/);
   assert.doesNotMatch(html, /1\.1\.1\.1/);
   // No accounts: no users section.

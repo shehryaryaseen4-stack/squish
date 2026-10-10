@@ -9,7 +9,7 @@
 // Stored per day (DATA_DIR/analytics.json, 120 days kept): views, visitors, per-hour views and
 // visitors, and counts by page, landing page, source, referring site, country, device,
 // conversion pair and event. Plus the last 500 notable events (arrivals, conversions, PDF
-// downloads, failures) for the live activity list.
+// downloads, failures, and the pages viewed after arriving) for the visitor journeys.
 
 const fs = require('fs');
 const path = require('path');
@@ -19,7 +19,7 @@ const store = require('./store');
 const FILE = path.join(store.DATA_DIR, 'analytics.json');
 const KEEP_DAYS = 120;
 const MAP_CAP = 400; // distinct keys per map per day; the rest are counted as "(other)"
-const RECENT = 500;
+const RECENT = 2500;
 const LIVE_MS = 5 * 60000;
 
 const hourFmt = new Intl.DateTimeFormat('en-GB', { timeZone: store.TZ, hour: '2-digit', hourCycle: 'h23' });
@@ -39,6 +39,7 @@ function load() {
   db.days ||= {}; db.recent ||= []; db.salt ||= {};
   for (const [day, b] of Object.entries(db.days)) {
     if (b.vis) sets.set(day, new Set(b.vis));
+    if (b.avis) sets.set(`${day}:act`, new Set(b.avis));
     if (b.hvis) b.hvis.forEach((arr, h) => arr && sets.set(`${day}:${h}`, new Set(arr)));
   }
   return db;
@@ -50,8 +51,9 @@ function saveNow() {
   for (const [day, b] of Object.entries(db.days)) {
     if (day === today) {
       b.vis = [...(sets.get(day) || [])];
+      b.avis = [...(sets.get(`${day}:act`) || [])];
       b.hvis = Array.from({ length: 24 }, (_, h) => [...(sets.get(`${day}:${h}`) || [])]);
-    } else { delete b.vis; delete b.hvis; sets.delete(day); for (let h = 0; h < 24; h++) sets.delete(`${day}:${h}`); }
+    } else { delete b.vis; delete b.hvis; delete b.avis; sets.delete(day); sets.delete(`${day}:act`); for (let h = 0; h < 24; h++) sets.delete(`${day}:${h}`); }
   }
   const cut = store.dayOf(Date.now() - KEEP_DAYS * 864e5);
   for (const day of Object.keys(db.days)) if (day < cut) delete db.days[day];
@@ -97,6 +99,12 @@ function sourceOf(refHost, utm) {
   for (const [re, name] of SOURCES) if (re.test(refHost)) return name;
   return 'Other sites';
 }
+// Groups of sources for the "how people find you" bar.
+const CHANNELS = { Google: 'Search', Bing: 'Search', Yahoo: 'Search', DuckDuckGo: 'Search', Yandex: 'Search', Baidu: 'Search', Ecosia: 'Search', 'Brave Search': 'Search',
+  ChatGPT: 'AI', Gemini: 'AI', Perplexity: 'AI', Copilot: 'AI', Claude: 'AI',
+  Facebook: 'Social', Instagram: 'Social', 'X (Twitter)': 'Social', LinkedIn: 'Social', Reddit: 'Social', YouTube: 'Social', Pinterest: 'Social', WhatsApp: 'Social', Quora: 'Social', TikTok: 'Social',
+  Direct: 'Direct' };
+const channelOf = (source) => CHANNELS[source] || 'Other sites';
 const cleanPath = (p) => {
   const s = String(p || '/').split(/[?#]/)[0].toLowerCase();
   return /^\/[a-z0-9\-/.]{0,100}$/.test(s) ? s.replace(/(.)\/+$/, '$1') : '/(other)';
@@ -105,7 +113,7 @@ const cleanPath = (p) => {
 // ----------------------------------------------------------------- counting --
 function bucket(day) {
   const d = load();
-  return (d.days[day] ||= { views: 0, visitors: 0, hours: Array.from({ length: 24 }, () => [0, 0]), pages: {}, landings: {}, sources: {}, refs: {}, countries: {}, devices: {}, pairs: {}, events: {} });
+  return (d.days[day] ||= { views: 0, visitors: 0, actors: 0, hours: Array.from({ length: 24 }, () => [0, 0]), pages: {}, landings: {}, sources: {}, refs: {}, countries: {}, devices: {}, pairs: {}, events: {} });
 }
 function bump(map, key, n = 1) {
   if (!key) return;
@@ -148,7 +156,7 @@ function pageview(req, body, host) {
     bump(b.landings, p);
     if (refHost && src === 'Other sites') bump(b.refs, refHost);
     remember({ t: now, v, cc, dev, k: 'arrive', p, s: src, ref: refHost || '' });
-  }
+  } else remember({ t: now, v, cc, dev, k: 'view', p });
   live.set(v, now);
   save();
   return true;
@@ -161,6 +169,11 @@ function event(req, kind, detail = {}) {
   if (BOT.test(ua) && kind !== 'convert' && kind !== 'compress') return;
   const now = Date.now(), day = store.today(), b = bucket(day), v = visitorOf(req);
   bump(b.events, kind);
+  // People who did something useful (converted, compressed or downloaded a PDF), once a day each.
+  if (kind !== 'fail') {
+    let a = sets.get(`${day}:act`); if (!a) sets.set(`${day}:act`, (a = new Set()));
+    if (!a.has(v)) { a.add(v); b.actors = (b.actors || 0) + 1; }
+  }
   if (detail.pair) bump(b.pairs, String(detail.pair).slice(0, 60));
   remember({ t: now, v, cc: countryOf(req), dev: deviceOf(ua), k: kind, p: detail.p ? cleanPath(detail.p) : '', d: String(detail.pair || detail.d || '').slice(0, 80) });
   live.set(v, now);
@@ -174,26 +187,45 @@ function liveCount() {
   return live.size;
 }
 const RANGES = { today: [0, 0], yesterday: [1, 1], '7d': [6, 0], '30d': [29, 0], '90d': [89, 0] };
+// The same number of days just before a range, for "compared with" figures.
+function previous(range) {
+  const [from, to] = RANGES[range] || RANGES.today;
+  const len = from - to + 1;
+  return totals(from + len, to + len);
+}
+function totals(from, to) {
+  const d = load();
+  const t = { views: 0, visitors: 0, actors: 0, events: {} };
+  for (let i = from; i >= to; i--) {
+    const b = d.days[store.dayOf(Date.now() - i * 864e5)];
+    if (!b) continue;
+    t.views += b.views; t.visitors += b.visitors; t.actors += b.actors || 0;
+    for (const [k, n] of Object.entries(b.events)) t.events[k] = (t.events[k] || 0) + n;
+  }
+  return t;
+}
 function summary(range) {
   const d = load();
   const [from, to] = RANGES[range] || RANGES.today;
   const days = [];
   for (let i = from; i >= to; i--) days.push(store.dayOf(Date.now() - i * 864e5));
-  const sum = { views: 0, visitors: 0, hours: Array.from({ length: 24 }, () => [0, 0]), byDay: [], pages: {}, landings: {}, sources: {}, refs: {}, countries: {}, devices: {}, pairs: {}, events: {} };
+  const sum = { views: 0, visitors: 0, actors: 0, hours: Array.from({ length: 24 }, () => [0, 0]), byDay: [], pages: {}, landings: {}, sources: {}, refs: {}, countries: {}, devices: {}, pairs: {}, events: {} };
   for (const day of days) {
     const b = d.days[day];
     sum.byDay.push([day, b ? b.visitors : 0, b ? b.views : 0, b ? Object.values(b.events).reduce((a, n) => a + n, 0) : 0]);
     if (!b) continue;
-    sum.views += b.views; sum.visitors += b.visitors;
+    sum.views += b.views; sum.visitors += b.visitors; sum.actors += b.actors || 0;
     b.hours.forEach(([vw, vs], h) => { sum.hours[h][0] += vw; sum.hours[h][1] += vs; });
     for (const k of ['pages', 'landings', 'sources', 'refs', 'countries', 'devices', 'pairs', 'events']) for (const [key, n] of Object.entries(b[k] || {})) sum[k][key] = (sum[k][key] || 0) + n;
   }
   const since = Date.parse(`${days[0]}T00:00:00Z`) - 14 * 36e5; // day starts in local time: allow for the time zone
-  sum.recent = d.recent.filter((e) => e.t >= since).slice(-150).reverse();
+  const until = to ? Date.parse(`${days[days.length - 1]}T23:59:59Z`) + 14 * 36e5 : Infinity;
+  sum.recent = d.recent.filter((e) => e.t >= since && e.t <= until && (from === to || e.k !== 'view')).slice(-1200).reverse();
   sum.live = liveCount();
   sum.days = days;
   sum.hourNow = hourOf(Date.now());
+  sum.prev = previous(range);
   return sum;
 }
 
-module.exports = { pageview, event, summary, liveCount, sourceOf, deviceOf, RANGES, flush: () => { if (timer && db) saveNow(); }, _reset: () => { db = null; live.clear(); sets.clear(); } };
+module.exports = { pageview, event, summary, liveCount, sourceOf, deviceOf, channelOf, RANGES, flush: () => { if (timer && db) saveNow(); }, _reset: () => { db = null; live.clear(); sets.clear(); } };

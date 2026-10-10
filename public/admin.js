@@ -57,6 +57,20 @@
   const later = $("[data-later-btn]");
   if (later) later.addEventListener("click", () => { document.querySelectorAll("tr[data-later]").forEach((tr) => { tr.hidden = false; }); later.parentNode.remove(); });
 
+  // "Show all" in ranked lists, more visitor journeys, and the journey filter.
+  document.addEventListener("click", (e) => {
+    const all = e.target.closest("[data-extra-btn]");
+    if (all) { all.previousElementSibling.querySelectorAll("[data-extra]").forEach((li) => { li.hidden = false; }); all.remove(); return; }
+    const more = e.target.closest("[data-jmore-btn]");
+    if (more) { document.querySelectorAll("[data-jmore]").forEach((li) => { li.removeAttribute("data-jmore"); }); applyFilter(); more.remove(); return; }
+    const f = e.target.closest("[data-jf]");
+    if (f) { document.querySelectorAll("[data-jf]").forEach((b) => b.setAttribute("aria-pressed", String(b === f))); applyFilter(); }
+  });
+  function applyFilter() {
+    const did = (document.querySelector('[data-jf][aria-pressed="true"]') || {}).dataset?.jf === "did";
+    document.querySelectorAll(".ad-j").forEach((li) => { li.hidden = li.hasAttribute("data-jmore") || (did && !li.classList.contains("ad-j-did")); });
+  }
+
   // Today's numbers refresh every minute while the tab is visible and nobody is typing.
   const main = $(".ad-main");
   if (main && main.dataset.range === "today") {

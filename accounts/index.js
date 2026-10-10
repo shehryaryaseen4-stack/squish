@@ -327,7 +327,7 @@ function mount(app, { pages, baseOf }) {
   app.get(A, (req, res) => {
     if (!isAdmin(req)) return html(res, admin.loginPage(A));
     const range = analytics.RANGES[req.query.range] ? req.query.range : 'today';
-    html(res, admin.dashboard({ users: store.users(), daily: store.daily(), path: A, store, stats: analytics.summary(range), range, accounts: ON }));
+    html(res, admin.dashboard({ users: store.users(), daily: store.daily(), path: A, store, stats: analytics.summary(range), range, accounts: ON, channelOf: analytics.channelOf }));
   });
   app.post(`${A}/login`, authLimit, json, sameOrigin, (req, res) => {
     const same = (a, b) => { const x = crypto.createHash('sha256').update(String(a)).digest(); return crypto.timingSafeEqual(x, crypto.createHash('sha256').update(String(b)).digest()); };
