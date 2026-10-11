@@ -166,7 +166,7 @@ function journeys(recent, tz, oneDay, channelOf) {
     const j = by.get(e.v);
     j.last = e.t; j.cc = j.cc || e.cc; j.dev = j.dev || e.dev;
     if (e.k === 'arrive' && !j.src) j.src = e.s === 'Other sites' && e.ref ? e.ref : e.s;
-    if (['convert', 'compress', 'pdf', 'combine'].includes(e.k)) j.did += 1;
+    if (['convert', 'compress', 'pdf', 'combine', 'tool'].includes(e.k)) j.did += 1;
     j.steps.push(e);
   }
   const list = [...by.values()].sort((a, b) => b.last - a.last);
@@ -179,6 +179,7 @@ function journeys(recent, tz, oneDay, channelOf) {
       case 'compress': return `<span class="ad-step ad-step-ok">${ico('convert', 'ad-ico-s')}Compressed ${esc(String(e.d).split(' → ')[0])}</span>`;
       case 'pdf': return `<span class="ad-step ad-step-pdf">${ico('pdf', 'ad-ico-s')}Downloaded a PDF</span>`;
       case 'combine': return `<span class="ad-step ad-step-pdf">${ico('pdf', 'ad-ico-s')}Made one PDF from ${esc(e.d || 'images')}</span>`;
+      case 'tool': return `<span class="ad-step ad-step-pdf">${ico('pdf', 'ad-ico-s')}Used ${esc(e.d || 'a PDF tool')}</span>`;
       case 'fail': return `<span class="ad-step ad-step-bad">Failed: ${esc(e.d)}</span>`;
       default: return '';
     }
@@ -200,7 +201,7 @@ function dashboard({ users, daily, path, store, stats, range = 'today', accounts
   const S = stats, P = S.prev || { views: 0, visitors: 0, actors: 0, events: {} };
   const ev = (k, o = S.events) => o[k] || 0;
   const conversions = ev('convert') + ev('compress'), pConversions = ev('convert', P.events) + ev('compress', P.events);
-  const pdfs = ev('pdf') + ev('combine'), pPdfs = ev('pdf', P.events) + ev('combine', P.events);
+  const pdfs = ev('pdf') + ev('combine') + ev('tool'), pPdfs = ev('pdf', P.events) + ev('combine', P.events) + ev('tool', P.events);
   const oneDay = S.days.length === 1;
   const [, , rangeText, prevText] = RANGE_LABELS.find(([k]) => k === range);
   const tile = (icon, label, value, sub, help, cls = '') => `<div class="ad-card ad-tile ${cls}" title="${esc(help)}"><span class="ad-label">${ico(icon)}${label}</span><strong>${value}</strong><span class="ad-sub">${sub}</span></div>`;
@@ -232,7 +233,7 @@ function dashboard({ users, daily, path, store, stats, range = 'today', accounts
 
   const devTotal = Object.values(S.devices).reduce((a, n) => a + n, 0);
   const devices = devTotal ? `<div class="ad-devs">${['Mobile', 'Desktop', 'Tablet'].map((d) => `<div class="ad-dev">${ico(d.toLowerCase(), 'ad-ico-l')}<b>${pct(S.devices[d] || 0, devTotal)}%</b><span>${d}</span><span class="ad-dim">${fmt(S.devices[d] || 0)}</span></div>`).join('')}</div>` : '<p class="ad-empty-s">No visitors yet.</p>';
-  const did = [['convert', 'Files converted', 'convert'], ['compress', 'Files compressed', 'convert'], ['pdf', 'PDFs downloaded from the editor', 'pdf'], ['combine', 'Images saved as one PDF', 'pdf'], ['fail', 'Conversions that failed', 'spark']]
+  const did = [['convert', 'Files converted', 'convert'], ['compress', 'Files compressed', 'convert'], ['pdf', 'PDFs downloaded from the editor', 'pdf'], ['combine', 'Images saved as one PDF', 'pdf'], ['tool', 'PDF tools used (split, protect ...)', 'pdf'], ['fail', 'Conversions that failed', 'spark']]
     .map(([k, name, ic]) => `<li class="${k === 'fail' && ev(k) ? 'ad-bad' : ''}">${ico(ic, 'ad-ico-s')}<span>${name}</span><b>${fmt(ev(k))}</b></li>`).join('');
 
   // Accounts (only when sign-up is on, or users exist from before).
@@ -290,7 +291,7 @@ function dashboard({ users, daily, path, store, stats, range = 'today', accounts
     ${tile('eye', 'Page views', fmt(S.views), delta(S.views, P.views, prevText), 'Every page opened, including several pages by the same person.')}
     ${tile('spark', 'Used a tool', `${fmt(S.actors)}<small>${S.visitors ? ` ${pct(S.actors, S.visitors)}%` : ''}</small>`, delta(S.actors, P.actors, prevText), 'Visitors who converted or compressed a file or downloaded a PDF. The % is the share of all visitors.')}
     ${tile('convert', 'Files converted', fmt(conversions), delta(conversions, pConversions, prevText), 'Files converted plus files compressed.')}
-    ${tile('pdf', 'PDF downloads', fmt(pdfs), delta(pdfs, pPdfs, prevText), 'PDFs downloaded from the editor plus images saved as one PDF.')}
+    ${tile('pdf', 'PDF downloads', fmt(pdfs), delta(pdfs, pPdfs, prevText), 'PDFs downloaded from the editor, images saved as one PDF and PDF tools used (split, protect ...).')}
   </div>
   ${chart}
   <div class="ad-grid2">

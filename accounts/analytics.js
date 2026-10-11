@@ -163,7 +163,8 @@ function pageview(req, body, host) {
 }
 
 // Things people do: 'convert' / 'compress' (server side), 'pdf' (editor download), 'combine'
-// (several images saved as one PDF), 'fail' (a conversion that did not work).
+// (several images saved as one PDF), 'tool' (a PDF tool such as Split or Protect PDF), 'fail'
+// (a conversion that did not work).
 function event(req, kind, detail = {}) {
   const ua = req.get('user-agent') || '';
   if (BOT.test(ua) && kind !== 'convert' && kind !== 'compress') return;

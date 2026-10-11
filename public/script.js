@@ -16,6 +16,7 @@
     track({ p: location.pathname, r: document.referrer, u: utm || undefined });
   }
   window.addEventListener("pe:exported", () => track({ e: "pdf", p: location.pathname }));
+  window.addEventListener("pt:done", (e) => track({ e: "tool", p: location.pathname, d: e.detail }));
 
   // Ad slots: present only when ADSENSE_CLIENT and slot IDs are set on the server.
   document.querySelectorAll("ins.adsbygoogle").forEach(() => { (window.adsbygoogle = window.adsbygoogle || []).push({}); });

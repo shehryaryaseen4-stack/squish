@@ -15,6 +15,7 @@ const pages = require('./pages');
 const registry = require('./registry');
 const { getHandler } = require('./engines');
 const { compressToSize, SIZE_TARGET_FORMATS } = require('./engines/size-target');
+const pdfTools = require('./engines/pdf-tools');
 const seo = require('./seo');
 
 const PORT = process.env.PORT || 3000;
@@ -219,6 +220,33 @@ app.post('/api/compress', upload.single('file'), async (req, res) => {
   }
 });
 
+// PDF tools that need the server: protect, unlock, repair, PDF/A (the rest run in the browser).
+const TOOL_SUFFIX = { protect: 'protected', unlock: 'unlocked', repair: 'repaired', pdfa: 'pdfa' };
+app.post('/api/pdf-tool', upload.single('file'), async (req, res) => {
+  const op = String(req.body && req.body.op || '');
+  const name = pdfTools.OPS[op] ? pdfTools.OPS[op].name : '';
+  try {
+    if (!name) return res.status(400).json({ error: 'Unknown PDF tool.' });
+    if (!req.file) return res.status(400).json({ error: 'No file received.' });
+    const out = await pdfTools.pdfTool({ buffer: req.file.buffer, op, password: req.body.password || '', level: req.body.level });
+    const base = safeName(req.file.originalname || 'document.pdf', registry.getFormat('pdf'));
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': disposition(`${base}-${TOOL_SUFFIX[op]}.pdf`),
+      'X-Original-Size': String(req.file.size),
+      'X-Compressed-Size': String(out.buffer.length),
+      ...(out.note ? { 'X-Note': out.note } : {}),
+    });
+    res.send(out.buffer);
+    analytics.event(req, 'tool', { pair: name, p: fromPage(req) });
+  } catch (err) {
+    if (name) analytics.event(req, 'fail', { pair: name, p: fromPage(req) });
+    if (err.userMessage) return res.status(err.statusCode || 422).json({ error: err.userMessage });
+    console.error('PDF tool error:', err);
+    res.status(500).json({ error: 'This PDF could not be processed. It may be damaged or use an unusual variant of PDF.' });
+  }
+});
+
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
 
@@ -258,6 +286,8 @@ app.get('/converters', (req, res) => sendHtml(res, pages.hubPage(baseOf(req))));
 // Converters under the names people search for (/pdf-to-word, /word-to-pdf ...). Before the X-to-Y
 // route, which would otherwise read "pdf-to-word" as an unknown pair.
 if (pages.friendlies().length) app.get(new RegExp(`^/(${pages.friendlies().map((x) => x.slug).join('|')})$`), (req, res) => sendHtml(res, pages.resolveFriendly(req.params[0], baseOf(req)).html));
+// PDF tools (/split-pdf, /protect-pdf ...). Before the X-to-Y route, which would read /pdf-to-pdfa as a pair.
+app.get(new RegExp(`^/(${[...pages.PDF_TOOLS.map((t) => t.slug), 'pdf-tools'].join('|')})$`), (req, res) => sendHtml(res, pages.resolvePdfTool(req.params[0], baseOf(req)).html));
 // PDF editor landing pages (/resume-maker, /invoice-generator, /sign-pdf ...): the editor with
 // its own text. Before the X-to-Y route, since some of them (add-text-to-pdf) look like pairs.
 if (pages.PDF_EDITOR && pages.EDITOR_LANDINGS.length) {
@@ -290,13 +320,16 @@ app.get(/^\/([a-z0-9-]+)-converter$/, (req, res, next) => {
 // PDF writer for the browser: the editor, and "one PDF" when several images are converted to PDF.
 app.get('/vendor/pdf-lib.min.js', (_req, res) => res.set('Cache-Control', 'public, max-age=604800')
   .sendFile(require.resolve('pdf-lib/dist/pdf-lib.min.js')));
-if (pages.PDF_EDITOR) {
+// pdf.js renders page previews in the editor and the PDF tools (split, organize, crop ...).
+{
   const pdfjsDir = path.dirname(require.resolve('pdfjs-dist/package.json'));
   const vendorOpts = { index: false, maxAge: '7d' };
   for (const dir of ['build', 'cmaps', 'standard_fonts', 'wasm', 'iccs']) {
     // the legacy build includes the polyfills that older (but still common) browsers need
     app.use(`/vendor/pdfjs${dir === 'build' ? '' : `/${dir}`}`, express.static(path.join(pdfjsDir, dir === 'build' ? 'legacy/build' : dir), vendorOpts));
   }
+}
+if (pages.PDF_EDITOR) {
   app.get('/vendor/fontkit.umd.min.js', (_req, res) => res.set('Cache-Control', 'public, max-age=604800')
     .sendFile(require.resolve('@pdf-lib/fontkit/dist/fontkit.umd.min.js')));
   require('./fonts').routes(app);

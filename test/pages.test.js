@@ -96,7 +96,7 @@ test('sitemap only lists pages that are indexable', () => {
   assert.ok(paths.includes('/image-converter') && paths.includes('/png-converter') && paths.includes('/jfif-to-png'));
   assert.ok(!paths.includes('/mp4-to-mp3') && !paths.includes('/video-converter') && !paths.includes('/mp4-converter'));
   for (const p of paths.filter((x) => x !== '/' && x !== '/converters' && !/^\/(about|privacy|terms|contact|guides)(\/|$)/.test(x))) {
-    const fr = pages.resolveFriendly(p.slice(1), BASE);
+    const fr = pages.resolveFriendly(p.slice(1), BASE) || pages.resolvePdfTool(p.slice(1), BASE);
     const m = fr ? null : /^\/(.+)-converter$/.exec(p);
     const r = m || fr ? null : registry.parseConverterRoute(p);
     const html = fr ? fr.html : m ? pages.resolveConverter(m[1], BASE).html

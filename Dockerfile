@@ -16,6 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pandoc calibre \
     # PDF, PostScript, vector graphics
     ghostscript poppler-utils inkscape \
+    # PDF passwords and repair (Protect / Unlock / Repair PDF)
+    qpdf \
     # extra image formats (PSD, ICO, PPM, BMP/PSD/EPS output; HEIC/HEIF)
     imagemagick libheif-examples libheif-plugin-libde265 \
     # archives

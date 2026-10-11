@@ -18,7 +18,7 @@ function fetchPath(p) {
   if (m) return pages.resolveInfo(m[1], BASE);
   m = /^\/guides(?:\/([a-z0-9-]+))?$/.exec(clean);
   if (m) return pages.resolveGuide(m[1], BASE);
-  const fr = pages.resolveFriendly(clean.slice(1), BASE);
+  const fr = pages.resolveFriendly(clean.slice(1), BASE) || pages.resolvePdfTool(clean.slice(1), BASE);
   if (fr) return fr;
   m = /^\/([a-z0-9-]+)-converter$/.exec(clean);
   if (m) return pages.resolveConverter(m[1], BASE);

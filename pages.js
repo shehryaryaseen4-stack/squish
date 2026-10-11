@@ -45,6 +45,12 @@ function friendlies() {
 }
 const friendlyBySlug = (slug) => friendlies().find((x) => x.slug === slug) || null;
 
+// PDF tools with their own pages (/split-pdf, /protect-pdf ...). Those done on the server are
+// listed only when its programs (qpdf, Ghostscript) are installed.
+const PDFT = require('./content/pdf-tools');
+const PDF_TOOLS = PDFT.tools.filter((t) => t.browser || require('./engines/pdf-tools').available(t.op));
+const PDF_TOOL_BY_SLUG = new Map(PDF_TOOLS.map((t) => [t.slug, t]));
+
 const SITE = process.env.SITE_NAME || brand.NAME;
 const CONTACT_EMAIL = process.env.CONTACT_EMAIL || '';
 // The site's social profiles (Facebook, YouTube, X...), comma separated; they tell search engines
@@ -189,6 +195,7 @@ const ICON_PATHS = {
   edit: '<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/><path d="m10 17 5.5-5.5 1.5 1.5L11.5 18.5H10z"/>',
   convert: '<path d="M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2"/><path d="M21 4v5h-5M3 20v-5h5"/>',
 };
+for (const [k, v] of Object.entries(PDFT.icons)) ICON_PATHS[`t-${k}`] = v;
 const icon = (name, cls = 'ico') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[name] || ICON_PATHS.file}</svg>`;
 
 // File-type icon: a coloured page with the extension on it (colour = category), drawn in CSS.
@@ -275,6 +282,8 @@ function megaMenu() {
   groups.push(['popular', 'Popular', [...friendlies().map((x) => ({ id: x.inputs[0], href: `/${x.slug}`, text: esc(x.h1.replace(/ Converter$/, '')), live: true })),
     ...POPULAR.map(([f, t]) => ({ id: f, href: pairPath(f, t), text: `${F(f).label} &rarr; ${F(t).label}`, live: true }))],
     `<a class="mega-head" href="/converters">All ${TOTAL_COUNT.toLocaleString('en-US')} conversions &rarr;</a>`]);
+  groups.push(['pdf-tools', 'PDF tools', pdfGroups().flatMap(([, items]) => items).map(([href, label]) => ({ id: 'pdf', href, text: esc(label), live: true })),
+    '<a class="mega-head" href="/pdf-tools">All PDF tools &rarr;</a>']);
   CATS.forEach((c) => {
     const items = registry.getFormatsByCategory(c.id).map((f) => ({ id: f.id, href: formatPath(f.id), live: formatIsLive(f.id) }));
     groups.push([c.id, c.converterName, items, `<a class="mega-head" href="${categoryPath(c.id)}">${icon(c.icon)}${c.converterName} &rarr;</a>`]);
@@ -306,8 +315,8 @@ function topbar(full = false) {
       ${toolsMenu}
       <details class="nav-menu nav-simple" data-menu><summary class="nav-item">Convert<span class="caret" aria-hidden="true"></span></summary><div class="dropdown"><ul>${convertList}</ul></div></details>
       <details class="nav-menu nav-simple" data-menu><summary class="nav-item">Compress<span class="caret" aria-hidden="true"></span></summary><div class="dropdown"><ul>${compress}</ul></div></details>
+      <details class="nav-menu nav-simple nav-pdf" data-menu><summary class="nav-item">PDF Tools<span class="caret" aria-hidden="true"></span></summary>${pdfMenu()}</details>
       ${PDF_EDITOR ? '<a class="nav-item nav-link nav-resume" href="/resume-maker">Resume<span class="nav-long">&nbsp;Builder</span></a>' : ''}
-      <a class="nav-item nav-link" href="/converters">Formats</a>
     </nav>
     <div class="top-actions">${PDF_EDITOR ? `
       <a class="btn btn-brand btn-sm btn-edit-pdf" href="/edit-pdf">${icon('edit')}Edit PDF</a>` : ''}
@@ -321,8 +330,9 @@ function footer() {
     ...POPULAR.slice(0, 8).map(([f, t]) => `<li>${link(pairPath(f, t), pairLabel(f, t))}</li>`)].join('');
   const cats = CATS.map((c) => `<li>${link(categoryPath(c.id), c.converterName)}</li>`).join('');
   const comp = COMPRESSIBLE.map((s) => `<li>${link(compressPath(s), `Compress ${F(s).label}`)}</li>`).join('');
-  const pdf = PDF_EDITOR ? `<div><h4>PDF tools</h4><ul><li>${link('/edit-pdf', 'Edit PDF')}</li>${['resume-maker', 'invoice-generator', 'certificate-maker', 'cover-letter-maker', 'sign-pdf', 'fill-pdf', 'merge-pdf', 'add-text-to-pdf']
-    .filter((x) => LANDING_BY_SLUG.has(x)).map((x) => `<li>${link(`/${x}`, LANDING_BY_SLUG.get(x).short)}</li>`).join('')}</ul></div>` : '';
+  if (!knownPaths) knownPaths = new Set(allPaths());
+  const pdf = `<div><h4>PDF tools</h4><ul>${['/edit-pdf', '/merge-pdf', '/split-pdf', '/compress-pdf', '/protect-pdf', '/unlock-pdf', '/resume-maker', '/invoice-generator', '/sign-pdf']
+    .filter((x) => knownPaths.has(x)).map((x) => `<li>${link(x, esc(toolName(x)))}</li>`).join('')}<li>${link('/pdf-tools', 'All PDF tools')}</li></ul></div>`;
   return `<footer class="site-footer"><div class="footer-inner${pdf ? ' footer-6' : ''}">
     <div class="footer-brand">${BRAND_LINK}
       <p>Free online file converter. ${LIVE_COUNT.toLocaleString('en-US')} conversions across ${LIVE_CAT_NAMES.length} categories, free and without sign-up.</p></div>
@@ -583,12 +593,13 @@ function popularCards() {
 // Share-image key for a URL path: '/' -> 'home', '/png-to-webp' -> 'png-to-webp'.
 const ogKey = (urlPath) => (urlPath === '/' ? 'home' : urlPath.slice(1).replace(/\//g, '-'));
 
+const PRIVACY_SERVER = '<strong>How this works:</strong> your file is uploaded over HTTPS and converted on this server with open-source engines (libvips for images, FFmpeg for audio and video, LibreOffice and Pandoc for documents, Calibre for ebooks, Ghostscript and Inkscape for PDF and vector files). Images are processed in memory; other files use a private temporary folder that is deleted as soon as the conversion finishes.';
 function baseFields(base, urlPath, title, desc, extra) {
   const url = base + urlPath;
   return {
     TITLE: esc(title), META_DESC: esc(desc), ROBOTS: 'index, follow, max-image-preview:large, max-snippet:-1', URL: url,
     CANONICAL_TAG: `<link rel="canonical" href="${url}">`,
-    TOPBAR: topbar(), FOOTER: footer(), DEFAULT_FORMAT: 'auto', JSONLD: '{}', TOOL: '', CONTENT: '', RELATED: '', BODY: '',
+    TOPBAR: topbar(), FOOTER: footer(), DEFAULT_FORMAT: 'auto', JSONLD: '{}', TOOL: '', CONTENT: '', RELATED: '', BODY: '', PRIVACY: PRIVACY_SERVER, SCRIPTS: '',
     CSS_V: seo.ASSET_V.css, JS_V: seo.ASSET_V.js,
     _url: url, _title: esc(title), _desc: esc(desc), _image: `${base}/og/${ogKey(urlPath)}.png`, _noindex: false,
     ...extra,
@@ -767,6 +778,123 @@ const resolveFriendly = (slug, base) => (friendlyBySlug(slug) ? { html: friendly
 function friendlyLinks(from, to) {
   const hits = friendlies().filter((x) => x.inputs.includes(from) && x.outputs.includes(to));
   return hits.length ? `<p class="also-try">Also available as ${hits.map((x) => link(`/${x.slug}`, esc(x.h1))).join(' and ')}, which accepts ${hits.map((x) => x.inputs.map((i) => F(i).label).join(', ')).join('; ')} files.</p>` : '';
+}
+
+// ------------------------------------------------------------- PDF tools --
+// /split-pdf, /protect-pdf ...: the tool (public/pdf-tools.js) with its own text and FAQ, and
+// /pdf-tools, every PDF tool on the site in groups.
+const PRIVACY_BROWSER = '<strong>How this works:</strong> this tool runs in your browser with open-source code (pdf.js to show the pages, pdf-lib to save the PDF). Your file is read on your own device and is never uploaded to our server.';
+const PRIVACY_PDF_SERVER = '<strong>How this works:</strong> your PDF is uploaded over HTTPS and processed on this server with open-source tools (qpdf and Ghostscript) in a private temporary folder, which is deleted as soon as the result is ready. Passwords are used once and never stored or logged.';
+const tIcon = (name) => `<span class="pt-tile pt-tile-${name}">${icon(`t-${name}`)}</span>`;
+// The directory, without tools this server does not have (editor pages when PDF_EDITOR is off).
+function pdfGroups() {
+  if (!knownPaths) knownPaths = new Set(allPaths());
+  return PDFT.groups.map(([name, items]) => [name, items.filter(([p]) => knownPaths.has(p))]).filter(([, items]) => items.length);
+}
+function pdfMenu() {
+  return `<div class="dropdown pdf-menu">${pdfGroups().map(([name, items]) => `<div class="pdf-menu-group"><h3>${esc(name)}</h3><ul>${items
+    .map(([p, label, ic]) => `<li><a href="${p}">${tIcon(ic)}${esc(label)}</a></li>`).join('')}</ul></div>`).join('')}
+    <a class="pdf-menu-all" href="/pdf-tools">See all PDF tools &rarr;</a></div>`;
+}
+
+const pwField = (name, label, auto, extra = '') => `<label class="pt-field"><span>${label}</span><span class="pt-pw"><input type="password" name="${name}" autocomplete="${auto}" maxlength="100" spellcheck="false"${extra}><button type="button" class="pt-eye" data-eye aria-label="Show password">Show</button></span></label>`;
+const PT_OPTS = {
+  split: `<fieldset class="pt-radios"><legend>How to split</legend>
+      <label><input type="radio" name="mode" value="each" checked> Every page as its own PDF</label>
+      <label><input type="radio" name="mode" value="ranges"> Custom page ranges</label>
+      <label><input type="radio" name="mode" value="every"> Fixed number of pages per file</label></fieldset>
+    <label class="pt-field" data-when="ranges" hidden><span>Page ranges, separated by commas</span><input type="text" name="ranges" placeholder="e.g. 1-3, 4-8, 9" inputmode="numeric" autocomplete="off"></label>
+    <label class="pt-field pt-field-s" data-when="every" hidden><span>Pages per file</span><input type="number" name="every" min="1" value="2"></label>`,
+  extract: `<label class="pt-field"><span>Pages to extract (click the pages below, or type them)</span><input type="text" name="pages" placeholder="e.g. 1, 3, 5-7" inputmode="numeric" autocomplete="off"></label>
+    <div class="pt-row"><button type="button" class="pt-link" data-all>Select all</button><button type="button" class="pt-link" data-none>Clear</button>
+    <label class="pt-check"><input type="checkbox" name="separate"> Save each page as its own PDF</label></div>`,
+  organize: `<p class="pt-hint">Drag a page to move it, or use the arrows. Rotate, delete or add a blank page with the buttons on each page.</p>
+    <div class="pt-row"><button type="button" class="pt-link" data-reset-pages>Reset</button></div>`,
+  crop: `<p class="pt-hint">Drag the corners or edges of the box. Everything outside it is cropped away.</p>
+    <div class="pt-row"><fieldset class="pt-radios pt-inline"><legend class="sr">Apply to</legend><label><input type="radio" name="apply" value="all" checked> All pages</label><label><input type="radio" name="apply" value="one"> This page only</label></fieldset>
+    <button type="button" class="pt-link" data-crop-reset>Reset box</button></div>
+    <div class="pt-crop"><div class="pt-crop-nav"><button type="button" class="pt-link" data-prev aria-label="Previous page">&lsaquo; Prev</button><span data-pageno></span><button type="button" class="pt-link" data-next aria-label="Next page">Next &rsaquo;</button></div>
+    <div class="pt-crop-stage" data-stage><canvas></canvas><div class="pt-crop-box" data-box tabindex="0" aria-label="Crop area">${['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].map((h) => `<i data-h="${h}"></i>`).join('')}</div></div></div>`,
+  protect: `${pwField('password', 'Password', 'new-password', ' minlength="4" required')}${pwField('confirm', 'Type it again', 'new-password', ' required')}
+    <p class="pt-hint">Use 8 or more characters. Keep the password safe: without it nobody can open the PDF, not even us.</p>`,
+  unlock: `${pwField('password', 'Password (leave empty if the PDF opens without one)', 'current-password')}
+    <p class="pt-hint">Only unlock PDFs you own or are allowed to change.</p>`,
+  repair: '<p class="pt-hint">The file is checked and rebuilt. Click <strong>Repair PDF</strong> to start.</p>',
+  pdfa: `<label class="pt-field pt-field-s"><span>PDF/A version</span><select name="level"><option value="1">PDF/A-1b</option><option value="2" selected>PDF/A-2b (recommended)</option><option value="3">PDF/A-3b</option></select></label>`,
+};
+const PT_GO = { split: 'Split PDF', extract: 'Extract pages', organize: 'Save PDF', crop: 'Crop PDF', protect: 'Protect PDF', unlock: 'Unlock PDF', repair: 'Repair PDF', pdfa: 'Convert to PDF/A' };
+
+function pdfToolBox(t) {
+  const next = t.see.filter((s) => knownPaths.has(s)).slice(0, 4).map((s) => link(s, esc(toolName(s)))).join('');
+  return `<section class="pt" id="pt" data-op="${t.op}" data-name="${esc(t.name)}" data-max-mb="${MAX_MB}"${t.browser ? ' data-browser' : ''}>
+  <div class="pt-drop" data-drop>
+    <input type="file" accept="application/pdf,.pdf" data-input hidden>
+    ${icon('upload', 'pt-drop-ico')}
+    <button class="btn btn-brand btn-select" type="button" data-pick>${icon('upload')}Select PDF file</button>
+    <p class="pt-drop-sub">or drop a PDF here &middot; up to ${MAX_MB} MB</p>
+    <p class="pt-private">${icon('shield')}${t.browser ? 'Your PDF never leaves your device' : 'Files are deleted as soon as they are done'}</p>
+  </div>
+  <div class="pt-work" data-work hidden>
+    <div class="pt-filebar">${icon('pdf')}<span class="pt-fname" data-fname></span><span class="pt-fmeta" data-fmeta></span><button type="button" class="pt-link" data-again>Choose another file</button></div>
+    <form class="pt-opts" data-opts autocomplete="off" onsubmit="return false">${PT_OPTS[t.op]}</form>
+    ${t.browser && t.op !== 'crop' ? '<ol class="pt-pages" data-pages></ol>' : ''}
+    <div class="pt-bar"><p class="pt-msg" data-msg role="status" aria-live="polite"></p><button type="button" class="btn btn-brand pt-go" data-go>${PT_GO[t.op]}</button></div>
+  </div>
+  <div class="pt-done" data-done hidden>
+    <span class="pt-done-ico" aria-hidden="true">&#10003;</span>
+    <h2 class="pt-done-h">Done!</h2>
+    <p class="pt-done-text" data-done-text></p>
+    <div class="pt-done-btns"><a class="btn btn-brand" data-dl href="#" download>${icon('download')}Download</a><button type="button" class="btn btn-ghost" data-again>Start over</button></div>
+    ${next ? `<p class="pt-next">Continue with: ${next}</p>` : ''}
+  </div>
+  <noscript><p class="pt-msg">This tool needs JavaScript. Please turn it on and reload the page.</p></noscript>
+</section>`;
+}
+
+function pdfToolPage(slug, base) {
+  const t = PDF_TOOL_BY_SLUG.get(slug);
+  if (!knownPaths) knownPaths = new Set(allPaths());
+  const p = `/${t.slug}`;
+  const crumbs = [['Home', '/'], ['PDF Tools', '/pdf-tools'], [t.name, p]];
+  const see = t.see.filter((s) => knownPaths.has(s)).map((s) => [s, esc(toolName(s)), true]);
+  const steps = `<section class="howto"><h2>How to ${esc(t.name.replace(/^PDF to /, 'convert PDF to ').replace(/^(\w)/, (c) => c.toLowerCase()).replace(/ pdf$/i, ' a PDF'))}</h2><ol class="steps">${t.steps
+    .map(([s, d]) => `<li><strong>${s}</strong> ${d}</li>`).join('')}</ol></section>`;
+  return renderPage(PAGE_TPL, baseFields(base, p, `${t.title} | ${SITE}`, t.desc, {
+    JSONLD: graph(base, p, t.h1, t.desc, t.faq, crumbs, { features: [t.browser ? 'Runs in the browser, no upload' : 'Files deleted after processing', 'No sign-up', 'No watermark', 'Free'] }),
+    HERO: hero({ h1: t.h1, crumbs, intro: t.intro }),
+    TOOL: pdfToolBox(t),
+    CONTENT: steps + t.sections.map(([h, html]) => `<section class="notes prose-block"><h2>${esc(h)}</h2>${liveLinks(html)}</section>`).join('')
+      + `<section class="related-tools"><h2>Related tools</h2>${chips(see)}<p class="also-try">Need something else? See ${link('/pdf-tools', 'all PDF tools')}.</p></section>`
+      + readMore(p) + faqHtml(t.faq),
+    PRIVACY: t.browser ? PRIVACY_BROWSER : PRIVACY_PDF_SERVER,
+    SCRIPTS: `<script src="/vendor/pdf-lib.min.js?v=${seo.ASSET_V.pdfTools}" defer></script>\n<script type="module" src="/pdf-tools.js?v=${seo.ASSET_V.pdfTools}"></script>\n`,
+  }));
+}
+
+function pdfToolsHub(base) {
+  const p = '/pdf-tools';
+  const title = `All PDF Tools - Free Online PDF Toolkit | ${SITE}`;
+  const desc = 'Every free PDF tool in one place: merge, split, compress, convert, edit, sign, crop, protect and unlock PDF files online. No sign-up, no watermark.';
+  const crumbs = [['Home', '/'], ['PDF Tools', p]];
+  const groups = pdfGroups();
+  const body = groups.map(([name, items]) => `<section class="hub-section"><h2>${esc(name)}</h2><ul class="pt-grid">${items
+    .map(([href, label, ic]) => `<li><a class="pt-card" href="${href}">${tIcon(ic)}<strong>${esc(label)}</strong><span>${esc(PDFT.blurbs[href] || '')}</span></a></li>`).join('')}</ul></section>`).join('');
+  const count = groups.reduce((n, [, items]) => n + items.length, 0);
+  const faq = [
+    ['Are these PDF tools free?', 'Yes. Every tool is free to use, with no sign-up, no email and no watermark on your files.'],
+    ['Are my files safe?', 'Many tools (split, extract, organize, crop and the editor) run in your browser, so the file never leaves your device. The others process files over HTTPS and delete them as soon as they are done.'],
+    ['Do the tools work on a phone?', 'Yes. They work in the browser on Android and iPhone, with no app to install.'],
+  ];
+  return renderPage(HUB_TPL, baseFields(base, p, title, desc, {
+    JSONLD: graph(base, p, 'All PDF tools', desc, faq, crumbs, { type: 'CollectionPage' }),
+    HERO: hero({ h1: 'Every PDF tool you need, free', crumbs, intro: `${count} free tools to merge, split, compress, convert, edit, sign and protect PDF files. No sign-up, no watermark, and many of them never upload your file.`, short: true }),
+    BODY: body + faqHtml(faq),
+  }));
+}
+
+function resolvePdfTool(slug, base) {
+  if (slug === 'pdf-tools') return { html: pdfToolsHub(base) };
+  return PDF_TOOL_BY_SLUG.has(slug) ? { html: pdfToolPage(slug, base) } : null;
 }
 
 function compressPage(slug, base) {
@@ -1028,6 +1156,8 @@ const toolName = (p) => {
   if (p === '/edit-pdf') return 'Edit PDF';
   if (LANDING_BY_SLUG.has(p.slice(1))) return LANDING_BY_SLUG.get(p.slice(1)).short;
   if (friendlyBySlug(p.slice(1))) return friendlyBySlug(p.slice(1)).h1.replace(/ Converter$/, '');
+  if (PDF_TOOL_BY_SLUG.has(p.slice(1))) return PDF_TOOL_BY_SLUG.get(p.slice(1)).name;
+  if (p === '/pdf-tools') return 'All PDF tools';
   const r = registry.resolveRoute(p, ANY);
   return r && r.type === 'compress' ? `Compress ${r.from.label}` : r ? `${r.from.label} to ${r.to.label}` : p;
 };
@@ -1263,6 +1393,8 @@ function ogSpec(rawKey) {
     return a ? { title: a.h1.length > 48 ? `${a.h1.slice(0, 46).replace(/\s+\S*$/, '')}...` : a.h1, subtitle: 'Guide' } : null;
   }
   if (friendlyBySlug(key)) { const x = friendlyBySlug(key); return { title: x.h1, subtitle: 'Free online converter \u00b7 No sign-up \u00b7 No watermark' }; }
+  if (PDF_TOOL_BY_SLUG.has(key)) return { title: PDF_TOOL_BY_SLUG.get(key).h1, subtitle: 'Free online PDF tool \u00b7 No sign-up \u00b7 No watermark' };
+  if (key === 'pdf-tools') return { title: 'All PDF Tools', subtitle: 'Merge, split, compress, convert, edit and protect PDFs free' };
   if (key === 'edit-pdf') return { title: 'Free PDF Editor', subtitle: 'Edit, sign and fill PDFs. Resume and invoice templates' };
   if (LANDING_BY_SLUG.has(key)) { const l = LANDING_BY_SLUG.get(key); return { title: l.h1, subtitle: l.kicker }; }
   if (key === 'home') return { title: 'Free Online File Converter', subtitle: `${LIVE_COUNT.toLocaleString('en-US')} conversions \u00b7 Video, audio, documents, images` };
@@ -1319,6 +1451,7 @@ function allPaths() {
     ...Object.keys(INFO_PAGES).map((k) => `/${k}`),
     '/guides', ...ARTICLES.map((a) => articlePath(a.slug)),
     ...friendlies().map((x) => `/${x.slug}`),
+    '/pdf-tools', ...PDF_TOOLS.map((t) => `/${t.slug}`),
     ...(PDF_EDITOR ? ['/edit-pdf', ...EDITOR_LANDINGS.map((l) => `/${l.slug}`)] : []),
   ];
 }
@@ -1327,7 +1460,7 @@ function allPaths() {
 // (Google ignores priority/changefreq; Bing and others still read them.)
 function sitemapPriority(p) {
   if (p === '/') return '1.0';
-  if (friendlyBySlug(p.slice(1))) return '1.0';
+  if (friendlyBySlug(p.slice(1)) || PDF_TOOL_BY_SLUG.has(p.slice(1)) || p === '/pdf-tools') return '1.0';
   if (/-to-|^\/compress-|^\/edit-pdf$/.test(p) || LANDING_BY_SLUG.has(p.slice(1))) return '0.9';
   if (/-converter$/.test(p) || p === '/converters') return '0.8';
   if (p.startsWith('/guides')) return '0.6';
@@ -1342,6 +1475,6 @@ function sitemap(base) {
 const robots = (base) => `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${base}/sitemap.xml\n`;
 
 module.exports = {
-  megaMenu,
+  megaMenu, PDF_TOOLS, resolvePdfTool,
   ACCOUNTS, authPage, accountPage, authDonePage, resolveFriendly, friendlies,
   editorPage, PDF_EDITOR, EDITOR_LANDINGS, homePage, resolveGuide, hubPage, notFoundPage, resolvePair, resolveCompress, resolveConverter, resolveInfo, ogSpec, sitemap, robots, allPaths, adsTxt, ADS_ENABLED: !!ADS_CLIENT };

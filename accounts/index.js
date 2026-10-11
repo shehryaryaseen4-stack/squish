@@ -17,6 +17,8 @@ const store = require('./store');
 const admin = require('./admin');
 const mail = require('./mail');
 const analytics = require('./analytics');
+// PDF tools that run in the browser report their use with the beacon (names only from this list).
+const BROWSER_TOOLS = new Set(require('../content/pdf-tools').tools.filter((t) => t.browser).map((t) => t.name));
 
 const ON = process.env.ACCOUNTS === '1';
 const GOOGLE_ID = process.env.GOOGLE_CLIENT_ID || '';
@@ -137,6 +139,7 @@ function mount(app, { pages, baseOf }) {
     const origin = req.get('origin');
     if (origin) { try { if (new URL(origin).host !== req.get('host')) return res.status(204).end(); } catch { return res.status(204).end(); } }
     if (b.e === 'pdf' || b.e === 'combine') analytics.event(req, b.e, { p: b.p, d: b.d });
+    else if (b.e === 'tool') { if (BROWSER_TOOLS.has(b.d)) analytics.event(req, 'tool', { pair: b.d, p: b.p }); }
     else analytics.pageview(req, b, req.get('host'));
     res.set('Cache-Control', 'no-store').status(204).end();
   });
