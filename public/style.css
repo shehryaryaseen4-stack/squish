@@ -300,6 +300,7 @@ input[type=range]{width:150px; accent-color:var(--brand);}
   .top-row{gap:12px; grid-template-columns:auto 1fr auto;}
   .main-nav{justify-content:flex-start;}
   .nav-link{display:none;}
+  .nav-link.nav-resume{display:inline-flex;}
   .top-actions .btn-edit-pdf{padding:7px 11px; font-size:.85rem;}
   .top-actions .btn-edit-pdf .ico{display:none;}
   .nav-simple{display:none;}
@@ -557,3 +558,19 @@ body:has(.acct) .site-footer{margin-top:0;}
 .auth-link:hover{text-decoration:underline;}
 .auth-link:disabled{color:var(--dim); cursor:default; text-decoration:none;}
 .auth-code[hidden]{display:none;}
+
+/* Phones: logo, Tools, Resume and Edit PDF must fit on one line */
+@media (max-width:520px){
+  .top-row{gap:4px; padding-left:12px; padding-right:12px;}
+  .nav-long{display:none;}
+  .main-nav{gap:0;}
+  .main-nav .nav-item{padding-left:6px; padding-right:6px;}
+  .top-row > .brand{gap:7px;}
+  .brand-logo{height:30px;}
+  .brand-name{font-size:1.05rem;}
+  .brand .brand-mark{width:24px; height:24px;}
+  .top-actions .btn-edit-pdf{padding:7px 9px;}
+}
+@media (max-width:370px){ .top-row > .brand .brand-name{display:none;} .brand-logo{height:25px;} }
+@media (max-width:340px){ .top-row{padding-left:8px; padding-right:8px;} .main-nav .nav-item{padding-left:4px; padding-right:4px;} .top-actions .btn-edit-pdf{padding:6px 7px; font-size:.8rem;} }
+.nav-item.nav-resume{gap:0;}

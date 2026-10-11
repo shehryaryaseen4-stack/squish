@@ -361,7 +361,7 @@ const LOOKS = [
   ['creative', 'creative', 'Creative pink', ['#db2777', '#500724', '#fce7f3'], 'raleway', 'lato'],
 ];
 
-export const RESUME_STYLES = [['all', 'All resumes'], ['modern', 'Modern'], ['classic', 'Classic'], ['simple', 'Simple'], ['creative', 'Creative'], ['ats', 'ATS-friendly'], ['letter', 'Cover letter']];
+export const RESUME_STYLES = [['resumes', 'Resumes'], ['modern', 'Modern'], ['classic', 'Classic'], ['simple', 'Simple'], ['creative', 'Creative'], ['ats', 'ATS-friendly'], ['letter', 'Cover letter']];
 
 const RESUMES = LOOKS.map(([layout, style, name, [acc, dark, soft], hf, bf], i) => ({
   id: `resume-${i + 1}`, name, cat: 'resume', style, size: A4, more: true,
