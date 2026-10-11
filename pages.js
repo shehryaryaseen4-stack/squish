@@ -26,7 +26,8 @@ const registry = require('./registry');
 const seo = require('./seo');
 const brand = require('./brand');
 const GUIDES = { ...require('./content/guides'), ...require('./content/guides-more') };
-const ARTICLES = require('./content/articles');
+// Resume guides only exist alongside the Resume Builder (part of the PDF editor).
+const ARTICLES = [...require('./content/articles'), ...(process.env.PDF_EDITOR === '1' ? require('./content/resume-articles') : [])];
 const KEYWORDS = require('./content/keywords');
 
 const SITE = process.env.SITE_NAME || brand.NAME;
@@ -289,7 +290,7 @@ function topbar(full = false) {
       ${toolsMenu}
       <details class="nav-menu nav-simple" data-menu><summary class="nav-item">Convert<span class="caret" aria-hidden="true"></span></summary><div class="dropdown"><ul>${convertList}</ul></div></details>
       <details class="nav-menu nav-simple" data-menu><summary class="nav-item">Compress<span class="caret" aria-hidden="true"></span></summary><div class="dropdown"><ul>${compress}</ul></div></details>
-      ${PDF_EDITOR ? '<a class="nav-item nav-link nav-resume" href="/resume-maker">Resume<span class="nav-long"> Builder</span></a>' : ''}
+      ${PDF_EDITOR ? '<a class="nav-item nav-link nav-resume" href="/resume-maker">Resume<span class="nav-long">&nbsp;Builder</span></a>' : ''}
       <a class="nav-item nav-link" href="/converters">Formats</a>
     </nav>
     <div class="top-actions">${PDF_EDITOR ? `
@@ -876,8 +877,11 @@ const LANDING_BY_SLUG = new Map(EDITOR_LANDINGS.map((l) => [l.slug, l]));
 const landingLinks = (except) => {
   const group = (kind, h) => `<h3>${h}</h3><ul class="pe-links">${EDITOR_LANDINGS.filter((l) => l.kind === kind && l.slug !== except)
     .map((l) => `<li>${link(`/${l.slug}`, esc(l.short))}</li>`).join('')}</ul>`;
-  return `<section class="pe-more"><h2>${except ? 'More free PDF tools and makers' : 'Free templates and PDF tools'}</h2>
-    ${group('template', 'Make a document from a template')}${group('tool', 'Work on an existing PDF')}
+  const resumeFirst = except && LANDING_BY_SLUG.get(except) && (LANDING_BY_SLUG.get(except).kind === 'resume' || except === 'resume-maker');
+  const resumes = `<h3>Resume templates by job and style</h3><ul class="pe-links">${[['resume-maker', 'All resume templates'], ...EDITOR_LANDINGS.filter((l) => l.kind === 'resume').map((l) => [l.slug, l.short])]
+    .filter(([s]) => s !== except).map(([s, t]) => `<li>${link(`/${s}`, esc(t))}</li>`).join('')}</ul>`;
+  return `<section class="pe-more"><h2>${resumeFirst ? 'More resume templates and tools' : except ? 'More free PDF tools and makers' : 'Free templates and PDF tools'}</h2>
+    ${resumeFirst ? resumes : ''}${group('template', 'Make a document from a template')}${group('tool', 'Work on an existing PDF')}${resumeFirst ? '' : resumes}
     ${except ? `<p class="more-link">${link('/edit-pdf', 'Open the full PDF editor')}</p>` : ''}</section>`;
 };
 // The start screen's hero and template panel carry the landing's own words; the editor reads
@@ -895,7 +899,7 @@ function editorApp(l) {
   // The blank-page card stays in the markup, hidden, because the editor script binds to it.
   if (l.only) {
     const card = (href, ico, title, text, btn, cls) => `<a class="pe-card pe-link-card" href="${href}"><span class="pe-card-ico ${cls}"><svg viewBox="0 0 24 24" aria-hidden="true">${ico}</svg></span><strong>${title}</strong><span>${text}</span><span class="btn ${cls === 'pe-card-ico-alt' ? 'btn-dark' : 'btn-brand'} btn-sm pe-card-btn">${btn}</span></a>`;
-    app = app.replace('<div class="pe" id="pe"', `<div class="pe pe-only" id="pe" data-only-cat="${l.only}"`)
+    app = app.replace('<div class="pe" id="pe"', `<div class="pe pe-only" id="pe" data-only-cat="${l.only}"${l.feature ? ` data-feature="${esc(l.feature.join(','))}" data-feature-label="${esc(l.chip)}"` : ''}${l.style ? ` data-start-style="${esc(l.style)}"` : ''}`)
       .replace('<div class="pe-choices">', `<div class="pe-choices">${card(`/${l.slug}?template=resume-blank`, '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 11v6m-3-3h6"/>', 'Start a blank resume', 'Headings ready, you fill in the rest', 'Start blank', 'pe-card-ico-alt')}`)
       .replace('<strong>Open a PDF</strong>', '<strong>Edit your resume PDF</strong>')
       .replace('<span>Drop it here or click to choose</span>', '<span>Open the resume you already have</span>')
@@ -936,7 +940,7 @@ function editorPage(base, slug) {
       <li><strong>Tables</strong>Real tables with rows and columns for invoices, price lists and agendas.</li>
     </ul>`;
   const body = l
-    ? `<div class="pe-info pe-landing">${l.sections.map(([h, html]) => `<section><h2>${esc(h)}</h2>${html}</section>`).join('')}${landingLinks(l.slug)}</div>${faqHtml(faq)}`
+    ? `<div class="pe-info pe-landing">${l.sections.map(([h, html]) => `<section><h2>${esc(h)}</h2>${html}</section>`).join('')}${readMore(p)}${landingLinks(l.slug)}</div>${faqHtml(faq)}`
     : `${info}${landingLinks('')}</div>${faqHtml(faq)}`;
   return render(EDITOR_TPL, {
     ...baseFields(base, p, title, desc, {}),
@@ -963,6 +967,7 @@ const articlePath = (slug) => `/guides/${slug}`;
 const ARTICLE_BY_SLUG = new Map(ARTICLES.map((a) => [a.slug, a]));
 const articlesFor = (toolPath) => ARTICLES.filter((a) => a.tools.includes(toolPath));
 const toolName = (p) => {
+  if (LANDING_BY_SLUG.has(p.slice(1))) return LANDING_BY_SLUG.get(p.slice(1)).short;
   const r = registry.resolveRoute(p, ANY);
   return r && r.type === 'compress' ? `Compress ${r.from.label}` : r ? `${r.from.label} to ${r.to.label}` : p;
 };

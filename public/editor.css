@@ -560,3 +560,5 @@ body.is-editing .pe-app{height:auto;}
 .pe-tpl-more a{color:var(--brand); font-weight:700; text-decoration:none;}
 .pe-tpl-more a:hover{text-decoration:underline;}
 @media (max-width:860px){ .pe-choices-3{grid-template-columns:1fr;} }
+.pe-cols{columns:3 180px; column-gap:28px; padding-left:20px;}
+.pe-cols li{break-inside:avoid;}

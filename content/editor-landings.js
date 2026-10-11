@@ -11,7 +11,7 @@
 
 const T = (id, name) => `<a href="/edit-pdf?template=${id}">${name}</a>`;
 
-module.exports = [
+const LANDINGS = [
   // --------------------------------------------------------------- templates --
   {
     slug: 'resume-maker', kind: 'template', cat: 'resume', only: 'resume', short: 'Resume builder',
@@ -24,6 +24,8 @@ module.exports = [
       ['How to make a resume online', `<ol><li><strong>Pick a layout.</strong> The ${T('resume-modern', 'Modern resume')} has a coloured sidebar for contact details and skills; the ${T('resume-classic', 'Classic resume')} is a single clean column that suits banks, government jobs and academic posts.</li><li><strong>Replace the sample text.</strong> Click your name, job title, experience and education and type over them. Change fonts, sizes and colours from the bar above the page.</li><li><strong>Add or remove sections.</strong> Duplicate a job entry with Ctrl+D, delete what you do not need, and drag a guide line out of the ruler to keep everything aligned.</li><li><strong>Download your resume PDF.</strong> It opens the same on every computer and phone, which is what recruiters expect.</li></ol>`],
       ['What makes a good resume', '<p>Keep it to one page if you have less than ten years of experience, and two at most after that. Start with a two-line summary of who you are and what you want, then list jobs from newest to oldest with numbers wherever you can: "cut delivery time by 30%" says more than "responsible for delivery". Put the skills that match the job advert near the top, and use the same words the advert uses.</p><p>Applicant tracking systems (ATS) read text, not pictures, so this resume builder keeps your words as real text in the PDF. Use a standard font such as Helvetica, Roboto or Open Sans, avoid putting key details inside images, and save the file as <em>firstname-lastname-resume.pdf</em>.</p>'],
       ['Resume, CV or biodata?', '<p>A resume is a short summary of your work history, usually one or two pages, used for most private jobs. A CV (curriculum vitae) is longer and also lists publications, research and awards; it is common for academic jobs and in the UK, Europe, Pakistan and India. Biodata adds personal details such as date of birth and is still asked for in some government forms. All three can be made from the same templates: add or remove sections until it matches what the employer asked for.</p>'],
+      ['Resume templates for every job', '<p>Start from a resume already filled in for your field, then replace the details: <a href="/software-engineer-resume">software engineer</a>, <a href="/nurse-resume">nurse</a>, <a href="/teacher-resume">teacher</a>, <a href="/accountant-resume">accountant</a>, <a href="/civil-engineer-resume">engineer</a>, <a href="/sales-resume">sales</a>, <a href="/marketing-resume">marketing</a>, <a href="/graphic-designer-resume">graphic designer</a>, <a href="/data-analyst-resume">data analyst</a>, <a href="/manager-resume">manager</a> and <a href="/fresher-resume">freshers with no experience</a>. Or browse by style: <a href="/modern-resume-template">modern</a>, <a href="/professional-resume-template">professional</a>, <a href="/simple-resume-template">simple</a>, <a href="/creative-resume-template">creative</a> and <a href="/ats-resume-template">ATS-friendly</a>.</p>'],
+      ['Which resume format should you use?', '<p>Most people should use the <strong>reverse-chronological</strong> format, newest job first: every template here follows it. Career changers can move Skills above Experience; students and fresh graduates can put Education first. Read the step-by-step <a href="/guides/how-to-write-a-resume">guide to writing a resume</a> for what to put in each section.</p>'],
       ['Write a cover letter that matches', `<p>Most employers read the cover letter first. Open the ${T('cover-letter', 'Cover letter template')}, use the same font and colour as your resume, and write three short paragraphs: why this job, what you have done that proves you can do it, and a polite request for an interview. See the ${'<a href="/cover-letter-maker">cover letter maker</a>'} for more tips.</p>`],
     ],
     faq: [
@@ -32,6 +34,11 @@ module.exports = [
       ['Is the resume ATS-friendly?', 'The text in the downloaded PDF stays real, selectable text, which applicant tracking systems can read. Keep important details out of images and use standard section titles such as Experience, Education and Skills.'],
       ['Can I edit my old resume PDF?', 'Yes. Open your existing resume PDF with Open a PDF, click a line with Edit text and retype it, or cover old details with Whiteout and type the new ones on top.'],
       ['Can I add a photo to my resume?', 'Yes. Use Image to add your photo, then choose the circle shape in the Image settings to show it round, as on the Modern resume.'],
+      ['How many resume templates are there?', '30 resume designs in five styles (modern, classic, simple, creative and ATS-friendly), a blank resume and a matching cover letter, all free.'],
+      ['Do I need to sign up or pay?', 'No. Open a template, edit it and download the PDF; there is no account, no trial and no watermark.'],
+      ['Can I download my resume in Word format?', 'The resume downloads as a PDF, which is what most employers prefer. If a company asks for Word, convert the PDF with our PDF to DOCX converter.'],
+      ['Can I make my resume on my phone?', 'Yes. The Resume Builder works in mobile browsers; tap any text to change it and download the PDF to your phone.'],
+      ['Can I make a resume in Urdu?', 'Yes. Type in Urdu and choose an Urdu font such as Noto Naskh Arabic; the letters join correctly in the PDF.'],
     ],
   },
   {
@@ -417,3 +424,6 @@ module.exports = [
     ],
   },
 ];
+
+// Resume pages by job and style (content/resume-landings.js) come after the main ones.
+module.exports = [...LANDINGS, ...require('./resume-landings')];

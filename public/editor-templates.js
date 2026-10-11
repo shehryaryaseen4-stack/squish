@@ -365,7 +365,8 @@ export const RESUME_STYLES = [['resumes', 'Resumes'], ['modern', 'Modern'], ['cl
 
 const RESUMES = LOOKS.map(([layout, style, name, [acc, dark, soft], hf, bf], i) => ({
   id: `resume-${i + 1}`, name, cat: 'resume', style, size: A4, more: true,
-  items: LAYOUTS[layout](PEOPLE[(i * 3) % PEOPLE.length], { acc, dark, soft, ink: '#374151', mute: '#6b7280', hf, bf }),
+  // person for design i: each person gets three different layouts (see content/resume-landings.js)
+  items: LAYOUTS[layout](PEOPLE[(3 * i + 3 * Math.floor(i / 10)) % PEOPLE.length], { acc, dark, soft, ink: '#374151', mute: '#6b7280', hf, bf }),
 }));
 
 // A resume with headings and hints only, for "Start a blank resume".

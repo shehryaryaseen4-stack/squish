@@ -105,6 +105,30 @@ test('PDF editor landing pages: unique titles and descriptions, in the sitemap, 
     assert.equal(x.h1s, 1, x.slug);
     assert.equal(x.canon, `https://example.test/${x.slug}`);
     assert.ok(x.inSitemap && x.og && x.faq, x.slug);
-    assert.equal(x.cat, x.kind === 'template', x.slug);
+    assert.equal(x.cat, x.kind !== 'tool', x.slug);
   }
+});
+
+test('resume guides and pages: indexed, linked both ways, and every link goes to a real page', () => {
+  const out = JSON.parse(execFileSync(process.execPath, ['-e', `
+    const pages = require('./pages');
+    const paths = new Set(pages.allPaths());
+    const arts = require('./content/resume-articles');
+    const lands = pages.EDITOR_LANDINGS.filter((l) => l.kind === 'resume' || l.slug === 'resume-maker');
+    const bad = [];
+    const hrefs = (html) => [...html.matchAll(/href="(\\/[^"#?]*)/g)].map((m) => m[1]);
+    for (const a of arts) {
+      const p = '/guides/' + a.slug;
+      if (!paths.has(p)) bad.push('not in sitemap ' + p);
+      for (const t of a.tools) {
+        if (!paths.has(t)) bad.push(p + ' tool ' + t);
+        if (!pages.editorPage('https://e.test', t.slice(1)).includes('href="' + p + '"')) bad.push(t + ' does not link back to ' + p);
+      }
+      for (const h of hrefs(a.sections.map((x) => x[1]).join(''))) if (!paths.has(h)) bad.push(p + ' links to ' + h);
+    }
+    for (const l of lands) for (const h of hrefs(l.sections.map((x) => x[1]).join(''))) if (!paths.has(h)) bad.push(l.slug + ' links to ' + h);
+    console.log(JSON.stringify({ bad, arts: arts.length, lands: lands.length }));
+  `], { cwd: ROOT, env: { ...process.env, PDF_EDITOR: '1' } }).toString());
+  assert.deepEqual(out.bad, []);
+  assert.ok(out.arts >= 5 && out.lands >= 15);
 });
