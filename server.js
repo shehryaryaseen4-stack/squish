@@ -255,6 +255,9 @@ app.get('/', (req, res) => sendHtml(res, pages.homePage(baseOf(req))));
 app.get('/converters', (req, res) => sendHtml(res, pages.hubPage(baseOf(req))));
 
 // Format ids can contain hyphens (tar-gz), so the split happens in the registry, not here.
+// Converters under the names people search for (/pdf-to-word, /word-to-pdf ...). Before the X-to-Y
+// route, which would otherwise read "pdf-to-word" as an unknown pair.
+if (pages.friendlies().length) app.get(new RegExp(`^/(${pages.friendlies().map((x) => x.slug).join('|')})$`), (req, res) => sendHtml(res, pages.resolveFriendly(req.params[0], baseOf(req)).html));
 // PDF editor landing pages (/resume-maker, /invoice-generator, /sign-pdf ...): the editor with
 // its own text. Before the X-to-Y route, since some of them (add-text-to-pdf) look like pairs.
 if (pages.PDF_EDITOR && pages.EDITOR_LANDINGS.length) {

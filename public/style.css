@@ -574,3 +574,4 @@ body:has(.acct) .site-footer{margin-top:0;}
 @media (max-width:370px){ .top-row > .brand .brand-name{display:none;} .brand-logo{height:25px;} }
 @media (max-width:340px){ .top-row{padding-left:8px; padding-right:8px;} .main-nav .nav-item{padding-left:4px; padding-right:4px;} .top-actions .btn-edit-pdf{padding:6px 7px; font-size:.8rem;} }
 .nav-item.nav-resume{gap:0;}
+.related-tools{margin-top:34px;} .related-tools h3{margin:18px 0 8px; font-size:1.05rem;} .also-try{margin:18px 0; padding:12px 16px; border-radius:10px; background:var(--bg-soft);} .also-try a{color:var(--brand); font-weight:700;}

@@ -29,6 +29,21 @@ const GUIDES = { ...require('./content/guides'), ...require('./content/guides-mo
 // Resume guides only exist alongside the Resume Builder (part of the PDF editor).
 const ARTICLES = [...require('./content/articles'), ...(process.env.PDF_EDITOR === '1' ? require('./content/resume-articles') : [])];
 const KEYWORDS = require('./content/keywords');
+// Converters under the names people search for: /pdf-to-word, /word-to-pdf ... (friendlyPage)
+const FRIENDLY_ALL = require('./content/friendly-pages');
+// Only the file types this server can really convert (LibreOffice, Calibre ... may be missing):
+// a page whose conversions are all unavailable is left out entirely. Worked out on first use.
+let friendlyCache = null;
+function friendlies() {
+  if (friendlyCache) return friendlyCache;
+  friendlyCache = FRIENDLY_ALL.map((x) => {
+    const outputs = x.outputs.filter((o) => x.inputs.some((i) => isLivePair(i, o)));
+    const inputs = x.inputs.filter((i) => outputs.some((o) => isLivePair(i, o)));
+    return { ...x, inputs, outputs };
+  }).filter((x) => x.inputs.length && x.outputs.length);
+  return friendlyCache;
+}
+const friendlyBySlug = (slug) => friendlies().find((x) => x.slug === slug) || null;
 
 const SITE = process.env.SITE_NAME || brand.NAME;
 const CONTACT_EMAIL = process.env.CONTACT_EMAIL || '';
@@ -257,7 +272,8 @@ let megaCache = null, megaVersion = null;
 function megaMenu() {
   if (megaCache) return megaCache;
   const groups = [];
-  groups.push(['popular', 'Popular', POPULAR.map(([f, t]) => ({ id: f, href: pairPath(f, t), text: `${F(f).label} &rarr; ${F(t).label}`, live: true })),
+  groups.push(['popular', 'Popular', [...friendlies().map((x) => ({ id: x.inputs[0], href: `/${x.slug}`, text: esc(x.h1.replace(/ Converter$/, '')), live: true })),
+    ...POPULAR.map(([f, t]) => ({ id: f, href: pairPath(f, t), text: `${F(f).label} &rarr; ${F(t).label}`, live: true }))],
     `<a class="mega-head" href="/converters">All ${TOTAL_COUNT.toLocaleString('en-US')} conversions &rarr;</a>`]);
   CATS.forEach((c) => {
     const items = registry.getFormatsByCategory(c.id).map((f) => ({ id: f.id, href: formatPath(f.id), live: formatIsLive(f.id) }));
@@ -301,7 +317,8 @@ function topbar(full = false) {
 }
 
 function footer() {
-  const pop = POPULAR.slice(0, 10).map(([f, t]) => `<li>${link(pairPath(f, t), pairLabel(f, t))}</li>`).join('');
+  const pop = [...friendlies().slice(0, 4).map((x) => `<li>${link(`/${x.slug}`, esc(x.h1.replace(/ Converter$/, '')))}</li>`),
+    ...POPULAR.slice(0, 8).map(([f, t]) => `<li>${link(pairPath(f, t), pairLabel(f, t))}</li>`)].join('');
   const cats = CATS.map((c) => `<li>${link(categoryPath(c.id), c.converterName)}</li>`).join('');
   const comp = COMPRESSIBLE.map((s) => `<li>${link(compressPath(s), `Compress ${F(s).label}`)}</li>`).join('');
   const pdf = PDF_EDITOR ? `<div><h4>PDF tools</h4><ul><li>${link('/edit-pdf', 'Edit PDF')}</li>${['resume-maker', 'invoice-generator', 'certificate-maker', 'cover-letter-maker', 'sign-pdf', 'fill-pdf', 'merge-pdf', 'add-text-to-pdf']
@@ -584,8 +601,13 @@ function baseFields(base, urlPath, title, desc, extra) {
 const COMMON = new Set(('jpg png webp gif bmp tiff heic avif svg ico jfif pdf docx doc odt rtf txt html xlsx xls csv pptx ppt '
   + 'epub mobi mp4 mov avi mkv webm wmv mp3 wav aac m4a flac ogg wma opus zip rar 7z ttf otf woff woff2').split(' '));
 const POPULAR_SET = new Set(registry.getPopularConversions().map((c) => `${c.from}>${c.to}`));
-const pairIndexable = (f, t) => POPULAR_SET.has(`${f}>${t}`) || !!GUIDES[`${f}>${t}`] || !!KEYWORDS[pairPath(f, t)] || (COMMON.has(f) && COMMON.has(t));
-const formatIndexable = (id) => COMMON.has(id) || !!KEYWORDS[formatPath(id)];
+// Rarer pairs that Google Search Console shows people already finding (October 2026): kept indexed.
+const SEEN_IN_SEARCH = new Set(('txt>rst xz>tar-xz cbz>mobi txt>dot ppsx>odp pot>odp swf>mod rtf>tex swf>webp wav>oga djvu>tiff pptx>jpg flv>swf prc>oeb '
+  + 'docm>docx odt>doc ttf>woff docx>html rtf>doc mobi>txt mod>mov mod>avi wmv>mpg swf>gif bmp>pdf txt>docx txt>doc pdf>mobi pdf>prc docx>txt doc>txt').split(' '));
+const pairIndexable = (f, t) => POPULAR_SET.has(`${f}>${t}`) || SEEN_IN_SEARCH.has(`${f}>${t}`) || !!GUIDES[`${f}>${t}`] || !!KEYWORDS[pairPath(f, t)] || (COMMON.has(f) && COMMON.has(t));
+// Every working format page is indexed: Search Console shows even rare ones (LZ, XZ, TCR) ranking
+// on page one, because few sites cover them.
+const formatIndexable = () => true;
 // Working page, not indexed: keeps its tool, ads and structured data.
 const notIndexed = (fields) => ({ ...fields, ROBOTS: 'noindex, follow', _soft: true });
 
@@ -688,7 +710,7 @@ function pairPage(fromSlug, toSlug, base) {
     const name = kwCase(kw.primary), alt = kwAlt(kw);
     title = fitTitle(`${name} Converter`, alt && kwCase(alt));
     const also = alt && / to /.test(alt) ? ` (${kwCase(alt)})` : '';
-    description = `Free ${name} converter${also}. Convert ${from.label} files to ${to.label} online, many at once, and download them as a ZIP. No sign-up, no watermark.`;
+    description = kw.desc || `Free ${name} converter${also}. Convert ${from.label} files to ${to.label} online, many at once, and download them as a ZIP. No sign-up, no watermark.`;
     h1 = `${name} Converter`;
     lead = `This ${name} converter works in your browser on any computer or phone. `;
   }
@@ -705,10 +727,46 @@ function pairPage(fromSlug, toSlug, base) {
       widget, withSelect: true }),
     TOOL: toolHtml({ inputs: [fromSlug], outputs: outputsFor(fromSlug), dropTitle: `Drop your ${from.label} files here`, dropSub: `or click to choose ${from.label} files` }),
     CONTENT: howToSteps(from.label, to.label, 'convert', imagePair) + guideHtml(from, to, guide) + cards + compareTable([fromSlug, toSlug])
-      + `<section class="notes"><h2>Converting ${from.name} to ${to.name}</h2><ul>${notes.map((x) => `<li>${x}</li>`).join('')}</ul></section>` + readMore(p) + faqHtml(faq),
+      + `<section class="notes"><h2>Converting ${from.name} to ${to.name}</h2><ul>${notes.map((x) => `<li>${x}</li>`).join('')}</ul></section>`
+      + friendlyLinks(fromSlug, toSlug) + readMore(p) + faqHtml(faq),
     RELATED: relatedForPair(from, to),
   });
   return renderPage(PAGE_TPL, pairIndexable(fromSlug, toSlug) ? pairFields : notIndexed(pairFields));
+}
+
+// A converter under a friendly name (content/friendly-pages.js): the same upload tool as the pair
+// pages, accepting every file type the name covers, with its own title, text and FAQ. Links to
+// pages that are switched off (the PDF editor) become plain text.
+let knownPaths = null;
+function liveLinks(html) {
+  if (!knownPaths) knownPaths = new Set(allPaths());
+  return html.replace(/<a href="(\/[^"#?]*)[^"]*">([\s\S]*?)<\/a>/g, (m, href, text) => (knownPaths.has(href) ? m : text));
+}
+function friendlyPage(slug, base) {
+  const x = friendlyBySlug(slug);
+  if (!x) return null;
+  const p = `/${x.slug}`;
+  const crumbs = [['Home', '/'], [x.h1.replace(/ Converter$/, ''), p]];
+  const inLabels = x.inputs.map((i) => F(i).label);
+  const see = x.see.filter((s) => { if (!knownPaths) knownPaths = new Set(allPaths()); return knownPaths.has(s); })
+    .map((s) => [s, friendlyBySlug(s.slice(1)) ? friendlyBySlug(s.slice(1)).h1.replace(/ Converter$/, '') : toolName(s), true]);
+  const more = friendlies().filter((o) => o.slug !== x.slug).map((o) => [`/${o.slug}`, o.h1.replace(/ Converter$/, ''), true]);
+  return renderPage(PAGE_TPL, baseFields(base, p, `${x.title} | ${SITE}`, x.desc, {
+    JSONLD: graph(base, p, x.h1, x.desc, x.faq, crumbs, { features: TOOL_FEATURES }),
+    DEFAULT_FORMAT: F(x.outputs[0]).select,
+    HERO: hero({ h1: x.h1, crumbs, intro: x.intro }),
+    TOOL: toolHtml({ inputs: x.inputs, outputs: x.outputs, dropTitle: `Drop your ${inLabels.length > 3 ? 'files' : inLabels.join(' or ')} here`, dropSub: `${inLabels.join(', ')}` }),
+    CONTENT: x.sections.map(([h, html]) => `<section class="notes prose-block"><h2>${esc(h)}</h2>${liveLinks(html)}</section>`).join('')
+      + `<section class="related-tools"><h2>Related tools</h2>${chips(see)}<h3>More popular converters</h3>${chips(more)}</section>`
+      + readMore(p) + faqHtml(x.faq),
+  }));
+}
+const resolveFriendly = (slug, base) => (friendlyBySlug(slug) ? { html: friendlyPage(slug, base) } : null);
+
+// "Also try": the friendly-name converters that cover this pair (PDF to DOCX -> PDF to Word).
+function friendlyLinks(from, to) {
+  const hits = friendlies().filter((x) => x.inputs.includes(from) && x.outputs.includes(to));
+  return hits.length ? `<p class="also-try">Also available as ${hits.map((x) => link(`/${x.slug}`, esc(x.h1))).join(' and ')}, which accepts ${hits.map((x) => x.inputs.map((i) => F(i).label).join(', ')).join('; ')} files.</p>` : '';
 }
 
 function compressPage(slug, base) {
@@ -967,7 +1025,9 @@ const articlePath = (slug) => `/guides/${slug}`;
 const ARTICLE_BY_SLUG = new Map(ARTICLES.map((a) => [a.slug, a]));
 const articlesFor = (toolPath) => ARTICLES.filter((a) => a.tools.includes(toolPath));
 const toolName = (p) => {
+  if (p === '/edit-pdf') return 'Edit PDF';
   if (LANDING_BY_SLUG.has(p.slice(1))) return LANDING_BY_SLUG.get(p.slice(1)).short;
+  if (friendlyBySlug(p.slice(1))) return friendlyBySlug(p.slice(1)).h1.replace(/ Converter$/, '');
   const r = registry.resolveRoute(p, ANY);
   return r && r.type === 'compress' ? `Compress ${r.from.label}` : r ? `${r.from.label} to ${r.to.label}` : p;
 };
@@ -1202,6 +1262,7 @@ function ogSpec(rawKey) {
     const a = ARTICLE_BY_SLUG.get(key.slice(7));
     return a ? { title: a.h1.length > 48 ? `${a.h1.slice(0, 46).replace(/\s+\S*$/, '')}...` : a.h1, subtitle: 'Guide' } : null;
   }
+  if (friendlyBySlug(key)) { const x = friendlyBySlug(key); return { title: x.h1, subtitle: 'Free online converter \u00b7 No sign-up \u00b7 No watermark' }; }
   if (key === 'edit-pdf') return { title: 'Free PDF Editor', subtitle: 'Edit, sign and fill PDFs. Resume and invoice templates' };
   if (LANDING_BY_SLUG.has(key)) { const l = LANDING_BY_SLUG.get(key); return { title: l.h1, subtitle: l.kicker }; }
   if (key === 'home') return { title: 'Free Online File Converter', subtitle: `${LIVE_COUNT.toLocaleString('en-US')} conversions \u00b7 Video, audio, documents, images` };
@@ -1257,6 +1318,7 @@ function allPaths() {
     ...COMPRESSIBLE.map((s) => compressPath(s)),
     ...Object.keys(INFO_PAGES).map((k) => `/${k}`),
     '/guides', ...ARTICLES.map((a) => articlePath(a.slug)),
+    ...friendlies().map((x) => `/${x.slug}`),
     ...(PDF_EDITOR ? ['/edit-pdf', ...EDITOR_LANDINGS.map((l) => `/${l.slug}`)] : []),
   ];
 }
@@ -1265,6 +1327,7 @@ function allPaths() {
 // (Google ignores priority/changefreq; Bing and others still read them.)
 function sitemapPriority(p) {
   if (p === '/') return '1.0';
+  if (friendlyBySlug(p.slice(1))) return '1.0';
   if (/-to-|^\/compress-|^\/edit-pdf$/.test(p) || LANDING_BY_SLUG.has(p.slice(1))) return '0.9';
   if (/-converter$/.test(p) || p === '/converters') return '0.8';
   if (p.startsWith('/guides')) return '0.6';
@@ -1280,5 +1343,5 @@ const robots = (base) => `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: $
 
 module.exports = {
   megaMenu,
-  ACCOUNTS, authPage, accountPage, authDonePage,
+  ACCOUNTS, authPage, accountPage, authDonePage, resolveFriendly, friendlies,
   editorPage, PDF_EDITOR, EDITOR_LANDINGS, homePage, resolveGuide, hubPage, notFoundPage, resolvePair, resolveCompress, resolveConverter, resolveInfo, ogSpec, sitemap, robots, allPaths, adsTxt, ADS_ENABLED: !!ADS_CLIENT };
