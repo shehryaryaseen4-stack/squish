@@ -201,13 +201,13 @@ const tools = [
 const groups = [
   ['Organize PDF', [['/merge-pdf', 'Merge PDF', 'merge'], ['/split-pdf', 'Split PDF', 'split'], ['/delete-pdf-pages', 'Remove pages', 'remove'],
     ['/extract-pdf-pages', 'Extract pages', 'extract'], ['/organize-pdf', 'Organize PDF', 'organize'], ['/rotate-pdf', 'Rotate PDF', 'rotate']]],
-  ['Optimize PDF', [['/compress-pdf', 'Compress PDF', 'compress'], ['/repair-pdf', 'Repair PDF', 'repair']]],
+  ['Edit PDF', [['/edit-pdf', 'Edit PDF', 'edit'], ['/add-page-numbers-to-pdf', 'Add page numbers', 'numbers'], ['/watermark-pdf', 'Add watermark', 'watermark'],
+    ['/crop-pdf', 'Crop PDF', 'crop'], ['/add-text-to-pdf', 'Add text', 'text'], ['/fill-pdf', 'Fill PDF forms', 'form']]],
   ['Convert to PDF', [['/jpg-to-pdf', 'JPG to PDF', 'image'], ['/word-to-pdf', 'Word to PDF', 'word'], ['/powerpoint-to-pdf', 'PowerPoint to PDF', 'ppt'],
     ['/excel-to-pdf', 'Excel to PDF', 'excel'], ['/html-to-pdf', 'HTML to PDF', 'html'], ['/image-to-pdf', 'Image to PDF', 'image']]],
   ['Convert from PDF', [['/pdf-to-jpg', 'PDF to JPG', 'image'], ['/pdf-to-word', 'PDF to Word', 'word'], ['/pdf-to-image', 'PDF to Image', 'image'],
     ['/pdf-to-pdfa', 'PDF to PDF/A', 'archive'], ['/pdf-to-txt', 'PDF to Text', 'text']]],
-  ['Edit PDF', [['/edit-pdf', 'Edit PDF', 'edit'], ['/add-page-numbers-to-pdf', 'Add page numbers', 'numbers'], ['/watermark-pdf', 'Add watermark', 'watermark'],
-    ['/crop-pdf', 'Crop PDF', 'crop'], ['/add-text-to-pdf', 'Add text', 'text'], ['/fill-pdf', 'Fill PDF forms', 'form']]],
+  ['Optimize PDF', [['/compress-pdf', 'Compress PDF', 'compress'], ['/repair-pdf', 'Repair PDF', 'repair']]],
   ['PDF security', [['/unlock-pdf', 'Unlock PDF', 'unlock'], ['/protect-pdf', 'Protect PDF', 'lock'], ['/sign-pdf', 'Sign PDF', 'sign'], ['/whiteout-pdf', 'Whiteout PDF', 'whiteout']]],
 ];
 
