@@ -407,22 +407,6 @@ const LANDINGS = [
       ['Does rotating reduce quality?', 'No. The page is turned, not re-drawn, so text and images keep their quality.'],
     ],
   },
-  {
-    slug: 'merge-pdf', kind: 'tool', short: 'Merge PDF',
-    title: 'Merge PDF Online Free - Combine PDF Files into One',
-    desc: 'Merge PDF files online for free. Combine several PDFs into one document, reorder the pages and download. Files are merged in your browser.',
-    kicker: 'Combine PDFs', h1: 'Merge PDF Files',
-    lede: 'Combine several PDFs into one file: put them in order, remove pages you do not need, and download a single PDF.',
-    sections: [
-      ['How to merge PDFs', '<ol><li>Open the first PDF.</li><li>In the Pages panel, click <strong>Merge PDF</strong> and choose the next file. Its pages are added after the current page. Repeat for each file.</li><li>Drag pages to change the order and delete any you do not need.</li><li>Download the merged PDF.</li></ol>'],
-      ['Merging images and scans', '<p>To add photos or scans as pages, use Image page in the Pages panel. To turn many images into one PDF at once, use our JPG to PDF converter and choose One PDF when you download.</p>'],
-    ],
-    faq: [
-      ['Is it free to merge PDFs?', 'Yes. Combine PDFs and download the result for free, without a watermark.'],
-      ['Are my files uploaded?', 'No. The PDFs are merged in your browser and the result is saved straight to your device.'],
-      ['Can I add page numbers to the merged PDF?', 'Yes. Tick Add page numbers when you download.'],
-    ],
-  },
 ];
 
 // Resume pages by job and style (content/resume-landings.js) come after the main ones.

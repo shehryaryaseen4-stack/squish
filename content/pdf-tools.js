@@ -10,6 +10,30 @@
 
 const tools = [
   {
+    slug: 'merge-pdf', name: 'Merge PDF', op: 'merge', browser: true, multi: true, howto: 'How to merge PDF files',
+    title: 'Merge PDF - Combine PDF Files into One Free',
+    desc: 'Merge PDF files online for free: combine several PDFs into one document in the order you want. In your browser, no upload, no sign-up, no watermark.',
+    h1: 'Merge PDF Files',
+    intro: 'Combine several PDF files into one document. Select your PDFs, drag them into the right order and download a single PDF. Free, with no sign-up, no watermark and no upload: it all happens in your browser.',
+    steps: [['Choose your PDFs.', 'Click <em>Select PDF files</em> and pick two or more PDFs (hold Ctrl or Cmd to pick several), or drop them into the box. You can add more later.'],
+      ['Put them in order.', 'Drag the files, or use the arrows, so they are in the order you want. Remove any file with the &times; button.'],
+      ['Merge and download.', 'Click <em>Merge PDF</em> and the combined PDF downloads straight away.']],
+    sections: [
+      ['When to merge PDFs', '<p>Send one file instead of five: put your CV, cover letter and certificates together for a job application, join scanned pages of a form, combine monthly bank statements, or collect invoices and receipts for your accountant. One PDF is easier to email, upload to a portal and print.</p>'],
+      ['Quality and file size', '<p>Pages are copied exactly as they are, so text stays sharp and searchable and images keep their quality. The merged file is about the size of all the PDFs added together. If it is too big to upload, make it smaller with <a href="/compress-pdf">Compress PDF</a>.</p>'],
+      ['Private: nothing is uploaded', '<p>Your PDFs are combined in your browser with open-source code (pdf-lib), so they never leave your device. To change the order of single pages after merging, use <a href="/organize-pdf">Organize PDF</a>; to take some pages out again, use <a href="/split-pdf">Split PDF</a> or <a href="/extract-pdf-pages">Extract pages</a>.</p>'],
+    ],
+    faq: [
+      ['How do I merge PDF files into one?', 'Select all your PDFs here (or drop them in), drag them into the order you want and click Merge PDF. One combined PDF downloads.'],
+      ['Is merging PDFs free?', 'Yes. It is completely free, with no sign-up, no email, no watermark and no daily limit.'],
+      ['How many PDFs can I merge?', 'As many as you like; each file can be up to the size limit shown in the box. Very large sets depend on the memory of your device.'],
+      ['Are my files uploaded?', 'No. The PDFs are merged in your browser and the result is saved straight to your device.'],
+      ['Can I merge PDFs on my phone?', 'Yes. It works in Chrome, Safari and other browsers on Android and iPhone; use the arrow buttons to change the order.'],
+      ['Can I merge a password-protected PDF?', 'Remove the password first with Unlock PDF, then merge it.'],
+    ],
+    see: ['/split-pdf', '/organize-pdf', '/compress-pdf', '/jpg-to-pdf', '/extract-pdf-pages'],
+  },
+  {
     slug: 'split-pdf', name: 'Split PDF', op: 'split', browser: true,
     title: 'Split PDF - Separate PDF Pages Online Free',
     desc: 'Split PDF files online for free: save every page as its own PDF, or cut a PDF into page ranges. Works in your browser, no upload, no sign-up.',
@@ -31,7 +55,7 @@ const tools = [
       ['Does splitting reduce quality?', 'No. The pages are copied exactly as they are: text stays text and images keep their quality.'],
       ['Can I split a password-protected PDF?', 'Unlock it first with Unlock PDF (you need the password), then split it.'],
     ],
-    see: ['/extract-pdf-pages', '/merge-pdf', '/organize-pdf', '/delete-pdf-pages', '/compress-pdf'],
+    see: ['/merge-pdf', '/extract-pdf-pages', '/organize-pdf', '/delete-pdf-pages', '/compress-pdf'],
   },
   {
     slug: 'extract-pdf-pages', name: 'Extract pages', op: 'extract', browser: true,

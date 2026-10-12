@@ -70,6 +70,7 @@ function saveBlob(blob, name, text) {
 }
 
 function reset() {
+  mfiles = [];
   file = bytes = srcDoc = null; count = 0;
   if (view) { try { (view.loadingTask || view).destroy(); } catch { /* already closed */ } view = null; }
   if (list) list.innerHTML = '';
@@ -121,10 +122,10 @@ function dropSay(text, bad = true) {
 }
 
 $('[data-pick]').addEventListener('click', () => input.click());
-input.addEventListener('change', () => open(input.files[0]));
+input.addEventListener('change', () => (OP === 'merge' ? addFiles([...input.files]) : open(input.files[0])));
 ['dragenter', 'dragover'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add('is-over'); }));
 ['dragleave', 'drop'].forEach((t) => drop.addEventListener(t, () => drop.classList.remove('is-over')));
-drop.addEventListener('drop', (e) => { e.preventDefault(); open(e.dataTransfer.files[0]); });
+drop.addEventListener('drop', (e) => { e.preventDefault(); if (OP === 'merge') addFiles([...e.dataTransfer.files]); else open(e.dataTransfer.files[0]); });
 $$('[data-again]').forEach((b) => b.addEventListener('click', reset));
 $$('[data-eye]').forEach((b) => b.addEventListener('click', () => {
   const i = b.previousElementSibling, show = i.type === 'password';
@@ -477,9 +478,120 @@ async function runServer() {
   form.reset();
 }
 
-const RUN = { split: runSplit, extract: runExtract, organize: runOrganize, crop: runCrop, protect: runServer, unlock: runServer, repair: runServer, pdfa: runServer };
+
+// Merge ----------------------------------------------------------------------
+// mfiles: { file, doc (pdf-lib), pages, el } in the order they will be merged.
+let mfiles = [];
+const FILE_BTNS = `<div class="pt-tools">
+  <button type="button" data-m="left" aria-label="Move earlier">&larr;</button><button type="button" data-m="del" aria-label="Remove this file">&times;</button>
+  <button type="button" data-m="right" aria-label="Move later">&rarr;</button></div>`;
+async function firstPageThumb(bytes, canvas) {
+  try {
+    const lib = await loadPdfjs();
+    const task = lib.getDocument({ data: bytes, cMapUrl: `${VENDOR}pdfjs/cmaps/`, cMapPacked: true, standardFontDataUrl: `${VENDOR}pdfjs/standard_fonts/`, wasmUrl: `${VENDOR}pdfjs/wasm/`, iccUrl: `${VENDOR}pdfjs/iccs/` });
+    const doc = await task.promise;
+    const page = await doc.getPage(1);
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const vp = page.getViewport({ scale: (150 * dpr) / page.getViewport({ scale: 1 }).width });
+    canvas.width = Math.round(vp.width); canvas.height = Math.round(vp.height);
+    await page.render({ canvas, viewport: vp }).promise;
+    canvas.classList.add('is-drawn');
+    task.destroy();
+  } catch { /* the preview is optional */ }
+}
+async function addFiles(files) {
+  if (!files.length) return;
+  const bad = [];
+  if (!mfiles.length) dropSay('Opening your PDFs...', false);
+  await wait(() => window.PDFLib);
+  for (const f of files) {
+    if (!/\.pdf$/i.test(f.name) && f.type !== 'application/pdf') { bad.push(`${f.name} is not a PDF`); continue; }
+    if (f.size > MAX) { bad.push(`${f.name} is larger than ${sizeText(MAX)}`); continue; }
+    try {
+      const bytes = new Uint8Array(await f.arrayBuffer());
+      let doc;
+      try { doc = await window.PDFLib.PDFDocument.load(bytes, { updateMetadata: false }); } catch (e) {
+        bad.push(/encrypt/i.test(e.message || '') ? `${f.name} has a password (<a href="/unlock-pdf">unlock it</a> first)` : `${f.name} could not be read`);
+        continue;
+      }
+      const li = document.createElement('li');
+      li.className = 'pt-page pt-file';
+      li.draggable = true;
+      li.innerHTML = `<div class="pt-thumb"><canvas width="150" height="200" aria-hidden="true"></canvas></div><span class="pt-fn"></span><span class="pt-num">${plural(doc.getPageCount(), 'page')}</span>${FILE_BTNS}`;
+      li.querySelector('.pt-fn').textContent = f.name;
+      li.title = f.name;
+      const it = { file: f, doc, pages: doc.getPageCount(), el: li };
+      li._item = it;
+      mfiles.push(it);
+      list.append(li);
+      firstPageThumb(bytes.slice(), li.querySelector('canvas'));
+    } catch { bad.push(`${f.name} could not be opened`); }
+  }
+  if (!mfiles.length) { dropSay(bad.join('; ') || 'Please choose PDF files.'); input.value = ''; return; }
+  dropSay('');
+  drop.hidden = true; work.hidden = false;
+  showFiles(bad.length ? `Not added: ${bad.join('; ')}.` : '');
+  input.value = '';
+}
+function showFiles(note = '') {
+  mfiles.forEach((it, k) => {
+    it.el.querySelector('[data-m="left"]').disabled = k === 0;
+    it.el.querySelector('[data-m="right"]').disabled = k === mfiles.length - 1;
+  });
+  const pages = mfiles.reduce((n, it) => n + it.pages, 0), size = mfiles.reduce((n, it) => n + it.file.size, 0);
+  $('[data-fname]').textContent = plural(mfiles.length, 'PDF file');
+  $('[data-fmeta]').textContent = `${plural(pages, 'page')} · ${sizeText(size)}`;
+  go.disabled = mfiles.length < 2;
+  if (note) say(note);
+  else say(mfiles.length < 2 ? 'Add at least one more PDF to merge.' : `${plural(mfiles.length, 'file')} will be merged into one PDF of ${plural(pages, 'page')}.`, false);
+}
+if (OP === 'merge') {
+  const addInput = $('[data-add-input]');
+  $('[data-add]').addEventListener('click', () => addInput.click());
+  addInput.addEventListener('change', () => { addFiles([...addInput.files]); addInput.value = ''; });
+  work.addEventListener('dragover', (e) => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) e.preventDefault(); });
+  work.addEventListener('drop', (e) => { if (e.dataTransfer && e.dataTransfer.files.length) { e.preventDefault(); addFiles([...e.dataTransfer.files]); } });
+  list.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-m]');
+    if (!b) return;
+    const it = b.closest('.pt-page')._item, k = mfiles.indexOf(it);
+    if (b.dataset.m === 'left' && k > 0) [mfiles[k - 1], mfiles[k]] = [mfiles[k], mfiles[k - 1]];
+    if (b.dataset.m === 'right' && k < mfiles.length - 1) [mfiles[k + 1], mfiles[k]] = [mfiles[k], mfiles[k + 1]];
+    if (b.dataset.m === 'del') { mfiles.splice(k, 1); it.el.remove(); }
+    mfiles.forEach((x) => list.append(x.el));
+    if (!mfiles.length) { reset(); return; }
+    showFiles();
+    if (b.isConnected) b.focus();
+  });
+  let dragged = null;
+  list.addEventListener('dragstart', (e) => { dragged = e.target.closest('.pt-page'); if (!dragged) return; dragged.classList.add('is-drag'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', ''); } catch { /* old browsers */ } });
+  list.addEventListener('dragend', () => { if (dragged) dragged.classList.remove('is-drag'); dragged = null; mfiles = [...list.children].map((li) => li._item); showFiles(); });
+  list.addEventListener('dragover', (e) => {
+    if (!dragged) return;
+    e.preventDefault();
+    const over = e.target.closest('.pt-page');
+    if (!over || over === dragged) return;
+    const r = over.getBoundingClientRect();
+    list.insertBefore(dragged, e.clientX > r.left + r.width / 2 ? over.nextSibling : over);
+  });
+}
+async function runMerge() {
+  if (mfiles.length < 2) throw new Error('Add at least two PDFs to merge.');
+  const doc = await window.PDFLib.PDFDocument.create();
+  for (let k = 0; k < mfiles.length; k++) {
+    busy(true, `Adding file ${k + 1} of ${mfiles.length}...`);
+    const src = mfiles[k].doc;
+    (await doc.copyPages(src, src.getPageIndices())).forEach((p) => doc.addPage(p));
+  }
+  busy(true, 'Saving the merged PDF...');
+  const pages = doc.getPageCount();
+  saveBlob(new Blob([await doc.save()], { type: 'application/pdf' }), `${baseName(mfiles[0].file.name)}-merged.pdf`,
+    `${plural(mfiles.length, 'PDF')} combined into one PDF of ${plural(pages, 'page')}.`);
+}
+
+const RUN = { merge: runMerge, split: runSplit, extract: runExtract, organize: runOrganize, crop: runCrop, protect: runServer, unlock: runServer, repair: runServer, pdfa: runServer };
 go.addEventListener('click', async () => {
-  if (!file || go.disabled) return;
+  if ((OP === 'merge' ? !mfiles.length : !file) || go.disabled) return;
   try {
     await RUN[OP]();
     busy(false, '');

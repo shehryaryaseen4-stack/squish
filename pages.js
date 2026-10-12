@@ -799,6 +799,8 @@ function pdfMenu() {
 
 const pwField = (name, label, auto, extra = '') => `<label class="pt-field"><span>${label}</span><span class="pt-pw"><input type="password" name="${name}" autocomplete="${auto}" maxlength="100" spellcheck="false"${extra}><button type="button" class="pt-eye" data-eye aria-label="Show password">Show</button></span></label>`;
 const PT_OPTS = {
+  merge: `<p class="pt-hint">Drag the files into the order you want, or use the arrows. The first file comes first in the merged PDF.</p>
+    <div class="pt-row"><button type="button" class="pt-link" data-add>+ Add more PDFs</button><input type="file" accept="application/pdf,.pdf" multiple data-add-input hidden></div>`,
   split: `<fieldset class="pt-radios"><legend>How to split</legend>
       <label><input type="radio" name="mode" value="each" checked> Every page as its own PDF</label>
       <label><input type="radio" name="mode" value="ranges"> Custom page ranges</label>
@@ -822,17 +824,17 @@ const PT_OPTS = {
   repair: '<p class="pt-hint">The file is checked and rebuilt. Click <strong>Repair PDF</strong> to start.</p>',
   pdfa: `<label class="pt-field pt-field-s"><span>PDF/A version</span><select name="level"><option value="1">PDF/A-1b</option><option value="2" selected>PDF/A-2b (recommended)</option><option value="3">PDF/A-3b</option></select></label>`,
 };
-const PT_GO = { split: 'Split PDF', extract: 'Extract pages', organize: 'Save PDF', crop: 'Crop PDF', protect: 'Protect PDF', unlock: 'Unlock PDF', repair: 'Repair PDF', pdfa: 'Convert to PDF/A' };
+const PT_GO = { merge: 'Merge PDF', split: 'Split PDF', extract: 'Extract pages', organize: 'Save PDF', crop: 'Crop PDF', protect: 'Protect PDF', unlock: 'Unlock PDF', repair: 'Repair PDF', pdfa: 'Convert to PDF/A' };
 
 function pdfToolBox(t) {
   const next = t.see.filter((s) => knownPaths.has(s)).slice(0, 4).map((s) => link(s, esc(toolName(s)))).join('');
   return `<section class="pt" id="pt" data-op="${t.op}" data-name="${esc(t.name)}" data-max-mb="${MAX_MB}"${t.browser ? ' data-browser' : ''}>
   <div class="pt-drop" data-drop>
-    <input type="file" accept="application/pdf,.pdf" data-input hidden>
+    <input type="file" accept="application/pdf,.pdf" data-input hidden${t.multi ? ' multiple' : ''}>
     ${icon('upload', 'pt-drop-ico')}
-    <button class="btn btn-brand btn-select" type="button" data-pick>${icon('upload')}Select PDF file</button>
-    <p class="pt-drop-sub">or drop a PDF here &middot; up to ${MAX_MB} MB</p>
-    <p class="pt-private">${icon('shield')}${t.browser ? 'Your PDF never leaves your device' : 'Files are deleted as soon as they are done'}</p>
+    <button class="btn btn-brand btn-select" type="button" data-pick>${icon('upload')}Select PDF file${t.multi ? 's' : ''}</button>
+    <p class="pt-drop-sub">or drop ${t.multi ? 'PDFs' : 'a PDF'} here &middot; up to ${MAX_MB} MB${t.multi ? ' each' : ''}</p>
+    <p class="pt-private">${icon('shield')}${t.browser ? `Your ${t.multi ? 'PDFs never leave' : 'PDF never leaves'} your device` : 'Files are deleted as soon as they are done'}</p>
   </div>
   <div class="pt-work" data-work hidden>
     <div class="pt-filebar">${icon('pdf')}<span class="pt-fname" data-fname></span><span class="pt-fmeta" data-fmeta></span><button type="button" class="pt-link" data-again>Choose another file</button></div>
@@ -857,7 +859,7 @@ function pdfToolPage(slug, base) {
   const p = `/${t.slug}`;
   const crumbs = [['Home', '/'], ['PDF Tools', '/pdf-tools'], [t.name, p]];
   const see = t.see.filter((s) => knownPaths.has(s)).map((s) => [s, esc(toolName(s)), true]);
-  const steps = `<section class="howto"><h2>How to ${esc(t.name.replace(/^PDF to /, 'convert PDF to ').replace(/^(\w)/, (c) => c.toLowerCase()).replace(/ pdf$/i, ' a PDF'))}</h2><ol class="steps">${t.steps
+  const steps = `<section class="howto"><h2>${t.howto ? esc(t.howto) : `How to ${esc(t.name.replace(/^PDF to /, 'convert PDF to ').replace(/^(\w)/, (c) => c.toLowerCase()).replace(/ pdf$/i, ' a PDF'))}`}</h2><ol class="steps">${t.steps
     .map(([s, d]) => `<li><strong>${s}</strong> ${d}</li>`).join('')}</ol></section>`;
   return renderPage(PAGE_TPL, baseFields(base, p, `${t.title} | ${SITE}`, t.desc, {
     JSONLD: graph(base, p, t.h1, t.desc, t.faq, crumbs, { features: [t.browser ? 'Runs in the browser, no upload' : 'Files deleted after processing', 'No sign-up', 'No watermark', 'Free'] }),

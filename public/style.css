@@ -703,3 +703,6 @@ body:has(.acct) .site-footer{margin-top:0;}
 .pt-opts{max-width:none;} .pt-opts > :not(.pt-crop){max-width:620px;}
 @media (max-width:640px){ .pt-org{grid-template-columns:repeat(2, 1fr); gap:10px;} .pt-org .pt-page{padding:8px 4px 6px;} .pt-org .pt-tools{gap:2px;} .pt-org .pt-tools button{width:22px; height:22px;} }
 .pt-go{white-space:nowrap;}
+.pt-fn{max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.85rem; font-weight:700; color:var(--ink);}
+.pt-file{cursor:grab;}
+.pt-file.is-drag{opacity:.4;}
