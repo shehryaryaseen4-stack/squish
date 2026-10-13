@@ -25,6 +25,8 @@ const E = (x, y, w, h, o = {}) => ({
   type: 'ellipse', x, y, w, h, color: o.stroke || o.fill || '#111827', width: o.sw ?? 1, dash: o.dash || 'solid',
   fill: o.fill || '#ffffff', fillOn: !!o.fill, opacity: o.op ?? 100,
 });
+// a photo placeholder: clicking it in the editor asks for a picture, which fills the circle
+const PHOTO = (shape) => ({ ...shape, photo: true });
 const L = (x1, y1, x2, y2, o = {}) => {
   const width = o.w || 1, pad = Math.max(width, 4); // same box as the editor's lineBox()
   return { type: 'line', x1, y1, x2, y2, color: o.color || '#d1d5db', width, dash: o.dash || 'solid', opacity: o.op ?? 100,
@@ -133,7 +135,7 @@ const LAYOUTS = {
   sideLeft(p, c) {
     const out = [], sx = 26, mx = 222, mr = 560;
     out.push(R(0, 0, 196, PH, { fill: c.dark }));
-    out.push(E(48, 40, 100, 100, { fill: c.acc })); out.push(C(initials(p.name), 98, 72, 30, { color: '#ffffff', bold: true, font: c.hf }));
+    out.push(PHOTO(E(48, 40, 100, 100, { fill: c.acc }))); out.push(C(initials(p.name), 98, 72, 30, { color: '#ffffff', bold: true, font: c.hf }));
     let y = 176;
     const sh = (t) => { out.push(T(t, sx, y, 10, { bold: true, color: '#ffffff', font: c.hf }), L(sx, y + 17, 170, y + 17, { color: c.acc, w: 1.2 })); y += 28; };
     sh('CONTACT'); out.push(T(`${p.phone}\n${p.email}\n${p.city}\n${p.web}`, sx, y, 9, { color: '#e5e7eb', font: c.bf })); y += 74;
@@ -165,7 +167,7 @@ const LAYOUTS = {
     for (const [dg, sc, d] of p.edu) { out.push(T(dg, mx, y, 11, { bold: true, color: c.dark, font: c.bf }), T(`${sc}  |  ${d}`, mx, y + 15, 9, { color: c.mute, font: c.bf })); y += 38; }
     let sy = 50;
     const sh = (t) => { out.push(T(t, sx, sy, 11, { bold: true, color: c.dark, font: c.hf }), L(sx, sy + 18, 570, sy + 18, { color: c.acc })); sy += 28; };
-    out.push(E(sx + 30, sy, 110, 110, { fill: '#ffffff', stroke: c.acc, sw: 2 }), C('PHOTO', sx + 85, sy + 49, 9, { color: c.mute, bold: true })); sy += 136;
+    out.push(PHOTO(E(sx + 30, sy, 110, 110, { fill: '#ffffff', stroke: c.acc, sw: 2 })), C('PHOTO', sx + 85, sy + 49, 9, { color: c.mute, bold: true })); sy += 136;
     sh('Contact'); out.push(T(`${p.phone}\n${p.email}\n${p.city}\n${p.web}`, sx, sy, 9, { color: c.ink, font: c.bf })); sy += 74;
     sh('Skills'); out.push(T(p.skills.map((s) => `-  ${s}`).join('\n'), sx, sy, 9, { color: c.ink, font: c.bf })); sy += p.skills.length * 11 + 22;
     sh('Languages'); out.push(T(p.langs.join('\n'), sx, sy, 9, { color: c.ink, font: c.bf }));
@@ -307,7 +309,7 @@ const LAYOUTS = {
   creative(p, c) {
     const out = [], x = 44, r = 551, sx = 392;
     out.push(R(0, 0, W, 10, { fill: c.acc }), R(0, PH - 10, W, 10, { fill: c.acc }));
-    out.push(E(x, 40, 84, 84, { fill: c.soft }), C(initials(p.name), x + 42, 66, 28, { bold: true, color: c.acc, font: c.hf }));
+    out.push(PHOTO(E(x, 40, 84, 84, { fill: c.soft })), C(initials(p.name), x + 42, 66, 28, { bold: true, color: c.acc, font: c.hf }));
     out.push(T(p.name, x + 104, 50, 27, { bold: true, color: c.dark, font: c.hf }), T(p.role, x + 104, 86, 13, { color: c.acc, font: c.bf }));
     out.push(R(x, 146, r - x, 30, { fill: c.soft, r: 8 }), T(`${p.phone}     ${p.email}     ${p.city}`, x + 14, 155, 9, { color: c.dark, font: c.bf }));
     let y = 200;
@@ -409,7 +411,7 @@ export const TEMPLATES = [
       ];
       return [
         R(0, 0, 200, 841.89, { fill: navy }),
-        E(52, 46, 96, 96, { fill: '#334366', stroke: '#4b5d85', sw: 2 }), C('PHOTO', 100, 88, 9, { color: '#8fa0c4', bold: true }),
+        PHOTO(E(52, 46, 96, 96, { fill: '#334366', stroke: '#4b5d85', sw: 2 })), C('PHOTO', 100, 88, 9, { color: '#8fa0c4', bold: true }),
         ...sideHead('CONTACT', 176), T('+1 555 010 2030\nalex.morgan@email.com\nalexmorgan.design\nNew York, USA', 28, 202, 9.5, { color: side }),
         ...sideHead('SKILLS', 292), T('User research\nWireframing and prototyping\nFigma, Sketch, Adobe XD\nDesign systems\nHTML and CSS basics\nUsability testing', 28, 318, 9.5, { color: side }),
         ...sideHead('LANGUAGES', 444), T('English  (native)\nSpanish  (fluent)\nFrench  (basic)', 28, 470, 9.5, { color: side }),

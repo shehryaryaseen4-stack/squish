@@ -1068,7 +1068,7 @@ const landingLinks = (except) => {
   const resumeFirst = except && LANDING_BY_SLUG.get(except) && (LANDING_BY_SLUG.get(except).kind === 'resume' || except === 'resume-maker');
   const resumes = `<h3>Resume templates by job and style</h3><ul class="pe-links">${[['resume-maker', 'All resume templates'], ...EDITOR_LANDINGS.filter((l) => l.kind === 'resume').map((l) => [l.slug, l.short])]
     .filter(([s]) => s !== except).map(([s, t]) => `<li>${link(`/${s}`, esc(t))}</li>`).join('')}</ul>`;
-  return `<section class="pe-more"><h2>${resumeFirst ? 'More resume templates and tools' : except ? 'More free PDF tools and makers' : 'Free templates and PDF tools'}</h2>
+  return `<section class="pe-related"><h2>${resumeFirst ? 'More resume templates and tools' : except ? 'More free PDF tools and makers' : 'Free templates and PDF tools'}</h2>
     ${resumeFirst ? resumes : ''}${group('template', 'Make a document from a template')}${group('tool', 'Work on an existing PDF')}${resumeFirst ? '' : resumes}
     ${except ? `<p class="more-link">${link('/edit-pdf', 'Open the full PDF editor')}</p>` : ''}</section>`;
 };

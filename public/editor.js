@@ -106,7 +106,7 @@ function catalogMatch(name) {
 
 const SHAPES = new Set(['rect', 'ellipse', 'line', 'arrow', 'check', 'cross']);
 const HINTS = {
-  select: 'Click an object to select it. Drag to move, use the corners to resize (hold Ctrl to resize both sides equally).',
+  select: 'Click an object to select it, drag to move it, use the corners to resize. Hold Space and drag to move around the page.',
   edittext: 'Click on any text in the PDF to change it.',
   editimage: 'Click on an image in the PDF to replace, move or remove it.',
   text: 'Click anywhere on a page to add text.',
@@ -445,6 +445,7 @@ function renderObjects(layer, p, z, live) {
         // an image in a shape fills it (cover) and is cut to an ellipse or a rounded rectangle
         if (it.clip) {
           o.classList.add('pe-clip');
+          if (a) placePhotoImg(img, it, a, z);
           const rad = it.clip === 'ellipse' ? '50%' : it.clip === 'rounded' ? `${Math.min(it.r || 0, it.w / 2, it.h / 2) * z}px` : '0';
           o.style.borderRadius = rad;
           if (it.sw > 0) { const b = document.createElement('span'); b.className = 'pe-clip-border'; Object.assign(b.style, { borderRadius: rad, border: `${it.sw * z}px solid ${it.stroke}` }); o.append(b); }
@@ -513,6 +514,61 @@ function arrowHead(it) {
   const ang = Math.atan2(it.y2 - it.y1, it.x2 - it.x1);
   const len = Math.max(10, (it.width || 2) * 4.5);
   return [ang + Math.PI - 0.45, ang + Math.PI + 0.45].map((a) => [it.x2 + Math.cos(a) * len, it.y2 + Math.sin(a) * len]);
+}
+
+// ------------------------------------------------------------- photos --
+// A picture in a shape covers it, zoomed by fz (1 = just covers the shape) and shifted by fx / fy
+// (0..1: how much of the overflow is cut on the left / top; 0.5 = centred). Screen and PDF use
+// the same numbers. Resume photos (photo: true) are moved inside their circle by dragging, and
+// zoomed with the slider under them, the mouse wheel or two fingers.
+function photoRect(it, a) {
+  const s = Math.max(it.w / a.w, it.h / a.h) * (it.fz || 1);
+  const w = a.w * s, h = a.h * s;
+  return { x: -(w - it.w) * (it.fx ?? 0.5), y: -(h - it.h) * (it.fy ?? 0.5), w, h };
+}
+function placePhotoImg(img, it, a, z) {
+  const r = photoRect(it, a);
+  Object.assign(img.style, { inset: 'auto', left: `${r.x * z}px`, top: `${r.y * z}px`, width: `${r.w * z}px`, height: `${r.h * z}px`, maxWidth: 'none', objectFit: 'fill' });
+}
+const isPhoto = (it) => !!(it && it.type === 'image' && it.photo && it.clip);
+// redraw just the picture inside a photo while it is dragged or zoomed (no full redraw)
+function refreshPhoto(pageId, it) {
+  const o = $(`.pe-page[data-id="${pageId}"] .pe-obj[data-id="${it.id}"] img`), a = S.assets.get(it.asset);
+  if (o && a) placePhotoImg(o, it, a, S.zoom);
+  const r = $('.pe-photobar input[type=range]');
+  if (r) r.value = String(Math.round((it.fz || 1) * 100));
+}
+function zoomPhoto(pageId, it, fz) {
+  it.fz = clamp(fz, 1, 5);
+  refreshPhoto(pageId, it);
+}
+// The photo circle in a template under a click: the circle itself, or the PHOTO / initials text on it.
+function photoSlotAt(p, pt, it) {
+  if (it.photo && it.type === 'ellipse' && !it.locked) return it;
+  if (it.type !== 'text') return null;
+  return p.items.find((o) => o.photo && o.type === 'ellipse' && !o.hidden && !o.locked && pt.x >= o.x && pt.x <= o.x + o.w && pt.y >= o.y && pt.y <= o.y + o.h) || null;
+}
+function choosePhoto(p, slot) {
+  imagePick = { mode: 'photo', page: p.id, id: slot.id };
+  $('#peImageInput').click();
+}
+function photoBar(it, layer, z) {
+  const bar = document.createElement('div');
+  bar.className = 'pe-photobar';
+  bar.style.left = `${(it.x + it.w / 2) * z}px`; bar.style.top = `${(it.y + it.h) * z + 12}px`;
+  bar.innerHTML = `<button type="button" data-ph="out" aria-label="Zoom out">&minus;</button><input type="range" min="100" max="500" step="1" value="${Math.round((it.fz || 1) * 100)}" aria-label="Zoom photo"><button type="button" data-ph="in" aria-label="Zoom in">+</button><button type="button" data-ph="change">Change photo</button>`;
+  const pageId = S.sel.page, range = bar.querySelector('input');
+  range.addEventListener('pointerdown', () => snapshot());
+  range.addEventListener('keydown', () => snapshot(), { once: true });
+  range.addEventListener('input', () => zoomPhoto(pageId, it, Number(range.value) / 100));
+  bar.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-ph]');
+    if (!b) return;
+    if (b.dataset.ph === 'change') { imagePick = { mode: 'item', sel: { page: pageId, id: it.id } }; $('#peImageInput').click(); return; }
+    snapshot();
+    zoomPhoto(pageId, it, (it.fz || 1) * (b.dataset.ph === 'in' ? 1.15 : 1 / 1.15));
+  });
+  layer.append(bar);
 }
 
 // ------------------------------------------------------- images in shapes --
@@ -807,7 +863,7 @@ function select(pageId, id) {
   updateProps(); renderLayers();
 }
 const isLine = (it) => it.type === 'line' || it.type === 'arrow';
-function clearSelectionUi() { $$('.pe-selbox, .pe-handle').forEach((e) => e.remove()); }
+function clearSelectionUi() { $$('.pe-selbox, .pe-handle, .pe-photobar').forEach((e) => e.remove()); }
 // Outline, corner handles and a rotation handle, turned with the object.
 function decorateSelection() {
   clearSelectionUi();
@@ -843,6 +899,7 @@ function decorateSelection() {
     }
   }
   layer.append(box);
+  if (isPhoto(it) && !it.locked) photoBar(it, layer, z);
 }
 
 // ----------------------------------------------------------- arrange etc. --
@@ -1148,11 +1205,30 @@ async function replaceWith(file) {
     p.items.push(coverFor(pick.target.box), it);
     setTool('select');
     drawItems(pageIndex(p.id)); select(p.id, it.id);
+  } else if (pick.mode === 'photo') {
+    // a template's photo circle: the picture takes its place, and the PHOTO / initials text on it goes
+    const p = pageById(pick.page), sh = p && p.items.find((o) => o.id === pick.id);
+    if (!sh) return;
+    snapshot();
+    const onIt = (o) => {
+      if (o.type !== 'text') return false;
+      const cx = o.align === 'center' && o.ax !== undefined ? o.ax : o.x + o.w / 2, cy = o.y + o.h / 2;
+      return cx > sh.x && cx < sh.x + sh.w && cy > sh.y && cy < sh.y + sh.h && o.w <= sh.w && o.h <= sh.h;
+    };
+    const outline = sh.width > 0 && !(sh.fillOn && sh.fill === sh.color);
+    const it = { id: uid(), type: 'image', asset: a.id, opacity: 100, x: sh.x, y: sh.y, w: sh.w, h: sh.h, rot: sh.rot || 0,
+      clip: 'ellipse', r: 0, sw: outline ? sh.width : 0, stroke: sh.color, photo: true, fx: 0.5, fy: 0.5, fz: 1 };
+    p.items.splice(p.items.indexOf(sh), 1, it);
+    p.items = p.items.filter((o) => !onIt(o));
+    setTool('select');
+    drawItems(pageIndex(p.id)); select(p.id, it.id);
+    toast('Drag the photo to place your face in the circle. Zoom with the slider, the mouse wheel or two fingers.');
   } else if (pick.mode === 'item') {
     const it = itemOf(pick.sel);
     if (!it) return;
     snapshot();
-    Object.assign(it, { asset: a.id }, fitInto(a, { x: it.x, y: it.y, w: it.w, h: it.h }));
+    if (it.clip) Object.assign(it, { asset: a.id, fx: 0.5, fy: 0.5, fz: 1 });
+    else Object.assign(it, { asset: a.id }, fitInto(a, { x: it.x, y: it.y, w: it.w, h: it.h }));
     drawItems(pageIndex(pick.sel.page)); select(pick.sel.page, it.id);
   }
 }
@@ -1182,9 +1258,20 @@ function ptOf(e, pageEl) {
   return { x: (e.clientX - r.left) / S.zoom, y: (e.clientY - r.top) / S.zoom };
 }
 
+// ------------------------------------------------------------ hand scroll --
+// Hold Space (or the middle mouse button) and drag to move around a zoomed page. On a touch
+// screen one finger moves the page, unless it starts on the object that is already selected
+// (then it moves that object); a tap selects.
+let spaceDown = false;
+function startScroll(e, extra = {}) {
+  const v = $('#peView');
+  drag = { kind: 'scroll', x: e.clientX, y: e.clientY, sl: v.scrollLeft, st: v.scrollTop, moved: false, pid: e.pointerId, ...extra };
+  v.classList.add('pe-grabbing');
+}
 function onPointerDown(e) {
+  if (drag && drag.kind === 'scroll') return;
   const pageEl = e.target.closest('.pe-page');
-  if (!pageEl || e.button > 0) return;
+  if (!pageEl || e.button > 0 || e.target.closest('.pe-photobar')) return;
   const p = pageById(pageEl.dataset.id);
   setCurrent(pageIndex(p.id));
   const pt = ptOf(e, pageEl);
@@ -1218,6 +1305,26 @@ function onPointerDown(e) {
   }
 
   const tool = S.tool;
+  if (tool === 'select' && e.pointerType === 'touch' && !handle && !(it && S.sel && S.sel.id === it.id)) {
+    startScroll(e, { page: p, it, start: pt, tap: true });
+    pageEl.setPointerCapture(e.pointerId);
+    return;
+  }
+  // a second finger on a photo being dragged: pinch to zoom it
+  if (drag && drag.kind === 'pan' && it === drag.it) {
+    e.preventDefault();
+    drag.pts.set(e.pointerId, pt); rebasePan(drag);
+    pageEl.setPointerCapture(e.pointerId);
+    return;
+  }
+  if (tool === 'select' && isPhoto(it) && !it.locked) {
+    e.preventDefault();
+    if (!(S.sel && S.sel.id === it.id)) select(p.id, it.id);
+    drag = { kind: 'pan', page: p, it, pts: new Map([[e.pointerId, pt]]), moved: false, pageEl };
+    rebasePan(drag);
+    pageEl.setPointerCapture(e.pointerId);
+    return;
+  }
   if (tool === 'select') {
     if (!it) { select(null, null); return; }
     e.preventDefault();
@@ -1282,7 +1389,44 @@ function onPointerDown(e) {
   drawRubber(drag);
 }
 
+function rebasePan(d) {
+  d.base = { pts: new Map(d.pts), fx: d.it.fx ?? 0.5, fy: d.it.fy ?? 0.5, fz: d.it.fz || 1 };
+}
+const twoDist = (m) => { const [a, b] = [...m.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
 function onPointerMove(e) {
+  if (drag && drag.kind === 'scroll') {
+    if (e.pointerId !== drag.pid) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!drag.moved && Math.hypot(dx, dy) < 6) return;
+    drag.moved = true;
+    const v = $('#peView');
+    v.scrollLeft = drag.sl - dx; v.scrollTop = drag.st - dy;
+    return;
+  }
+  if (drag && drag.kind === 'pan') {
+    if (!drag.pts.has(e.pointerId)) return;
+    const d = drag, it = d.it, a = S.assets.get(it.asset);
+    if (!a) return;
+    d.pts.set(e.pointerId, ptOf(e, d.pageEl));
+    const b = d.base;
+    if (d.pts.size >= 2) {
+      const d0 = twoDist(b.pts);
+      if (d0 > 2) {
+        if (!d.moved) { snapshot(); d.moved = true; }
+        zoomPhoto(d.page.id, it, b.fz * (twoDist(d.pts) / d0));
+      }
+      return;
+    }
+    const p0 = b.pts.get(e.pointerId), p1 = d.pts.get(e.pointerId);
+    const dx = p1.x - p0.x, dy = p1.y - p0.y;
+    if (!d.moved && Math.hypot(dx, dy) < 1.5) return;
+    if (!d.moved) { snapshot(); d.moved = true; }
+    const r = photoRect({ ...it, fz: b.fz }, a), ox = r.w - it.w, oy = r.h - it.h;
+    if (ox > 0.5) it.fx = clamp(b.fx - dx / ox, 0, 1);
+    if (oy > 0.5) it.fy = clamp(b.fy - dy / oy, 0, 1);
+    refreshPhoto(d.page.id, it);
+    return;
+  }
   if (!drag) {
     if (RUNS[S.tool]) {
       const pageEl = e.target.closest('.pe-page');
@@ -1435,13 +1579,33 @@ function drawRubber(d) {
   if (d.tool === 'ellipse') d.rub.style.borderRadius = '50%';
 }
 
-function onPointerUp() {
+function onPointerUp(e) {
   if (!drag) return;
+  if (drag.kind === 'scroll') {
+    if (e && e.pointerId !== undefined && e.pointerId !== drag.pid) return;
+    const d = drag; drag = null;
+    $('#peView').classList.remove('pe-grabbing');
+    if (d.tap && !d.moved) {
+      // a tap: select what is under the finger (a template's photo circle asks for a picture)
+      const slot = d.it ? photoSlotAt(d.page, d.start, d.it) : null;
+      if (slot) { select(d.page.id, slot.id); choosePhoto(d.page, slot); } else select(d.it ? d.page.id : null, d.it ? d.it.id : null);
+    }
+    return;
+  }
+  if (drag.kind === 'pan') {
+    if (e && e.pointerId !== undefined) drag.pts.delete(e.pointerId); else drag.pts.clear();
+    if (drag.pts.size) { rebasePan(drag); return; }
+    const d = drag; drag = null;
+    if (d.moved) { drawItems(pageIndex(d.page.id)); updateProps(); }
+    return;
+  }
   const d = drag; drag = null;
   const p = d.page, idx = pageIndex(p.id);
   if (d.kind === 'move' || d.kind === 'resize' || d.kind === 'rotate' || d.kind === 'tgrip') {
     showGuides(null);
+    const slot = !d.moved && d.kind === 'move' && S.tool === 'select' ? photoSlotAt(p, d.start, d.it) : null;
     if (d.moved) { drawItems(idx); updateProps(); updatePanel(); }
+    else if (slot) choosePhoto(p, slot);
     else if (d.kind === 'move' && d.it.type === 'text' && S.tool !== 'select') editText(p.id, d.it);
     else if (d.kind === 'move' && d.it.type === 'table' && d.rc) { S.cell = { id: d.it.id, ...d.rc }; markActiveCell(d.it); updateProps(); }
     return;
@@ -2720,10 +2884,10 @@ async function buildPdf(opts = {}) {
           }
           if (it.clip) {
             // cover the shape, cut away what sticks out, then the border on top
-            const s0 = Math.max(it.w / a.w, it.h / a.h), dw = a.w * s0, dh = a.h * s0;
+            const pr = photoRect(it, a);
             const bx = it.x, by = VH - it.y - it.h;
             page.pushOperators(pushGraphicsState(), ...shapePath(bx, by, it.w, it.h, it.clip, it.r), clip(), endPath());
-            page.drawImage(images.get(a.id), { x: bx + (it.w - dw) / 2, y: by + (it.h - dh) / 2, width: dw, height: dh, opacity: op });
+            page.drawImage(images.get(a.id), { x: bx + pr.x, y: VH - (it.y + pr.y) - pr.h, width: pr.w, height: pr.h, opacity: op });
             page.pushOperators(popGraphicsState());
             if (it.sw > 0) {
               const sw = it.sw;
@@ -3077,14 +3241,39 @@ function init() {
   bindGuides();
   bindTables();
   bindAuth();
+  // Space + drag, or the middle mouse button: move around the page
+  view.addEventListener('pointerdown', (e) => {
+    if (!(spaceDown || e.button === 1) || e.pointerType === 'touch') return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    startScroll(e);
+    view.setPointerCapture(e.pointerId);
+  }, true);
+  const typingNow = (e) => S.editing || S.cellEdit || /^(input|select|textarea|button)$/i.test(e.target.tagName) || e.target.isContentEditable;
+  document.addEventListener('keydown', (e) => {
+    if (e.code !== 'Space' || $('#peApp').hidden || typingNow(e)) return;
+    e.preventDefault();
+    if (!spaceDown) { spaceDown = true; view.classList.add('pe-grab'); }
+  });
+  document.addEventListener('keyup', (e) => { if (e.code === 'Space') { spaceDown = false; view.classList.remove('pe-grab'); } });
+  window.addEventListener('blur', () => { spaceDown = false; view.classList.remove('pe-grab'); });
   view.addEventListener('pointerdown', onPointerDown);
   view.addEventListener('pointermove', (e) => { onPointerMove(e); drawRulersSoon({ x: e.clientX, y: e.clientY }); });
   view.addEventListener('pointerleave', () => drawRulersSoon(null));
   view.addEventListener('contextmenu', openCtx);
   // Ctrl + mouse wheel (or a trackpad pinch) zooms
-  let wheelZoom = 0, wheelT = 0;
+  let wheelZoom = 0, wheelT = 0, wheelPhotoT = 0;
   view.addEventListener('wheel', (e) => {
-    if (!e.ctrlKey && !e.metaKey) return;
+    if (!e.ctrlKey && !e.metaKey) {
+      // the mouse wheel over a selected photo zooms the photo
+      const it = itemOf(S.sel), o = e.target.closest('.pe-obj');
+      if (isPhoto(it) && !it.locked && o && o.dataset.id === it.id) {
+        e.preventDefault();
+        if (!wheelPhotoT) snapshot();
+        clearTimeout(wheelPhotoT); wheelPhotoT = setTimeout(() => { wheelPhotoT = 0; }, 400);
+        zoomPhoto(S.sel.page, it, (it.fz || 1) * Math.exp(-e.deltaY * 0.0015));
+      }
+      return;
+    }
     e.preventDefault();
     wheelZoom = (wheelZoom || S.zoom) * Math.exp(-e.deltaY * 0.0025);
     $('#peZoom').textContent = `${Math.round(clamp(wheelZoom, 0.25, 4) * 100)}%`;

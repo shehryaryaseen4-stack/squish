@@ -536,10 +536,10 @@ body.is-editing .pe-app{height:auto;}
 .pe-landing section{margin-bottom:8px;}
 .pe-landing ol,.pe-landing ul{padding-left:22px;}
 .pe-landing li{margin:6px 0;}
-.pe-landing a,.pe-more a{color:var(--brand); font-weight:600;}
-.pe-more{margin-top:36px; padding:22px 24px; background:#fff; border:1px solid var(--border); border-radius:14px;}
-.pe-more h2{margin-top:0;}
-.pe-more h3{font-size:1rem; margin:16px 0 8px; color:var(--dim);}
+.pe-landing a,.pe-related a{color:var(--brand); font-weight:600;}
+.pe-related{margin-top:36px; padding:22px 24px; background:#fff; border:1px solid var(--border); border-radius:14px;}
+.pe-related h2{margin-top:0;}
+.pe-related h3{font-size:1rem; margin:16px 0 8px; color:var(--dim);}
 .pe-links{display:flex; flex-wrap:wrap; gap:8px; list-style:none; padding:0 !important; margin:0;}
 .pe-links li{margin:0;}
 .pe-links a{display:inline-block; padding:7px 14px; border:1px solid var(--border); border-radius:99px; background:var(--bg-soft, #F4F5F7); color:var(--ink); font-weight:600; text-decoration:none; font-size:.93rem;}
@@ -562,3 +562,23 @@ body.is-editing .pe-app{height:auto;}
 @media (max-width:860px){ .pe-choices-3{grid-template-columns:1fr;} }
 .pe-cols{columns:3 180px; column-gap:28px; padding-left:20px;}
 .pe-cols li{break-inside:avoid;}
+/* resume photo: zoom slider and "Change photo" under the selected photo */
+.pe-photobar{position:absolute; z-index:6; transform:translateX(-50%); display:flex; align-items:center; gap:6px; padding:6px 8px; background:#fff; border:1px solid #E2E4E8; border-radius:999px; box-shadow:0 6px 18px rgba(20,24,32,.18); white-space:nowrap; touch-action:auto;}
+.pe-photobar button{border:0; background:#F1F2F4; color:#23262D; font:inherit; font-size:.85rem; font-weight:700; height:28px; min-width:28px; padding:0 8px; border-radius:999px; cursor:pointer;}
+.pe-photobar button:hover{background:#E5322D; color:#fff;}
+.pe-photobar input[type=range]{width:110px; accent-color:#E5322D;}
+.pe-obj.pe-photo{cursor:grab;}
+/* Space + drag moves around the page */
+.pe-view.pe-grab, .pe-view.pe-grab *{cursor:grab !important;}
+.pe-view.pe-grabbing, .pe-view.pe-grabbing *{cursor:grabbing !important;}
+/* a zoomed page wider than the window can be scrolled to both edges (centring would cut off its left side) */
+.pe-view{align-items:flex-start;}
+.pe-view > *{margin-left:auto; margin-right:auto;}
+/* compact toolbar: a little taller than the icons */
+.pe-head{padding-top:6px; padding-bottom:6px;}
+.pe-tools{padding:3px; gap:1px; border-radius:12px;}
+@media (min-width:1181px){ .pe-tool{height:44px; min-width:56px; gap:2px; padding:3px 6px;} }
+.pe-tool{border-radius:9px;}
+.pe-tool svg{width:20px; height:20px;}
+.pe-tool-ind{top:3px; left:3px; height:calc(100% - 6px); border-radius:9px;}
+@media (max-width:1180px){ .pe-tool{height:38px; min-width:38px; padding:3px;} }
