@@ -435,6 +435,8 @@ function renderObjects(layer, p, z, live) {
         fontWeight: it.bold ? '700' : '400', fontStyle: it.italic ? 'italic' : 'normal',
         textDecoration: it.underline ? 'underline' : 'none', textAlign: it.align || 'left',
       });
+      // a text with a column width wraps inside it
+      if (it.wrap) { o.classList.add('pe-wrap'); o.style.width = `${it.wrap * z}px`; }
       if (!isStd(it.font)) ensureFont(it.font, it.bold, it.italic);
       if (live && S.editing === it.id) startEditing(o, it, true);
     } else {
@@ -987,6 +989,138 @@ function moveItem(it, dx, dy) {
   if (it.type === 'line' || it.type === 'arrow') { it.x1 += dx; it.x2 += dx; it.y1 += dy; it.y2 += dy; }
 }
 
+// ------------------------------------------------------------ flowing text --
+// Left-aligned text gets a column width (wrap, in points) when it is first edited, so longer
+// text breaks into lines inside its column instead of running off the page. While it grows or
+// shrinks, everything under it in the same column (headings, lines, other text) moves down or
+// up by the same amount, so the gaps stay the same. When editing ends, whatever no longer fits
+// on the page moves to the next page; a new page (with the same background) is added if needed.
+const itemLeft = (o) => (isLine(o) ? Math.min(o.x1, o.x2) : o.x);
+const itemRight = (o) => (isLine(o) ? Math.max(o.x1, o.x2) : o.x + o.w);
+const itemTop = (o) => (isLine(o) ? Math.min(o.y1, o.y2) : o.y);
+const itemBottom = (o) => (isLine(o) ? Math.max(o.y1, o.y2) : o.y + o.h);
+const isBackdrop = (o, W, H) => (o.type === 'rect' || o.type === 'ellipse' || o.type === 'image') && (o.h > H * 0.45 || (o.w > W * 0.9 && o.h > H * 0.2));
+function columnWidth(p, it) {
+  const [W, H] = viewSize(p);
+  const top = it.y, bot = it.y + it.h, right0 = it.x + it.w;
+  let limit = W - clamp(it.x, 24, 56); // same margin as on the left
+  for (const o of p.items) {
+    if (o === it || o.hidden) continue;
+    // a coloured column (sidebar) around the text: stay inside it, padded like on its left
+    if (o.type === 'rect' && o.fillOn && o.x <= it.x && o.x + o.w >= right0 && o.y <= top && o.y + o.h >= bot && o.w < W * 0.8) limit = Math.min(limit, o.x + o.w - (it.x - o.x));
+    // something on the same lines to its right (a date next to a job title)
+    else if (o.x >= right0 - 1 && o.y < bot && o.y + o.h > top && !isBackdrop(o, W, H)) limit = Math.min(limit, o.x - 10);
+    // the next column: left-aligned text further right, near these lines
+    else if (o.type === 'text' && o.ax == null && o.x > right0 + 24 && o.y < bot + 260 && o.y + o.h > top - 260) limit = Math.min(limit, o.x - 18);
+  }
+  // a line across this column (a section rule) marks its right edge
+  const rules = p.items.filter((o) => isLine(o) && !o.hidden && Math.abs(o.y1 - o.y2) < 1 && itemLeft(o) <= it.x + 4 && itemRight(o) > right0 && itemRight(o) <= limit + 40)
+    .sort((a, b) => Math.abs(a.y1 - top) - Math.abs(b.y1 - top));
+  if (rules.length) limit = Math.min(limit, itemRight(rules[0]));
+  return Math.max(it.w, limit - it.x);
+}
+function giveWrap(p, it) {
+  if (it.wrap || it.type !== 'text' || (it.align && it.align !== 'left') || it.rot) return;
+  it.wrap = round(columnWidth(p, it));
+  delete it.ax;
+}
+// Move everything below `bottom` in the text's column by dy; returns what moved.
+function flowBelow(p, it, bottom, dy) {
+  if (!dy) return [];
+  const [W, H] = viewSize(p);
+  const L = it.x, R = it.x + Math.max(it.w, it.wrap || 0);
+  const moved = [];
+  for (const o of p.items) {
+    if (o === it || o.hidden || o.locked || isBackdrop(o, W, H)) continue;
+    if (itemTop(o) < bottom - 1) continue;           // above or beside the text
+    if (itemLeft(o) >= R - 1 || itemRight(o) <= L + 1) continue; // another column
+    o.y += dy;
+    if (isLine(o)) { o.y1 += dy; o.y2 += dy; }
+    moved.push(o);
+  }
+  return moved;
+}
+// While typing: keep the things under the text the same distance below it.
+function flowWhileTyping(o, it) {
+  const p = S.pages.find((pg) => pg.items.includes(it));
+  if (!p || !it.wrap) return;
+  const h = o.offsetHeight / S.zoom, dy = h - it.h;
+  if (Math.abs(dy) < 0.5) return;
+  const layer = o.closest('.pe-layer');
+  for (const m of flowBelow(p, it, it.y + it.h, dy)) {
+    const el = layer && layer.querySelector(`.pe-obj[data-id="${m.id}"]`);
+    if (el) el.style.top = `${m.y * S.zoom}px`;
+    (S.flowed || (S.flowed = new Set())).add(m.id);
+  }
+}
+// Where the text in an element has to be cut so that it ends above `limit` (page points).
+function cutAt(o, limit) {
+  const walker = document.createTreeWalker(o, NodeFilter.SHOW_TEXT);
+  const pageTop = o.closest('.pe-page').getBoundingClientRect().top;
+  const r = document.createRange();
+  let off = 0, node;
+  while ((node = walker.nextNode())) {
+    for (let i = 0; i < node.length; i++) {
+      r.setStart(node, i); r.setEnd(node, i + 1);
+      const b = r.getBoundingClientRect();
+      if (b.height && (b.bottom - pageTop) / S.zoom > limit) return off + i;
+    }
+    off += node.length;
+  }
+  return -1;
+}
+// After editing: move what runs past the bottom of the page to the next page.
+function spillOver(p, it, el) {
+  const [W, H] = viewSize(p);
+  const limit = H - 28, topM = 36;
+  const flowed = S.flowed || new Set();
+  S.flowed = null;
+  const out = [];
+  // the edited text itself: split it at the last line that fits
+  if (it && it.wrap && it.y + it.h > limit && el) {
+    if (it.y >= limit - it.size * LINE) out.push(it);
+    else {
+      let cut = cutAt(el, limit);
+      const full = it.text;
+      if (cut > 0 && cut < full.length) {
+        const ws = Math.max(full.lastIndexOf('\n', cut), full.lastIndexOf(' ', cut));
+        if (ws > 0) cut = ws;
+        const rest = full.slice(cut).replace(/^\s+/, '');
+        it.text = full.slice(0, cut).replace(/\s+$/, '');
+        it.h = Math.max(it.size * LINE, (limit - it.y));
+        if (rest) out.push({ ...JSON.parse(JSON.stringify(it)), id: uid(), text: rest, y: it.y + it.h });
+      }
+    }
+  }
+  for (const o of p.items) if (o !== it && flowed.has(o.id) && itemBottom(o) > limit) out.push(o);
+  if (!out.length) return;
+  // the next page made for overflow, or a new one with this page's background
+  const i = pageIndex(p.id);
+  let next = S.pages[i + 1];
+  if (!next || next.flowFrom !== p.id) {
+    next = blankPage(W, H);
+    next.flowFrom = p.id;
+    next.items = p.items.filter((o) => !o.hidden && isBackdrop(o, W, H)).map((o) => ({ ...JSON.parse(JSON.stringify(o)), id: uid() }));
+    S.pages.splice(i + 1, 0, next);
+  }
+  const startY = Math.min(...out.map(itemTop));
+  // below what is already on that page in these columns
+  const L = Math.min(...out.map(itemLeft)), R = Math.max(...out.map(itemRight));
+  const there = next.items.filter((o) => !isBackdrop(o, W, H) && itemLeft(o) < R && itemRight(o) > L);
+  const at = there.length ? Math.max(...there.map(itemBottom)) + 14 : topM;
+  const dy = at - startY;
+  p.items = p.items.filter((o) => !out.includes(o));
+  for (const o of out) {
+    o.y += dy;
+    if (isLine(o)) { o.y1 += dy; o.y2 += dy; }
+    next.items.push(o);
+  }
+  // still too long: carry on to the page after
+  const more = next.items.filter((o) => !isBackdrop(o, W, H) && itemBottom(o) > limit && out.includes(o));
+  if (more.length && next.items.length < 400) { S.flowed = new Set(more.map((o) => o.id)); spillOver(next, null, null); }
+  return true;
+}
+
 // ------------------------------------------------------------ text editing --
 function startEditing(o, it, keepCaret) {
   S.editing = it.id;
@@ -1000,6 +1134,7 @@ function startEditing(o, it, keepCaret) {
   }
   o.oninput = () => {
     it.text = o.innerText.replace(/\n$/, '');
+    flowWhileTyping(o, it);
     it.w = o.offsetWidth / S.zoom; it.h = o.offsetHeight / S.zoom;
   };
   o.onblur = () => setTimeout(() => { if (S.editing === it.id && document.activeElement !== o) finishEditing(); }, 0);
@@ -1009,7 +1144,11 @@ function startEditing(o, it, keepCaret) {
 function editText(pageId, it) {
   const o = $(`.pe-page[data-id="${pageId}"] .pe-obj[data-id="${it.id}"]`);
   if (!o) return;
-  if (S.editing !== it.id) { snapshot(); S.sel = { page: pageId, id: it.id }; }
+  if (S.editing !== it.id) {
+    snapshot(); S.sel = { page: pageId, id: it.id };
+    const p = pageById(pageId);
+    if (p && !it.wrap) { giveWrap(p, it); if (it.wrap) { o.classList.add('pe-wrap'); o.style.width = `${it.wrap * S.zoom}px`; o.style.left = `${it.x * S.zoom}px`; it.w = it.wrap; } }
+  }
   $$('.pe-handle').forEach((e) => e.remove()); o.classList.remove('pe-sel');
   startEditing(o, it);
   updateProps();
@@ -1032,7 +1171,12 @@ function finishEditing() {
       p.items = p.items.filter((i) => i !== it);
       if (S.sel && S.sel.id === id) S.sel = null;
     }
-    drawItems(pageIndex(p.id));
+    const el = $(`.pe-page[data-id="${p.id}"] .pe-obj[data-id="${it.id}"]`);
+    if (spillOver(p, p.items.includes(it) ? it : null, el)) {
+      if (S.sel && !p.items.some((x) => x.id === S.sel.id)) S.sel = null;
+      rebuild();
+      toast('The text no longer fitted on the page, so the rest moved to the next page.');
+    } else drawItems(pageIndex(p.id));
     break;
   }
   updateProps();
@@ -1328,8 +1472,9 @@ function onPointerDown(e) {
   if (tool === 'select') {
     if (!it) { select(null, null); return; }
     e.preventDefault();
-    if (!(S.sel && S.sel.id === it.id)) select(p.id, it.id);
-    drag = { kind: 'move', page: p, it, start: pt, orig: { x: it.x, y: it.y }, moved: false, pageEl, rc };
+    const was = !!(S.sel && S.sel.id === it.id);
+    if (!was) select(p.id, it.id);
+    drag = { kind: 'move', page: p, it, start: pt, orig: { x: it.x, y: it.y }, moved: false, pageEl, rc, was };
     pageEl.setPointerCapture(e.pointerId);
     return;
   }
@@ -1519,7 +1664,7 @@ function onPointerMove(e) {
       if (w < 4 || h < 4) return;
       const mx = (L + R) / 2, my = (T + B) / 2;
       const cx = o.x + o.w / 2 + mx * cs - my * sn, cy = o.y + o.h / 2 + mx * sn + my * cs;
-      if (it.type === 'text') it.size = clamp(Math.round(o.size * (w / o.w) * 10) / 10, 4, 400);
+      if (it.type === 'text') { it.size = clamp(Math.round(o.size * (w / o.w) * 10) / 10, 4, 400); if (o.wrap) it.wrap = o.wrap * (w / o.w); }
       Object.assign(it, { x: cx - w / 2, y: cy - h / 2, w, h });
       if (it.type === 'table') { it.rh = o.rh.map((rh) => Math.max(minRowH(it), round(rh * (h / o.h)))); it.rmin = it.rh.slice(); fixTable(it); }
     }
@@ -1579,7 +1724,9 @@ function drawRubber(d) {
   if (d.tool === 'ellipse') d.rub.style.borderRadius = '50%';
 }
 
+let lastTextClick = null;
 function onPointerUp(e) {
+  if (drag && drag.kind === 'move' && !drag.moved && drag.it.type === 'text') lastTextClick = { id: drag.it.id, t: performance.now() };
   if (!drag) return;
   if (drag.kind === 'scroll') {
     if (e && e.pointerId !== undefined && e.pointerId !== drag.pid) return;
@@ -1606,6 +1753,9 @@ function onPointerUp(e) {
     const slot = !d.moved && d.kind === 'move' && S.tool === 'select' ? photoSlotAt(p, d.start, d.it) : null;
     if (d.moved) { drawItems(idx); updateProps(); updatePanel(); }
     else if (slot) choosePhoto(p, slot);
+    // a second click on a text (or a double click): type in it. The browser's own dblclick
+    // event goes to the page, not the text, because the page captures the pointer.
+    else if (d.kind === 'move' && d.it.type === 'text' && S.tool === 'select' && (d.was || (lastTextClick && lastTextClick.id === d.it.id && performance.now() - lastTextClick.t < 450))) { lastTextClick = null; editText(p.id, d.it); }
     else if (d.kind === 'move' && d.it.type === 'text' && S.tool !== 'select') editText(p.id, d.it);
     else if (d.kind === 'move' && d.it.type === 'table' && d.rc) { S.cell = { id: d.it.id, ...d.rc }; markActiveCell(d.it); updateProps(); }
     return;
@@ -2815,7 +2965,8 @@ async function buildPdf(opts = {}) {
       }
       if (it.type === 'text') {
         const fo = await font(it.font, it.bold, it.italic);
-        const lines = it.text.split('\n');
+        let lines = it.text.split('\n');
+        if (it.wrap) { const w = []; for (const para of lines) w.push(...await wrapText(page, fo, para, it.size, it.wrap + 0.5, textLine)); lines = w; }
         for (let i = 0; i < lines.length; i++) {
           if (!lines[i]) continue;
           const ln = await textLine(page, fo, lines[i], it.size);
