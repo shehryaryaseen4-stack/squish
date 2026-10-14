@@ -1,6 +1,10 @@
 <div class="pe" id="pe">
   <!-- Start screen: open a PDF or start a blank one. -->
   <section class="pe-start" id="peStart">
+    <div class="pe-recent" id="peRecent" hidden>
+      <div class="pe-recent-head"><h2>Continue where you left off</h2><p>Your designs are saved in this browser as you work.</p></div>
+      <div class="pe-recent-list" data-projects="start"></div>
+    </div>
     <div class="pe-start-inner">
       <p class="pe-kicker">Free PDF editor</p>
       <h1>Edit PDF</h1>
@@ -106,7 +110,22 @@
     </header>
 
     <div class="pe-body">
-      <aside class="pe-side" aria-label="Pages">
+      <aside class="pe-side" aria-label="Pages, uploads and projects">
+        <div class="pe-side-tabs" role="tablist">
+          <button type="button" role="tab" data-side="pages" aria-selected="true"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6"/></svg>Pages</button>
+          <button type="button" role="tab" data-side="uploads" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3M8 8l4-4 4 4M12 4v12"/></svg>Uploads</button>
+          <button type="button" role="tab" data-side="projects" aria-selected="false"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Projects</button>
+        </div>
+        <div class="pe-side-pane" data-pane="uploads" hidden>
+          <button type="button" class="btn btn-brand btn-sm pe-upload-btn" data-act="uploadfiles"><svg viewBox="0 0 24 24"><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3M8 8l4-4 4 4M12 4v12"/></svg>Upload files</button>
+          <input type="file" id="peUploadInput" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
+          <p class="pe-side-note">Click a picture to add it. With a photo circle selected, it goes into the circle.</p>
+          <div class="pe-uploads" id="peUploads"></div>
+        </div>
+        <div class="pe-side-pane" data-pane="projects" hidden>
+          <p class="pe-side-note">Saved automatically in this browser. Click one to open it.</p>
+          <div class="pe-recent-list pe-recent-side" data-projects="side"></div>
+        </div>
         <ol class="pe-thumbs" id="peThumbs"></ol>
         <div class="pe-side-add">
           <button type="button" class="pe-add" data-act="addpage"><svg viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg>Blank page</button>

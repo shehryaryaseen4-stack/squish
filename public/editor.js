@@ -205,6 +205,7 @@ function snapshot() {
   S.undo.push(JSON.stringify(S.pages));
   if (S.undo.length > 100) S.undo.shift();
   S.redo = []; S.dirty = true; updateUndo();
+  scheduleSave();
 }
 function restore(json) {
   const before = structureKey();
@@ -273,21 +274,41 @@ async function openFile(file) {
 // original PDFs its pages came from). Opening that PDF here again brings back every text box,
 // list, photo and shape as it was, instead of flat PDF lines.
 const PROJECT_FILE = 'flipit-project.json';
+// The whole editable document: pages and their objects, the pictures used, and the original
+// PDFs behind the pages (null when those are too big to carry along).
+function projectPayload() {
+  const docIds = [...new Set(S.pages.filter((p) => p.src).map((p) => p.src.doc))];
+  const srcBytes = docIds.reduce((n, id) => n + ((S.docs.get(id) || {}).bytes || []).length, 0);
+  if (srcBytes > 25 * 1024 * 1024 || docIds.some((id) => !S.docs.get(id) || !S.docs.get(id).bytes)) return null;
+  const used = new Set(S.pages.flatMap((p) => p.items.filter((i) => i.type === 'image').map((i) => i.asset)));
+  const proj = {
+    app: 'flipitfree', v: 1, title: $('#peDocName').textContent, name: $('#peFileName').value,
+    pages: S.pages.map((p) => ({ ...p, src: p.src ? { doc: docIds.indexOf(p.src.doc), index: p.src.index } : null })),
+    assets: [...used].map((id) => S.assets.get(id)).filter(Boolean),
+  };
+  return { proj, sources: docIds.map((id) => S.docs.get(id).bytes) };
+}
 function attachProject(out) {
   try {
-    const docIds = [...new Set(S.pages.filter((p) => p.src).map((p) => p.src.doc))];
-    const srcBytes = docIds.reduce((n, id) => n + ((S.docs.get(id) || {}).bytes || []).length, 0);
-    if (srcBytes > 25 * 1024 * 1024 || docIds.some((id) => !S.docs.get(id) || !S.docs.get(id).bytes)) return;
-    const used = new Set(S.pages.flatMap((p) => p.items.filter((i) => i.type === 'image').map((i) => i.asset)));
-    const proj = {
-      app: 'flipitfree', v: 1, title: $('#peDocName').textContent, name: $('#peFileName').value,
-      pages: S.pages.map((p) => ({ ...p, src: p.src ? { doc: docIds.indexOf(p.src.doc), index: p.src.index } : null })),
-      assets: [...used].map((id) => S.assets.get(id)).filter(Boolean),
-    };
+    const pl = projectPayload();
+    if (!pl) return;
     const opt = { mimeType: 'application/json', description: 'Editable copy of this document. Open this PDF at flipitfree.com/edit-pdf to keep editing it.' };
-    out.attach(new TextEncoder().encode(JSON.stringify(proj)), PROJECT_FILE, opt);
-    docIds.forEach((id, i) => out.attach(S.docs.get(id).bytes, `flipit-source-${i}.pdf`, { mimeType: 'application/pdf', description: 'Original pages, for editing again at flipitfree.com' }));
+    out.attach(new TextEncoder().encode(JSON.stringify(pl.proj)), PROJECT_FILE, opt);
+    pl.sources.forEach((b, i) => out.attach(b, `flipit-source-${i}.pdf`, { mimeType: 'application/pdf', description: 'Original pages, for editing again at flipitfree.com' }));
   } catch (e) { console.warn('Could not attach the editable project', e); }
+}
+// Open a saved project (from a PDF's attachment or from this browser's saved designs).
+async function applyProject(proj, sources, fileName) {
+  const docMap = [];
+  for (let i = 0; i < sources.length; i++) {
+    const pages = await addPdf(new Uint8Array(sources[i]));
+    docMap[i] = pages.length ? pages[0].src.doc : null;
+  }
+  if (proj.pages.some((p) => p.src && !docMap[p.src.doc])) return false;
+  for (const a of proj.assets || []) if (a && a.id && a.url) S.assets.set(a.id, a);
+  const pages = proj.pages.map((p) => ({ ...p, src: p.src ? { doc: docMap[p.src.doc], index: p.src.index } : null }));
+  resetDoc(pages, proj.name || fileName, proj.title || fileName);
+  return true;
 }
 async function openProject(bytes, fileName) {
   let proxy;
@@ -302,15 +323,9 @@ async function openProject(bytes, fileName) {
     const proj = JSON.parse(new TextDecoder().decode(await bytesOf(PROJECT_FILE)));
     if (!proj || proj.app !== 'flipitfree' || !Array.isArray(proj.pages)) return false;
     // the original PDFs behind the pages
-    const docMap = [];
-    for (let i = 0; has(`flipit-source-${i}.pdf`); i++) {
-      const pages = await addPdf(new Uint8Array(await bytesOf(`flipit-source-${i}.pdf`)));
-      docMap[i] = pages.length ? pages[0].src.doc : null;
-    }
-    if (proj.pages.some((p) => p.src && !docMap[p.src.doc])) return false;
-    for (const a of proj.assets || []) if (a && a.id && a.url) S.assets.set(a.id, a);
-    const pages = proj.pages.map((p) => ({ ...p, src: p.src ? { doc: docMap[p.src.doc], index: p.src.index } : null }));
-    resetDoc(pages, proj.name || fileName, proj.title || fileName);
+    const sources = [];
+    for (let i = 0; has(`flipit-source-${i}.pdf`); i++) sources.push(await bytesOf(`flipit-source-${i}.pdf`));
+    if (!(await applyProject(proj, sources, fileName))) return false;
     toast('Opened with everything editable again: text boxes, lists, photos and shapes, just as you left them.');
     return true;
   } catch (e) {
@@ -329,6 +344,7 @@ function createNew() {
 function resetDoc(pages, name, title) {
   S.docs.forEach((d, id) => { if (!pages.some((p) => p.src && p.src.doc === id)) { closePdf(d.proxy); S.docs.delete(id); } });
   S.pages = pages; S.undo = []; S.redo = []; S.sel = null; S.editing = null; S.current = 0; S.dirty = false; S.runs.clear();
+  S.projectId = null; // a new design gets its place in "Projects" with its first change
   $('#peFileName').value = name;
   $('#peDocName').textContent = title || name;
   $('#peStart').hidden = true; $('#peApp').hidden = false;
@@ -1574,6 +1590,175 @@ function readText(el, keepEnd) {
   return keepEnd ? out : out.replace(/\n$/, '');
 }
 
+
+// ------------------------------------------------------ saved in this browser --
+// Uploads (pictures added before, ready to use again) and Projects (every design, saved
+// automatically as you work) live in this browser's IndexedDB: no account or server needed.
+let dbp = null;
+function db() {
+  if (!dbp) {
+    dbp = new Promise((res, rej) => {
+      try {
+        const r = indexedDB.open('flipit-editor', 1);
+        r.onupgradeneeded = () => { const d = r.result; for (const st of ['uploads', 'projects']) if (!d.objectStoreNames.contains(st)) d.createObjectStore(st, { keyPath: 'id' }); };
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+      } catch (e) { rej(e); }
+    });
+  }
+  return dbp;
+}
+async function dbDo(store, mode, fn) {
+  const d = await db();
+  return new Promise((res, rej) => {
+    const tx = d.transaction(store, mode);
+    const req = fn(tx.objectStore(store));
+    tx.oncomplete = () => res(req && req.result);
+    tx.onerror = () => rej(tx.error);
+  });
+}
+const dbAll = (st) => dbDo(st, 'readonly', (o) => o.getAll()).catch(() => []);
+const dbPut = (st, v) => dbDo(st, 'readwrite', (o) => o.put(v)).catch((e) => console.warn('Could not save', e));
+const dbDel = (st, id) => dbDo(st, 'readwrite', (o) => o.delete(id)).catch(() => {});
+function hashStr(str) {
+  let h = 0;
+  const step = Math.max(1, Math.floor(str.length / 4000));
+  for (let i = 0; i < str.length; i += step) h = (h * 31 + str.charCodeAt(i)) | 0;
+  return `${str.length}-${h >>> 0}`;
+}
+const ago = (t) => {
+  const m = Math.round((Date.now() - t) / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h} hour${h > 1 ? 's' : ''} ago`;
+  return new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+};
+
+// Uploads ----------------------------------------------------------------------
+async function saveUpload(a, name) {
+  await dbPut('uploads', { id: hashStr(a.url), url: a.url, mime: a.mime, w: a.w, h: a.h, name, t: Date.now() });
+  const pane = $('[data-pane="uploads"]');
+  if (pane && !pane.hidden) renderUploads();
+}
+async function renderUploads() {
+  const box = $('#peUploads');
+  if (!box) return;
+  const list = (await dbAll('uploads')).sort((a, b) => b.t - a.t);
+  box.textContent = '';
+  if (!list.length) { box.innerHTML = '<p class="pe-side-empty">Pictures you upload appear here, ready to use again in any design.</p>'; return; }
+  for (const u of list) {
+    const el = document.createElement('div');
+    el.className = 'pe-upload';
+    el.innerHTML = '<button type="button" class="pe-upload-use" title="Add to the page"><img alt=""></button><button type="button" class="pe-upload-del" title="Remove from uploads" aria-label="Remove from uploads">&times;</button>';
+    el.querySelector('img').src = u.url;
+    el.querySelector('.pe-upload-use').addEventListener('click', () => useUpload(u));
+    el.querySelector('.pe-upload-del').addEventListener('click', async () => { await dbDel('uploads', u.id); renderUploads(); });
+    box.append(el);
+  }
+}
+async function useUpload(u) {
+  let a;
+  try { a = await addAsset(u.url); } catch (e) { toast(e.message, true); return; }
+  const it = itemOf(S.sel);
+  // a selected photo circle or picture takes it; otherwise it is placed on the page
+  if (it && it.photo && it.type === 'ellipse') applyPick({ mode: 'photo', page: S.sel.page, id: it.id }, a);
+  else if (it && it.type === 'image') applyPick({ mode: 'item', sel: { ...S.sel } }, a);
+  else placeAsset(a, viewSize(S.pages[S.current])[0] * 0.6);
+}
+
+// Projects ---------------------------------------------------------------------
+let saveT = 0;
+function scheduleSave() { S.unsaved = true; clearTimeout(saveT); saveT = setTimeout(saveProject, 1500); }
+async function miniThumb(p) {
+  const [vw, vh] = viewSize(p);
+  const W = 150, k = W / vw;
+  const c = document.createElement('canvas'); c.width = W; c.height = Math.round(vh * k);
+  const x = c.getContext('2d');
+  x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+  const pc = p.src && $(`.pe-page[data-id="${p.id}"] canvas`);
+  if (pc && pc.width > 4) x.drawImage(pc, 0, 0, c.width, c.height);
+  for (const it of p.items) {
+    if (it.hidden) continue;
+    x.globalAlpha = (it.opacity ?? 100) / 100;
+    if (it.type === 'rect' || it.type === 'whiteout') { if (it.fillOn || it.type === 'whiteout') { x.fillStyle = it.type === 'whiteout' ? it.color : it.fill; x.fillRect(it.x * k, it.y * k, it.w * k, it.h * k); } }
+    else if (it.type === 'ellipse') { x.beginPath(); x.ellipse((it.x + it.w / 2) * k, (it.y + it.h / 2) * k, it.w * k / 2, it.h * k / 2, 0, 0, Math.PI * 2); if (it.fillOn) { x.fillStyle = it.fill; x.fill(); } else { x.strokeStyle = it.color; x.stroke(); } }
+    else if (isLine(it)) { x.strokeStyle = it.color; x.lineWidth = Math.max(0.5, (it.width || 1) * k); x.beginPath(); x.moveTo(it.x1 * k, it.y1 * k); x.lineTo(it.x2 * k, it.y2 * k); x.stroke(); }
+    else if (it.type === 'text') {
+      x.fillStyle = it.color; x.font = `${it.italic ? 'italic ' : ''}${it.bold ? '700 ' : ''}${Math.max(1, it.size * k)}px ${cssFamily(it.font)}`; x.textBaseline = 'top';
+      (it.caps ? it.text.toUpperCase() : it.text).split('\n').forEach((l, i) => x.fillText(l, it.x * k, (it.y + i * it.size * (it.lh || LINE)) * k, (it.wrap || 1e4) * k));
+    } else if (it.type === 'image') {
+      const a = S.assets.get(it.asset);
+      if (a) {
+        try {
+          const im = await loadImg(a.url);
+          x.save(); if (it.clip === 'ellipse') { x.beginPath(); x.ellipse((it.x + it.w / 2) * k, (it.y + it.h / 2) * k, it.w * k / 2, it.h * k / 2, 0, 0, Math.PI * 2); x.clip(); }
+          const r = it.clip ? photoRect(it, a) : { x: 0, y: 0, w: it.w, h: it.h };
+          x.drawImage(im, (it.x + r.x) * k, (it.y + r.y) * k, r.w * k, r.h * k); x.restore();
+        } catch { /* skip the picture */ }
+      }
+    }
+  }
+  x.globalAlpha = 1;
+  return c.toDataURL('image/jpeg', 0.75);
+}
+async function saveProject() {
+  if (!S.unsaved || $('#peApp').hidden || !S.pages.length || !S.pages.some((p) => p.src || p.items.length)) return;
+  const pl = projectPayload();
+  if (!pl) return;
+  S.unsaved = false;
+  if (!S.projectId) S.projectId = uid();
+  let thumb = '';
+  try { thumb = await miniThumb(S.pages[0]); } catch { /* no preview */ }
+  await dbPut('projects', { id: S.projectId, title: pl.proj.title || 'Untitled design', updated: Date.now(), pages: S.pages.length, thumb, proj: pl.proj, sources: pl.sources.map((b) => b.slice()) });
+  const all = await dbAll('projects');
+  if (all.length > 30) for (const r of all.sort((a, b) => b.updated - a.updated).slice(30)) await dbDel('projects', r.id);
+  const pane = $('[data-pane="projects"]');
+  if (pane && !pane.hidden) renderProjects();
+}
+async function renderProjects() {
+  const list = (await dbAll('projects')).sort((a, b) => b.updated - a.updated);
+  $('#peRecent').hidden = !list.length;
+  for (const box of $$('[data-projects]')) {
+    box.textContent = '';
+    if (!list.length) { box.innerHTML = '<p class="pe-side-empty">Designs you make are saved here automatically.</p>'; continue; }
+    for (const r of list.slice(0, box.dataset.projects === 'start' ? 8 : 30)) {
+      const el = document.createElement('div');
+      el.className = `pe-proj${r.id === S.projectId && !$('#peApp').hidden ? ' current' : ''}`;
+      el.innerHTML = '<button type="button" class="pe-proj-open"><span class="pe-proj-thumb"><img alt=""></span><strong></strong><span></span></button><button type="button" class="pe-proj-del" title="Delete this design" aria-label="Delete this design">&times;</button>';
+      if (r.thumb) el.querySelector('img').src = r.thumb;
+      el.querySelector('strong').textContent = r.title;
+      el.querySelector('.pe-proj-open > span:last-child').textContent = `${r.pages} page${r.pages > 1 ? 's' : ''} · ${ago(r.updated)}`;
+      el.querySelector('.pe-proj-open').addEventListener('click', () => openSaved(r));
+      el.querySelector('.pe-proj-del').addEventListener('click', async () => {
+        if (!window.confirm(`Delete "${r.title}" from this browser?`)) return;
+        await dbDel('projects', r.id);
+        if (S.projectId === r.id) S.projectId = null;
+        renderProjects();
+      });
+      box.append(el);
+    }
+  }
+}
+async function openSaved(r) {
+  if (S.projectId === r.id && !$('#peApp').hidden) return;
+  if (S.unsaved) await saveProject();
+  busy(true, 'Opening your design…');
+  try {
+    finishEditing();
+    if (await applyProject(r.proj, r.sources || [], r.title)) { S.projectId = r.id; toast(`Opened "${r.title}".`); renderProjects(); }
+    else toast('This design could not be opened.', true);
+  } catch (e) { toast(e.message || 'This design could not be opened.', true); } finally { busy(false); }
+}
+function showSide(tab) {
+  const side = $('.pe-side');
+  side.dataset.tab = tab;
+  $$('[data-side]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.side === tab)));
+  $$('.pe-side-pane').forEach((pn) => { pn.hidden = pn.dataset.pane !== tab; });
+  if (tab === 'uploads') renderUploads();
+  if (tab === 'projects') renderProjects();
+}
+
 // ------------------------------------------------------------ text editing --
 function startEditing(o, it, keepCaret) {
   S.editing = it.id;
@@ -1586,6 +1771,7 @@ function startEditing(o, it, keepCaret) {
     const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
   }
   o.oninput = () => {
+    scheduleSave();
     it.text = readText(o);
     flowWhileTyping(o, it);
     it.w = o.offsetWidth / S.zoom; it.h = o.offsetHeight / S.zoom;
@@ -1823,6 +2009,9 @@ async function replaceWith(file) {
   if (!isImage(file)) { toast('Please choose a PNG, JPG, WebP or GIF image.', true); return; }
   let a;
   try { a = await addAsset(file); } catch (e) { toast(e.message, true); return; }
+  applyPick(pick, a);
+}
+function applyPick(pick, a) {
   if (pick.mode === 'pdf') {
     const p = pageById(pick.target.page);
     if (!p) return;
@@ -3408,6 +3597,7 @@ async function addAsset(fileOrUrl) {
   }
   const a = { id: uid(), url, mime, w: img.naturalWidth, h: img.naturalHeight };
   S.assets.set(a.id, a);
+  if (typeof fileOrUrl !== 'string') saveUpload(a, fileOrUrl.name || 'image');
   return a;
 }
 function placeAsset(a, maxW) {
@@ -4122,6 +4312,7 @@ function init() {
     image: () => { imagePick = null; $('#peImageInput').click(); },
     replaceimg: () => { if (itemOf(S.sel)) { imagePick = { mode: 'item', sel: { ...S.sel } }; $('#peImageInput').click(); } },
     elements: () => openElements($('[data-act="elements"]')),
+    uploadfiles: () => $('#peUploadInput').click(),
     filemenu: () => $('#peFileMenu').classList.toggle('open'),
     pages: () => $('.pe-body').classList.toggle(window.matchMedia('(max-width:860px)').matches ? 'show-pages' : 'no-pages'),
     imgpage: () => $('#peImgPageInput').click(),
@@ -4143,6 +4334,16 @@ function init() {
   };
   $$('[data-act]').forEach((b) => b.addEventListener('click', () => { const f = acts[b.dataset.act]; if (f) f(); }));
   $('#peElements').addEventListener('click', (e) => { const b = e.target.closest('[data-el]'); if (b) addElement(b.dataset.el); });
+  $$('[data-side]').forEach((b) => b.addEventListener('click', () => showSide(b.dataset.side)));
+  $('#peUploadInput').addEventListener('change', async (e) => {
+    const files = [...e.target.files].filter(isImage);
+    e.target.value = '';
+    for (const f of files) { try { await addAsset(f); } catch (err) { toast(err.message, true); } }
+    renderUploads();
+    if (files.length) toast(`${files.length} picture${files.length > 1 ? 's' : ''} uploaded. Click one to add it to the page.`);
+  });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) saveProject(); });
+  renderProjects();
   document.addEventListener('pointerdown', (e) => { if (!e.target.closest('#peElements, [data-act="elements"]')) closeElements(); });
   $('#peExportOk').addEventListener('click', doExport);
   $('#peNumbers').addEventListener('change', () => { $('#peNumbersOpts').hidden = !$('#peNumbers').checked; });
