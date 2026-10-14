@@ -2334,7 +2334,19 @@ async function editRunAt(p, pt, { edit = true } = {}) {
 function groupAt(p, pt) {
   const runs = S.runs.get(`groups:${runKey('edittext', p)}`) || [];
   return runs.filter((r) => pt.x >= r.x - 1 && pt.x <= r.x + r.w + 1 && pt.y >= r.top - 1 && pt.y <= r.top + r.h + 1)
+    .filter((r) => !retyped(p, r))
     .sort((a, b) => a.w * a.h - b.w * b.h)[0] || null;
+}
+// a paragraph of the PDF that was already picked up (its lines are under white covers): the
+// text box made from it is what gets the hover and the clicks, not the old paragraph
+function retyped(p, r) {
+  let covered = 0;
+  for (const o of p.items) {
+    if (o.type !== 'whiteout') continue;
+    const w = Math.min(o.x + o.w, r.x + r.w) - Math.max(o.x, r.x), h = Math.min(o.y + o.h, r.top + r.h) - Math.max(o.y, r.top);
+    if (w > 0 && h > 0) covered += w * h;
+  }
+  return covered > r.w * r.h * 0.5;
 }
 // On an opened PDF, white boxes (whiteouts, and the covers left where things were picked up)
 // let clicks through to what is under them; they are still in the Layers list.
