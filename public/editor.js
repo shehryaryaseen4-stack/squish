@@ -106,7 +106,7 @@ function catalogMatch(name) {
 
 const SHAPES = new Set(['rect', 'ellipse', 'line', 'arrow', 'check', 'cross']);
 const HINTS = {
-  select: 'Click to select, Shift+click or drag a box over empty space to select several. Drag to move, use the handles to resize. Space+drag moves around the page.',
+  select: 'Click any text to type in it (the PDF's own text too). Click to select, Shift+click or drag a box over empty space to select several. Drag to move, use the handles to resize. Space+drag moves around the page.',
   edittext: 'Click on any text in the PDF to change it.',
   editimage: 'Click on an image in the PDF to replace, move or remove it.',
   text: 'Click anywhere on a page to add text.',
@@ -2161,6 +2161,49 @@ async function editRunAt(p, pt) {
   if (lines.length > 1) toast(`Editing the whole paragraph (${lines.length} lines). Lines wrap inside the box; drag its sides to change the width.`);
 }
 
+// ------------------------------------------------------------ hover --
+// In Select, whatever is under the pointer gets a thin outline (an object, or a paragraph of the
+// PDF's own text), so it is clear what a click picks up: one click on text starts typing.
+function groupAt(p, pt) {
+  const runs = S.runs.get(`groups:${runKey('edittext', p)}`) || [];
+  return runs.filter((r) => pt.x >= r.x - 1 && pt.x <= r.x + r.w + 1 && pt.y >= r.top - 1 && pt.y <= r.top + r.h + 1)
+    .sort((a, b) => a.w * a.h - b.w * b.h)[0] || null;
+}
+function hoverOff() {
+  $$('.pe-hover').forEach((o) => o.classList.remove('pe-hover'));
+  $$('.pe-hoverbox').forEach((o) => o.remove());
+}
+function hoverAt(e) {
+  const pageEl = e.target.closest && e.target.closest('.pe-page');
+  const objEl = e.target.closest && e.target.closest('.pe-obj');
+  const p = pageEl && pageById(pageEl.dataset.id);
+  const it = p && objEl ? p.items.find((i) => i.id === objEl.dataset.id) : null;
+  const ok = it && !it.cover && !it.hidden && S.editing !== it.id && !(S.sel && S.sel.id === it.id) && !(S.group && S.group.has(it.id));
+  const cur = $('.pe-obj.pe-hover');
+  if (ok && cur === objEl) return;
+  hoverOff();
+  if (ok) { objEl.classList.add('pe-hover'); return; }
+  if (!p || !p.src || it) return;
+  const key = `groups:${runKey('edittext', p)}`;
+  if (!S.runs.has(key)) { textGroups(p); return; } // read once, outlined from the next move on
+  const g = groupAt(p, ptOf(e, pageEl));
+  if (!g) return;
+  const z = S.zoom, b = document.createElement('div');
+  b.className = 'pe-hoverbox';
+  Object.assign(b.style, { left: `${(g.x - 2) * z}px`, top: `${(g.top - 2) * z}px`, width: `${(g.w + 4) * z}px`, height: `${(g.h + 4) * z}px` });
+  pageEl.querySelector('.pe-layer').append(b);
+}
+// put the caret where the text was clicked (not at the end)
+function caretAt(pageId, it, e) {
+  const o = $(`.pe-page[data-id="${pageId}"] .pe-obj[data-id="${it.id}"]`);
+  if (!o || !e || e.clientX === undefined) return;
+  let r = null;
+  if (document.caretRangeFromPoint) r = document.caretRangeFromPoint(e.clientX, e.clientY);
+  else if (document.caretPositionFromPoint) { const c = document.caretPositionFromPoint(e.clientX, e.clientY); if (c) { r = document.createRange(); r.setStart(c.offsetNode, c.offset); r.collapse(true); } }
+  if (!r || !o.contains(r.startContainer)) return;
+  const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+}
+
 // ------------------------------------------------------------ pointer input --
 let drag = null;
 let lastCellDown = null;
@@ -2189,7 +2232,9 @@ function onPointerDown(e) {
   const pt = ptOf(e, pageEl);
   const objEl = e.target.closest('.pe-obj');
   const handle = e.target.closest('.pe-handle');
-  const it = objEl ? p.items.find((i) => i.id === objEl.dataset.id) : null;
+  const found = objEl ? p.items.find((i) => i.id === objEl.dataset.id) : null;
+  const it = found && found.cover ? null : found; // covers over edited PDF text are not picked up
+  hoverOff();
 
   if (it && S.editing === it.id) return; // typing: let the browser place the caret
   const cellEl = it && it.type === 'table' ? e.target.closest('.pe-cell') : null;
@@ -2379,6 +2424,7 @@ function onPointerMove(e) {
     return;
   }
   if (!drag) {
+    if (S.tool === 'select') hoverAt(e);
     if (RUNS[S.tool]) {
       const pageEl = e.target.closest('.pe-page');
       if (pageEl) {
@@ -2536,7 +2582,6 @@ function drawRubber(d) {
   if (d.tool === 'ellipse') d.rub.style.borderRadius = '50%';
 }
 
-let lastTextClick = null;
 function onPointerUp(e) {
   if (drag && (drag.kind === 'gmove' || drag.kind === 'marquee')) {
     const d = drag; drag = null;
@@ -2547,7 +2592,11 @@ function onPointerUp(e) {
     }
     d.rub.remove();
     const x1 = Math.min(d.start.x, d.end.x), x2 = Math.max(d.start.x, d.end.x), y1 = Math.min(d.start.y, d.end.y), y2 = Math.max(d.start.y, d.end.y);
-    if (x2 - x1 < 3 && y2 - y1 < 3) return;
+    if (x2 - x1 < 3 && y2 - y1 < 3) {
+      // a click on the PDF's own text: edit that paragraph, no need to pick "Edit text" first
+      if (d.page.src && groupAt(d.page, d.start)) editRunAt(d.page, d.start);
+      return;
+    }
     const [W, H] = viewSize(d.page);
     const inside = (o) => itemLeft(o) >= x1 && itemRight(o) <= x2 && itemTop(o) >= y1 && itemBottom(o) <= y2;
     const touches = (o) => itemLeft(o) < x2 && itemRight(o) > x1 && itemTop(o) < y2 && itemBottom(o) > y1;
@@ -2555,9 +2604,6 @@ function onPointerUp(e) {
     selectGroup(d.page.id, ids);
     return;
   }
-  // remember this click (the one before it decides whether this is a double click)
-  const prevClick = lastTextClick;
-  if (drag && drag.kind === 'move' && !drag.moved && drag.it.type === 'text') lastTextClick = { id: drag.it.id, t: performance.now() };
   if (!drag) return;
   if (drag.kind === 'scroll') {
     if (e && e.pointerId !== undefined && e.pointerId !== drag.pid) return;
@@ -2588,9 +2634,8 @@ function onPointerUp(e) {
       if (d.kind === 'resize' && d.it.type === 'text' && d.h.length === 1) reflowAfter(p, d.it, d.orig.y + d.orig.h);
     }
     else if (slot) choosePhoto(p, slot);
-    // a second click on a text (or a double click): type in it. The browser's own dblclick
-    // event goes to the page, not the text, because the page captures the pointer.
-    else if (d.kind === 'move' && d.it.type === 'text' && S.tool === 'select' && (d.was || (prevClick && prevClick.id === d.it.id && performance.now() - prevClick.t < 450))) { lastTextClick = null; editText(p.id, d.it); }
+    // one click on a text (not a drag): type in it, with the caret where it was clicked
+    else if (d.kind === 'move' && d.it.type === 'text' && S.tool === 'select' && !d.it.locked) { editText(p.id, d.it); caretAt(p.id, d.it, e); }
     else if (d.kind === 'move' && d.it.type === 'text' && S.tool !== 'select') editText(p.id, d.it);
     else if (d.kind === 'move' && d.it.type === 'table' && d.rc) { S.cell = { id: d.it.id, ...d.rc }; markActiveCell(d.it); updateProps(); }
     return;
@@ -4221,7 +4266,7 @@ function quickAction(a) {
   else if (a !== 'close') setTool(a);
 }
 const TIPS = {
-  select: ['Select', 'Move, resize and rotate anything you added.', 'V'],
+  select: ['Select', 'Click any text to type in it. Move, resize and rotate anything.', 'V'],
   edittext: ['Edit text', 'Click a line of text in the PDF and type to change it.', 'E'],
   editimage: ['Edit image', 'Click a picture in the PDF to replace, move or remove it.', 'I'],
   text: ['Add text', 'Click anywhere on the page and start typing.', 'T'],
@@ -4370,7 +4415,7 @@ function init() {
   window.addEventListener('blur', () => { spaceDown = false; view.classList.remove('pe-grab'); });
   view.addEventListener('pointerdown', onPointerDown);
   view.addEventListener('pointermove', (e) => { onPointerMove(e); drawRulersSoon({ x: e.clientX, y: e.clientY }); });
-  view.addEventListener('pointerleave', () => drawRulersSoon(null));
+  view.addEventListener('pointerleave', () => { drawRulersSoon(null); hoverOff(); });
   view.addEventListener('contextmenu', openCtx);
   // Ctrl + mouse wheel (or a trackpad pinch) zooms
   let wheelZoom = 0, wheelT = 0, wheelPhotoT = 0;
