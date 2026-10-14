@@ -2011,8 +2011,14 @@ function pdfThingAt(p, pt) {
   const tol = 4 / S.zoom;
   const all = [...(S.runs.get(runKey('vector', p)) || []), ...(S.runs.get(runKey('editimage', p)) || []).map((r) => ({ ...r, kind: 'image' }))];
   const covers = p.items.filter((o) => o.cover);
+  const texts = S.runs.get(`groups:${runKey('edittext', p)}`) || [];
+  // a background (a coloured side bar, a panel) with text or other drawings on it stays part
+  // of the page: picked up, it would come in front of what is printed on it and hide it
+  const inside = (a, r) => a !== r && a.w * a.h < r.w * r.h * 0.5 && a.x + a.w / 2 > r.x && a.x + a.w / 2 < r.x + r.w && (a.top ?? a.y) + a.h / 2 > r.y && (a.top ?? a.y) + a.h / 2 < r.y + r.h;
+  const backdrop = (r) => r.kind !== 'line' && (texts.some((t) => inside(t, r)) || all.some((o) => inside(o, r)));
   return all.filter((r) => pt.x >= r.x - tol && pt.x <= r.x + r.w + tol && pt.y >= r.y - tol && pt.y <= r.y + r.h + tol)
     .filter((r) => !covers.some((c) => c.x <= r.x + 0.5 && c.y <= r.y + 0.5 && c.x + c.w >= r.x + r.w - 0.5 && c.y + c.h >= r.y + r.h - 0.5))
+    .filter((r) => !backdrop(r))
     .sort((a, b) => a.w * a.h - b.w * b.h)[0] || null;
 }
 const pdfRunsReady = (p) => ['edittext', 'vector', 'editimage'].every((k) => S.runs.has(k === 'edittext' ? `groups:${runKey(k, p)}` : runKey(k, p)));
@@ -2315,7 +2321,9 @@ async function editRunAt(p, pt, { edit = true } = {}) {
   const all = { x: left, y: Math.min(...lines.map((r) => r.top)), w: right - left, h: Math.max(...lines.map((r) => r.top + r.h)) - Math.min(...lines.map((r) => r.top)) };
   const col = pageColors(p, all) || { bg: '#ffffff', fg: null };
   // the old lines are covered in the page's own background colour; these covers never move
-  const covers = lines.map((r) => ({ id: uid(), type: 'whiteout', color: col.bg, opacity: 100, cover: true, x: r.x - 1, y: r.top - 1, w: r.w + 2, h: r.h + 2 }));
+  // "of" marks which paragraph of the PDF they replace, so its old outline is never shown again
+  const of = [Math.round(all.x * 10) / 10, Math.round(all.y * 10) / 10];
+  const covers = lines.map((r) => ({ id: uid(), type: 'whiteout', color: col.bg, opacity: 100, cover: true, of, x: r.x - 1, y: r.top - 1, w: r.w + 2, h: r.h + 2 }));
   const lh = lines.length > 1 ? Math.round((lineStep / size) * 100) / 100 : undefined;
   const t = { id: uid(), type: 'text', text, font: run.font, size, bold: run.bold, italic: run.italic, underline: false, align: 'left', color: col.fg || '#000000', opacity: 100,
     x: left, y: lines[0].base - baselineOffset(run.font, size, lh || LINE), w: right - left, h: lines[lines.length - 1].top + lines[lines.length - 1].h - lines[0].top };
@@ -2343,6 +2351,7 @@ function retyped(p, r) {
   let covered = 0;
   for (const o of p.items) {
     if (o.type !== 'whiteout') continue;
+    if (o.of && Math.abs(o.of[0] - r.x) < 1.5 && Math.abs(o.of[1] - r.top) < 1.5) return true;
     const w = Math.min(o.x + o.w, r.x + r.w) - Math.max(o.x, r.x), h = Math.min(o.y + o.h, r.top + r.h) - Math.max(o.y, r.top);
     if (w > 0 && h > 0) covered += w * h;
   }
