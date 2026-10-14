@@ -25,7 +25,7 @@ const FONT_CSS = {
 // They place the PDF baseline where the on-screen text sits.
 const METRICS = { helv: [0.905, 0.212], times: [0.891, 0.216], courier: [0.833, 0.3] };
 const LINE = 1.2;
-const baselineOffset = (font, size) => { const [a, d] = METRICS[font] || METRICS.helv; return ((LINE - a - d) / 2 + a) * size; };
+const baselineOffset = (font, size, lh = LINE) => { const [a, d] = METRICS[font] || METRICS.helv; return ((lh - a - d) / 2 + a) * size; };
 
 // ------------------------------------------------------------------- fonts --
 // Three standard PDF fonts need no download. The others are Google Fonts served by our own
@@ -106,7 +106,7 @@ function catalogMatch(name) {
 
 const SHAPES = new Set(['rect', 'ellipse', 'line', 'arrow', 'check', 'cross']);
 const HINTS = {
-  select: 'Click an object to select it, drag to move it, use the corners to resize. Hold Space and drag to move around the page.',
+  select: 'Click to select, Shift+click or drag a box over empty space to select several. Drag to move, use the handles to resize. Space+drag moves around the page.',
   edittext: 'Click on any text in the PDF to change it.',
   editimage: 'Click on an image in the PDF to replace, move or remove it.',
   text: 'Click anywhere on a page to add text.',
@@ -119,7 +119,7 @@ const HINTS = {
 };
 // Which settings each kind of object (or tool) has.
 const PROPS = {
-  text: ['color', 'font', 'size', 'style', 'align', 'list', 'opacity'],
+  text: ['color', 'font', 'size', 'style', 'align', 'list', 'spacing', 'opacity'],
   pen: ['color', 'width', 'dash', 'opacity'], line: ['color', 'width', 'dash', 'opacity'], arrow: ['color', 'width', 'dash', 'opacity'],
   check: ['color', 'width'], cross: ['color', 'width'],
   rect: ['color', 'width', 'dash', 'fill', 'radius', 'opacity'], ellipse: ['color', 'width', 'dash', 'fill', 'opacity'],
@@ -428,8 +428,9 @@ function renderObjects(layer, p, z, live) {
     if (it.rot) { o.style.transformOrigin = 'center'; o.style.transform = `rotate(${it.rot}deg)`; }
     if (it.type === 'text') {
       o.classList.add('pe-text');
-      o.textContent = it.text;
+      fillText(o, it, z);
       o.dir = 'auto';
+      if (it.lh) o.style.lineHeight = String(it.lh);
       Object.assign(o.style, {
         fontFamily: cssFamily(it.font), fontSize: `${it.size * z}px`, color: it.color,
         fontWeight: it.bold ? '700' : '400', fontStyle: it.italic ? 'italic' : 'normal',
@@ -859,6 +860,7 @@ function bindTables() {
 // --------------------------------------------------------------- selection --
 function select(pageId, id) {
   finishEditing();
+  S.group = null;
   S.sel = id ? { page: pageId, id } : null;
   if (!S.cell || S.cell.id !== id) S.cell = null;
   clearSelectionUi();
@@ -866,10 +868,61 @@ function select(pageId, id) {
   updateProps(); renderLayers();
 }
 const isLine = (it) => it.type === 'line' || it.type === 'arrow';
-function clearSelectionUi() { $$('.pe-selbox, .pe-handle, .pe-photobar').forEach((e) => e.remove()); }
+
+// ---------------------------------------------------------- multi-select --
+// Several objects on one page can be selected together: Shift (or Ctrl) + click, a drag box over
+// empty space, Ctrl+A, or Shift/Ctrl + click in Layers. They move, copy, paste, duplicate and
+// delete together, and style changes (colour, font, size ...) apply to all of them.
+const isSelId = (id) => (S.group ? S.group.has(id) : !!(S.sel && S.sel.id === id));
+function selectGroup(pageId, ids) {
+  ids = [...new Set(ids)];
+  if (ids.length < 2) { select(ids.length ? pageId : null, ids[0] || null); return; }
+  finishEditing();
+  S.sel = { page: pageId, id: ids[ids.length - 1] }; S.cell = null;
+  S.group = new Set(ids);
+  clearSelectionUi(); decorateSelection(); updateProps(); renderLayers();
+}
+function toggleGroup(pageId, id) {
+  const cur = S.sel && S.sel.page === pageId ? (S.group ? [...S.group] : [S.sel.id]) : [];
+  selectGroup(pageId, cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
+}
+// the selected objects (one or several), in page order
+function selItems() {
+  if (!S.sel) return [];
+  const p = pageById(S.sel.page);
+  if (!p) return [];
+  return S.group ? p.items.filter((o) => S.group.has(o.id)) : p.items.filter((o) => o.id === S.sel.id);
+}
+const shiftY = (o, dy) => { o.y += dy; if (isLine(o)) { o.y1 += dy; o.y2 += dy; } };
+function selectAllOnPage() {
+  const p = S.pages[S.current];
+  if (!p) return;
+  const [W, H] = viewSize(p);
+  selectGroup(p.id, p.items.filter((o) => !o.hidden && !o.locked && !isBackdrop(o, W, H)).map((o) => o.id));
+}
+function clearSelectionUi() { $$('.pe-selbox, .pe-handle, .pe-photobar, .pe-gbox').forEach((e) => e.remove()); }
 // Outline, corner handles and a rotation handle, turned with the object.
 function decorateSelection() {
   clearSelectionUi();
+  if (S.group && S.sel) {
+    const gp = $(`.pe-page[data-id="${S.sel.page}"] .pe-layer`);
+    if (!gp) return;
+    const z = S.zoom, its = selItems().filter((o) => !o.hidden);
+    for (const o of its) {
+      const b = document.createElement('div'); b.className = 'pe-selbox pe-gsel';
+      Object.assign(b.style, { left: `${o.x * z}px`, top: `${o.y * z}px`, width: `${o.w * z}px`, height: `${o.h * z}px` });
+      if (o.rot) b.style.transform = `rotate(${o.rot}deg)`;
+      gp.append(b);
+    }
+    if (its.length) {
+      const L = Math.min(...its.map(itemLeft)), T = Math.min(...its.map(itemTop)), R = Math.max(...its.map(itemRight)), B = Math.max(...its.map(itemBottom));
+      const g = document.createElement('div'); g.className = 'pe-gbox';
+      Object.assign(g.style, { left: `${L * z - 4}px`, top: `${T * z - 4}px`, width: `${(R - L) * z + 8}px`, height: `${(B - T) * z + 8}px` });
+      g.dataset.n = `${its.length} selected`;
+      gp.append(g);
+    }
+    return;
+  }
   const it = itemOf(S.sel);
   const pageEl = S.sel && $(`.pe-page[data-id="${S.sel.page}"]`);
   if (!it || !pageEl || it.hidden || S.editing === it.id) return;
@@ -930,23 +983,26 @@ function toggleFlag(sel, flag) {
 }
 let clip = null;
 function copySel(cut) {
-  const it = itemOf(S.sel);
-  if (!it) return false;
-  clip = { item: JSON.parse(JSON.stringify(it)), page: S.sel.page };
-  if (cut) removeSelected(); else toast('Copied');
+  const its = selItems();
+  if (!its.length) return false;
+  clip = { items: JSON.parse(JSON.stringify(its)), page: S.sel.page };
+  if (cut) removeSelected(); else toast(its.length > 1 ? `${its.length} objects copied` : 'Copied');
   return true;
 }
 function pasteClip() {
   if (!clip) return false;
   const p = S.pages[S.current] || S.pages[0];
-  const c = { ...JSON.parse(JSON.stringify(clip.item)), id: uid(), locked: false, hidden: false };
-  if (clip.page === p.id) moveItem(c, 12, 12);
+  const cs = clip.items.map((o) => ({ ...JSON.parse(JSON.stringify(o)), id: uid(), locked: false, hidden: false }));
+  if (clip.page === p.id) cs.forEach((c) => moveItem(c, 12, 12));
+  // keep the whole group on the page
   const [vw, vh] = viewSize(p);
-  moveItem(c, clamp(c.x, 0, Math.max(0, vw - c.w)) - c.x, clamp(c.y, 0, Math.max(0, vh - c.h)) - c.y);
+  const L = Math.min(...cs.map(itemLeft)), T = Math.min(...cs.map(itemTop)), R = Math.max(...cs.map(itemRight)), B = Math.max(...cs.map(itemBottom));
+  const dx = clamp(L, 0, Math.max(0, vw - (R - L))) - L, dy = clamp(T, 0, Math.max(0, vh - (B - T))) - T;
+  if (dx || dy) cs.forEach((c) => moveItem(c, dx, dy));
   snapshot();
-  p.items.push(c);
-  clip = { item: JSON.parse(JSON.stringify(c)), page: p.id }; // the next paste steps on again
-  drawItems(pageIndex(p.id)); setTool('select'); select(p.id, c.id);
+  p.items.push(...cs);
+  clip = { items: JSON.parse(JSON.stringify(cs)), page: p.id }; // the next paste steps on again
+  drawItems(pageIndex(p.id)); setTool('select'); selectGroup(p.id, cs.map((c) => c.id));
   return true;
 }
 // Paste from outside the editor: an image becomes an image, plain text becomes a text box.
@@ -967,23 +1023,44 @@ async function pasteExternal(e) {
 }
 
 function removeSelected() {
-  const it = itemOf(S.sel);
-  if (!it) return;
+  const its = selItems();
+  if (!its.length) return;
   snapshot();
   const p = pageById(S.sel.page);
-  p.items = p.items.filter((i) => i !== it);
-  S.sel = null;
-  drawItems(pageIndex(p.id)); updateProps();
+  p.items = p.items.filter((i) => !its.includes(i));
+  S.sel = null; S.group = null;
+  drawItems(pageIndex(p.id)); updateProps(); renderLayers();
 }
+// Duplicate puts the copy straight under the original (a new job, school or list block) and
+// moves what was under it down to make room; what no longer fits goes to the next page.
 function duplicateSelected() {
-  const it = itemOf(S.sel);
-  if (!it) return;
+  const its = selItems().filter((o) => !o.locked);
+  if (!its.length) return;
   snapshot();
   const p = pageById(S.sel.page);
-  const c = { ...JSON.parse(JSON.stringify(it)), id: uid() };
-  moveItem(c, 12, 12);
-  p.items.push(c);
-  drawItems(pageIndex(p.id)); select(p.id, c.id);
+  const [W, H] = viewSize(p);
+  const L = Math.min(...its.map(itemLeft)), R = Math.max(...its.map(itemRight));
+  const T = Math.min(...its.map(itemTop)), B = Math.max(...its.map(itemBottom));
+  const gap = its.length > 1 ? 12 : 6, dy = B - T + gap;
+  const moved = [];
+  for (const o of p.items) {
+    if (its.includes(o) || o.hidden || o.locked || isBackdrop(o, W, H)) continue;
+    if (itemTop(o) < B - 1 || itemLeft(o) >= R - 1 || itemRight(o) <= L + 1) continue;
+    shiftY(o, dy); moved.push(o);
+  }
+  const copies = its.map((o) => { const c = { ...JSON.parse(JSON.stringify(o)), id: uid(), locked: false, hidden: false }; shiftY(c, dy); return c; });
+  // the copies go right after the last original in the layer order
+  p.items.splice(Math.max(...its.map((o) => p.items.indexOf(o))) + 1, 0, ...copies);
+  S.flowed = new Set([...moved, ...copies].map((o) => o.id));
+  if (spillOver(p, null, null)) {
+    rebuild();
+    const where = S.pages.find((pg) => pg.items.includes(copies[0]));
+    selectGroup(where.id, copies.filter((c) => where.items.includes(c)).map((c) => c.id));
+    toast('Duplicated. The page was full, so some of it moved to the next page.');
+    return;
+  }
+  drawItems(pageIndex(p.id));
+  selectGroup(p.id, copies.map((c) => c.id));
 }
 function frontSelected() { arrange('tofront'); }
 function moveItem(it, dx, dy) {
@@ -1070,7 +1147,7 @@ function cutAt(o, limit) {
     for (let i = 0; i < node.length; i++) {
       r.setStart(node, i); r.setEnd(node, i + 1);
       const b = r.getBoundingClientRect();
-      if (b.height && (b.bottom - pageTop) / S.zoom > limit) return off + i;
+      if (b.height && (b.bottom - pageTop) / S.zoom > limit) return textOffset(o, node, i);
     }
     off += node.length;
   }
@@ -1128,6 +1205,90 @@ function spillOver(p, it, el) {
   return true;
 }
 
+// ------------------------------------------------------------- paragraphs --
+// A text box shows each line of its text (each paragraph) as its own block, so the space between
+// paragraphs (ps, points) and list items with a hanging indent (wrapped lines start under the
+// text, not under the bullet) look the same on screen and in the PDF.
+let measureCtx = null;
+function markerWidth(it, marker) {
+  if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d');
+  measureCtx.font = `${it.italic ? 'italic ' : ''}${it.bold ? '700 ' : '400 '}${it.size}px ${cssFamily(it.font)}`;
+  return measureCtx.measureText(marker).width;
+}
+function fillText(o, it, z) {
+  o.textContent = '';
+  const ps = (it.ps || 0) * z;
+  (it.text || '').split('\n').forEach((line, i) => {
+    const d = document.createElement('div');
+    d.className = 'pe-para';
+    if (i && ps) d.style.marginTop = `${ps}px`;
+    const m = it.wrap ? LIST_RE.exec(line) : null;
+    if (m) { const mw = markerWidth(it, m[1]) * z; d.style.paddingLeft = `${mw}px`; d.style.textIndent = `${-mw}px`; }
+    if (line) d.textContent = line; else d.append(document.createElement('br'));
+    o.append(d);
+  });
+}
+// Caret position <-> offset in the text (paragraphs joined by \n).
+function textOffset(o, node, off) {
+  const r = document.createRange(); r.selectNodeContents(o); r.setEnd(node, off);
+  const tmp = document.createElement('div'); tmp.append(r.cloneContents());
+  return readText(tmp, true).length;
+}
+function caretRange(o) {
+  const sel = window.getSelection();
+  if (!sel.rangeCount || !o.contains(sel.anchorNode)) { const n = (o.textContent && readText(o).length) || 0; return [n, n]; }
+  const r = sel.getRangeAt(0);
+  const a = textOffset(o, r.startContainer, r.startOffset), b = textOffset(o, r.endContainer, r.endOffset);
+  return [Math.min(a, b), Math.max(a, b)];
+}
+function placeCaretAt(o, pos) {
+  const paras = [...o.querySelectorAll('.pe-para')];
+  const r = document.createRange();
+  for (const d of paras) {
+    const len = d.textContent.length;
+    if (pos <= len) {
+      const t = d.firstChild;
+      if (t && t.nodeType === 3) r.setStart(t, pos); else r.setStart(d, 0);
+      r.collapse(true);
+      const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      return;
+    }
+    pos -= len + 1;
+  }
+  r.selectNodeContents(o); r.collapse(false);
+  const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+}
+// Replace the text while typing (Enter, paste) and redraw the paragraphs with the caret kept.
+function setEditedText(o, it, text, caret) {
+  it.text = text;
+  fillText(o, it, S.zoom);
+  placeCaretAt(o, caret);
+  flowWhileTyping(o, it);
+  it.w = o.offsetWidth / S.zoom; it.h = o.offsetHeight / S.zoom;
+}
+// Enter: a new paragraph; in a list, the next bullet or number (Enter on an empty item ends the
+// list). Shift+Enter: a new line without a bullet.
+function onEnter(e, o, it) {
+  e.preventDefault();
+  const [a, b] = caretRange(o);
+  const t = readText(o);
+  const ls = t.lastIndexOf('\n', a - 1) + 1;
+  let le = t.indexOf('\n', a); if (le < 0) le = t.length;
+  const line = t.slice(ls, le), m = e.shiftKey ? null : /^(\u2022 |(\d+)\.\s)/.exec(line);
+  if (m && !line.slice(m[0].length).trim() && a === b) {
+    setEditedText(o, it, t.slice(0, ls) + t.slice(ls + m[0].length), ls);
+    return;
+  }
+  const ins = `\n${m ? (m[2] ? `${Number(m[2]) + 1}. ` : BULLET) : ''}`;
+  setEditedText(o, it, t.slice(0, a) + ins + t.slice(b), a + ins.length);
+}
+function onPasteText(e, o, it) {
+  e.preventDefault();
+  const txt = ((e.clipboardData || window.clipboardData).getData('text/plain') || '').replace(/\r\n?/g, '\n');
+  const [a, b] = caretRange(o), t = readText(o);
+  setEditedText(o, it, t.slice(0, a) + txt + t.slice(b), a + txt.length);
+}
+
 // ------------------------------------------------------------------ lists --
 // A list is ordinary text whose lines start with "• " or "1. ", so it looks the same everywhere
 // (screen, PDF, other programs). The buttons add or remove the markers on every line; Enter on a
@@ -1173,27 +1334,10 @@ function reflowAfter(p, it, oldBottom) {
   S.flowed = new Set(moved.map((m) => m.id));
   if (spillOver(p, null, null)) rebuild(); else drawItems(pageIndex(p.id));
 }
-// Enter in a list line: the next bullet or number
-function listEnter(e, o, it) {
-  if (e.key !== 'Enter' || e.shiftKey) return;
-  const sel = window.getSelection();
-  if (!sel.rangeCount) return;
-  const r = document.createRange(); r.selectNodeContents(o); r.setEnd(sel.anchorNode, sel.anchorOffset);
-  const before = r.toString(), line = before.slice(before.lastIndexOf('\n') + 1);
-  const m = /^(\u2022 |(\d+)\.\s)(.*)$/.exec(line);
-  if (!m) return;
-  e.preventDefault();
-  if (!m[3].trim()) {
-    // empty item: end the list (remove its marker)
-    for (let i = 0; i < m[1].length; i++) document.execCommand('delete');
-    return;
-  }
-  document.execCommand('insertText', false, `\n${m[2] ? `${Number(m[2]) + 1}. ` : BULLET}`);
-}
 
 // The text of an edited box. innerText adds extra blank lines when the browser wraps pasted or
 // typed lines in <div>s, so the lines are read from the nodes: a block starts a new line, <br> is one.
-function readText(el) {
+function readText(el, keepEnd) {
   let out = '';
   const walk = (n) => {
     for (const c of n.childNodes) {
@@ -1207,7 +1351,7 @@ function readText(el) {
     }
   };
   walk(el);
-  return out.replace(/\n$/, '');
+  return keepEnd ? out : out.replace(/\n$/, '');
 }
 
 // ------------------------------------------------------------ text editing --
@@ -1227,8 +1371,11 @@ function startEditing(o, it, keepCaret) {
     it.w = o.offsetWidth / S.zoom; it.h = o.offsetHeight / S.zoom;
   };
   o.onblur = () => setTimeout(() => { if (S.editing === it.id && document.activeElement !== o) finishEditing(); }, 0);
-  o.onpaste = (e) => { e.preventDefault(); document.execCommand('insertText', false, (e.clipboardData || window.clipboardData).getData('text/plain')); };
-  o.onkeydown = (e) => { if (e.key === 'Escape') { e.preventDefault(); o.blur(); finishEditing(); return; } listEnter(e, o, it); };
+  o.onpaste = (e) => onPasteText(e, o, it);
+  o.onkeydown = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); o.blur(); finishEditing(); return; }
+    if (e.key === 'Enter') onEnter(e, o, it);
+  };
 }
 function editText(pageId, it) {
   const o = $(`.pe-page[data-id="${pageId}"] .pe-obj[data-id="${it.id}"]`);
@@ -1559,6 +1706,23 @@ function onPointerDown(e) {
     pageEl.setPointerCapture(e.pointerId);
     return;
   }
+  if (tool === 'select' && it && (e.shiftKey || e.ctrlKey || e.metaKey)) { e.preventDefault(); toggleGroup(p.id, it.id); return; }
+  if (tool === 'select' && it && S.group && S.group.has(it.id) && S.sel.page === p.id) {
+    e.preventDefault();
+    const its = selItems().filter((o) => !o.locked);
+    drag = { kind: 'gmove', page: p, its, orig: its.map((o) => JSON.parse(JSON.stringify(o))), start: pt, moved: false, clickId: it.id };
+    pageEl.setPointerCapture(e.pointerId);
+    return;
+  }
+  if (tool === 'select' && !it && e.pointerType !== 'touch') {
+    e.preventDefault();
+    select(null, null);
+    const rub = document.createElement('div'); rub.className = 'pe-marquee';
+    pageEl.querySelector('.pe-layer').append(rub);
+    drag = { kind: 'marquee', page: p, start: pt, end: pt, rub };
+    pageEl.setPointerCapture(e.pointerId);
+    return;
+  }
   if (tool === 'select' && isPhoto(it) && !it.locked) {
     e.preventDefault();
     if (!(S.sel && S.sel.id === it.id)) select(p.id, it.id);
@@ -1637,6 +1801,27 @@ function rebasePan(d) {
 }
 const twoDist = (m) => { const [a, b] = [...m.values()]; return Math.hypot(a.x - b.x, a.y - b.y); };
 function onPointerMove(e) {
+  if (drag && (drag.kind === 'gmove' || drag.kind === 'marquee')) {
+    const pageEl = $(`.pe-page[data-id="${drag.page.id}"]`);
+    const pt = ptOf(e, pageEl);
+    if (drag.kind === 'marquee') {
+      drag.end = pt;
+      const z = S.zoom, x = Math.min(pt.x, drag.start.x), y = Math.min(pt.y, drag.start.y);
+      Object.assign(drag.rub.style, { left: `${x * z}px`, top: `${y * z}px`, width: `${Math.abs(pt.x - drag.start.x) * z}px`, height: `${Math.abs(pt.y - drag.start.y) * z}px` });
+      return;
+    }
+    const dx = pt.x - drag.start.x, dy = pt.y - drag.start.y;
+    if (!drag.moved && Math.hypot(dx, dy) < 1.5) return;
+    if (!drag.moved) { snapshot(); drag.moved = true; }
+    drag.its.forEach((o, i) => {
+      const g = drag.orig[i];
+      o.x = g.x + dx; o.y = g.y + dy;
+      if (isLine(o)) { o.x1 = g.x1 + dx; o.x2 = g.x2 + dx; o.y1 = g.y1 + dy; o.y2 = g.y2 + dy; }
+      if (dx) delete o.ax;
+    });
+    drawItems(pageIndex(drag.page.id));
+    return;
+  }
   if (drag && drag.kind === 'scroll') {
     if (e.pointerId !== drag.pid) return;
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
@@ -1830,6 +2015,23 @@ function drawRubber(d) {
 
 let lastTextClick = null;
 function onPointerUp(e) {
+  if (drag && (drag.kind === 'gmove' || drag.kind === 'marquee')) {
+    const d = drag; drag = null;
+    if (d.kind === 'gmove') {
+      if (!d.moved) select(d.page.id, d.clickId); // a click on one of them: just that one
+      else { drawItems(pageIndex(d.page.id)); updatePanel(); }
+      return;
+    }
+    d.rub.remove();
+    const x1 = Math.min(d.start.x, d.end.x), x2 = Math.max(d.start.x, d.end.x), y1 = Math.min(d.start.y, d.end.y), y2 = Math.max(d.start.y, d.end.y);
+    if (x2 - x1 < 3 && y2 - y1 < 3) return;
+    const [W, H] = viewSize(d.page);
+    const inside = (o) => itemLeft(o) >= x1 && itemRight(o) <= x2 && itemTop(o) >= y1 && itemBottom(o) <= y2;
+    const touches = (o) => itemLeft(o) < x2 && itemRight(o) > x1 && itemTop(o) < y2 && itemBottom(o) > y1;
+    const ids = d.page.items.filter((o) => !o.hidden && !o.locked && (inside(o) || (touches(o) && !isBackdrop(o, W, H) && o.type === 'text'))).map((o) => o.id);
+    selectGroup(d.page.id, ids);
+    return;
+  }
   // remember this click (the one before it decides whether this is a double click)
   const prevClick = lastTextClick;
   if (drag && drag.kind === 'move' && !drag.moved && drag.it.type === 'text') lastTextClick = { id: drag.it.id, t: performance.now() };
@@ -1947,7 +2149,7 @@ const TOOL_ICONS = { select: '<path d="M6 3l12 9-5.5 1.2L15 20l-2.4 1-2.5-6.6L6 
 function updateContextChip(t) {
   const it = itemOf(S.sel);
   const kind = it ? it.type : S.tool;
-  $('#peCtxName').textContent = it ? (it.type === 'text' ? 'Text' : LAYER_NAMES[it.type] || 'Object') : TOOL_NAMES[S.tool] || '';
+  $('#peCtxName').textContent = S.group ? `${S.group.size} selected` : it ? (it.type === 'text' ? 'Text' : LAYER_NAMES[it.type] || 'Object') : TOOL_NAMES[S.tool] || '';
   $('#peCtxIco').innerHTML = TOOL_ICONS[kind] || LAYER_ICONS[kind] || TOOL_ICONS.select;
   $('#peCtxChip').title = it ? 'Selected object' : 'Current tool';
   return t;
@@ -1970,6 +2172,7 @@ function updateProps() {
     if ('underline' in o) FIELDS.underline.setAttribute('aria-pressed', String(!!o.underline));
     const al = o.type === 'table' ? o.align[S.cell && S.cell.id === o.id ? S.cell.c : 0] : o.align;
     $$('[data-align]').forEach((b) => b.setAttribute('aria-pressed', String((al || 'left') === b.dataset.align)));
+    if (o.type === 'text') { $('#pLh').value = String(o.lh || LINE); $('#pPs').value = String(o.ps || 0); }
     if (o.type === 'text') { const lk = listKind(o.text || ''); $$('[data-list]').forEach((b) => b.setAttribute('aria-pressed', String(lk === b.dataset.list))); }
     if (o.type === 'image') {
       $$('[data-imgshape]').forEach((b) => b.setAttribute('aria-pressed', String((o.clip || 'none') === b.dataset.imgshape)));
@@ -1994,6 +2197,8 @@ function setProp(key, value) {
   if (!t) return;
   if (t.item && !propSnap) { snapshot(); propSnap = true; }
   t.obj[key] = value;
+  // the same change for every selected object of the same kind
+  if (t.item && S.group) for (const o of selItems()) if (o !== t.obj && o.type === t.obj.type && key in t.obj) o[key] = value;
   if (t.item) {
     // the default for that kind of object follows what was just chosen
     const d = DEFAULTS[t.kind];
@@ -2024,6 +2229,23 @@ function bindProps() {
     else { setProp('align', b.dataset.align); end(); }
     updateProps();
   }));
+  // line height and paragraph spacing: the box grows or shrinks, and what is under it follows
+  const spacing = (key, el, lo, hi) => {
+    el.addEventListener('input', () => {
+      const it = itemOf(S.sel);
+      if (!it || it.type !== 'text') return;
+      const v = clamp(Number(el.value) || 0, lo, hi);
+      if (!propSnap) { snapshot(); propSnap = true; }
+      const p = pageById(S.sel.page), oldB = it.y + it.h;
+      if (!it.wrap) giveWrap(p, it);
+      it[key] = v;
+      drawItems(pageIndex(p.id));
+      reflowAfter(p, it, oldB);
+    });
+    el.addEventListener('change', end);
+  };
+  spacing('lh', $('#pLh'), 0.8, 3);
+  spacing('ps', $('#pPs'), 0, 48);
   $$('[data-list]').forEach((b) => {
     b.addEventListener('mousedown', (e) => e.preventDefault()); // keep the caret in the text
     b.addEventListener('click', () => toggleList(b.dataset.list));
@@ -2223,7 +2445,7 @@ function renderLayers() {
   // middle of a click would swallow the click).
   const sig = p.id + p.items.map((it) => `|${it.id}:${layerName(it)}:${it.hidden ? 1 : 0}${it.locked ? 1 : 0}:${it.font || ''}`).join('');
   if (list.dataset.sig === sig) {
-    $$('li', list).forEach((li) => li.classList.toggle('sel', !!(S.sel && S.sel.id === li.dataset.id)));
+    $$('li', list).forEach((li) => li.classList.toggle('sel', isSelId(li.dataset.id)));
     return;
   }
   list.dataset.sig = sig;
@@ -2233,7 +2455,7 @@ function renderLayers() {
   p.items.slice().reverse().forEach((it) => {
     const li = document.createElement('li');
     li.draggable = true; li.dataset.id = it.id;
-    li.className = `${S.sel && S.sel.id === it.id ? 'sel' : ''} ${it.hidden ? 'is-hidden' : ''}`;
+    li.className = `${isSelId(it.id) ? 'sel' : ''} ${it.hidden ? 'is-hidden' : ''}`;
     li.innerHTML = `<svg viewBox="0 0 24 24">${LAYER_ICONS[it.type] || ''}</svg><span class="pe-lname"></span>
       <button type="button" class="pe-lbtn${it.locked ? ' on' : ''}" data-l="lock" title="${it.locked ? 'Unlock' : 'Lock'}" aria-label="${it.locked ? 'Unlock' : 'Lock'}"><svg viewBox="0 0 24 24">${it.locked ? LOCK : UNLOCK}</svg></button>
       <button type="button" class="pe-lbtn${it.hidden ? ' on' : ''}" data-l="eye" title="${it.hidden ? 'Show' : 'Hide'}" aria-label="${it.hidden ? 'Show' : 'Hide'}"><svg viewBox="0 0 24 24">${it.hidden ? EYE_OFF : EYE}</svg></button>`;
@@ -2253,6 +2475,7 @@ function bindLayers() {
     const it = itemOf({ page: pid, id: li.dataset.id });
     if (!it || it.hidden) return;
     if (S.tool !== 'select') setTool('select');
+    if (e.shiftKey || e.ctrlKey || e.metaKey) { toggleGroup(pid, li.dataset.id); return; }
     select(pid, li.dataset.id);
     const el = $(`.pe-page[data-id="${pid}"] .pe-obj[data-id="${li.dataset.id}"]`);
     if (el) el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
@@ -3019,17 +3242,35 @@ async function buildPdf(opts = {}) {
   // and drawn as outlines, because the PDF writer cannot join their letters itself.
   const textLine = async (page, fo, line, size) => {
     if (RTL_RE.test(line) && FONTS_BASE) {
-      const covers = (f) => f.fk && Array.from(line).every((ch) => /\s/.test(ch) || f.fk.hasGlyphForCodePoint(ch.codePointAt(0)));
-      const f2 = covers(fo) ? fo : await font(/[֐-׿]/.test(line) ? 'noto-sans-hebrew' : 'noto-naskh-arabic', false, false);
-      const run = f2.fk.layout(line);
-      const sc = size / f2.fk.unitsPerEm;
-      let cx = 0, d = '';
-      run.glyphs.forEach((g, i) => {
-        const pos = run.positions[i];
-        d += g.path.scale(sc, -sc).translate(cx + pos.xOffset * sc, -pos.yOffset * sc).toSVG();
-        cx += pos.xAdvance * sc;
-      });
-      return { width: cx, draw: (x, y, col, op) => { if (d) page.drawSvgPath(d, { x, y, color: col, opacity: op }); } };
+      // Split the line into right-to-left runs (Urdu, Arabic, Hebrew: shaped by fontkit and drawn
+      // as outlines, because the PDF writer cannot join their letters) and the rest (normal text).
+      // Runs are placed in reading order: left to right, or right to left when the line starts in Urdu.
+      const R = '\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF';
+      const parts = line.split(new RegExp(`([${R}](?:[${R}\\s\u060C\u061B\u061F\u06D4\u0660-\u0669\u06F0-\u06F9]*[${R}])?)`)).filter(Boolean);
+      const segs = [];
+      for (const part of parts) {
+        if (RTL_RE.test(part)) {
+          const covers = (f) => f.fk && Array.from(part).every((ch) => /\s/.test(ch) || f.fk.hasGlyphForCodePoint(ch.codePointAt(0)));
+          const heb = /[\u0590-\u05FF]/.test(part);
+          const f2 = covers(fo) ? fo : await font(heb ? 'noto-sans-hebrew' : 'noto-naskh-arabic', false, false);
+          const run = f2.fk.layout(part, [], heb ? 'hebr' : 'arab', null, 'rtl');
+          const sc = size / f2.fk.unitsPerEm;
+          let cx = 0, d = '';
+          run.glyphs.forEach((g, i) => {
+            const pos = run.positions[i];
+            d += g.path.scale(sc, -sc).translate(cx + pos.xOffset * sc, -pos.yOffset * sc).toSVG();
+            cx += pos.xAdvance * sc;
+          });
+          segs.push({ width: cx, draw: (x, y, col, op) => { if (d) page.drawSvgPath(d, { x, y, color: col, opacity: op }); } });
+        } else {
+          const t = clean(fo, part);
+          segs.push({ width: fo.ft.widthOfTextAtSize(t, size), draw: (x, y, col, op) => { if (t.trim()) page.drawText(t, { x, y, size, font: fo.ft, color: col, opacity: op }); } });
+        }
+      }
+      const firstStrong = /[A-Za-z\u00C0-\u024F\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/.exec(line);
+      if (firstStrong && RTL_RE.test(firstStrong[0])) segs.reverse();
+      const width = segs.reduce((n, sg) => n + sg.width, 0);
+      return { width, draw: (x, y, col, op) => { let cx = x; for (const sg of segs) { sg.draw(cx, y, col, op); cx += sg.width; } } };
     }
     const t = clean(fo, line);
     return { width: fo.ft.widthOfTextAtSize(t, size), draw: (x, y, col, op) => page.drawText(t, { x, y, size, font: fo.ft, color: col, opacity: op }) };
@@ -3080,13 +3321,28 @@ async function buildPdf(opts = {}) {
       }
       if (it.type === 'text') {
         const fo = await font(it.font, it.bold, it.italic);
-        let lines = it.text.split('\n');
-        if (it.wrap) { const w = []; for (const para of lines) w.push(...await wrapText(page, fo, para, it.size, it.wrap + 0.5, textLine)); lines = w; }
-        for (let i = 0; i < lines.length; i++) {
-          if (!lines[i]) continue;
-          const ln = await textLine(page, fo, lines[i], it.size);
-          const x = it.x + (it.align === 'center' ? (it.w - ln.width) / 2 : it.align === 'right' ? it.w - ln.width : 0);
-          const y = VH - (it.y + baselineOffset(it.font, it.size) + i * LINE * it.size);
+        // paragraphs (with the space between them), wrapped to the box; list items hang under their text
+        const lhK = it.lh || LINE, lineH = lhK * it.size, base = baselineOffset(it.font, it.size, lhK);
+        const rows = [];
+        let top = 0;
+        const paras = it.text.split('\n');
+        for (let pi = 0; pi < paras.length; pi++) {
+          const para = paras[pi], m = it.wrap ? LIST_RE.exec(para) : null;
+          if (m) {
+            const mw = (await textLine(page, fo, m[1], it.size)).width;
+            const body = await wrapText(page, fo, para.slice(m[1].length), it.size, it.wrap + 0.5 - mw, textLine);
+            body.forEach((t, k) => { rows.push({ t: k ? t : m[1] + t, dx: k ? mw : 0, top }); top += lineH; });
+          } else {
+            const ls = it.wrap ? await wrapText(page, fo, para, it.size, it.wrap + 0.5, textLine) : [para];
+            ls.forEach((t) => { rows.push({ t, dx: 0, top }); top += lineH; });
+          }
+          top += it.ps || 0;
+        }
+        for (const row of rows) {
+          if (!row.t) continue;
+          const ln = await textLine(page, fo, row.t, it.size);
+          const x = it.x + (it.align === 'center' ? (it.w - ln.width) / 2 : it.align === 'right' ? it.w - ln.width : row.dx);
+          const y = VH - (it.y + base + row.top);
           ln.draw(x, y, color(it.color), op);
           if (it.underline) page.drawLine({ start: { x, y: y - it.size * 0.12 }, end: { x: x + ln.width, y: y - it.size * 0.12 }, thickness: Math.max(0.5, it.size / 16), color: color(it.color), opacity: op });
         }
@@ -3362,13 +3618,14 @@ function onKey(e) {
   if ((e.key === 'Delete' || e.key === 'Backspace') && selIt && selIt.type === 'table' && S.cell && S.cell.id === selIt.id && selIt.rows > 1) {
     e.preventDefault(); tableOp('delrow'); toast('Row deleted. To remove the whole table, right-click it and choose Delete table.'); return;
   }
+  if (mod && e.key.toLowerCase() === 'a') { e.preventDefault(); selectAllOnPage(); return; }
   if ((e.key === 'Delete' || e.key === 'Backspace') && S.sel) { e.preventDefault(); removeSelected(); return; }
   if (e.key === 'Escape') { closeImgMenu(); closeCtx(); closeFontPicker(); select(null, null); setTool('select'); return; }
   if (S.sel && e.key.startsWith('Arrow') && !(selIt && selIt.locked)) {
     e.preventDefault();
-    const it = itemOf(S.sel), st = e.shiftKey ? 10 : 1;
+    const st = e.shiftKey ? 10 : 1;
     snapshot();
-    moveItem(it, e.key === 'ArrowLeft' ? -st : e.key === 'ArrowRight' ? st : 0, e.key === 'ArrowUp' ? -st : e.key === 'ArrowDown' ? st : 0);
+    for (const it of selItems().filter((o) => !o.locked)) moveItem(it, e.key === 'ArrowLeft' ? -st : e.key === 'ArrowRight' ? st : 0, e.key === 'ArrowUp' ? -st : e.key === 'ArrowDown' ? st : 0);
     drawItems(pageIndex(S.sel.page)); updatePanel();
     return;
   }

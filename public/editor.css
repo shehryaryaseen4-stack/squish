@@ -587,3 +587,14 @@ body.is-editing .pe-app{height:auto;}
 /* side handles of a text box: drag to change its width or height */
 .pe-selbox .pe-handle[data-h="e"],.pe-selbox .pe-handle[data-h="w"]{width:8px; height:18px; margin:-9px 0 0 -4px; border-radius:4px; cursor:ew-resize;}
 .pe-selbox .pe-handle[data-h="s"]{width:18px; height:8px; margin:-4px 0 0 -9px; border-radius:4px; cursor:ns-resize;}
+/* text boxes: one block per paragraph */
+.pe-para{min-height:1lh;}
+.pe-spacing{gap:6px;}
+.pe-spacing label{display:inline-flex; align-items:center; gap:3px; color:var(--ink-2);}
+.pe-spacing svg{width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;}
+.pe-spacing input{width:48px; height:28px; padding:0 4px; border:1px solid var(--line); border-radius:6px; font:inherit; font-size:.8rem;}
+/* several objects selected */
+.pe-selbox.pe-gsel{outline-style:solid; outline-color:var(--sel); outline-width:1px; opacity:.8;}
+.pe-gbox{position:absolute; z-index:5; pointer-events:none; border:1.5px dashed var(--sel); border-radius:3px;}
+.pe-gbox::after{content:attr(data-n); position:absolute; left:0; top:-22px; padding:2px 7px; border-radius:5px; background:var(--sel); color:#fff; font:600 11px/16px system-ui,sans-serif; white-space:nowrap;}
+.pe-marquee{position:absolute; z-index:6; pointer-events:none; border:1px solid var(--sel); background:rgba(37,99,235,.08);}
