@@ -2336,6 +2336,9 @@ function groupAt(p, pt) {
   return runs.filter((r) => pt.x >= r.x - 1 && pt.x <= r.x + r.w + 1 && pt.y >= r.top - 1 && pt.y <= r.top + r.h + 1)
     .sort((a, b) => a.w * a.h - b.w * b.h)[0] || null;
 }
+// On an opened PDF, white boxes (whiteouts, and the covers left where things were picked up)
+// let clicks through to what is under them; they are still in the Layers list.
+const passThrough = (p, it) => !!(it && (it.cover || (p && p.src && it.type === 'whiteout')));
 function hoverOff() {
   $$('.pe-hover').forEach((o) => o.classList.remove('pe-hover'));
   $$('.pe-hoverbox').forEach((o) => o.remove());
@@ -2344,7 +2347,8 @@ function hoverAt(e) {
   const pageEl = e.target.closest && e.target.closest('.pe-page');
   const objEl = e.target.closest && e.target.closest('.pe-obj');
   const p = pageEl && pageById(pageEl.dataset.id);
-  const it = p && objEl ? p.items.find((i) => i.id === objEl.dataset.id) : null;
+  const found = p && objEl ? p.items.find((i) => i.id === objEl.dataset.id) : null;
+  const it = passThrough(p, found) ? null : found;
   const ok = it && !it.cover && !it.hidden && S.editing !== it.id && !(S.sel && S.sel.id === it.id) && !(S.group && S.group.has(it.id));
   const cur = $('.pe-obj.pe-hover');
   if (ok && cur === objEl) return;
@@ -2410,7 +2414,7 @@ function onPointerDown(e) {
   const objEl = e.target.closest('.pe-obj');
   const handle = e.target.closest('.pe-handle');
   const found = objEl ? p.items.find((i) => i.id === objEl.dataset.id) : null;
-  const it = found && found.cover ? null : found; // covers over edited PDF text are not picked up
+  const it = passThrough(p, found) ? null : found; // white boxes on a PDF are not picked up
   hoverOff();
 
   if (it && S.editing === it.id) return; // typing: let the browser place the caret
