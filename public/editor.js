@@ -119,7 +119,7 @@ const HINTS = {
 };
 // Which settings each kind of object (or tool) has.
 const PROPS = {
-  text: ['color', 'font', 'size', 'style', 'align', 'opacity'],
+  text: ['color', 'font', 'size', 'style', 'align', 'list', 'opacity'],
   pen: ['color', 'width', 'dash', 'opacity'], line: ['color', 'width', 'dash', 'opacity'], arrow: ['color', 'width', 'dash', 'opacity'],
   check: ['color', 'width'], cross: ['color', 'width'],
   rect: ['color', 'width', 'dash', 'fill', 'radius', 'opacity'], ellipse: ['color', 'width', 'dash', 'fill', 'opacity'],
@@ -437,6 +437,7 @@ function renderObjects(layer, p, z, live) {
       });
       // a text with a column width wraps inside it
       if (it.wrap) { o.classList.add('pe-wrap'); o.style.width = `${it.wrap * z}px`; }
+      if (it.minH) o.style.minHeight = `${it.minH * z}px`;
       if (!isStd(it.font)) ensureFont(it.font, it.bold, it.italic);
       if (live && S.editing === it.id) startEditing(o, it, true);
     } else {
@@ -735,7 +736,7 @@ function startCellEditing(o, it) {
   focusIt();
   requestAnimationFrame(() => { focusIt(); ce.busy = false; });
   span.oninput = () => {
-    it.cells[ce.r][ce.c] = span.innerText.replace(/\n$/, '');
+    it.cells[ce.r][ce.c] = readText(span);
     // a taller row moves the cells below in place, so the caret and the typing are not disturbed
     const need = span.offsetHeight / S.zoom + TPAD.y * 2;
     if (need > it.rh[ce.r] + 0.5) { it.rh[ce.r] = Math.ceil(need * 2) / 2; fixTable(it); relayoutTable(o, it); }
@@ -892,6 +893,8 @@ function decorateSelection() {
     [['nw', '0%', '0%'], ['ne', '100%', '0%'], ['sw', '0%', '100%'], ['se', '100%', '100%']].forEach(([h, x, y]) => handle(h, box, x, y));
     // tables also get side handles: drag them to make the table wider or narrower only
     if (it.type === 'table') [['w', '0%', '50%'], ['e', '100%', '50%']].forEach(([h, x, y]) => handle(h, box, x, y));
+    // text boxes: the sides change the width (the text wraps again), the bottom the height
+    if (it.type === 'text') [['w', '0%', '50%'], ['e', '100%', '50%'], ['s', '50%', '100%']].forEach(([h, x, y]) => handle(h, box, x, y));
     handle('rot', box, '50%', 0);
     if (it.type === 'table' && !it.rot) {
       // drag the lines between columns and under rows to resize them
@@ -1028,7 +1031,8 @@ function giveWrap(p, it) {
 function flowBelow(p, it, bottom, dy) {
   if (!dy) return [];
   const [W, H] = viewSize(p);
-  const L = it.x, R = it.x + Math.max(it.w, it.wrap || 0);
+  // the whole column, even when the box itself was made narrower (dates on the right move too)
+  const L = it.x, R = it.x + Math.max(it.w, it.wrap || 0, it.align === 'left' || !it.align ? columnWidth(p, it) : 0);
   const moved = [];
   for (const o of p.items) {
     if (o === it || o.hidden || o.locked || isBackdrop(o, W, H)) continue;
@@ -1044,10 +1048,13 @@ function flowBelow(p, it, bottom, dy) {
 function flowWhileTyping(o, it) {
   const p = S.pages.find((pg) => pg.items.includes(it));
   if (!p || !it.wrap) return;
-  const h = o.offsetHeight / S.zoom, dy = h - it.h;
+  const nb = it.y + o.offsetHeight / S.zoom;
+  if (S.flowB == null) S.flowB = it.y + it.h;
+  const dy = nb - S.flowB, from = S.flowB;
   if (Math.abs(dy) < 0.5) return;
+  S.flowB = nb;
   const layer = o.closest('.pe-layer');
-  for (const m of flowBelow(p, it, it.y + it.h, dy)) {
+  for (const m of flowBelow(p, it, from, dy)) {
     const el = layer && layer.querySelector(`.pe-obj[data-id="${m.id}"]`);
     if (el) el.style.top = `${m.y * S.zoom}px`;
     (S.flowed || (S.flowed = new Set())).add(m.id);
@@ -1121,6 +1128,88 @@ function spillOver(p, it, el) {
   return true;
 }
 
+// ------------------------------------------------------------------ lists --
+// A list is ordinary text whose lines start with "• " or "1. ", so it looks the same everywhere
+// (screen, PDF, other programs). The buttons add or remove the markers on every line; Enter on a
+// list line starts the next item, and Enter on an empty item ends the list.
+const BULLET = '\u2022 ';
+const LIST_RE = /^(\u2022 |\d+\.\s)/;
+function listKind(text) {
+  const ls = text.split('\n').filter((l) => l.trim());
+  if (!ls.length) return '';
+  if (ls.every((l) => l.startsWith(BULLET))) return 'bullet';
+  if (ls.every((l) => /^\d+\.\s/.test(l))) return 'number';
+  return '';
+}
+function applyList(text, kind) {
+  let n = 0;
+  return text.split('\n').map((l) => {
+    if (!l.trim()) return l;
+    const b = l.replace(LIST_RE, '');
+    return kind === 'bullet' ? BULLET + b : kind === 'number' ? `${++n}. ${b}` : b;
+  }).join('\n');
+}
+const renumber = (text) => (listKind(text) === 'number' ? applyList(text, 'number') : text);
+function toggleList(kind) {
+  const it = itemOf(S.sel);
+  if (!it || it.type !== 'text') return;
+  const p = pageById(S.sel.page);
+  snapshot();
+  const oldH = it.h;
+  it.text = applyList(it.text || '', listKind(it.text || '') === kind ? '' : kind);
+  if (!it.wrap) giveWrap(p, it);
+  const wasEditing = S.editing === it.id;
+  drawItems(pageIndex(p.id));
+  reflowAfter(p, it, it.y + oldH);
+  if (wasEditing) { const o = $(`.pe-obj[data-id="${it.id}"]`); if (o) { o.focus(); const r = document.createRange(); r.selectNodeContents(o); r.collapse(false); const sl = window.getSelection(); sl.removeAllRanges(); sl.addRange(r); } }
+  updateProps();
+}
+// After a text changed height outside typing (list, resize): move what is under it, then spill.
+function reflowAfter(p, it, oldBottom) {
+  const dy = it.y + it.h - oldBottom;
+  if (!it.wrap || Math.abs(dy) < 0.5) return;
+  const moved = flowBelow(p, it, oldBottom, dy);
+  if (!moved.length) return;
+  S.flowed = new Set(moved.map((m) => m.id));
+  if (spillOver(p, null, null)) rebuild(); else drawItems(pageIndex(p.id));
+}
+// Enter in a list line: the next bullet or number
+function listEnter(e, o, it) {
+  if (e.key !== 'Enter' || e.shiftKey) return;
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  const r = document.createRange(); r.selectNodeContents(o); r.setEnd(sel.anchorNode, sel.anchorOffset);
+  const before = r.toString(), line = before.slice(before.lastIndexOf('\n') + 1);
+  const m = /^(\u2022 |(\d+)\.\s)(.*)$/.exec(line);
+  if (!m) return;
+  e.preventDefault();
+  if (!m[3].trim()) {
+    // empty item: end the list (remove its marker)
+    for (let i = 0; i < m[1].length; i++) document.execCommand('delete');
+    return;
+  }
+  document.execCommand('insertText', false, `\n${m[2] ? `${Number(m[2]) + 1}. ` : BULLET}`);
+}
+
+// The text of an edited box. innerText adds extra blank lines when the browser wraps pasted or
+// typed lines in <div>s, so the lines are read from the nodes: a block starts a new line, <br> is one.
+function readText(el) {
+  let out = '';
+  const walk = (n) => {
+    for (const c of n.childNodes) {
+      if (c.nodeType === 3) out += c.data;
+      else if (c.nodeName === 'BR') out += '\n';
+      else if (c.nodeType === 1) {
+        const block = /^(DIV|P|LI)$/.test(c.nodeName);
+        if (block && out && !out.endsWith('\n')) out += '\n';
+        walk(c);
+      }
+    }
+  };
+  walk(el);
+  return out.replace(/\n$/, '');
+}
+
 // ------------------------------------------------------------ text editing --
 function startEditing(o, it, keepCaret) {
   S.editing = it.id;
@@ -1133,13 +1222,13 @@ function startEditing(o, it, keepCaret) {
     const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
   }
   o.oninput = () => {
-    it.text = o.innerText.replace(/\n$/, '');
+    it.text = readText(o);
     flowWhileTyping(o, it);
     it.w = o.offsetWidth / S.zoom; it.h = o.offsetHeight / S.zoom;
   };
   o.onblur = () => setTimeout(() => { if (S.editing === it.id && document.activeElement !== o) finishEditing(); }, 0);
   o.onpaste = (e) => { e.preventDefault(); document.execCommand('insertText', false, (e.clipboardData || window.clipboardData).getData('text/plain')); };
-  o.onkeydown = (e) => { if (e.key === 'Escape') { e.preventDefault(); o.blur(); finishEditing(); } };
+  o.onkeydown = (e) => { if (e.key === 'Escape') { e.preventDefault(); o.blur(); finishEditing(); return; } listEnter(e, o, it); };
 }
 function editText(pageId, it) {
   const o = $(`.pe-page[data-id="${pageId}"] .pe-obj[data-id="${it.id}"]`);
@@ -1148,6 +1237,7 @@ function editText(pageId, it) {
     snapshot(); S.sel = { page: pageId, id: it.id };
     const p = pageById(pageId);
     if (p && !it.wrap) { giveWrap(p, it); if (it.wrap) { o.classList.add('pe-wrap'); o.style.width = `${it.wrap * S.zoom}px`; o.style.left = `${it.x * S.zoom}px`; it.w = it.wrap; } }
+    S.flowB = it.y + o.offsetHeight / S.zoom; // the things below are placed for this bottom
   }
   $$('.pe-handle').forEach((e) => e.remove()); o.classList.remove('pe-sel');
   startEditing(o, it);
@@ -1167,9 +1257,17 @@ function finishEditing() {
   for (const p of S.pages) {
     const it = p.items.find((i) => i.id === id);
     if (!it) continue;
+    if (it.text) it.text = renumber(it.text);
     if (!it.text || !it.text.trim()) {
       p.items = p.items.filter((i) => i !== it);
       if (S.sel && S.sel.id === id) S.sel = null;
+    }
+    // the box as it is drawn now (not while typing) decides where the things below go
+    const flowB = S.flowB; S.flowB = null;
+    if (flowB != null && it.wrap && p.items.includes(it)) {
+      drawItems(pageIndex(p.id));
+      const dy = it.y + it.h - flowB;
+      if (Math.abs(dy) >= 0.5) for (const m of flowBelow(p, it, flowB, dy)) (S.flowed || (S.flowed = new Set())).add(m.id);
     }
     const el = $(`.pe-page[data-id="${p.id}"] .pe-obj[data-id="${it.id}"]`);
     if (spillOver(p, p.items.includes(it) ? it : null, el)) {
@@ -1652,7 +1750,9 @@ function onPointerMove(e) {
       if (drag.h.includes('s')) { B += ly; if (fromCentre) T -= ly; }
       if (drag.h.includes('n')) { T += ly; if (fromCentre) B -= ly; }
       let w = R - L, h = B - T;
-      if (((it.type === 'image' && !it.clip) || it.type === 'check' || it.type === 'cross' || it.type === 'text') && !e.shiftKey) {
+      const textSide = it.type === 'text' && drag.h.length === 1;
+      if (textSide) { if (drag.h === 's') h = Math.max(h, 4); }
+      else if (((it.type === 'image' && !it.clip) || it.type === 'check' || it.type === 'cross' || it.type === 'text') && !e.shiftKey) {
         const k = Math.max(w / o.w, h / o.h);
         w = o.w * k; h = o.h * k;
         if (fromCentre) { L = -w / 2; R = w / 2; T = -h / 2; B = h / 2; }
@@ -1664,7 +1764,11 @@ function onPointerMove(e) {
       if (w < 4 || h < 4) return;
       const mx = (L + R) / 2, my = (T + B) / 2;
       const cx = o.x + o.w / 2 + mx * cs - my * sn, cy = o.y + o.h / 2 + mx * sn + my * cs;
-      if (it.type === 'text') { it.size = clamp(Math.round(o.size * (w / o.w) * 10) / 10, 4, 400); if (o.wrap) it.wrap = o.wrap * (w / o.w); }
+      if (textSide) {
+        if (drag.h === 'e' || drag.h === 'w') { it.wrap = round(Math.max(it.size, w)); delete it.ax; }
+        else { it.minH = round(h); if (!it.wrap) { it.wrap = round(o.w); delete it.ax; } }
+        w = it.wrap || o.w;
+      } else if (it.type === 'text') { it.size = clamp(Math.round(o.size * (w / o.w) * 10) / 10, 4, 400); if (o.wrap) it.wrap = o.wrap * (w / o.w); }
       Object.assign(it, { x: cx - w / 2, y: cy - h / 2, w, h });
       if (it.type === 'table') { it.rh = o.rh.map((rh) => Math.max(minRowH(it), round(rh * (h / o.h)))); it.rmin = it.rh.slice(); fixTable(it); }
     }
@@ -1726,6 +1830,8 @@ function drawRubber(d) {
 
 let lastTextClick = null;
 function onPointerUp(e) {
+  // remember this click (the one before it decides whether this is a double click)
+  const prevClick = lastTextClick;
   if (drag && drag.kind === 'move' && !drag.moved && drag.it.type === 'text') lastTextClick = { id: drag.it.id, t: performance.now() };
   if (!drag) return;
   if (drag.kind === 'scroll') {
@@ -1751,11 +1857,15 @@ function onPointerUp(e) {
   if (d.kind === 'move' || d.kind === 'resize' || d.kind === 'rotate' || d.kind === 'tgrip') {
     showGuides(null);
     const slot = !d.moved && d.kind === 'move' && S.tool === 'select' ? photoSlotAt(p, d.start, d.it) : null;
-    if (d.moved) { drawItems(idx); updateProps(); updatePanel(); }
+    if (d.moved) {
+      drawItems(idx); updateProps(); updatePanel();
+      // a text box made narrower, wider or taller: what is under it moves with it
+      if (d.kind === 'resize' && d.it.type === 'text' && d.h.length === 1) reflowAfter(p, d.it, d.orig.y + d.orig.h);
+    }
     else if (slot) choosePhoto(p, slot);
     // a second click on a text (or a double click): type in it. The browser's own dblclick
     // event goes to the page, not the text, because the page captures the pointer.
-    else if (d.kind === 'move' && d.it.type === 'text' && S.tool === 'select' && (d.was || (lastTextClick && lastTextClick.id === d.it.id && performance.now() - lastTextClick.t < 450))) { lastTextClick = null; editText(p.id, d.it); }
+    else if (d.kind === 'move' && d.it.type === 'text' && S.tool === 'select' && (d.was || (prevClick && prevClick.id === d.it.id && performance.now() - prevClick.t < 450))) { lastTextClick = null; editText(p.id, d.it); }
     else if (d.kind === 'move' && d.it.type === 'text' && S.tool !== 'select') editText(p.id, d.it);
     else if (d.kind === 'move' && d.it.type === 'table' && d.rc) { S.cell = { id: d.it.id, ...d.rc }; markActiveCell(d.it); updateProps(); }
     return;
@@ -1860,6 +1970,7 @@ function updateProps() {
     if ('underline' in o) FIELDS.underline.setAttribute('aria-pressed', String(!!o.underline));
     const al = o.type === 'table' ? o.align[S.cell && S.cell.id === o.id ? S.cell.c : 0] : o.align;
     $$('[data-align]').forEach((b) => b.setAttribute('aria-pressed', String((al || 'left') === b.dataset.align)));
+    if (o.type === 'text') { const lk = listKind(o.text || ''); $$('[data-list]').forEach((b) => b.setAttribute('aria-pressed', String(lk === b.dataset.list))); }
     if (o.type === 'image') {
       $$('[data-imgshape]').forEach((b) => b.setAttribute('aria-pressed', String((o.clip || 'none') === b.dataset.imgshape)));
       $('#iBorderWrap').hidden = !o.clip;
@@ -1913,6 +2024,10 @@ function bindProps() {
     else { setProp('align', b.dataset.align); end(); }
     updateProps();
   }));
+  $$('[data-list]').forEach((b) => {
+    b.addEventListener('mousedown', (e) => e.preventDefault()); // keep the caret in the text
+    b.addEventListener('click', () => toggleList(b.dataset.list));
+  });
   $$('[data-imgshape]').forEach((b) => b.addEventListener('click', () => setImageShape(b.dataset.imgshape)));
   $('#iIntoShape').addEventListener('click', imageIntoShape);
   $('#iBorder').addEventListener('input', () => { if (!(Number($('#iBorderW').value) > 0)) { $('#iBorderW').value = '3'; setProp('sw', 3); } setProp('stroke', $('#iBorder').value); });

@@ -584,3 +584,6 @@ body.is-editing .pe-app{height:auto;}
 @media (max-width:1180px){ .pe-tool{height:38px; min-width:38px; padding:3px;} }
 /* text with a column width: long lines break inside the column */
 .pe-text.pe-wrap{white-space:pre-wrap; overflow-wrap:break-word;}
+/* side handles of a text box: drag to change its width or height */
+.pe-selbox .pe-handle[data-h="e"],.pe-selbox .pe-handle[data-h="w"]{width:8px; height:18px; margin:-9px 0 0 -4px; border-radius:4px; cursor:ew-resize;}
+.pe-selbox .pe-handle[data-h="s"]{width:18px; height:8px; margin:-4px 0 0 -9px; border-radius:4px; cursor:ns-resize;}
