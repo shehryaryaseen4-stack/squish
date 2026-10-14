@@ -1553,7 +1553,24 @@ async function textRuns(p) {
   return runs;
 }
 
-const RUNS = { edittext: textRuns, editimage: imageRuns };
+// "Edit text" shows (and hovers) whole paragraphs and lists, the way clicking picks them up.
+async function textGroups(p) {
+  const key = `groups:${runKey('edittext', p)}`;
+  if (S.runs.has(key)) return S.runs.get(key);
+  const merged = mergeLines(await textRuns(p)).sort((a, b) => a.base - b.base);
+  const done = new Set(), groups = [];
+  for (const line of merged) {
+    if (done.has(line)) continue;
+    const g = paragraphRuns(merged, line).filter((r) => !done.has(r));
+    if (!g.includes(line)) g.push(line);
+    g.forEach((r) => done.add(r));
+    const x = Math.min(...g.map((r) => r.x)), top = Math.min(...g.map((r) => r.top));
+    groups.push({ x, top, w: Math.max(...g.map((r) => r.x + r.w)) - x, h: Math.max(...g.map((r) => r.top + r.h)) - top });
+  }
+  S.runs.set(key, groups);
+  return groups;
+}
+const RUNS = { edittext: textGroups, editimage: imageRuns };
 async function showRuns(pageEl) {
   const p = pageById(pageEl.dataset.id);
   const layer = pageEl.querySelector('.pe-layer');
@@ -1698,16 +1715,19 @@ function mergeLines(runs) {
 function paragraphRuns(runs, run) {
   const same = (r) => Math.abs(r.size - run.size) < 0.6 && r.bold === run.bold && r.italic === run.italic && r.font === run.font;
   const near = (a, b) => b.x >= a.x - run.size * 1.5 && b.x <= a.x + run.size * 2.5; // list lines hang a little to the right
+  // a heading in capitals (CONTACT, SKILLS) is not part of the text under it
+  const caps = (r) => { const l = r.str.replace(/[^A-Za-z]/g, ''); return l.length > 2 && l === l.toUpperCase(); };
+  const sameKind = (a, b) => caps(a) === caps(b);
   const pool = runs.filter((r) => same(r) && r.str.trim()).sort((a, b) => a.top - b.top);
   const out = [run];
   const step = (a, b) => b.base - a.base;
   for (let cur = run; ;) { // down
-    const nx = pool.find((r) => r.top > cur.top + cur.h * 0.5 && step(cur, r) <= run.size * 2.6 && near(out[0], r) && !out.includes(r));
+    const nx = pool.find((r) => r.top > cur.top + cur.h * 0.5 && step(cur, r) <= run.size * 2.6 && near(out[0], r) && sameKind(cur, r) && !out.includes(r));
     if (!nx) break;
     out.push(nx); cur = nx;
   }
   for (let cur = run; ;) { // up
-    const pv = [...pool].reverse().find((r) => r.top < cur.top - cur.h * 0.5 && step(r, cur) <= run.size * 2.6 && near(out[0], r) && !out.includes(r));
+    const pv = [...pool].reverse().find((r) => r.top < cur.top - cur.h * 0.5 && step(r, cur) <= run.size * 2.6 && near(out[0], r) && sameKind(cur, r) && !out.includes(r));
     if (!pv) break;
     out.unshift(pv); cur = pv;
   }
@@ -1716,6 +1736,7 @@ function paragraphRuns(runs, run) {
   const isItem = (r) => /^\s*(\u2022|[-\u2013*\u25CF\u25AA]|\d+[.)])\s/.test(r.str);
   const first = out.findIndex(isItem);
   if (first > 0 && out.indexOf(run) >= first) out.splice(0, first);
+  else if (first > 0) out.splice(first);
   return out;
 }
 async function editRunAt(p, pt) {
@@ -1975,7 +1996,7 @@ function onPointerMove(e) {
         showRuns(pageEl);
         const pt = ptOf(e, pageEl);
         const p = pageById(pageEl.dataset.id);
-        const runs = S.runs.get(runKey(S.tool, p)) || [];
+        const runs = S.runs.get(S.tool === 'edittext' ? `groups:${runKey('edittext', p)}` : runKey(S.tool, p)) || [];
         $$('.pe-run.hot').forEach((r) => r.classList.remove('hot'));
         const hits = runs.map((r, i) => [r, i]).filter(([r]) => pt.x >= r.x && pt.x <= r.x + r.w && pt.y >= r.top && pt.y <= r.top + r.h)
           .sort((a, b) => a[0].w * a[0].h - b[0].w * b[0].h);
