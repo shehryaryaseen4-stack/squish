@@ -277,7 +277,7 @@ body.is-editing .pe-app{height:auto;}
 .pe-handle[data-h="rot"]{top:-26px !important; left:50% !important; cursor:grab; background:var(--sel); border-color:#fff;}
 .pe-selbox::after{content:""; position:absolute; left:50%; top:-20px; width:1px; height:18px; background:var(--sel);}
 .pe-selbox.no-rot::after{display:none;}
-.pe-obj.pe-locked{pointer-events:none;}
+.pe-obj.pe-locked{cursor:not-allowed;}
 .pe-sel{outline:0;}
 
 /* --------------------------------------------------------- font picker -- */

@@ -1932,6 +1932,103 @@ async function imageRuns(p) {
   return runs;
 }
 
+// Lines, boxes and drawings of the PDF itself (its vector paths), in view points, with their
+// colour: so Select can pick them up like any object (a heading's underline, a coloured box).
+async function vectorRuns(p) {
+  const key = runKey('vector', p);
+  if (S.runs.has(key)) return S.runs.get(key);
+  if (!p.src) { S.runs.set(key, []); return []; }
+  const L = await lib();
+  const page = await pdfPage(p);
+  const vp = page.getViewport({ scale: 1, rotation: rotOf(p) });
+  const ops = await page.getOperatorList();
+  const O = L.OPS;
+  const [vw, vh] = viewSize(p);
+  const runs = [];
+  let ctm = [1, 0, 0, 1, 0, 0], fill = '#000000', stroke = '#000000', lw = 1;
+  const stack = [];
+  const STROKE = new Set([O.stroke, O.closeStroke]), FILL = new Set([O.fill, O.eoFill, O.fillStroke, O.eoFillStroke, O.closeFillStroke, O.closeEOFillStroke]);
+  for (let i = 0; i < ops.fnArray.length; i++) {
+    const fn = ops.fnArray[i], a = ops.argsArray[i];
+    if (fn === O.save) stack.push([ctm, fill, stroke, lw]);
+    else if (fn === O.restore) [ctm, fill, stroke, lw] = stack.pop() || [[1, 0, 0, 1, 0, 0], '#000000', '#000000', 1];
+    else if (fn === O.transform) ctm = L.Util.transform(ctm, a);
+    else if (fn === O.paintFormXObjectBegin) { stack.push([ctm, fill, stroke, lw]); if (a && a[0]) ctm = L.Util.transform(ctm, a[0]); }
+    else if (fn === O.paintFormXObjectEnd) [ctm, fill, stroke, lw] = stack.pop() || [ctm, fill, stroke, lw];
+    else if (fn === O.setFillRGBColor && typeof a[0] === 'string') fill = a[0];
+    else if (fn === O.setStrokeRGBColor && typeof a[0] === 'string') stroke = a[0];
+    else if (fn === O.setLineWidth) lw = a[0];
+    else if (fn === O.constructPath) {
+      const [op, data, mm] = a;
+      const isStroke = STROKE.has(op), isFill = FILL.has(op);
+      if ((!isStroke && !isFill) || !mm) continue;
+      const m = L.Util.transform(vp.transform, ctm);
+      const sc = Math.hypot(m[0], m[1]) || 1;
+      const half = isStroke ? (lw * sc) / 2 : 0;
+      const pts = [[mm[0], mm[1]], [mm[2], mm[1]], [mm[0], mm[3]], [mm[2], mm[3]]].map(([x, y]) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]]);
+      const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
+      const x = clamp(Math.min(...xs) - half, 0, vw), y = clamp(Math.min(...ys) - half, 0, vh);
+      const w = clamp(Math.max(...xs) + half, 0, vw) - x, h = clamp(Math.max(...ys) + half, 0, vh) - y;
+      if (w < 0.5 || h < 0.5 || (w < 3 && h < 3) || w * h > vw * vh * 0.5) continue; // specks and page backgrounds
+      // only straight lines (no curves) with a few corners: a line or a box we can redraw exactly
+      const path = data && data[0];
+      let plain = false;
+      if (path && typeof path.length === 'number' && !(m[1] || m[2])) {
+        plain = true; let n = 0;
+        for (let k = 0; k < path.length;) {
+          const c = path[k++];
+          if (c === 0 || c === 1) { k += 2; n++; } else if (c === 4) { /* close */ } else { plain = false; break; }
+        }
+        if (n > 5) plain = false;
+      }
+      const thin = Math.min(w, h) <= Math.max(3, half * 2 + 0.5);
+      const kind = thin && plain ? 'line' : plain && isFill && !isStroke ? 'box' : 'art';
+      if (runs.some((r) => Math.abs(r.x - x) < 0.5 && Math.abs(r.y - y) < 0.5 && Math.abs(r.w - w) < 0.5 && Math.abs(r.h - h) < 0.5)) continue;
+      runs.push({ x, y, w, h, top: y, kind, color: isFill ? fill : stroke, lw: thin ? (isStroke ? lw * sc : Math.min(w, h)) : lw * sc });
+    }
+  }
+  S.runs.set(key, runs);
+  return runs;
+}
+
+// What of the PDF itself is under the pointer for Select: a paragraph, else the smallest
+// line, box, drawing or image (thin lines are easy to hit: a few pixels around them count).
+function pdfThingAt(p, pt) {
+  const g = groupAt(p, pt);
+  if (g) return { kind: 'text', ...g };
+  const tol = 4 / S.zoom;
+  const all = [...(S.runs.get(runKey('vector', p)) || []), ...(S.runs.get(runKey('editimage', p)) || []).map((r) => ({ ...r, kind: 'image' }))];
+  const covers = p.items.filter((o) => o.cover);
+  return all.filter((r) => pt.x >= r.x - tol && pt.x <= r.x + r.w + tol && pt.y >= r.y - tol && pt.y <= r.y + r.h + tol)
+    .filter((r) => !covers.some((c) => c.x <= r.x + 0.5 && c.y <= r.y + 0.5 && c.x + c.w >= r.x + r.w - 0.5 && c.y + c.h >= r.y + r.h - 0.5))
+    .sort((a, b) => a.w * a.h - b.w * b.h)[0] || null;
+}
+const pdfRunsReady = (p) => ['edittext', 'vector', 'editimage'].every((k) => S.runs.has(k === 'edittext' ? `groups:${runKey(k, p)}` : runKey(k, p)));
+function loadPdfRuns(p) { textGroups(p); vectorRuns(p).catch((e) => { console.warn(e); S.runs.set(runKey('vector', p), []); }); imageRuns(p).catch(() => S.runs.set(runKey('editimage', p), [])); }
+
+// Turn a line, box, drawing or image of the PDF into an object of its own: the original is
+// covered in the colour around it and an exact copy (or a cut-out picture) goes on top.
+async function liftPdfThing(p, r) {
+  const col = pageColors(p, r) || { bg: '#ffffff' };
+  const cover = { id: uid(), type: 'whiteout', color: col.bg, opacity: 100, cover: true, x: r.x - 1, y: r.y - 1, w: r.w + 2, h: r.h + 2 };
+  let it;
+  if (r.kind === 'line') {
+    const wide = r.w >= r.h, lw = Math.max(0.3, Math.round(r.lw * 100) / 100);
+    it = wide ? { x1: r.x, y1: r.y + r.h / 2, x2: r.x + r.w, y2: r.y + r.h / 2 } : { x1: r.x + r.w / 2, y1: r.y, x2: r.x + r.w / 2, y2: r.y + r.h };
+    it = { id: uid(), type: 'line', ...DEFAULTS.line, ...it, color: r.color, width: lw };
+    lineBox(it);
+  } else if (r.kind === 'box') {
+    it = { id: uid(), type: 'rect', ...DEFAULTS.rect, x: r.x, y: r.y, w: r.w, h: r.h, fillOn: true, fill: r.color, color: r.color, width: 0.1 };
+  } else {
+    const a = await addAsset(await cropPage(p, r));
+    it = { id: uid(), type: 'image', asset: a.id, opacity: 100, x: r.x, y: r.y, w: r.w, h: r.h };
+  }
+  snapshot();
+  p.items.push(cover, it);
+  drawItems(pageIndex(p.id));
+  return it;
+}
+
 async function textRuns(p) {
   const key = runKey('edittext', p);
   if (S.runs.has(key)) return S.runs.get(key);
@@ -2246,9 +2343,8 @@ function hoverAt(e) {
     return;
   }
   if (!p || !p.src || it) return;
-  const key = `groups:${runKey('edittext', p)}`;
-  if (!S.runs.has(key)) { textGroups(p); return; } // read once, outlined from the next move on
-  const g = groupAt(p, ptOf(e, pageEl));
+  if (!pdfRunsReady(p)) { loadPdfRuns(p); return; } // read once, outlined from the next move on
+  const g = pdfThingAt(p, ptOf(e, pageEl));
   if (!g) return;
   const z = S.zoom, b = document.createElement('div');
   b.className = 'pe-hoverbox';
@@ -2347,11 +2443,13 @@ function onPointerDown(e) {
     pageEl.setPointerCapture(e.pointerId);
     return;
   }
-  if (tool === 'select' && !it && e.pointerType !== 'touch' && p.src && groupAt(p, pt)) {
-    // the PDF's own text: a click types in it, a drag moves it (it becomes a text box)
+  const thing = tool === 'select' && !it && e.pointerType !== 'touch' && p.src ? pdfThingAt(p, pt) : null;
+  if (thing) {
+    // the PDF's own text, lines, boxes and images: a click picks it up (text takes typing), a
+    // drag moves it (it becomes an object of its own)
     e.preventDefault();
     select(null, null);
-    drag = { kind: 'pdfgrab', page: p, start: pt, moved: false, pageEl };
+    drag = { kind: 'pdfgrab', page: p, start: pt, moved: false, pageEl, thing };
     pageEl.setPointerCapture(e.pointerId);
     return;
   }
@@ -2375,6 +2473,7 @@ function onPointerDown(e) {
   if (tool === 'select') {
     if (!it) { select(null, null); return; }
     e.preventDefault();
+    if (it.locked) { select(p.id, it.id); return; } // locked: it can be picked (to unlock it), not moved
     const was = !!(S.sel && S.sel.id === it.id);
     if (!was) select(p.id, it.id);
     drag = { kind: 'move', page: p, it, start: pt, orig: { x: it.x, y: it.y }, moved: false, pageEl, rc, was };
@@ -2470,12 +2569,13 @@ function onPointerMove(e) {
     const d = drag;
     if (d.moved || Math.hypot(ptOf(e, d.pageEl).x - d.start.x, ptOf(e, d.pageEl).y - d.start.y) < 3 / S.zoom) return;
     d.moved = true;
-    editRunAt(d.page, d.start, { edit: false }).then((t) => {
+    const lift = d.thing.kind === 'text' ? editRunAt(d.page, d.start, { edit: false }) : liftPdfThing(d.page, d.thing);
+    lift.then((t) => {
       if (drag !== d) return; // let go already
       if (!t) { drag = null; return; }
       select(d.page.id, t.id);
       drag = { kind: 'move', page: d.page, it: t, start: d.start, orig: { x: t.x, y: t.y }, moved: false, pageEl: d.pageEl, was: true };
-    });
+    }).catch((err) => { drag = null; toast(err.message, true); });
     return;
   }
   if (drag && drag.kind === 'scroll') {
@@ -2770,7 +2870,11 @@ function onPointerUp(e) {
   if (!drag) return;
   if (drag.kind === 'pdfgrab') {
     const d = drag; drag = null;
-    if (!d.moved) editRunAt(d.page, d.start); // a click: type in that paragraph
+    // a click: type in that paragraph, or select the line, box or picture
+    if (!d.moved) {
+      if (d.thing.kind === 'text') editRunAt(d.page, d.start);
+      else liftPdfThing(d.page, d.thing).then((t) => select(d.page.id, t.id)).catch((err) => toast(err.message, true));
+    }
     return;
   }
   if (drag.kind === 'scroll') {
