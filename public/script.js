@@ -276,7 +276,7 @@
   function addFiles(files){
     files.forEach(file => {
       const fmt = formatOf(file.name);
-      const row = { id: ++seq, file, name: file.name, size: file.size, fmt, state: "ready", quality: 75, reduce: 50, maxDim: 0, optionsOpen: false };
+      const row = { id: ++seq, file, name: file.name, size: file.size, fmt, state: "ready", quality: 75, reduce: 50, level: "recommended", maxDim: 0, optionsOpen: false };
       if (!fmt){ row.state = "error"; row.error = "This file type isn't supported here."; }
       else if (MAX_BYTES && file.size > MAX_BYTES){ row.state = "error"; row.error = tooBig(file.size); }
       else {
@@ -355,6 +355,7 @@
       form.append("format", t ? t[2] : row.target);
       form.append("quality", String(row.quality));
       if (compressMode) form.append("reduce", String(row.reduce)); // "make it N% smaller"
+      if (compressMode && isPdfRow(row)) form.append("level", row.level);
       form.append("maxDim", String(row.maxDim));
       const xhr = new XMLHttpRequest();
       xhr.open("POST", "/api/compress");
@@ -539,7 +540,7 @@
     let convert = "";
     if (compressMode && row.fmt && row.targets && row.targets.length){
       // Compress: no target to pick, just "Compress [PNG]" and image options.
-      const showOptions = isImageTarget(row.target) && row.state === "ready";
+      const showOptions = (isImageTarget(row.target) || isPdfRow(row)) && row.state === "ready";
       convert = `<div class="file-convert">
           <span class="convert-label">${COMPRESS_ICON}Compress</span>
           <span class="fmt-pill">${fsvgHtml(inCat)}${esc(inLabel)}</span>
@@ -559,7 +560,9 @@
         </div>`;
     }
     const removable = !["waiting", "uploading", "converting"].includes(row.state);
-    const options = row.optionsOpen && row.state === "ready" ? `<div class="file-options">
+    const options = row.optionsOpen && row.state === "ready" && compressMode && isPdfRow(row) ? `<div class="file-options">
+        <label>Compression <select class="lvl-sel">${PDF_LEVELS.map(([v, l]) => `<option value="${v}"${v === row.level ? " selected" : ""}>${l}</option>`).join("")}</select></label>
+      </div>` : row.optionsOpen && row.state === "ready" ? `<div class="file-options">
         ${compressMode
           ? `<label>Reduce size by <input type="range" class="r-range" min="10" max="90" step="5" value="${row.reduce}"><span class="q-val">${row.reduce}%</span></label>`
           : `<label>Quality <input type="range" class="q-range" min="10" max="100" value="${row.quality}"><span class="q-val">${row.quality}%</span></label>`}
@@ -573,6 +576,10 @@
         <button class="remove-btn" type="button" aria-label="Remove ${esc(row.name)}"${removable ? "" : " disabled"}>&times;</button>
       </div>${options}${statusHtml(row)}`;
   }
+  // PDF compression levels (the server maps them to Ghostscript settings and picture resolution)
+  const PDF_LEVELS = [["low", "Light (best quality, smaller saving)"], ["recommended", "Recommended (good quality, good saving)"],
+    ["strong", "Strong (smaller file)"], ["extreme", "Extreme (smallest file, lower picture quality)"]];
+  const isPdfRow = row => !!(row.fmt && row.fmt.ext === "pdf");
   const CONVERT_ICON = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2"/><path d="M21 4v5h-5M3 20v-5h5"/></svg>';
   const COMPRESS_ICON = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg>';
   const OPT_ICON = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>';
@@ -586,6 +593,8 @@
     if (q) q.addEventListener("input", () => { row.quality = Number(q.value); el.querySelector(".q-val").textContent = q.value + "%"; });
     const r = el.querySelector(".r-range");
     if (r) r.addEventListener("input", () => { row.reduce = Number(r.value); el.querySelector(".q-val").textContent = r.value + "%"; });
+    const lvl = el.querySelector(".lvl-sel");
+    if (lvl) lvl.addEventListener("change", () => { row.level = lvl.value; });
     const dim = el.querySelector(".dim-sel");
     if (dim) dim.addEventListener("change", () => { row.maxDim = Number(dim.value); });
     el.querySelector(".remove-btn").addEventListener("click", () => { rows.splice(rows.indexOf(row), 1); render(); });

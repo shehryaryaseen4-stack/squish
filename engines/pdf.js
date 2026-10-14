@@ -3,7 +3,7 @@
 //   PDF -> JPG/PNG/WebP/TIFF   every page rendered (pdftoppm); several pages come back as a ZIP
 //   PDF -> TXT / HTML          pdftotext / pdftohtml
 //   PDF -> SVG / EPS / PS      pdftocairo (SVG: one file per page)
-//   PDF -> PDF                 compression with Ghostscript (images downsampled to 150 dpi)
+//   PDF -> PDF                 compression with Ghostscript (pictures down to 300, 150, 100 or 72 dpi)
 //   images -> PDF              pdf-lib, one page per image, page size = image size
 
 const fs = require('fs/promises');
@@ -12,7 +12,10 @@ const { job, run, listFiles, collect, UserError } = require('./cli');
 
 const RASTER = { jpg: 'jpeg', png: 'png', webp: 'png', tiff: 'png' };
 
-async function pdfOut({ buffer, to }) {
+// Compression levels: Ghostscript preset and the resolution pictures are brought down to
+const PDF_LEVELS = { low: ['printer', 300], recommended: ['ebook', 150], strong: ['ebook', 100], extreme: ['ebook', 72] };
+
+async function pdfOut({ buffer, to, level }) {
   return job(async (dir) => {
     const input = path.join(dir, 'input.pdf');
     await fs.writeFile(input, buffer);
@@ -49,8 +52,12 @@ async function pdfOut({ buffer, to }) {
       } else if (to.id === 'eps') { await run('pdftocairo', ['-eps', '-f', '1', '-l', '1', input, path.join(out, 'output.eps')]); }
       else if (to.id === 'ps') { await run('pdftocairo', ['-ps', input, path.join(out, 'output.ps')]); }
       else if (to.id === 'pdf') {
+        const [preset, dpi] = PDF_LEVELS[level] || PDF_LEVELS.recommended;
         await run('gs', ['-q', '-dNOPAUSE', '-dBATCH', '-dSAFER', '-sDEVICE=pdfwrite', '-dCompatibilityLevel=1.5',
-          '-dPDFSETTINGS=/ebook', `-sOutputFile=${path.join(out, 'output.pdf')}`, input]);
+          `-dPDFSETTINGS=/${preset}`, '-dDownsampleColorImages=true', '-dDownsampleGrayImages=true',
+          '-dAutoFilterColorImages=false', '-dColorImageFilter=/DCTEncode', '-dAutoFilterGrayImages=false', '-dGrayImageFilter=/DCTEncode',
+          `-dColorImageResolution=${dpi}`, `-dGrayImageResolution=${dpi}`, `-dMonoImageResolution=${Math.max(dpi * 2, 150)}`,
+          `-sOutputFile=${path.join(out, 'output.pdf')}`, input]);
         const [f] = await listFiles(out);
         const smaller = (await fs.stat(f)).size < buffer.length;
         return { buffer: smaller ? await fs.readFile(f) : buffer, ext: 'pdf' };
