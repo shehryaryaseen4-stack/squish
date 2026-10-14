@@ -711,20 +711,25 @@ const QBAR_ICONS = {
   lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   unlock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/>',
   del: '<path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+  group: '<rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/><path d="M15 3h6v6M3 15v6h6" stroke-dasharray="2 2"/>',
+  ungroup: '<rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/>',
   more: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
 };
 function quickBar(layer, box, locked, z) {
   const bar = document.createElement('div');
   bar.className = 'pe-qbar';
   const btn = (k, title, ico = k) => `<button type="button" data-q="${k}" title="${title}" aria-label="${title}"><svg viewBox="0 0 24 24">${QBAR_ICONS[ico]}</svg></button>`;
-  bar.innerHTML = btn('dup', 'Duplicate (Ctrl+D)') + btn('lock', locked ? 'Unlock' : 'Lock', locked ? 'lock' : 'unlock') + btn('del', 'Delete (Del)') + btn('more', 'More options');
+  const grp = S.group ? (selIsOneGroup() ? btn('ungroup', 'Ungroup (Ctrl+Shift+G)') : btn('group', 'Group (Ctrl+G)')) : '';
+  bar.innerHTML = grp + btn('dup', 'Duplicate (Ctrl+D)') + btn('lock', locked ? 'Unlock' : 'Lock', locked ? 'lock' : 'unlock') + btn('del', 'Delete (Del)') + btn('more', 'More options');
   const above = box.top * z > 46;
   Object.assign(bar.style, { left: `${(box.left + box.w / 2) * z}px`, top: above ? `${box.top * z - 44}px` : `${(box.top + box.h) * z + 12}px` });
   bar.addEventListener('pointerdown', (e) => e.stopPropagation());
   bar.addEventListener('click', (e) => {
     const b = e.target.closest('[data-q]');
     if (!b) return;
-    if (b.dataset.q === 'dup') duplicateSelected();
+    if (b.dataset.q === 'group') groupSelected();
+    else if (b.dataset.q === 'ungroup') ungroupSelected();
+    else if (b.dataset.q === 'dup') duplicateSelected();
     else if (b.dataset.q === 'lock') lockSelected();
     else if (b.dataset.q === 'del') removeSelected();
     else { const r = b.getBoundingClientRect(); showCtx(r.left, r.bottom + 6); }
@@ -1196,6 +1201,7 @@ function decorateSelection() {
 
 // ----------------------------------------------------------- arrange etc. --
 function arrange(where) {
+  if (S.group) { arrangeMany(where); return; }
   const it = itemOf(S.sel);
   if (!it) return;
   const p = pageById(S.sel.page);
@@ -1206,6 +1212,57 @@ function arrange(where) {
   p.items.splice(i, 1); p.items.splice(j, 0, it);
   drawItems(pageIndex(p.id));
 }
+// several selected objects go up or down the layers together, keeping their own order
+function arrangeMany(where) {
+  const p = pageById(S.sel.page);
+  const its = selItems();
+  if (!p || !its.length) return;
+  const rest = p.items.filter((o) => !its.includes(o));
+  const first = p.items.indexOf(its[0]), last = p.items.indexOf(its[its.length - 1]);
+  // their place in the list without them: past the next (or before the previous) other object
+  const before = p.items.slice(0, first).filter((o) => !its.includes(o)).length;
+  const upTo = p.items.slice(0, last + 1).filter((o) => !its.includes(o)).length;
+  const at = clamp({ tofront: rest.length, toback: 0, forward: upTo + 1, backward: before - 1 }[where], 0, rest.length);
+  const next = [...rest.slice(0, at), ...its, ...rest.slice(at)];
+  if (next.every((o, i) => o === p.items[i])) return;
+  snapshot();
+  p.items.splice(0, p.items.length, ...next);
+  drawItems(pageIndex(p.id)); decorateSelection(); renderLayers();
+}
+
+// ------------------------------------------------------------------ groups --
+// Grouped objects share a grp id: one click picks up the whole group, which then moves, copies
+// and goes up or down the layers as one. A second click on one of them picks just that one
+// (a text then takes typing). Ctrl+G groups, Ctrl+Shift+G ungroups.
+function regroup(copies) {
+  const map = new Map();
+  copies.forEach((c) => { if (c.grp) { if (!map.has(c.grp)) map.set(c.grp, uid()); c.grp = map.get(c.grp); } });
+  return copies;
+}
+const groupOf = (p, it) => (it && it.grp ? p.items.filter((o) => o.grp === it.grp && !o.hidden) : null);
+const selIsOneGroup = () => { const its = selItems(); return its.length > 1 && !!its[0].grp && its.every((o) => o.grp === its[0].grp); };
+function groupSelected() {
+  const its = selItems();
+  if (its.length < 2) { toast('Select two or more objects first (Shift+click, or drag a box around them).'); return; }
+  snapshot();
+  const g = uid(); its.forEach((o) => { o.grp = g; });
+  // the group sits together in the layers, where its top object was
+  const p = pageById(S.sel.page), top = Math.max(...its.map((o) => p.items.indexOf(o)));
+  const below = p.items.slice(0, top + 1).filter((o) => !its.includes(o)), above = p.items.slice(top + 1);
+  p.items.splice(0, p.items.length, ...below, ...its, ...above);
+  drawItems(pageIndex(p.id)); selectGroup(p.id, its.map((o) => o.id));
+  toast('Grouped. Click once to pick up the group, click again to change one part.');
+}
+function ungroupSelected() {
+  const its = selItems().filter((o) => o.grp);
+  if (!its.length) return;
+  snapshot();
+  const p = pageById(S.sel.page), ids = new Set(its.map((o) => o.grp));
+  p.items.forEach((o) => { if (ids.has(o.grp)) delete o.grp; });
+  decorateSelection(); updateProps(); renderLayers();
+  toast('Ungrouped.');
+}
+
 function toggleFlag(sel, flag) {
   const it = itemOf(sel);
   if (!it) return;
@@ -1226,7 +1283,7 @@ function copySel(cut) {
 function pasteClip() {
   if (!clip) return false;
   const p = S.pages[S.current] || S.pages[0];
-  const cs = clip.items.map((o) => ({ ...JSON.parse(JSON.stringify(o)), id: uid(), locked: false, hidden: false }));
+  const cs = regroup(clip.items.map((o) => ({ ...JSON.parse(JSON.stringify(o)), id: uid(), locked: false, hidden: false })));
   if (clip.page === p.id) cs.forEach((c) => moveItem(c, 12, 12));
   // keep the whole group on the page
   const [vw, vh] = viewSize(p);
@@ -1282,7 +1339,7 @@ function duplicateSelected() {
     if (itemTop(o) < B - 1 || itemLeft(o) >= R - 1 || itemRight(o) <= L + 1) continue;
     shiftY(o, dy); moved.push(o);
   }
-  const copies = its.map((o) => { const c = { ...JSON.parse(JSON.stringify(o)), id: uid(), locked: false, hidden: false }; shiftY(c, dy); return c; });
+  const copies = regroup(its.map((o) => { const c = { ...JSON.parse(JSON.stringify(o)), id: uid(), locked: false, hidden: false }; shiftY(c, dy); return c; }));
   // the copies go right after the last original in the layer order
   p.items.splice(Math.max(...its.map((o) => p.items.indexOf(o))) + 1, 0, ...copies);
   S.flowed = new Set([...moved, ...copies].map((o) => o.id));
@@ -2125,11 +2182,11 @@ function paragraphRuns(runs, run) {
   else if (first > 0) out.splice(first);
   return out;
 }
-async function editRunAt(p, pt) {
+async function editRunAt(p, pt, { edit = true } = {}) {
   const runs = await textRuns(p);
   const merged = mergeLines(runs);
   const run = merged.find((r) => pt.x >= r.x - 1 && pt.x <= r.x + r.w + 1 && pt.y >= r.top - 1 && pt.y <= r.top + r.h + 1);
-  if (!run) { toast('Click on a line of text in the PDF to change it.'); return; }
+  if (!run) { if (edit) toast('Click on a line of text in the PDF to change it.'); return null; }
   snapshot();
   const lines = paragraphRuns(merged, run);
   const size = Math.round(run.size * 10) / 10;
@@ -2157,6 +2214,7 @@ async function editRunAt(p, pt) {
   p.items.push(...covers, t);
   drawItems(pageIndex(p.id));
   S.sel = { page: p.id, id: t.id };
+  if (!edit) return t;
   editText(p.id, t);
   if (lines.length > 1) toast(`Editing the whole paragraph (${lines.length} lines). Lines wrap inside the box; drag its sides to change the width.`);
 }
@@ -2182,7 +2240,11 @@ function hoverAt(e) {
   const cur = $('.pe-obj.pe-hover');
   if (ok && cur === objEl) return;
   hoverOff();
-  if (ok) { objEl.classList.add('pe-hover'); return; }
+  if (ok) {
+    objEl.classList.add('pe-hover');
+    (groupOf(p, it) || []).forEach((o) => { const el = pageEl.querySelector(`.pe-obj[data-id="${o.id}"]`); if (el) el.classList.add('pe-hover'); });
+    return;
+  }
   if (!p || !p.src || it) return;
   const key = `groups:${runKey('edittext', p)}`;
   if (!S.runs.has(key)) { textGroups(p); return; } // read once, outlined from the next move on
@@ -2275,10 +2337,21 @@ function onPointerDown(e) {
     return;
   }
   if (tool === 'select' && it && (e.shiftKey || e.ctrlKey || e.metaKey)) { e.preventDefault(); toggleGroup(p.id, it.id); return; }
+  const grpIts = tool === 'select' && it && !e.shiftKey && !e.ctrlKey && !e.metaKey && !(S.group && S.group.has(it.id)) && !(S.sel && S.sel.id === it.id) ? groupOf(p, it) : null;
+  if (grpIts && grpIts.length > 1) selectGroup(p.id, grpIts.map((o) => o.id));
   if (tool === 'select' && it && S.group && S.group.has(it.id) && S.sel.page === p.id) {
     e.preventDefault();
+    const fresh = !!grpIts;
     const its = selItems().filter((o) => !o.locked);
-    drag = { kind: 'gmove', page: p, its, orig: its.map((o) => JSON.parse(JSON.stringify(o))), start: pt, moved: false, clickId: it.id };
+    drag = { kind: 'gmove', page: p, its, orig: its.map((o) => JSON.parse(JSON.stringify(o))), start: pt, moved: false, clickId: it.id, fresh };
+    pageEl.setPointerCapture(e.pointerId);
+    return;
+  }
+  if (tool === 'select' && !it && e.pointerType !== 'touch' && p.src && groupAt(p, pt)) {
+    // the PDF's own text: a click types in it, a drag moves it (it becomes a text box)
+    e.preventDefault();
+    select(null, null);
+    drag = { kind: 'pdfgrab', page: p, start: pt, moved: false, pageEl };
     pageEl.setPointerCapture(e.pointerId);
     return;
   }
@@ -2388,6 +2461,19 @@ function onPointerMove(e) {
       if (dx) delete o.ax;
     });
     drawItems(pageIndex(drag.page.id));
+    showGaps(pageEl, drag.page, drag.its);
+    return;
+  }
+  if (drag && drag.kind === 'pdfgrab') {
+    const d = drag;
+    if (d.moved || Math.hypot(ptOf(e, d.pageEl).x - d.start.x, ptOf(e, d.pageEl).y - d.start.y) < 3 / S.zoom) return;
+    d.moved = true;
+    editRunAt(d.page, d.start, { edit: false }).then((t) => {
+      if (drag !== d) return; // let go already
+      if (!t) { drag = null; return; }
+      select(d.page.id, t.id);
+      drag = { kind: 'move', page: d.page, it: t, start: d.start, orig: { x: t.x, y: t.y }, moved: false, pageEl: d.pageEl, was: true };
+    });
     return;
   }
   if (drag && drag.kind === 'scroll') {
@@ -2454,6 +2540,7 @@ function onPointerMove(e) {
     o.style.left = `${it.x * S.zoom}px`; o.style.top = `${it.y * S.zoom}px`;
     showGuides(pageEl, sn.gx, sn.gy);
     decorateSelection();
+    showGaps(pageEl, drag.page, [it]);
     updatePanel();
     return;
   }
@@ -2569,6 +2656,50 @@ function showGuides(pageEl, gx, gy) {
   if (gy != null) { const g = document.createElement('div'); g.className = 'pe-guide h'; g.style.top = `${gy * S.zoom}px`; layer.append(g); }
 }
 
+// While something is dragged: the space to the nearest object above, below, left and right,
+// as a pink line with the distance on it (in the ruler's unit), so gaps can be matched by eye.
+function showGaps(pageEl, p, its) {
+  $$('.pe-gap').forEach((g) => g.remove());
+  if (!pageEl || !its || !its.length) return;
+  $$('.pe-qbar').forEach((q) => { q.style.visibility = 'hidden'; }); // it would cover the numbers
+  const [W, H] = viewSize(p);
+  const L = Math.min(...its.map(itemLeft)), T = Math.min(...its.map(itemTop)), R = Math.max(...its.map(itemRight)), B = Math.max(...its.map(itemBottom));
+  const others = p.items.filter((o) => !its.includes(o) && !o.hidden && !o.cover && !isBackdrop(o, W, H));
+  // on an opened PDF, its own paragraphs count too (not the ones already covered and retyped)
+  const covers = p.items.filter((o) => o.cover);
+  for (const g of S.runs.get(`groups:${runKey('edittext', p)}`) || []) {
+    if (covers.some((c) => c.x < g.x + g.w && c.x + c.w > g.x && c.y < g.top + g.h && c.y + c.h > g.top)) continue;
+    others.push({ x: g.x, y: g.top, w: g.w, h: g.h });
+  }
+  const near = (dir) => {
+    let best = null;
+    for (const o of others) {
+      const l = itemLeft(o), t = itemTop(o), r = itemRight(o), b = itemBottom(o);
+      const vert = dir === 'up' || dir === 'down';
+      if (vert ? Math.min(r, R) - Math.max(l, L) <= 0 : Math.min(b, B) - Math.max(t, T) <= 0) continue; // not side by side
+      const gap = { up: T - b, down: t - B, left: L - r, right: l - R }[dir];
+      if (gap < 0.5) continue;
+      if (!best || gap < best.gap) best = { gap, l, t, r, b };
+    }
+    return best;
+  };
+  const z = S.zoom, layer = pageEl.querySelector('.pe-layer');
+  const draw = (dir, n) => {
+    if (!n) return;
+    const g = document.createElement('div'); g.className = `pe-gap ${dir === 'up' || dir === 'down' ? 'v' : 'h'}`;
+    if (dir === 'up' || dir === 'down') {
+      const x = (Math.max(n.l, L) + Math.min(n.r, R)) / 2, y = dir === 'up' ? n.b : B;
+      Object.assign(g.style, { left: `${x * z}px`, top: `${y * z}px`, height: `${n.gap * z}px` });
+    } else {
+      const y = (Math.max(n.t, T) + Math.min(n.b, B)) / 2, x = dir === 'left' ? n.r : R;
+      Object.assign(g.style, { left: `${x * z}px`, top: `${y * z}px`, width: `${n.gap * z}px` });
+    }
+    const lab = document.createElement('span'); lab.textContent = String(toU(n.gap));
+    g.append(lab); layer.append(g);
+  };
+  ['up', 'down', 'left', 'right'].forEach((d) => draw(d, near(d)));
+}
+
 function drawRubber(d) {
   const z = S.zoom;
   if (d.tool === 'line' || d.tool === 'arrow') {
@@ -2585,8 +2716,14 @@ function drawRubber(d) {
 function onPointerUp(e) {
   if (drag && (drag.kind === 'gmove' || drag.kind === 'marquee')) {
     const d = drag; drag = null;
+    showGaps(null);
     if (d.kind === 'gmove') {
-      if (!d.moved) select(d.page.id, d.clickId); // a click on one of them: just that one
+      if (!d.moved && !d.fresh) {
+        // a click on one of them: just that one (a text takes typing straight away)
+        select(d.page.id, d.clickId);
+        const one = d.page.items.find((o) => o.id === d.clickId);
+        if (one && one.type === 'text' && !one.locked) { editText(d.page.id, one); caretAt(d.page.id, one, e); }
+      }
       else { drawItems(pageIndex(d.page.id)); updatePanel(); }
       return;
     }
@@ -2605,6 +2742,11 @@ function onPointerUp(e) {
     return;
   }
   if (!drag) return;
+  if (drag.kind === 'pdfgrab') {
+    const d = drag; drag = null;
+    if (!d.moved) editRunAt(d.page, d.start); // a click: type in that paragraph
+    return;
+  }
   if (drag.kind === 'scroll') {
     if (e && e.pointerId !== undefined && e.pointerId !== drag.pid) return;
     const d = drag; drag = null;
@@ -2626,7 +2768,7 @@ function onPointerUp(e) {
   const d = drag; drag = null;
   const p = d.page, idx = pageIndex(p.id);
   if (d.kind === 'move' || d.kind === 'resize' || d.kind === 'rotate' || d.kind === 'tgrip') {
-    showGuides(null);
+    showGuides(null); showGaps(null);
     const slot = !d.moved && d.kind === 'move' && S.tool === 'select' ? photoSlotAt(p, d.start, d.it) : null;
     if (d.moved) {
       drawItems(idx); updateProps(); updatePanel();
@@ -3456,6 +3598,8 @@ function showCtx(x, y) {
   const lock = $('[data-ctx="lock"]', m); lock.firstChild.textContent = it && it.locked ? 'Unlock' : 'Lock';
   $('[data-ctx="pastestyle"]', m).disabled = !it || !styleClip;
   $$('.pe-ctx-table', m).forEach((x) => { x.hidden = !(it && it.type === 'table'); });
+  $('[data-ctx="group"]', m).hidden = !S.group || selIsOneGroup();
+  $('[data-ctx="ungroup"]', m).hidden = !selItems().some((o) => o.grp);
   $$('.pe-ctx-image', m).forEach((x) => { x.hidden = !(it && it.type === 'image'); });
   $('[data-ctx="delete"]', m).firstChild.textContent = it && it.type === 'table' ? 'Delete table' : 'Delete';
   m.hidden = false;
@@ -3476,6 +3620,8 @@ function ctxAction(a) {
   else if (a.startsWith('al-')) alignTo(a.slice(3));
   else if (a.startsWith('flip-')) flipSelected(a.slice(5));
   else if (a === 'hide') toggleFlag(S.sel, 'hidden');
+  else if (a === 'group') groupSelected();
+  else if (a === 'ungroup') ungroupSelected();
   else if (a.startsWith('t-')) tableOp(a.slice(2));
   else if (a === 'intoshape') imageIntoShape();
   else if (a.startsWith('shape-')) setImageShape(a.slice(6));
@@ -4230,6 +4376,7 @@ function onKey(e) {
   if (mod && e.key.toLowerCase() === 'c') { if (copySel(false)) e.preventDefault(); return; }
   if (mod && e.key.toLowerCase() === 'x') { if (copySel(true)) e.preventDefault(); return; }
   if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); duplicateSelected(); return; }
+  if (mod && e.key.toLowerCase() === 'g') { e.preventDefault(); if (e.shiftKey) ungroupSelected(); else groupSelected(); return; }
   if (mod && (e.code === 'BracketRight' || e.code === 'BracketLeft')) { e.preventDefault(); arrange(e.code === 'BracketRight' ? (e.shiftKey ? 'tofront' : 'forward') : (e.shiftKey ? 'toback' : 'backward')); return; }
   if (e.key === '?') { $('#peHelpDlg').showModal(); return; }
   if (e.shiftKey && !mod && e.key.toLowerCase() === 'r') { setRulers(!$('#peStage').classList.contains('rulers')); return; }
