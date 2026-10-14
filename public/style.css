@@ -136,6 +136,7 @@ a{color:inherit;}
 .fmt-none, .fmt-hint{display:none; color:var(--dim); font-size:.9rem; padding:6px 4px;}
 .fmt-hint{display:block;}
 .fmt-panel.searching .fmt-grid{display:flex;}
+.fmt-panel.searching .fmt-grid[hidden]{display:none;}
 .fmt-panel.searching .fmt-cat.is-active{background:transparent; color:var(--ink); font-weight:400;}
 .fmt-panel.searching .fmt-arrow{visibility:hidden;}
 .fmt-panel.searching .mega-head{display:none;}

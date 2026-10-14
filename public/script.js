@@ -46,7 +46,17 @@
     function filter(){
       const term = q.value.trim().toLowerCase().replace(/^\./, "");
       let shown = 0;
-      panel.querySelectorAll(".fmt-btn").forEach(b => { const ok = !term || b.dataset.name.includes(term); b.hidden = !ok; if (ok) shown++; });
+      // a format listed in several categories (PDF is a document, an ebook and a vector
+      // format) shows once in the results
+      const seen = new Set();
+      panel.querySelectorAll(".fmt-btn").forEach(b => {
+        const key = b.getAttribute("href") + "|" + b.textContent.trim();
+        const ok = !term || (b.dataset.name.includes(term) && !seen.has(key));
+        if (term && ok) seen.add(key);
+        b.hidden = !ok; if (ok) shown++;
+      });
+      // and categories with nothing left leave no gap
+      grids().forEach(g => { g.hidden = !!term && !g.querySelector(".fmt-btn:not([hidden])"); });
       panel.classList.toggle("searching", !!term);
       panel.classList.toggle("no-match", !!term && shown === 0);
     }
