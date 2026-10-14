@@ -598,3 +598,35 @@ body.is-editing .pe-app{height:auto;}
 .pe-gbox{position:absolute; z-index:5; pointer-events:none; border:1.5px dashed var(--sel); border-radius:3px;}
 .pe-gbox::after{content:attr(data-n); position:absolute; left:0; top:-22px; padding:2px 7px; border-radius:5px; background:var(--sel); color:#fff; font:600 11px/16px system-ui,sans-serif; white-space:nowrap;}
 .pe-marquee{position:absolute; z-index:6; pointer-events:none; border:1px solid var(--sel); background:rgba(37,99,235,.08);}
+/* the small bar above a selection (duplicate, lock, delete, more) */
+.pe-qbar{position:absolute; z-index:7; transform:translateX(-50%); display:flex; gap:2px; padding:4px; background:#fff; border:1px solid #E2E4E8; border-radius:12px; box-shadow:0 6px 18px rgba(20,24,32,.16); white-space:nowrap;}
+.pe-qbar button{display:flex; align-items:center; justify-content:center; width:30px; height:30px; border:0; border-radius:8px; background:none; color:#3A3F48; cursor:pointer; padding:0;}
+.pe-qbar button:hover{background:#F1F2F4; color:#111;}
+.pe-qbar button[data-q="del"]:hover{background:#FDECEC; color:#E5322D;}
+.pe-qbar svg{width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;}
+.pe-qbar button[data-q="more"] svg{fill:currentColor; stroke:none;}
+/* Elements: text styles, icons, lines */
+.pe-elements{position:fixed; z-index:60; width:300px; max-height:70vh; overflow:auto; padding:12px; display:block;}
+.pe-elements[hidden]{display:none;}
+.pe-elements h3{margin:6px 2px 8px; font-size:.75rem; letter-spacing:.06em; text-transform:uppercase; color:#6B7079;}
+.pe-el-text{display:block; width:100%; text-align:left; margin-bottom:6px; padding:9px 12px; border:1px solid #E2E4E8; border-radius:9px; background:#fff; color:#23262D; cursor:pointer; font-family:inherit;}
+.pe-el-text:hover{border-color:#E5322D;}
+.pe-el-icons{display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-bottom:8px;}
+.pe-el-icons button{display:flex; align-items:center; justify-content:center; aspect-ratio:1; border:1px solid #E2E4E8; border-radius:9px; background:#fff; color:#23262D; cursor:pointer; padding:0;}
+.pe-el-icons button:hover{border-color:#E5322D; color:#E5322D;}
+.pe-el-icons svg{width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;}
+/* icons on the page */
+.pe-obj svg{display:block;}
+/* + Add page under the last page */
+.pe-addpage{display:flex; align-items:center; justify-content:center; gap:6px; max-width:100%; height:40px; flex:none; border:1.5px dashed #C9CDD5; border-radius:10px; background:#fff; color:#3A3F48; font:inherit; font-weight:700; cursor:pointer;}
+.pe-addpage:hover{border-color:#E5322D; color:#E5322D;}
+.pe-addpage svg{width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round;}
+/* text size − / + and the context menu's align row */
+.pe-sizebox{gap:2px;}
+.pe-step{width:26px; height:28px; border:1px solid var(--line); border-radius:6px; background:#fff; font:inherit; font-weight:700; cursor:pointer; color:var(--ink-2);}
+.pe-step:hover{border-color:var(--brand); color:var(--brand);}
+.pe-ctx-row{display:flex; align-items:center; gap:2px; padding:4px 8px;}
+.pe-ctx-row span{flex:1; font-size:.85rem; color:#6B7079;}
+.pe-ctx-row button{display:flex; align-items:center; justify-content:center; width:28px; height:28px; padding:0; border:0; border-radius:6px; background:none; cursor:pointer; color:#3A3F48;}
+.pe-ctx-row button:hover{background:#F1F2F4;}
+.pe-ctx-row svg{width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round;}

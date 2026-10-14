@@ -89,6 +89,7 @@
             <button type="button" data-tool="cross"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>Cross</button>
           </div>
         </div>
+        <button type="button" class="pe-tool" data-act="elements" title="Text styles, icons and lines" aria-haspopup="true"><svg viewBox="0 0 24 24"><circle cx="7" cy="7" r="3.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><path d="M7 14l3.5 6h-7z"/><path d="M14 17h7M17.5 13.5v7"/></svg><span>Elements</span></button>
         <button type="button" class="pe-tool" data-act="tablepick" title="Insert a table" aria-haspopup="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1.5"/><path d="M3 9.5h18M3 15h18M9 4v16M15 4v16"/></svg><span>Table</span></button>
         <span class="pe-sep" aria-hidden="true"></span>
         <button type="button" class="pe-tool" data-act="image" title="Insert image"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg><span>Image</span></button>
@@ -124,8 +125,8 @@
             <label class="pe-prop" data-for="fill" title="Fill"><span class="pe-lbl">Fill</span><span class="pe-swatch"><input type="color" id="pFill" value="#ffffff" aria-label="Fill colour"></span><input type="checkbox" id="pFillOn" aria-label="Fill on"></label>
             <label class="pe-prop" data-for="width" title="Thickness"><span class="pe-lbl">Size</span><input type="range" id="pWidth" min="1" max="16" value="2"><output id="pWidthOut">2</output></label>
             <span class="pe-prop" data-for="font"><button type="button" class="pe-fontbtn" id="pFontBtn" aria-haspopup="true" title="Font"><span id="pFontName">Helvetica</span><svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></svg></button></span>
-            <label class="pe-prop" data-for="size" title="Font size"><input type="number" id="pSize" min="4" max="200" value="14" aria-label="Font size"><span class="pe-lbl">pt</span></label>
-            <span class="pe-prop" data-for="style"><button type="button" class="pe-toggle" id="pBold" aria-pressed="false" title="Bold (Ctrl+B)"><b>B</b></button><button type="button" class="pe-toggle" id="pItalic" aria-pressed="false" title="Italic (Ctrl+I)"><i>I</i></button><button type="button" class="pe-toggle" id="pUnder" aria-pressed="false" title="Underline (Ctrl+U)"><u>U</u></button></span>
+            <span class="pe-prop pe-sizebox" data-for="size"><button type="button" class="pe-step" data-size="-1" title="Smaller" aria-label="Smaller text">&minus;</button><input type="number" id="pSize" min="4" max="200" value="14" aria-label="Font size" title="Font size"><button type="button" class="pe-step" data-size="1" title="Bigger" aria-label="Bigger text">+</button></span>
+            <span class="pe-prop" data-for="style"><button type="button" class="pe-toggle" id="pBold" aria-pressed="false" title="Bold (Ctrl+B)"><b>B</b></button><button type="button" class="pe-toggle" id="pItalic" aria-pressed="false" title="Italic (Ctrl+I)"><i>I</i></button><button type="button" class="pe-toggle" id="pUnder" aria-pressed="false" title="Underline (Ctrl+U)"><u>U</u></button><button type="button" class="pe-toggle" id="pStrike" aria-pressed="false" title="Strikethrough"><s>S</s></button><button type="button" class="pe-toggle" id="pCaps" aria-pressed="false" title="All capitals">aA</button></span>
             <span class="pe-prop" data-for="align"><button type="button" class="pe-toggle" data-align="left" title="Align left"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 10h10M4 14h16M4 18h10"/></svg></button><button type="button" class="pe-toggle" data-align="center" title="Align centre"><svg viewBox="0 0 24 24"><path d="M4 6h16M7 10h10M4 14h16M7 18h10"/></svg></button><button type="button" class="pe-toggle" data-align="right" title="Align right"><svg viewBox="0 0 24 24"><path d="M4 6h16M10 10h10M4 14h16M10 18h10"/></svg></button></span>
             <span class="pe-prop pe-spacing" data-for="spacing"><label title="Line height: space between the lines of a paragraph"><svg viewBox="0 0 24 24"><path d="M10 6h10M10 12h10M10 18h10M5 4v16M3 6l2-2 2 2M3 18l2 2 2-2"/></svg><input type="number" id="pLh" min="0.8" max="3" step="0.1" value="1.2" aria-label="Line height"></label><label title="Space between paragraphs and list items (pt)"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 9h12M4 15h16M4 19h12M20 10.5v3"/></svg><input type="number" id="pPs" min="0" max="48" step="1" value="0" aria-label="Paragraph spacing"></label></span>
             <span class="pe-prop" data-for="list"><button type="button" class="pe-toggle" data-list="bullet" aria-pressed="false" title="Bulleted list"><svg viewBox="0 0 24 24"><circle cx="5" cy="7" r="1.4" fill="currentColor" stroke="none"/><circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="5" cy="17" r="1.4" fill="currentColor" stroke="none"/><path d="M9.5 7H20M9.5 12H20M9.5 17H20"/></svg></button><button type="button" class="pe-toggle" data-list="number" aria-pressed="false" title="Numbered list"><svg viewBox="0 0 24 24"><path d="M4 5.5h1.5V9M4 9h3M4 14.2c.3-.7 2.8-.9 2.8.5 0 1-2.8 1.6-2.8 3.3h3M9.5 7H20M9.5 12H20M9.5 17H20"/></svg></button></span>
@@ -165,6 +166,7 @@
               <span id="iBorderWrap" class="pe-imgborder" hidden><span class="pe-lbl">Border</span><span class="pe-swatch" title="Border colour"><input type="color" id="iBorder" value="#ffffff" aria-label="Border colour"></span>
                 <select id="iBorderW" class="pe-select" aria-label="Border width"><option value="0">None</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="5">5</option><option value="8">8</option></select></span>
             </span>
+            <span class="pe-prop" data-for="flip"><button type="button" class="pe-toggle" data-flip="x" title="Flip horizontally" aria-label="Flip horizontally"><svg viewBox="0 0 24 24"><path d="M12 3v18M8 7l-5 5 5 5V7zM16 7l5 5-5 5V7z"/></svg></button><button type="button" class="pe-toggle" data-flip="y" title="Flip vertically" aria-label="Flip vertically"><svg viewBox="0 0 24 24"><path d="M3 12h18M7 8l5-5 5 5H7zM7 16l5 5 5-5H7z"/></svg></button></span>
             <span class="pe-prop" data-for="replace"><button type="button" class="pe-chip" data-act="replaceimg"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M4 20v-5h5"/></svg>Replace</button></span>
             <span class="pe-prop" data-for="layer">
               <button type="button" class="pe-ibtn pe-sm" data-act="front" title="Bring to front" aria-label="Bring to front"><svg viewBox="0 0 24 24"><path d="M12 20V9m-5 5 5-5 5 5"/><path d="M5 4h14"/></svg></button>
@@ -260,11 +262,35 @@
       <div class="pe-tblgrid" id="peTblGrid"></div>
       <span class="pe-tblsize" id="peTblSize">3 rows x 3 columns</span>
     </div>
+    <div class="pe-pop pe-elements" id="peElements" hidden>
+      <h3>Text</h3>
+      <button type="button" class="pe-el-text" data-el="heading"><b style="font-size:20px">Add a heading</b></button>
+      <button type="button" class="pe-el-text" data-el="subheading"><b style="font-size:15px">Add a subheading</b></button>
+      <button type="button" class="pe-el-text" data-el="body"><span style="font-size:13px">Add body text</span></button>
+      <button type="button" class="pe-el-text" data-el="bullets"><span style="font-size:13px">&bull; Add a bulleted list</span></button>
+      <h3>Icons</h3>
+      <div class="pe-el-icons" id="peIconGrid"></div>
+      <h3>Lines and shapes</h3>
+      <div class="pe-el-icons">
+        <button type="button" data-el="divider" title="Divider line"><svg viewBox="0 0 24 24"><path d="M3 12h18"/></svg></button>
+        <button type="button" data-el="rect" title="Rectangle"><svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="1"/></svg></button>
+        <button type="button" data-el="ellipse" title="Circle"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg></button>
+        <button type="button" data-el="photo" title="Photo circle (click it later to add a picture)"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.5c1.5-2.5 3.5-3.5 5.5-3.5s4 1 5.5 3.5"/></svg></button>
+      </div>
+    </div>
     <div class="pe-pop pe-ctx" id="peCtx" role="menu" hidden>
       <button type="button" role="menuitem" data-ctx="cut">Cut<kbd>Ctrl+X</kbd></button>
       <button type="button" role="menuitem" data-ctx="copy">Copy<kbd>Ctrl+C</kbd></button>
       <button type="button" role="menuitem" data-ctx="paste">Paste<kbd>Ctrl+V</kbd></button>
       <button type="button" role="menuitem" data-ctx="dup">Duplicate<kbd>Ctrl+D</kbd></button>
+      <button type="button" role="menuitem" data-ctx="copystyle">Copy style<kbd>Ctrl+Alt+C</kbd></button>
+      <button type="button" role="menuitem" data-ctx="pastestyle">Paste style<kbd>Ctrl+Alt+V</kbd></button>
+      <hr>
+      <div class="pe-ctx-row" role="group" aria-label="Align to page"><span>Align to page</span>
+        <button type="button" data-ctx="al-left" title="Left"><svg viewBox="0 0 24 24"><path d="M4 3v18M8 7h10v4H8zM8 14h6v4H8z"/></svg></button><button type="button" data-ctx="al-hcenter" title="Centre"><svg viewBox="0 0 24 24"><path d="M12 3v18M6 7h12v4H6zM8 14h8v4H8z"/></svg></button><button type="button" data-ctx="al-right" title="Right"><svg viewBox="0 0 24 24"><path d="M20 3v18M6 7h10v4H6zM10 14h6v4h-6z"/></svg></button><button type="button" data-ctx="al-top" title="Top"><svg viewBox="0 0 24 24"><path d="M3 4h18M7 8h4v10H7zM14 8h4v6h-4z"/></svg></button><button type="button" data-ctx="al-vcenter" title="Middle"><svg viewBox="0 0 24 24"><path d="M3 12h18M7 6h4v12H7zM14 8h4v8h-4z"/></svg></button><button type="button" data-ctx="al-bottom" title="Bottom"><svg viewBox="0 0 24 24"><path d="M3 20h18M7 6h4v10H7zM14 10h4v6h-4z"/></svg></button>
+      </div>
+      <button type="button" role="menuitem" class="pe-ctx-image" data-ctx="flip-x">Flip horizontally</button>
+      <button type="button" role="menuitem" class="pe-ctx-image" data-ctx="flip-y">Flip vertically</button>
       <hr class="pe-ctx-table">
       <button type="button" role="menuitem" class="pe-ctx-image" data-ctx="intoshape">Put into shape below</button>
       <button type="button" role="menuitem" class="pe-ctx-image" data-ctx="shape-ellipse">Crop to circle</button>

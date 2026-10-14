@@ -123,7 +123,7 @@ const PROPS = {
   pen: ['color', 'width', 'dash', 'opacity'], line: ['color', 'width', 'dash', 'opacity'], arrow: ['color', 'width', 'dash', 'opacity'],
   check: ['color', 'width'], cross: ['color', 'width'],
   rect: ['color', 'width', 'dash', 'fill', 'radius', 'opacity'], ellipse: ['color', 'width', 'dash', 'fill', 'opacity'],
-  highlight: ['color', 'opacity'], whiteout: ['color'], image: ['imgshape', 'opacity', 'replace'],
+  highlight: ['color', 'opacity'], whiteout: ['color'], image: ['imgshape', 'flip', 'opacity', 'replace'], icon: ['color', 'width', 'opacity'],
   table: ['font', 'size', 'color', 'align', 'table', 'opacity'],
 };
 const DEFAULTS = {
@@ -375,6 +375,13 @@ function rebuild() {
     observer.observe(el);
     drawItems(i);
   });
+  // "+ Add page" under the last page
+  const add = document.createElement('button');
+  add.type = 'button'; add.className = 'pe-addpage';
+  add.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add page';
+  add.style.width = `${viewSize(S.pages[S.pages.length - 1])[0] * S.zoom}px`;
+  add.addEventListener('click', () => { S.current = S.pages.length - 1; addBlankPage(); });
+  view.append(add);
   $('#peZoom').textContent = `${Math.round(S.zoom * 100)}%`;
   buildThumbs();
   markCurrent();
@@ -489,7 +496,8 @@ function renderObjects(layer, p, z, live) {
       Object.assign(o.style, {
         fontFamily: cssFamily(it.font), fontSize: `${it.size * z}px`, color: it.color,
         fontWeight: it.bold ? '700' : '400', fontStyle: it.italic ? 'italic' : 'normal',
-        textDecoration: it.underline ? 'underline' : 'none', textAlign: it.align || 'left',
+        textDecoration: [it.underline && 'underline', it.strike && 'line-through'].filter(Boolean).join(' ') || 'none', textAlign: it.align || 'left',
+        textTransform: it.caps ? 'uppercase' : 'none',
       });
       // a text with a column width wraps inside it
       if (it.wrap) { o.classList.add('pe-wrap'); o.style.width = `${it.wrap * z}px`; }
@@ -501,6 +509,7 @@ function renderObjects(layer, p, z, live) {
       if (it.type === 'image') {
         const a = S.assets.get(it.asset);
         const img = document.createElement('img'); img.alt = ''; img.src = a ? a.url : ''; o.append(img);
+        if (it.flipX || it.flipY) img.style.transform = `scale(${it.flipX ? -1 : 1}, ${it.flipY ? -1 : 1})`;
         // an image in a shape fills it (cover) and is cut to an ellipse or a rounded rectangle
         if (it.clip) {
           o.classList.add('pe-clip');
@@ -531,6 +540,7 @@ function renderObjects(layer, p, z, live) {
 
 const PATHS = { check: 'M0.12 0.55 L0.4 0.84 L0.9 0.16', cross: 'M0.16 0.16 L0.84 0.84 M0.84 0.16 L0.16 0.84' };
 function svgFor(it) {
+  if (it.type === 'icon') return `<svg viewBox="0 0 24 24" fill="none" stroke="${it.color}" stroke-width="${it.width || 2}" stroke-linecap="round" stroke-linejoin="round"><path d="${it.d}"/></svg>`;
   const z = S.zoom;
   const sw = (it.width || 2) * z;
   const dash = dashArray(it, sw);
@@ -629,6 +639,156 @@ function photoBar(it, layer, z) {
   });
   layer.append(bar);
 }
+
+// ------------------------------------------------------- quick actions --
+function flipSelected(axis) {
+  const its = selItems().filter((o) => o.type === 'image');
+  if (!its.length) return;
+  snapshot();
+  const k = axis === 'x' ? 'flipX' : 'flipY';
+  its.forEach((o) => { o[k] = !o[k]; });
+  drawItems(pageIndex(S.sel.page)); updateProps();
+}
+// Copy style / Paste style: colours, fonts and sizes from one object onto others of the same kind
+const STYLE_KEYS = {
+  text: ['color', 'font', 'size', 'bold', 'italic', 'underline', 'strike', 'caps', 'align', 'lh', 'ps', 'opacity'],
+  shape: ['color', 'fill', 'fillOn', 'width', 'dash', 'radius', 'opacity'],
+  image: ['opacity', 'sw', 'stroke'],
+  table: ['font', 'size', 'color', 'headFill', 'headColor', 'border', 'bw', 'borders', 'stripe', 'opacity'],
+};
+const styleKind = (o) => (o.type === 'text' || o.type === 'image' || o.type === 'table' ? o.type : 'shape');
+let styleClip = null;
+function copyStyle() {
+  const it = itemOf(S.sel);
+  if (!it) return;
+  const keys = STYLE_KEYS[styleKind(it)];
+  styleClip = { kind: styleKind(it), props: Object.fromEntries(keys.filter((k) => k in it).map((k) => [k, it[k]])) };
+  toast('Style copied. Select other objects and choose Paste style (Ctrl+Alt+V).');
+}
+function pasteStyle() {
+  if (!styleClip) { toast('Copy a style first: right-click an object and choose Copy style.'); return; }
+  const its = selItems().filter((o) => styleKind(o) === styleClip.kind && !o.locked);
+  if (!its.length) { toast(`That style is for ${styleClip.kind === 'shape' ? 'shapes and lines' : `${styleClip.kind}s`}. Select one of those.`); return; }
+  snapshot();
+  const p = pageById(S.sel.page);
+  for (const o of its) {
+    const oldB = o.y + o.h;
+    Object.assign(o, styleClip.props);
+    if (o.type === 'text' && !isStd(o.font)) ensureFont(o.font, o.bold, o.italic);
+    drawItems(pageIndex(p.id));
+    if (o.type === 'text') reflowAfter(p, o, oldB);
+  }
+  drawItems(pageIndex(p.id)); updateProps();
+}
+function lockSelected() {
+  const its = selItems();
+  if (!its.length) return;
+  snapshot();
+  const lock = !its.every((o) => o.locked);
+  its.forEach((o) => { o.locked = lock; });
+  drawItems(pageIndex(S.sel.page)); decorateSelection(); renderLayers();
+  toast(lock ? 'Locked: it cannot be moved or changed until you unlock it.' : 'Unlocked.');
+}
+// the small bar above the selection: duplicate, lock, delete and the full menu
+const QBAR_ICONS = {
+  dup: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  unlock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/>',
+  del: '<path d="M4 7h16M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+  more: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
+};
+function quickBar(layer, box, locked, z) {
+  const bar = document.createElement('div');
+  bar.className = 'pe-qbar';
+  const btn = (k, title, ico = k) => `<button type="button" data-q="${k}" title="${title}" aria-label="${title}"><svg viewBox="0 0 24 24">${QBAR_ICONS[ico]}</svg></button>`;
+  bar.innerHTML = btn('dup', 'Duplicate (Ctrl+D)') + btn('lock', locked ? 'Unlock' : 'Lock', locked ? 'lock' : 'unlock') + btn('del', 'Delete (Del)') + btn('more', 'More options');
+  const above = box.top * z > 46;
+  Object.assign(bar.style, { left: `${(box.left + box.w / 2) * z}px`, top: above ? `${box.top * z - 44}px` : `${(box.top + box.h) * z + 12}px` });
+  bar.addEventListener('pointerdown', (e) => e.stopPropagation());
+  bar.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-q]');
+    if (!b) return;
+    if (b.dataset.q === 'dup') duplicateSelected();
+    else if (b.dataset.q === 'lock') lockSelected();
+    else if (b.dataset.q === 'del') removeSelected();
+    else { const r = b.getBoundingClientRect(); showCtx(r.left, r.bottom + 6); }
+  });
+  layer.append(bar);
+}
+
+// ---------------------------------------------------------------- elements --
+// Ready text styles, icons, lines and a photo circle, placed in the middle of what is in view.
+const ICONS = {
+  phone: 'M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z',
+  email: 'M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM22 6l-10 7L2 6',
+  location: 'M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0zM12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+  website: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM2 12h20M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z',
+  linkedin: 'M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6zM2 9h4v12H2zM4 6a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+  github: 'M9 19c-5 1.5-5-2.5-7-3m14 6v-3.9a3.4 3.4 0 0 0-.9-2.6c3.1-.4 6.4-1.5 6.4-7a5.4 5.4 0 0 0-1.5-3.7 5 5 0 0 0-.1-3.8s-1.2-.3-3.9 1.5a13.4 13.4 0 0 0-7 0C6.3 1.7 5.1 2 5.1 2a5 5 0 0 0-.1 3.8A5.4 5.4 0 0 0 3.5 9.5c0 5.4 3.3 6.6 6.4 7a3.4 3.4 0 0 0-.9 2.6V22',
+  user: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
+  briefcase: 'M2 7h20v14H2zM16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16',
+  education: 'M22 10L12 5 2 10l10 5 10-5zM6 12v5c3 3 9 3 12 0v-5',
+  calendar: 'M3 4h18v18H3zM16 2v4M8 2v4M3 10h18',
+  award: 'M12 15a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM8.2 13.9L7 23l5-3 5 3-1.2-9.1',
+  language: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
+  code: 'M16 18l6-6-6-6M8 6l-6 6 6 6',
+  star: 'M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z',
+  check: 'M20 6L9 17l-5-5',
+  home: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM9 22V12h6v10',
+};
+function viewCentre() {
+  const p = S.pages[S.current] || S.pages[0];
+  const [vw, vh] = viewSize(p);
+  const pageEl = $(`.pe-page[data-id="${p.id}"]`), vr = $('#peView').getBoundingClientRect();
+  const pr = pageEl ? pageEl.getBoundingClientRect() : vr;
+  const cy = clamp(((Math.max(vr.top, pr.top) + Math.min(vr.bottom, pr.bottom)) / 2 - pr.top) / S.zoom, 30, vh - 30);
+  return { p, vw, vh, cx: vw / 2, cy };
+}
+function addElement(kind) {
+  closeElements();
+  finishEditing();
+  const { p, vw, vh, cx, cy } = viewCentre();
+  snapshot();
+  let it;
+  const TEXTS = {
+    heading: { text: 'Add a heading', size: 24, bold: true },
+    subheading: { text: 'Add a subheading', size: 15, bold: true },
+    body: { text: 'Add a little bit of body text', size: 11, bold: false },
+    bullets: { text: `${BULLET}First point\n${BULLET}Second point\n${BULLET}Third point`, size: 11, bold: false, wrap: 220 },
+  };
+  if (TEXTS[kind]) {
+    const d = { ...DEFAULTS.text, italic: false, underline: false, ...TEXTS[kind] };
+    it = { id: uid(), type: 'text', ...d, x: cx - 80, y: cy - d.size, w: 160, h: d.size * LINE };
+  } else if (ICONS[kind]) {
+    it = { id: uid(), type: 'icon', d: ICONS[kind], name: kind, color: DEFAULTS.text.color, width: 2, opacity: 100, x: cx - 10, y: cy - 10, w: 20, h: 20 };
+  } else if (kind === 'divider') {
+    it = { id: uid(), type: 'line', ...DEFAULTS.line, width: 1, color: '#9ca3af', x1: cx - 120, y1: cy, x2: cx + 120, y2: cy };
+    lineBox(it);
+  } else if (kind === 'rect' || kind === 'ellipse') {
+    it = { id: uid(), type: kind, ...DEFAULTS[kind], x: cx - 60, y: cy - 35, w: 120, h: 70 };
+  } else if (kind === 'photo') {
+    it = { id: uid(), type: 'ellipse', ...DEFAULTS.ellipse, color: '#d1d5db', width: 0, fill: '#e5e7eb', fillOn: true, photo: true, x: cx - 50, y: cy - 50, w: 100, h: 100 };
+  }
+  if (!it) return;
+  it.x = clamp(it.x, 0, Math.max(0, vw - it.w)); it.y = clamp(it.y, 0, Math.max(0, vh - it.h));
+  p.items.push(it);
+  drawItems(pageIndex(p.id));
+  setTool('select');
+  select(p.id, it.id);
+  if (it.type === 'text') editText(p.id, it);
+  if (kind === 'photo') toast('Photo circle added. Click it to choose your picture.');
+}
+function openElements(btn) {
+  const pop = $('#peElements');
+  if (!pop.hidden) { closeElements(); return; }
+  const grid = $('#peIconGrid');
+  if (!grid.children.length) grid.innerHTML = Object.entries(ICONS).map(([k, d]) => `<button type="button" data-el="${k}" title="${k[0].toUpperCase()}${k.slice(1)}"><svg viewBox="0 0 24 24"><path d="${d}"/></svg></button>`).join('');
+  pop.hidden = false;
+  const r = btn.getBoundingClientRect();
+  pop.style.left = `${clamp(r.left + r.width / 2 - pop.offsetWidth / 2, 8, window.innerWidth - pop.offsetWidth - 8)}px`;
+  pop.style.top = `${r.bottom + 8}px`;
+}
+const closeElements = () => { const pop = $('#peElements'); if (pop) pop.hidden = true; };
 
 // ------------------------------------------------------- images in shapes --
 // Put a picture in a circle, ellipse or rounded box: the picture fills the shape and the rest
@@ -955,7 +1115,7 @@ function selectAllOnPage() {
   const [W, H] = viewSize(p);
   selectGroup(p.id, p.items.filter((o) => !o.hidden && !o.locked && !isBackdrop(o, W, H)).map((o) => o.id));
 }
-function clearSelectionUi() { $$('.pe-selbox, .pe-handle, .pe-photobar, .pe-gbox').forEach((e) => e.remove()); }
+function clearSelectionUi() { $$('.pe-selbox, .pe-handle, .pe-photobar, .pe-gbox, .pe-qbar').forEach((e) => e.remove()); }
 // Outline, corner handles and a rotation handle, turned with the object.
 function decorateSelection() {
   clearSelectionUi();
@@ -975,6 +1135,7 @@ function decorateSelection() {
       Object.assign(g.style, { left: `${L * z - 4}px`, top: `${T * z - 4}px`, width: `${(R - L) * z + 8}px`, height: `${(B - T) * z + 8}px` });
       g.dataset.n = `${its.length} selected`;
       gp.append(g);
+      quickBar(gp, { left: L, top: T, w: R - L, h: B - T }, its.every((o) => o.locked), z);
     }
     return;
   }
@@ -990,6 +1151,7 @@ function decorateSelection() {
   };
   if (isLine(it)) {
     if (!it.locked) { handle('p1', layer, it.x1 * z, it.y1 * z); handle('p2', layer, it.x2 * z, it.y2 * z); }
+    quickBar(layer, { left: itemLeft(it), top: itemTop(it), w: itemRight(it) - itemLeft(it), h: itemBottom(it) - itemTop(it) }, !!it.locked, z);
     return;
   }
   const box = document.createElement('div');
@@ -1013,6 +1175,7 @@ function decorateSelection() {
   }
   layer.append(box);
   if (isPhoto(it) && !it.locked) photoBar(it, layer, z);
+  quickBar(layer, { left: itemLeft(it), top: itemTop(it), w: itemRight(it) - itemLeft(it), h: itemBottom(it) - itemTop(it) }, !!it.locked, z);
 }
 
 // ----------------------------------------------------------- arrange etc. --
@@ -1831,7 +1994,7 @@ function startScroll(e, extra = {}) {
 function onPointerDown(e) {
   if (drag && drag.kind === 'scroll') return;
   const pageEl = e.target.closest('.pe-page');
-  if (!pageEl || e.button > 0 || e.target.closest('.pe-photobar')) return;
+  if (!pageEl || e.button > 0 || e.target.closest('.pe-photobar, .pe-qbar')) return;
   const p = pageById(pageEl.dataset.id);
   setCurrent(pageIndex(p.id));
   const pt = ptOf(e, pageEl);
@@ -2108,7 +2271,7 @@ function onPointerMove(e) {
       let w = R - L, h = B - T;
       const textSide = it.type === 'text' && drag.h.length === 1;
       if (textSide) { if (drag.h === 's') h = Math.max(h, 4); }
-      else if (((it.type === 'image' && !it.clip) || it.type === 'check' || it.type === 'cross' || it.type === 'text') && !e.shiftKey) {
+      else if (((it.type === 'image' && !it.clip) || it.type === 'check' || it.type === 'cross' || it.type === 'icon' || it.type === 'text') && !e.shiftKey) {
         const k = Math.max(w / o.w, h / o.h);
         w = o.w * k; h = o.h * k;
         if (fromCentre) { L = -w / 2; R = w / 2; T = -h / 2; B = h / 2; }
@@ -2341,6 +2504,8 @@ function updateProps() {
     if ('bold' in o) FIELDS.bold.setAttribute('aria-pressed', String(!!o.bold));
     if ('italic' in o) FIELDS.italic.setAttribute('aria-pressed', String(!!o.italic));
     if ('underline' in o) FIELDS.underline.setAttribute('aria-pressed', String(!!o.underline));
+    if (o.type === 'text') { $('#pStrike').setAttribute('aria-pressed', String(!!o.strike)); $('#pCaps').setAttribute('aria-pressed', String(!!o.caps)); }
+    if (o.type === 'image') $$('[data-flip]').forEach((b) => b.setAttribute('aria-pressed', String(!!o[b.dataset.flip === 'x' ? 'flipX' : 'flipY'])));
     const al = o.type === 'table' ? o.align[S.cell && S.cell.id === o.id ? S.cell.c : 0] : o.align;
     $$('[data-align]').forEach((b) => b.setAttribute('aria-pressed', String((al || 'left') === b.dataset.align)));
     if (o.type === 'text') { $('#pLh').value = String(o.lh || LINE); $('#pPs').value = String(o.ps || 0); }
@@ -2400,6 +2565,17 @@ function bindProps() {
     else { setProp('align', b.dataset.align); end(); }
     updateProps();
   }));
+  // strikethrough, all capitals, smaller / bigger text, mirrored pictures
+  [$('#pStrike'), $('#pCaps'), ...$$('[data-size]')].forEach((b) => b.addEventListener('mousedown', (e) => e.preventDefault()));
+  $('#pStrike').addEventListener('click', () => { const t = propTarget(); if (t && t.obj.type === 'text') { setProp('strike', !t.obj.strike); end(); updateProps(); } });
+  $('#pCaps').addEventListener('click', () => { const t = propTarget(); if (t && t.obj.type === 'text') { setProp('caps', !t.obj.caps); end(); updateProps(); } });
+  $$('[data-size]').forEach((b) => b.addEventListener('click', () => {
+    const t = propTarget();
+    if (!t || !('size' in t.obj)) return;
+    const v = clamp(Math.round((t.obj.size + Number(b.dataset.size) * (t.obj.size >= 20 ? 2 : 1)) * 2) / 2, 4, 200);
+    FIELDS.size.value = v; setProp('size', v); end();
+  }));
+  $$('[data-flip]').forEach((b) => b.addEventListener('click', () => flipSelected(b.dataset.flip)));
   // line height and paragraph spacing: the box grows or shrinks, and what is under it follows
   const spacing = (key, el, lo, hi) => {
     el.addEventListener('input', () => {
@@ -2575,6 +2751,17 @@ function onDesignInput(id) {
   drawItems(pageIndex(S.sel.page)); updatePanel();
 }
 function alignTo(where) {
+  if (S.group) {
+    const its = selItems().filter((o) => !o.locked);
+    if (!its.length) return;
+    const [vw, vh] = viewSize(pageById(S.sel.page));
+    const L = Math.min(...its.map(itemLeft)), T = Math.min(...its.map(itemTop)), W = Math.max(...its.map(itemRight)) - L, H = Math.max(...its.map(itemBottom)) - T;
+    const nx = { left: 0, hcenter: (vw - W) / 2, right: vw - W }[where], ny = { top: 0, vcenter: (vh - H) / 2, bottom: vh - H }[where];
+    snapshot();
+    its.forEach((o) => moveItem(o, nx === undefined ? 0 : nx - L, ny === undefined ? 0 : ny - T));
+    drawItems(pageIndex(S.sel.page)); decorateSelection(); updatePanel();
+    return;
+  }
   const it = itemOf(S.sel);
   if (!it) return;
   const [vw, vh] = viewSize(pageById(S.sel.page));
@@ -2592,8 +2779,9 @@ function rotateSel(deg) {
   drawItems(pageIndex(S.sel.page)); updatePanel();
 }
 
-const LAYER_NAMES = { table: 'Table', image: 'Image', pen: 'Drawing', highlight: 'Highlight', whiteout: 'Whiteout', rect: 'Rectangle', ellipse: 'Circle', line: 'Line', arrow: 'Arrow', check: 'Check mark', cross: 'Cross' };
+const LAYER_NAMES = { icon: 'Icon', table: 'Table', image: 'Image', pen: 'Drawing', highlight: 'Highlight', whiteout: 'Whiteout', rect: 'Rectangle', ellipse: 'Circle', line: 'Line', arrow: 'Arrow', check: 'Check mark', cross: 'Cross' };
 const LAYER_ICONS = {
+  icon: '<circle cx="12" cy="12" r="8"/><path d="M12 8v8M8 12h8"/>',
   text: '<path d="M5 6V4h14v2M12 4v16m-3 0h6"/>', image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>',
   pen: '<path d="M3 21c3-1 4-4 7-7l7-7a2.1 2.1 0 0 0-3-3l-7 7c-3 3-6 4-7 7z"/>', highlight: '<path d="M9 11l-5 5v4h4l5-5"/><path d="M9 11l6-6 4 4-6 6z"/>',
   whiteout: '<rect x="3" y="6" width="18" height="12" rx="1.5"/>', rect: '<rect x="4" y="5" width="16" height="14" rx="1"/>', ellipse: '<ellipse cx="12" cy="12" rx="8" ry="7"/>',
@@ -3021,19 +3209,24 @@ function openCtx(e) {
   const p = pageById(pageEl.dataset.id);
   setCurrent(pageIndex(p.id));
   const objEl = e.target.closest('.pe-obj[data-id]');
-  if (objEl) { if (S.tool !== 'select') setTool('select'); select(p.id, objEl.dataset.id); } else select(null, null);
+  if (objEl) { if (S.tool !== 'select') setTool('select'); if (!isSelId(objEl.dataset.id)) select(p.id, objEl.dataset.id); } else select(null, null);
+  const cellEl = e.target.closest('.pe-cell');
+  const it0 = itemOf(S.sel);
+  if (it0 && it0.type === 'table' && cellEl) { S.cell = { id: it0.id, r: Number(cellEl.dataset.r), c: Number(cellEl.dataset.c) }; drawItems(pageIndex(p.id)); }
+  showCtx(e.clientX, e.clientY);
+}
+function showCtx(x, y) {
   const it = itemOf(S.sel);
   const m = $('#peCtx');
   $$('[data-ctx]', m).forEach((b) => { b.disabled = b.dataset.ctx === 'paste' ? !clip : !it; });
   const lock = $('[data-ctx="lock"]', m); lock.firstChild.textContent = it && it.locked ? 'Unlock' : 'Lock';
-  const cellEl = e.target.closest('.pe-cell');
-  if (it && it.type === 'table' && cellEl) { S.cell = { id: it.id, r: Number(cellEl.dataset.r), c: Number(cellEl.dataset.c) }; drawItems(pageIndex(p.id)); }
+  $('[data-ctx="pastestyle"]', m).disabled = !it || !styleClip;
   $$('.pe-ctx-table', m).forEach((x) => { x.hidden = !(it && it.type === 'table'); });
   $$('.pe-ctx-image', m).forEach((x) => { x.hidden = !(it && it.type === 'image'); });
   $('[data-ctx="delete"]', m).firstChild.textContent = it && it.type === 'table' ? 'Delete table' : 'Delete';
   m.hidden = false;
-  m.style.left = `${clamp(e.clientX, 8, window.innerWidth - m.offsetWidth - 8)}px`;
-  m.style.top = `${clamp(e.clientY, 8, window.innerHeight - m.offsetHeight - 8)}px`;
+  m.style.left = `${clamp(x, 8, window.innerWidth - m.offsetWidth - 8)}px`;
+  m.style.top = `${clamp(y, 8, window.innerHeight - m.offsetHeight - 8)}px`;
 }
 const closeCtx = () => { const m = $('#peCtx'); if (m) m.hidden = true; };
 function ctxAction(a) {
@@ -3043,7 +3236,11 @@ function ctxAction(a) {
   else if (a === 'paste') pasteClip();
   else if (a === 'dup') duplicateSelected();
   else if (a === 'delete') removeSelected();
-  else if (a === 'lock') toggleFlag(S.sel, 'locked');
+  else if (a === 'lock') lockSelected();
+  else if (a === 'copystyle') copyStyle();
+  else if (a === 'pastestyle') pasteStyle();
+  else if (a.startsWith('al-')) alignTo(a.slice(3));
+  else if (a.startsWith('flip-')) flipSelected(a.slice(5));
   else if (a === 'hide') toggleFlag(S.sel, 'hidden');
   else if (a.startsWith('t-')) tableOp(a.slice(2));
   else if (a === 'intoshape') imageIntoShape();
@@ -3451,6 +3648,16 @@ async function buildPdf(opts = {}) {
     r = Math.max(0, Math.min(r, (x1 - x0) / 2, (y1 - y0) / 2));
     return `M${x0 + r} ${y0} L${x1 - r} ${y0} A${r} ${r} 0 0 1 ${x1} ${y0 + r} L${x1} ${y1 - r} A${r} ${r} 0 0 1 ${x1 - r} ${y1} L${x0 + r} ${y1} A${r} ${r} 0 0 1 ${x0} ${y1 - r} L${x0} ${y0 + r} A${r} ${r} 0 0 1 ${x0 + r} ${y0} Z`;
   };
+  // a mirrored picture: flip the drawing about the picture's centre
+  let curVH = 0;
+  const flipped = (it, draw) => {
+    if (!it.flipX && !it.flipY) { draw(); return; }
+    const cx = it.x + it.w / 2, cy = curVH - (it.y + it.h / 2), sx = it.flipX ? -1 : 1, sy = it.flipY ? -1 : 1;
+    curPage.pushOperators(pushGraphicsState(), concatTransformationMatrix(sx, 0, 0, sy, cx - sx * cx, cy - sy * cy));
+    draw();
+    curPage.pushOperators(popGraphicsState());
+  };
+  let curPage = null;
   const total = S.pages.length;
 
   for (let n = 0; n < total; n++) {
@@ -3479,6 +3686,7 @@ async function buildPdf(opts = {}) {
     const [VW, VH] = viewSize(p);
     page.pushOperators(pushGraphicsState(), concatTransformationMatrix(...pageMatrix(p, raster)));
 
+    curPage = page; curVH = VH;
     for (const it of p.items) {
       if (it.hidden) continue;
       const op = (it.opacity ?? 100) / 100;
@@ -3496,7 +3704,7 @@ async function buildPdf(opts = {}) {
         const lhK = it.lh || LINE, lineH = lhK * it.size, base = baselineOffset(it.font, it.size, lhK);
         const rows = [];
         let top = 0;
-        const paras = it.text.split('\n');
+        const paras = (it.caps ? it.text.toUpperCase() : it.text).split('\n');
         for (let pi = 0; pi < paras.length; pi++) {
           const para = paras[pi], m = it.wrap ? LIST_RE.exec(para) : null;
           if (m) {
@@ -3516,6 +3724,7 @@ async function buildPdf(opts = {}) {
           const y = VH - (it.y + base + row.top);
           ln.draw(x, y, color(it.color), op);
           if (it.underline) page.drawLine({ start: { x, y: y - it.size * 0.12 }, end: { x: x + ln.width, y: y - it.size * 0.12 }, thickness: Math.max(0.5, it.size / 16), color: color(it.color), opacity: op });
+          if (it.strike) page.drawLine({ start: { x, y: y + it.size * 0.3 }, end: { x: x + ln.width, y: y + it.size * 0.3 }, thickness: Math.max(0.5, it.size / 16), color: color(it.color), opacity: op });
         }
       } else if (it.type === 'table') {
         const xs = colXs(it), ys = rowYs(it);
@@ -3580,7 +3789,7 @@ async function buildPdf(opts = {}) {
             const pr = photoRect(it, a);
             const bx = it.x, by = VH - it.y - it.h;
             page.pushOperators(pushGraphicsState(), ...shapePath(bx, by, it.w, it.h, it.clip, it.r), clip(), endPath());
-            page.drawImage(images.get(a.id), { x: bx + pr.x, y: VH - (it.y + pr.y) - pr.h, width: pr.w, height: pr.h, opacity: op });
+            flipped(it, () => page.drawImage(images.get(a.id), { x: bx + pr.x, y: VH - (it.y + pr.y) - pr.h, width: pr.w, height: pr.h, opacity: op }));
             page.pushOperators(popGraphicsState());
             if (it.sw > 0) {
               const sw = it.sw;
@@ -3588,8 +3797,10 @@ async function buildPdf(opts = {}) {
               else if (it.clip === 'rounded' && it.r > 0) page.drawSvgPath(roundRect(it.w, it.h, it.r, sw / 2), { x: it.x, y: VH - it.y, borderColor: color(it.stroke), borderWidth: sw, borderOpacity: op });
               else page.drawRectangle({ x: bx + sw / 2, y: by + sw / 2, width: Math.max(0, it.w - sw), height: Math.max(0, it.h - sw), borderColor: color(it.stroke), borderWidth: sw, borderOpacity: op });
             }
-          } else page.drawImage(images.get(a.id), { x: it.x, y: VH - it.y - it.h, width: it.w, height: it.h, opacity: op });
+          } else flipped(it, () => page.drawImage(images.get(a.id), { x: it.x, y: VH - it.y - it.h, width: it.w, height: it.h, opacity: op }));
         }
+      } else if (it.type === 'icon') {
+        page.drawSvgPath(it.d, { x: it.x, y: VH - it.y, scale: it.w / 24, borderColor: color(it.color), borderWidth: it.width || 2, borderOpacity: op, borderLineCap: LineCapStyle.Round });
       }
       if (it.rot && !isLine(it)) page.pushOperators(popGraphicsState());
     }
@@ -3779,6 +3990,8 @@ function onKey(e) {
     e.preventDefault(); toggleProp({ b: 'bold', i: 'italic', u: 'underline' }[e.key.toLowerCase()]); return;
   }
   if (typing) return;
+  if (mod && e.altKey && e.key.toLowerCase() === 'c') { e.preventDefault(); copyStyle(); return; }
+  if (mod && e.altKey && e.key.toLowerCase() === 'v') { e.preventDefault(); pasteStyle(); return; }
   if (mod && e.key.toLowerCase() === 'c') { if (copySel(false)) e.preventDefault(); return; }
   if (mod && e.key.toLowerCase() === 'x') { if (copySel(true)) e.preventDefault(); return; }
   if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); duplicateSelected(); return; }
@@ -3897,7 +4110,7 @@ function init() {
     if (!e.target.closest('.pe-more')) $$('.pe-more.open').forEach((m) => m.classList.remove('open'));
     if (!e.target.closest('.pe-menu')) $$('.pe-menu.open').forEach((m) => m.classList.remove('open'));
     if (!e.target.closest('#peImgMenu') && !e.target.closest('.pe-page')) closeImgMenu();
-    if (!e.target.closest('#peCtx')) closeCtx();
+    if (!e.target.closest('#peCtx, .pe-qbar')) closeCtx();
     if (!e.target.closest('#peFontPop') && !e.target.closest('#pFontBtn')) closeFontPicker();
   });
   $$('.pe-menu .pe-pop button').forEach((b) => b.addEventListener('click', () => b.closest('.pe-menu').classList.remove('open')));
@@ -3908,6 +4121,7 @@ function init() {
     addpdf: () => $('#peAddPdfInput').click(),
     image: () => { imagePick = null; $('#peImageInput').click(); },
     replaceimg: () => { if (itemOf(S.sel)) { imagePick = { mode: 'item', sel: { ...S.sel } }; $('#peImageInput').click(); } },
+    elements: () => openElements($('[data-act="elements"]')),
     filemenu: () => $('#peFileMenu').classList.toggle('open'),
     pages: () => $('.pe-body').classList.toggle(window.matchMedia('(max-width:860px)').matches ? 'show-pages' : 'no-pages'),
     imgpage: () => $('#peImgPageInput').click(),
@@ -3928,6 +4142,8 @@ function init() {
     export: openExport,
   };
   $$('[data-act]').forEach((b) => b.addEventListener('click', () => { const f = acts[b.dataset.act]; if (f) f(); }));
+  $('#peElements').addEventListener('click', (e) => { const b = e.target.closest('[data-el]'); if (b) addElement(b.dataset.el); });
+  document.addEventListener('pointerdown', (e) => { if (!e.target.closest('#peElements, [data-act="elements"]')) closeElements(); });
   $('#peExportOk').addEventListener('click', doExport);
   $('#peNumbers').addEventListener('change', () => { $('#peNumbersOpts').hidden = !$('#peNumbers').checked; });
   $('#peWatermark').addEventListener('change', () => { $('#peWatermarkOpts').hidden = !$('#peWatermark').checked; });
