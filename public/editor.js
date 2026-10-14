@@ -2454,6 +2454,8 @@ function onPointerMove(e) {
     const dx = pt.x - drag.start.x, dy = pt.y - drag.start.y;
     if (!drag.moved && Math.hypot(dx, dy) < 1.5) return;
     if (!drag.moved) { snapshot(); drag.moved = true; }
+    const np = carryToPage(drag, drag.its, e);
+    if (np) { drag.start = np; drag.orig = drag.its.map((o) => JSON.parse(JSON.stringify(o))); return; }
     drag.its.forEach((o, i) => {
       const g = drag.orig[i];
       o.x = g.x + dx; o.y = g.y + dy;
@@ -2532,6 +2534,8 @@ function onPointerMove(e) {
   if (drag.kind === 'move') {
     if (!drag.moved) { if (Math.hypot(pt.x - drag.start.x, pt.y - drag.start.y) < 2 / S.zoom) return; snapshot(); drag.moved = true; }
     const it = drag.it;
+    const np = carryToPage(drag, [it], e);
+    if (np) { drag.start = np; drag.orig = { x: it.x, y: it.y }; showGuides(null); return; }
     let nx = clamp(drag.orig.x + pt.x - drag.start.x, -it.w + 8, vw - 8);
     let ny = clamp(drag.orig.y + pt.y - drag.start.y, -it.h + 8, vh - 8);
     const sn = e.altKey ? { x: nx, y: ny } : snapMove(drag.page, it, nx, ny);
@@ -2648,6 +2652,28 @@ function snapMove(p, it, nx, ny) {
   const bx = pick(nx, it.w, xs), by = pick(ny, it.h, ys);
   return { x: nx + (bx ? bx.d : 0), y: ny + (by ? by.d : 0), gx: bx ? bx.c : null, gy: by ? by.c : null };
 }
+// Dragging something onto another page moves it to that page: it belongs to the page it is
+// dropped on (so deleting the page it came from no longer deletes it).
+function carryToPage(d, its, e) {
+  const over = pageUnder(e.clientX, e.clientY);
+  if (!over || over.dataset.id === d.page.id || !d.moved) return false;
+  const from = d.page, to = pageById(over.dataset.id);
+  if (!to) return false;
+  const oldEl = $(`.pe-page[data-id="${from.id}"]`);
+  const a = ptOf(e, oldEl), b = ptOf(e, over);
+  for (const o of its) {
+    moveItem(o, b.x - a.x, b.y - a.y);
+    from.items.splice(from.items.indexOf(o), 1);
+    to.items.push(o);
+  }
+  d.page = to; d.pageEl = over;
+  drawItems(pageIndex(from.id));
+  if (its.length > 1) { S.sel = { page: to.id, id: S.sel.id }; S.group = new Set(its.map((o) => o.id)); } else S.sel = { page: to.id, id: its[0].id };
+  setCurrent(pageIndex(to.id));
+  drawItems(pageIndex(to.id));
+  return b;
+}
+
 function showGuides(pageEl, gx, gy) {
   $$('.pe-guide').forEach((g) => g.remove());
   if (!pageEl) return;
