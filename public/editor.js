@@ -253,15 +253,70 @@ async function addPdf(bytes) {
   return pages;
 }
 
+// pdf.js 6 closes a document through its loading task
+const closePdf = (proxy) => { try { if (proxy) (proxy.loadingTask || proxy).destroy(); } catch { /* already closed */ } };
 const blankPage = (w, h) => ({ id: uid(), src: null, box: [0, 0, w, h], baseRot: 0, rot: 0, items: [] });
 
 async function openFile(file) {
   if (!isPdf(file)) { toast('Please choose a PDF file.', true); return; }
   busy(true, 'Opening PDF…');
   try {
-    const pages = await addPdf(await readFile(file));
+    const bytes = await readFile(file);
+    if (await openProject(bytes, file.name)) return;
+    const pages = await addPdf(bytes);
     resetDoc(pages, file.name.replace(/\.pdf$/i, '') + '-edited.pdf', file.name);
   } catch (e) { toast(e.message, true); } finally { busy(false); }
+}
+
+// ------------------------------------------------------- editable project --
+// A PDF saved here carries its editable project as an attachment (flipit-project.json, plus the
+// original PDFs its pages came from). Opening that PDF here again brings back every text box,
+// list, photo and shape as it was, instead of flat PDF lines.
+const PROJECT_FILE = 'flipit-project.json';
+function attachProject(out) {
+  try {
+    const docIds = [...new Set(S.pages.filter((p) => p.src).map((p) => p.src.doc))];
+    const srcBytes = docIds.reduce((n, id) => n + ((S.docs.get(id) || {}).bytes || []).length, 0);
+    if (srcBytes > 25 * 1024 * 1024 || docIds.some((id) => !S.docs.get(id) || !S.docs.get(id).bytes)) return;
+    const used = new Set(S.pages.flatMap((p) => p.items.filter((i) => i.type === 'image').map((i) => i.asset)));
+    const proj = {
+      app: 'flipitfree', v: 1, title: $('#peDocName').textContent, name: $('#peFileName').value,
+      pages: S.pages.map((p) => ({ ...p, src: p.src ? { doc: docIds.indexOf(p.src.doc), index: p.src.index } : null })),
+      assets: [...used].map((id) => S.assets.get(id)).filter(Boolean),
+    };
+    const opt = { mimeType: 'application/json', description: 'Editable copy of this document. Open this PDF at flipitfree.com/edit-pdf to keep editing it.' };
+    out.attach(new TextEncoder().encode(JSON.stringify(proj)), PROJECT_FILE, opt);
+    docIds.forEach((id, i) => out.attach(S.docs.get(id).bytes, `flipit-source-${i}.pdf`, { mimeType: 'application/pdf', description: 'Original pages, for editing again at flipitfree.com' }));
+  } catch (e) { console.warn('Could not attach the editable project', e); }
+}
+async function openProject(bytes, fileName) {
+  let proxy;
+  try {
+    const lib_ = await lib();
+    proxy = await lib_.getDocument({ data: bytes.slice(), isEvalSupported: false }).promise;
+    const att = await proxy.getAttachments();
+    // pdf.js 6 lists attachments in a Map and hands out their bytes separately
+    const has = (n) => !!att && (att instanceof Map ? att.has(n) : !!att[n]);
+    const bytesOf = async (n) => { const v = att instanceof Map ? att.get(n) : att[n]; return (v && v.content) || (proxy.getAttachmentContent ? proxy.getAttachmentContent(n) : null); };
+    if (!has(PROJECT_FILE)) return false;
+    const proj = JSON.parse(new TextDecoder().decode(await bytesOf(PROJECT_FILE)));
+    if (!proj || proj.app !== 'flipitfree' || !Array.isArray(proj.pages)) return false;
+    // the original PDFs behind the pages
+    const docMap = [];
+    for (let i = 0; has(`flipit-source-${i}.pdf`); i++) {
+      const pages = await addPdf(new Uint8Array(await bytesOf(`flipit-source-${i}.pdf`)));
+      docMap[i] = pages.length ? pages[0].src.doc : null;
+    }
+    if (proj.pages.some((p) => p.src && !docMap[p.src.doc])) return false;
+    for (const a of proj.assets || []) if (a && a.id && a.url) S.assets.set(a.id, a);
+    const pages = proj.pages.map((p) => ({ ...p, src: p.src ? { doc: docMap[p.src.doc], index: p.src.index } : null }));
+    resetDoc(pages, proj.name || fileName, proj.title || fileName);
+    toast('Opened with everything editable again: text boxes, lists, photos and shapes, just as you left them.');
+    return true;
+  } catch (e) {
+    console.warn('No editable project in this PDF', e);
+    return false;
+  } finally { closePdf(proxy); }
 }
 
 function createNew() {
@@ -272,7 +327,7 @@ function createNew() {
 }
 
 function resetDoc(pages, name, title) {
-  S.docs.forEach((d, id) => { if (!pages.some((p) => p.src && p.src.doc === id)) { d.proxy.destroy(); S.docs.delete(id); } });
+  S.docs.forEach((d, id) => { if (!pages.some((p) => p.src && p.src.doc === id)) { closePdf(d.proxy); S.docs.delete(id); } });
   S.pages = pages; S.undo = []; S.redo = []; S.sel = null; S.editing = null; S.current = 0; S.dirty = false; S.runs.clear();
   $('#peFileName').value = name;
   $('#peDocName').textContent = title || name;
@@ -1622,20 +1677,78 @@ async function replaceWith(file) {
   }
 }
 
+// The lines of the paragraph (or list) around a clicked line: the same font and size, close
+// under each other and starting near the same left edge. Returns them top to bottom.
+// Pieces of text on the same line with the same style become one line.
+function mergeLines(runs) {
+  const out = [];
+  const sorted = [...runs].sort((a, b) => a.base - b.base || a.x - b.x);
+  for (const r of sorted) {
+    const prev = out.find((o) => Math.abs(o.base - r.base) < r.size * 0.3 && Math.abs(o.size - r.size) < 0.6 && o.bold === r.bold && o.italic === r.italic && o.font === r.font
+      && r.x >= o.x + o.w - r.size * 0.2 && r.x - (o.x + o.w) < r.size * 1.2);
+    if (prev) {
+      const gap = r.x - (prev.x + prev.w);
+      prev.str += (gap > r.size * 0.15 && !/\s$/.test(prev.str) && !/^\s/.test(r.str) ? ' ' : '') + r.str;
+      prev.w = r.x + r.w - prev.x;
+      prev.parts.push(r);
+    } else out.push({ ...r, parts: [r] });
+  }
+  return out;
+}
+function paragraphRuns(runs, run) {
+  const same = (r) => Math.abs(r.size - run.size) < 0.6 && r.bold === run.bold && r.italic === run.italic && r.font === run.font;
+  const near = (a, b) => b.x >= a.x - run.size * 1.5 && b.x <= a.x + run.size * 2.5; // list lines hang a little to the right
+  const pool = runs.filter((r) => same(r) && r.str.trim()).sort((a, b) => a.top - b.top);
+  const out = [run];
+  const step = (a, b) => b.base - a.base;
+  for (let cur = run; ;) { // down
+    const nx = pool.find((r) => r.top > cur.top + cur.h * 0.5 && step(cur, r) <= run.size * 2.6 && near(out[0], r) && !out.includes(r));
+    if (!nx) break;
+    out.push(nx); cur = nx;
+  }
+  for (let cur = run; ;) { // up
+    const pv = [...pool].reverse().find((r) => r.top < cur.top - cur.h * 0.5 && step(r, cur) <= run.size * 2.6 && near(out[0], r) && !out.includes(r));
+    if (!pv) break;
+    out.unshift(pv); cur = pv;
+  }
+  out.sort((a, b) => a.base - b.base);
+  // a list: start at its first item (a company name or heading just above it is not part of it)
+  const isItem = (r) => /^\s*(\u2022|[-\u2013*\u25CF\u25AA]|\d+[.)])\s/.test(r.str);
+  const first = out.findIndex(isItem);
+  if (first > 0 && out.indexOf(run) >= first) out.splice(0, first);
+  return out;
+}
 async function editRunAt(p, pt) {
   const runs = await textRuns(p);
-  const run = runs.find((r) => pt.x >= r.x - 1 && pt.x <= r.x + r.w + 1 && pt.y >= r.top - 1 && pt.y <= r.top + r.h + 1);
+  const merged = mergeLines(runs);
+  const run = merged.find((r) => pt.x >= r.x - 1 && pt.x <= r.x + r.w + 1 && pt.y >= r.top - 1 && pt.y <= r.top + r.h + 1);
   if (!run) { toast('Click on a line of text in the PDF to change it.'); return; }
   snapshot();
-  const cover = { id: uid(), type: 'whiteout', color: '#ffffff', opacity: 100, x: run.x - 1, y: run.top - 1, w: run.w + 2, h: run.h + 2 };
+  const lines = paragraphRuns(merged, run);
   const size = Math.round(run.size * 10) / 10;
   if (!isStd(run.font)) await ensureFont(run.font, run.bold, run.italic);
-  const text = { id: uid(), type: 'text', text: run.str, font: run.font, size, bold: run.bold, italic: run.italic, underline: false, align: 'left', color: '#000000', opacity: 100,
-    x: run.x, y: run.base - baselineOffset(run.font, size), w: run.w, h: run.h };
-  p.items.push(cover, text);
+  // one text box for the whole paragraph: lines that wrapped are joined again, a bullet or a
+  // bigger gap starts a new line, and that gap becomes the space between paragraphs
+  const steps = lines.slice(1).map((r, i) => r.base - lines[i].base);
+  const lineStep = steps.length ? Math.min(...steps) : size * LINE;
+  let text = lines[0].str.trim(), extra = [];
+  for (let i = 1; i < lines.length; i++) {
+    const st = lines[i].str.trim(), gap = steps[i - 1];
+    const newItem = /^(•|[-–*●▪]|\d+[.)])\s/.test(st);
+    if (gap > lineStep * 1.35) { text += `\n${st}`; extra.push(gap - lineStep); } else if (newItem) text += `\n${st}`; else text += `${/-$/.test(text) ? '' : ' '}${st}`;
+  }
+  text = text.replace(/^[●▪*-]\s/gm, BULLET);
+  const left = Math.min(...lines.map((r) => r.x)), right = Math.max(...lines.map((r) => r.x + r.w));
+  const covers = lines.map((r) => ({ id: uid(), type: 'whiteout', color: '#ffffff', opacity: 100, x: r.x - 1, y: r.top - 1, w: r.w + 2, h: r.h + 2 }));
+  const lh = lines.length > 1 ? Math.round((lineStep / size) * 100) / 100 : undefined;
+  const t = { id: uid(), type: 'text', text, font: run.font, size, bold: run.bold, italic: run.italic, underline: false, align: 'left', color: '#000000', opacity: 100,
+    x: left, y: lines[0].base - baselineOffset(run.font, size, lh || LINE), w: right - left, h: lines[lines.length - 1].top + lines[lines.length - 1].h - lines[0].top };
+  if (lines.length > 1) { t.wrap = Math.round(right - left + 2); t.lh = lh; if (extra.length) t.ps = Math.round(extra.reduce((a, b) => a + b, 0) / extra.length); }
+  p.items.push(...covers, t);
   drawItems(pageIndex(p.id));
-  S.sel = { page: p.id, id: text.id };
-  editText(p.id, text);
+  S.sel = { page: p.id, id: t.id };
+  editText(p.id, t);
+  if (lines.length > 1) toast(`Editing the whole paragraph (${lines.length} lines). Lines wrap inside the box; drag its sides to change the width.`);
 }
 
 // ------------------------------------------------------------ pointer input --
@@ -3443,6 +3556,7 @@ async function buildPdf(opts = {}) {
     }
     page.pushOperators(popGraphicsState());
   }
+  attachProject(out);
   out.setProducer('Flipit Free PDF editor');
   out.setCreator('Flipit Free');
   return { bytes: await out.save(), replaced };
