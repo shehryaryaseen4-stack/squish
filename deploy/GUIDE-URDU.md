@@ -88,10 +88,14 @@ Ab is pate pe aane wali email aap ke Gmail mein aayegi. (Step 4 mein yahi email 
 3. **URL inspection** mein 10 se 20 khaas pages (jaise `/jpg-to-png`, `/heic-to-jpg`, `/pdf-to-docx`) daal kar **Request indexing**.
 4. https://www.bing.com/webmasters pe **Import from Google Search Console** se yahi sab ek click mein.
 
-## Step 8: AdSense (2 se 4 hafte baad)
+## Step 8: AdSense
 
-1. https://adsense.google.com pe apply karein, site ka URL dein.
-2. Approval ke baad apni publisher ID (`ca-pub-...`) server pe lagayein:
+1. https://adsense.google.com pe apne Google account se sign up karein. Site ka URL `flipitfree.com`
+   dein, mulk Pakistan chunein, aur payment profile mein apna asli naam aur pata likhein
+   (PIN wala khat isi pate pe aata hai).
+2. Sign up ke foran baad (approval ka intezar kiye baghair) apni publisher ID (`ca-pub-...`) server
+   pe lagayein. Isi se site AdSense se "connect" hoti hai: AdSense ka code har converter page pe aur
+   `/ads.txt` dono khud lag jate hain.
 
 ```
 ssh root@SERVER-IP
@@ -104,7 +108,10 @@ nano /opt/flipfree/.env
 bash /opt/flipfree/deploy/update.sh
 ```
 
-3. AdSense mein **Auto ads** on karein, aur **Privacy & messaging** mein GDPR message publish karein.
+3. AdSense mein **Sites** → apni site → "AdSense code snippet" ya "ads.txt" chun kar **Verify**, phir
+   **Request review**. Review mein kuch din se 2-4 hafte lagte hain.
+4. Approval ke baad **Ads** → **By site** → **Auto ads** on karein, aur **Privacy & messaging** mein
+   GDPR message publish karein.
 
 ---
 
