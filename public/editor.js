@@ -106,7 +106,7 @@ function catalogMatch(name) {
 
 const SHAPES = new Set(['rect', 'ellipse', 'line', 'arrow', 'check', 'cross']);
 const HINTS = {
-  select: 'Click any text to type in it (the PDF's own text too). Click to select, Shift+click or drag a box over empty space to select several. Drag to move, use the handles to resize. Space+drag moves around the page.',
+  select: 'Click any text to type in it (the PDF text too). Click to select, Shift+click or drag a box over empty space to select several. Drag to move, use the handles to resize. Space+drag moves around the page.',
   edittext: 'Click on any text in the PDF to change it.',
   editimage: 'Click on an image in the PDF to replace, move or remove it.',
   text: 'Click anywhere on a page to add text.',
