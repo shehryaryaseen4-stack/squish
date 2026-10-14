@@ -431,12 +431,24 @@ async function paintPage(el) {
 }
 
 // ------------------------------------------------------------------- items --
+// On an opened PDF, whiteouts (and the covers left where text, lines or pictures were picked
+// up) only hide the PDF's own content: they always sit under every object, so moving or
+// reordering objects can never put one behind a white box.
+function sinkCovers(p) {
+  if (!p.src) return;
+  const low = (o) => o.type === 'whiteout';
+  const i = p.items.findIndex((o) => !low(o));
+  if (i < 0 || !p.items.slice(i).some(low)) return;
+  p.items = [...p.items.filter(low), ...p.items.filter((o) => !low(o))];
+}
+
 function drawItems(index) {
   const p = S.pages[index];
   if (!p) return;
   const el = $(`.pe-page[data-id="${p.id}"]`);
   if (!el) return;
   const layer = el.querySelector('.pe-layer');
+  sinkCovers(p);
   const keepRuns = layer.querySelector('.pe-runs');
   layer.textContent = '';
   if (keepRuns) layer.append(keepRuns);
@@ -2339,7 +2351,14 @@ function hoverAt(e) {
   hoverOff();
   if (ok) {
     objEl.classList.add('pe-hover');
-    (groupOf(p, it) || []).forEach((o) => { const el = pageEl.querySelector(`.pe-obj[data-id="${o.id}"]`); if (el) el.classList.add('pe-hover'); });
+    const z = S.zoom, layer = pageEl.querySelector('.pe-layer');
+    for (const o of groupOf(p, it) || [it]) {
+      const b = document.createElement('div');
+      b.className = 'pe-hoverbox pe-hoverobj';
+      Object.assign(b.style, { left: `${(itemLeft(o) - 1) * z}px`, top: `${(itemTop(o) - 1) * z}px`, width: `${(itemRight(o) - itemLeft(o) + 2) * z}px`, height: `${(itemBottom(o) - itemTop(o) + 2) * z}px` });
+      if (o.rot && !isLine(o)) b.style.transform = `rotate(${o.rot}deg)`;
+      layer.append(b);
+    }
     return;
   }
   if (!p || !p.src || it) return;
@@ -3316,8 +3335,8 @@ function renderLayers() {
   list.dataset.sig = sig;
   list.textContent = '';
   list.dataset.page = p.id;
-  $('#peLayersEmpty').hidden = p.items.length > 0;
-  p.items.slice().reverse().forEach((it) => {
+  $('#peLayersEmpty').hidden = p.items.some((o) => !o.cover);
+  p.items.slice().reverse().filter((it) => !it.cover).forEach((it) => {
     const li = document.createElement('li');
     li.draggable = true; li.dataset.id = it.id;
     li.className = `${isSelId(it.id) ? 'sel' : ''} ${it.hidden ? 'is-hidden' : ''}`;
