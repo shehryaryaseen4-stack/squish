@@ -1161,13 +1161,15 @@ function giveWrap(p, it) {
 }
 // Move everything below `bottom` in the text's column by dy; returns what moved.
 function flowBelow(p, it, bottom, dy) {
-  if (!dy) return [];
+  // Pages of an opened PDF: its own content cannot move, so nothing else moves either (as in
+  // other PDF editors); only templates and blank pages reflow.
+  if (!dy || p.src) return [];
   const [W, H] = viewSize(p);
   // the whole column, even when the box itself was made narrower (dates on the right move too)
   const L = it.x, R = it.x + Math.max(it.w, it.wrap || 0, it.align === 'left' || !it.align ? columnWidth(p, it) : 0);
   const moved = [];
   for (const o of p.items) {
-    if (o === it || o.hidden || o.locked || isBackdrop(o, W, H)) continue;
+    if (o === it || o.hidden || o.locked || o.cover || isBackdrop(o, W, H)) continue;
     if (itemTop(o) < bottom - 1) continue;           // above or beside the text
     if (itemLeft(o) >= R - 1 || itemRight(o) <= L + 1) continue; // another column
     o.y += dy;
@@ -1694,6 +1696,38 @@ async function replaceWith(file) {
   }
 }
 
+// The page's own colours around and inside a box (from the rendered page): the background, to
+// cover old text with, and the text colour, so edited text keeps its look (blue, grey, white
+// on a dark sidebar ...).
+function pageColors(p, box) {
+  try {
+    const cv = $(`.pe-page[data-id="${p.id}"] canvas`);
+    const [vw] = viewSize(p);
+    if (!cv || cv.width < 4) return null;
+    const k = cv.width / vw;
+    const x0 = Math.max(0, Math.floor((box.x - 2) * k)), y0 = Math.max(0, Math.floor((box.y - 2) * k));
+    const w = Math.min(cv.width - x0, Math.ceil((box.w + 4) * k)), h = Math.min(cv.height - y0, Math.ceil((box.h + 4) * k));
+    if (w < 2 || h < 2) return null;
+    const d = cv.getContext('2d').getImageData(x0, y0, w, h).data;
+    const px = (i) => [d[i], d[i + 1], d[i + 2]];
+    const q = (c) => c.map((v) => v >> 4).join(',');
+    const tally = new Map(), border = [];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (x > 1 && y > 1 && x < w - 2 && y < h - 2) continue;
+      const c = px((y * w + x) * 4); border.push(c);
+      tally.set(q(c), (tally.get(q(c)) || 0) + 1);
+    }
+    const bgKey = [...tally.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    const bg = border.find((c) => q(c) === bgKey);
+    const dist = (c) => Math.abs(c[0] - bg[0]) + Math.abs(c[1] - bg[1]) + Math.abs(c[2] - bg[2]);
+    let best = null, bd = 0;
+    for (let i = 0; i < d.length; i += 4) { const c = px(i), dd = dist(c); if (dd > bd) { bd = dd; best = c; } }
+    const fg = best; // the strongest pixel is the text colour (the rest is anti-aliased edges)
+    const hex = (c) => `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+    return { bg: hex(bg), fg: fg && bd > 60 ? hex(fg) : null };
+  } catch { return null; }
+}
+
 // The lines of the paragraph (or list) around a clicked line: the same font and size, close
 // under each other and starting near the same left edge. Returns them top to bottom.
 // Pieces of text on the same line with the same style become one line.
@@ -1760,9 +1794,12 @@ async function editRunAt(p, pt) {
   }
   text = text.replace(/^[●▪*-]\s/gm, BULLET);
   const left = Math.min(...lines.map((r) => r.x)), right = Math.max(...lines.map((r) => r.x + r.w));
-  const covers = lines.map((r) => ({ id: uid(), type: 'whiteout', color: '#ffffff', opacity: 100, x: r.x - 1, y: r.top - 1, w: r.w + 2, h: r.h + 2 }));
+  const all = { x: left, y: Math.min(...lines.map((r) => r.top)), w: right - left, h: Math.max(...lines.map((r) => r.top + r.h)) - Math.min(...lines.map((r) => r.top)) };
+  const col = pageColors(p, all) || { bg: '#ffffff', fg: null };
+  // the old lines are covered in the page's own background colour; these covers never move
+  const covers = lines.map((r) => ({ id: uid(), type: 'whiteout', color: col.bg, opacity: 100, cover: true, x: r.x - 1, y: r.top - 1, w: r.w + 2, h: r.h + 2 }));
   const lh = lines.length > 1 ? Math.round((lineStep / size) * 100) / 100 : undefined;
-  const t = { id: uid(), type: 'text', text, font: run.font, size, bold: run.bold, italic: run.italic, underline: false, align: 'left', color: '#000000', opacity: 100,
+  const t = { id: uid(), type: 'text', text, font: run.font, size, bold: run.bold, italic: run.italic, underline: false, align: 'left', color: col.fg || '#000000', opacity: 100,
     x: left, y: lines[0].base - baselineOffset(run.font, size, lh || LINE), w: right - left, h: lines[lines.length - 1].top + lines[lines.length - 1].h - lines[0].top };
   if (lines.length > 1) { t.wrap = Math.round(right - left + 2); t.lh = lh; if (extra.length) t.ps = Math.round(extra.reduce((a, b) => a + b, 0) / extra.length); }
   p.items.push(...covers, t);
