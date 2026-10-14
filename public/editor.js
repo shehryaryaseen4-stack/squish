@@ -1146,7 +1146,7 @@ function selectAllOnPage() {
   const p = S.pages[S.current];
   if (!p) return;
   const [W, H] = viewSize(p);
-  selectGroup(p.id, p.items.filter((o) => !o.hidden && !o.locked && !isBackdrop(o, W, H)).map((o) => o.id));
+  selectGroup(p.id, p.items.filter((o) => !o.hidden && !o.locked && !passThrough(p, o) && !isBackdrop(o, W, H)).map((o) => o.id));
 }
 function clearSelectionUi() { $$('.pe-selbox, .pe-handle, .pe-photobar, .pe-gbox, .pe-qbar').forEach((e) => e.remove()); }
 // Outline, corner handles and a rotation handle, turned with the object.
@@ -2907,7 +2907,7 @@ function onPointerUp(e) {
     const [W, H] = viewSize(d.page);
     const inside = (o) => itemLeft(o) >= x1 && itemRight(o) <= x2 && itemTop(o) >= y1 && itemBottom(o) <= y2;
     const touches = (o) => itemLeft(o) < x2 && itemRight(o) > x1 && itemTop(o) < y2 && itemBottom(o) > y1;
-    const ids = d.page.items.filter((o) => !o.hidden && !o.locked && (inside(o) || (touches(o) && !isBackdrop(o, W, H) && o.type === 'text'))).map((o) => o.id);
+    const ids = d.page.items.filter((o) => !o.hidden && !o.locked && !passThrough(d.page, o) && (inside(o) || (touches(o) && !isBackdrop(o, W, H) && o.type === 'text'))).map((o) => o.id);
     selectGroup(d.page.id, ids);
     return;
   }
@@ -3360,8 +3360,10 @@ function renderLayers() {
   list.dataset.sig = sig;
   list.textContent = '';
   list.dataset.page = p.id;
-  $('#peLayersEmpty').hidden = p.items.some((o) => !o.cover);
-  p.items.slice().reverse().filter((it) => !it.cover).forEach((it) => {
+  // white boxes are never listed: they only hide what is printed under them
+  const listed = (o) => !o.cover && o.type !== 'whiteout';
+  $('#peLayersEmpty').hidden = p.items.some(listed);
+  p.items.slice().reverse().filter(listed).forEach((it) => {
     const li = document.createElement('li');
     li.draggable = true; li.dataset.id = it.id;
     li.className = `${isSelId(it.id) ? 'sel' : ''} ${it.hidden ? 'is-hidden' : ''}`;
