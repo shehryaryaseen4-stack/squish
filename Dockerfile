@@ -18,6 +18,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ghostscript poppler-utils inkscape \
     # PDF passwords and repair (Protect / Unlock / Repair PDF)
     qpdf \
+    # text recognition (Image to Text, OCR PDF): English plus the main European languages
+    tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa tesseract-ocr-fra tesseract-ocr-deu tesseract-ocr-ita tesseract-ocr-por tesseract-ocr-nld \
     # extra image formats (PSD, ICO, PPM, BMP/PSD/EPS output; HEIC/HEIF)
     imagemagick libheif-examples libheif-plugin-libde265 \
     # archives

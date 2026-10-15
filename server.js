@@ -247,6 +247,29 @@ app.post('/api/pdf-tool', upload.single('file'), async (req, res) => {
   }
 });
 
+// Text recognition (Image to Text, OCR PDF): text back as plain text, or a searchable PDF.
+const ocrEngine = require('./engines/ocr');
+app.post('/api/ocr', upload.single('file'), async (req, res) => {
+  const format = req.body && req.body.format === 'pdf' ? 'pdf' : 'txt';
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file received.' });
+    const out = await ocrEngine.ocr({ buffer: req.file.buffer, lang: String(req.body.lang || 'eng'), format });
+    const base = String(req.file.originalname || 'scan').replace(/\.[^.]+$/, '').replace(/[^\w.-]+/g, '-').slice(0, 80) || 'scan';
+    res.set({
+      'Content-Type': format === 'pdf' ? 'application/pdf' : 'text/plain; charset=utf-8',
+      'Content-Disposition': disposition(format === 'pdf' ? `${base}-searchable.pdf` : `${base}.txt`),
+      'X-Pages': String(out.pages),
+    });
+    res.send(out.buffer);
+    analytics.event(req, 'tool', { pair: format === 'pdf' ? 'OCR to PDF' : 'OCR to text', p: fromPage(req) });
+  } catch (err) {
+    analytics.event(req, 'fail', { pair: 'OCR', p: fromPage(req) });
+    if (err.userMessage) return res.status(err.statusCode || 422).json({ error: err.userMessage });
+    console.error('OCR error:', err);
+    res.status(500).json({ error: 'The text could not be read from this file. Try a clearer photo or scan.' });
+  }
+});
+
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
 
@@ -290,6 +313,7 @@ if (pages.friendlies().length) app.get(new RegExp(`^/(${pages.friendlies().map((
 app.get(new RegExp(`^/(${[...pages.PDF_TOOLS.map((t) => t.slug), 'pdf-tools'].join('|')})$`), (req, res) => sendHtml(res, pages.resolvePdfTool(req.params[0], baseOf(req)).html));
 // PDF editor landing pages (/resume-maker, /invoice-generator, /sign-pdf ...): the editor with
 // its own text. Before the X-to-Y route, since some of them (add-text-to-pdf) look like pairs.
+app.get(new RegExp(`^/(${pages.APPS.map((t) => t.slug).join('|')})$`), (req, res) => sendHtml(res, pages.resolveApp(req.params[0], baseOf(req)).html));
 if (pages.PDF_EDITOR && pages.EDITOR_LANDINGS.length) {
   app.get(new RegExp(`^/(${pages.EDITOR_LANDINGS.map((l) => l.slug).join('|')})$`), (req, res) => sendHtml(res, pages.editorPage(baseOf(req), req.params[0])));
 }

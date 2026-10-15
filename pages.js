@@ -30,6 +30,8 @@ const GUIDES = { ...require('./content/guides'), ...require('./content/guides-mo
 const ARTICLES = [...require('./content/articles'), ...(process.env.PDF_EDITOR === '1' ? require('./content/resume-articles') : [])];
 const KEYWORDS = require('./content/keywords');
 const USES = require('./content/uses');
+const APPS = require('./content/apps');
+const APP_BY_SLUG = new Map(APPS.map((t) => [t.slug, t]));
 // Converters under the names people search for: /pdf-to-word, /word-to-pdf ... (friendlyPage)
 const FRIENDLY_ALL = require('./content/friendly-pages');
 // Only the file types this server can really convert (LibreOffice, Calibre ... may be missing):
@@ -285,6 +287,8 @@ function megaMenu() {
     `<a class="mega-head" href="/converters">All ${TOTAL_COUNT.toLocaleString('en-US')} conversions &rarr;</a>`]);
   groups.push(['pdf-tools', 'PDF tools', pdfGroups().flatMap(([, items]) => items).map(([href, label]) => ({ id: 'pdf', href, text: esc(label), live: true })),
     '<a class="mega-head" href="/pdf-tools">All PDF tools &rarr;</a>']);
+  groups.push(['apps', 'More tools', APPS.map((t) => ({ id: { passport: 'jpg', ocr: 'txt', invoice: 'pdf' }[t.app], href: `/${t.slug}`, text: esc(t.name), live: true })),
+    '<span class="mega-head">Photo, text and invoice tools</span>']);
   CATS.forEach((c) => {
     const items = registry.getFormatsByCategory(c.id).map((f) => ({ id: f.id, href: formatPath(f.id), live: formatIsLive(f.id) }));
     groups.push([c.id, c.converterName, items, `<a class="mega-head" href="${categoryPath(c.id)}">${icon(c.icon)}${c.converterName} &rarr;</a>`]);
@@ -332,7 +336,7 @@ function footer() {
   const cats = CATS.map((c) => `<li>${link(categoryPath(c.id), c.converterName)}</li>`).join('');
   const comp = COMPRESSIBLE.map((s) => `<li>${link(compressPath(s), `Compress ${F(s).label}`)}</li>`).join('');
   if (!knownPaths) knownPaths = new Set(allPaths());
-  const pdf = `<div><h4>PDF tools</h4><ul>${['/edit-pdf', '/merge-pdf', '/split-pdf', '/compress-pdf', '/protect-pdf', '/unlock-pdf', '/resume-maker', '/invoice-generator', '/sign-pdf']
+  const pdf = `<div><h4>PDF tools</h4><ul>${['/edit-pdf', '/merge-pdf', '/split-pdf', '/compress-pdf', '/protect-pdf', '/unlock-pdf', '/resume-maker', '/sign-pdf']
     .filter((x) => knownPaths.has(x)).map((x) => `<li>${link(x, esc(toolName(x)))}</li>`).join('')}<li>${link('/pdf-tools', 'All PDF tools')}</li></ul></div>`;
   return `<footer class="site-footer"><div class="footer-inner${pdf ? ' footer-6' : ''}">
     <div class="footer-brand">${BRAND_LINK}
@@ -340,7 +344,7 @@ function footer() {
     <div><h4>Converters</h4><ul>${cats}</ul></div>
     <div><h4>Popular</h4><ul>${pop}</ul></div>
     ${pdf}
-    <div><h4>Tools</h4><ul>${comp}<li>${link('/converters', 'All formats')}</li></ul></div>
+    <div><h4>Tools</h4><ul>${APPS.map((t) => `<li>${link(`/${t.slug}`, esc(t.name))}</li>`).join('')}${comp}<li>${link('/converters', 'All formats')}</li></ul></div>
     <div><h4>Company</h4><ul><li>${link('/about', 'About')}</li><li>${link('/guides', 'Guides')}</li><li>${link('/privacy', 'Privacy Policy')}</li><li>${link('/terms', 'Terms of Use')}</li><li>${link('/contact', 'Contact')}</li>${CONTACT_EMAIL ? `<li>${mailLink}</li>` : ''}</ul></div>
   </div><div class="footer-bottom">&copy; ${new Date().getFullYear()} ${SITE}. Files are deleted as soon as they are converted.</div></footer>`;
 }
@@ -901,6 +905,139 @@ function pdfToolsHub(base) {
   }));
 }
 
+// ------------------------------------------------------------ app pages --
+// Stand-alone tools (content/apps.js): passport photo maker, image to text / OCR PDF, invoice
+// generator. Same layout as the PDF tool pages; the tool box is driven by public/apps.js.
+const OCR_LANGS = () => require('./engines/ocr').langs();
+function appBox(t) {
+  if (t.app === 'passport') {
+    return `<section class="app app-passport" id="app" data-app="passport">
+  <div class="pt-drop" data-drop>
+    <input type="file" accept="image/*,.heic,.heif" data-input hidden>
+    ${icon('upload', 'pt-drop-ico')}
+    <button class="btn btn-brand btn-select" type="button" data-pick>${icon('upload')}Select photo</button>
+    <p class="pt-drop-sub">or drop a photo here &middot; JPG, PNG, WEBP or HEIC</p>
+    <p class="pt-private">${icon('shield')}Your photo never leaves your device</p>
+  </div>
+  <div class="pp-work" data-work hidden>
+    <div class="pp-stage"><canvas class="pp-canvas" data-canvas width="600" height="600" aria-label="Drag to move the photo, scroll or pinch to zoom"></canvas><p class="pp-hint">Drag to move &middot; scroll, pinch or use the slider to zoom. Top of head on the upper line, chin on the lower line.</p></div>
+    <form class="pp-opts" autocomplete="off" onsubmit="return false">
+      <label>Country / document<select data-size>
+        <option value="us">US passport &amp; visa, India (2 x 2 in)</option>
+        <option value="eu">UK, EU, Schengen, Australia (35 x 45 mm)</option>
+        <option value="ca">Canada (50 x 70 mm)</option></select></label>
+      <label>Zoom<input type="range" data-zoom min="0.2" max="4" step="0.01" value="1"></label>
+      <label>Straighten<input type="range" data-rot min="-15" max="15" step="0.5" value="0"></label>
+      <label>Brightness<input type="range" data-bright min="70" max="140" step="1" value="100"></label>
+      <div class="pp-btns">
+        <button type="button" class="btn btn-brand" data-dl-photo>${icon('download')}Digital photo (JPG)</button>
+        <button type="button" class="btn btn-ghost" data-dl-sheet>${icon('download')}4x6 print sheet</button>
+        <button type="button" class="pt-link" data-again>Choose another photo</button>
+      </div>
+      <p class="pt-msg" data-msg role="status" aria-live="polite"></p>
+    </form>
+  </div>
+  <noscript><p class="pt-msg">This tool needs JavaScript. Please turn it on and reload the page.</p></noscript>
+</section>`;
+  }
+  if (t.app === 'ocr') {
+    const langs = OCR_LANGS();
+    const pdfFirst = t.accept === 'pdf';
+    return `<section class="app app-ocr" id="app" data-app="ocr" data-max-mb="${MAX_MB}">
+  <div class="pt-drop" data-drop>
+    <input type="file" accept="image/*,.heic,.heif,application/pdf,.pdf" data-input hidden>
+    ${icon('upload', 'pt-drop-ico')}
+    <button class="btn btn-brand btn-select" type="button" data-pick>${icon('upload')}Select file</button>
+    <p class="pt-drop-sub">or drop ${pdfFirst ? 'a scanned PDF or an image' : 'an image or a scanned PDF'} here &middot; up to ${MAX_MB} MB</p>
+    <p class="pt-private">${icon('shield')}Files are deleted as soon as the text is read</p>
+  </div>
+  <div class="pt-work" data-work hidden>
+    <div class="pt-filebar">${icon('file')}<span class="pt-fname" data-fname></span><span class="pt-fmeta" data-fmeta></span><button type="button" class="pt-link" data-again>Choose another file</button></div>
+    <form class="pt-opts" autocomplete="off" onsubmit="return false">
+      <label>Language<select data-lang>${(langs.length ? langs : [['eng', 'English']]).map(([id, n]) => `<option value="${id}">${n}</option>`).join('')}</select></label>
+      <fieldset class="pt-radios"><legend>Result</legend>
+        <label><input type="radio" name="fmt" value="txt"${pdfFirst ? '' : ' checked'}> Text (copy or TXT)</label>
+        <label><input type="radio" name="fmt" value="pdf"${pdfFirst ? ' checked' : ''}> Searchable PDF</label></fieldset>
+    </form>
+    <div class="pt-bar"><p class="pt-msg" data-msg role="status" aria-live="polite"></p><button type="button" class="btn btn-brand pt-go" data-go>Read text</button></div>
+  </div>
+  <div class="ocr-out" data-out hidden>
+    <div class="ocr-out-bar"><strong data-out-title>Text</strong><span class="ocr-btns"><button type="button" class="btn btn-ghost btn-sm" data-copy>Copy text</button><a class="btn btn-brand btn-sm" data-dl href="#" download>${icon('download')}Download TXT</a><button type="button" class="pt-link" data-again>New file</button></span></div>
+    <textarea class="ocr-text" data-text rows="14" spellcheck="false" aria-label="Recognised text"></textarea>
+  </div>
+  <div class="pt-done" data-done hidden>
+    <span class="pt-done-ico" aria-hidden="true">&#10003;</span>
+    <h2 class="pt-done-h">Your searchable PDF is ready</h2>
+    <p class="pt-done-text" data-done-text></p>
+    <div class="pt-done-btns"><a class="btn btn-brand" data-dl-pdf href="#" download>${icon('download')}Download PDF</a><button type="button" class="btn btn-ghost" data-again>Start over</button></div>
+  </div>
+  <noscript><p class="pt-msg">This tool needs JavaScript. Please turn it on and reload the page.</p></noscript>
+</section>`;
+  }
+  // invoice
+  const cur = [['USD', '$', 'US dollar'], ['EUR', '\u20ac', 'Euro'], ['GBP', '\u00a3', 'British pound'], ['CAD', 'C$', 'Canadian dollar'], ['AUD', 'A$', 'Australian dollar'],
+    ['NZD', 'NZ$', 'New Zealand dollar'], ['CHF', 'CHF ', 'Swiss franc'], ['INR', 'Rs. ', 'Indian rupee'], ['PKR', 'Rs ', 'Pakistani rupee'], ['AED', 'AED ', 'UAE dirham'], ['SAR', 'SAR ', 'Saudi riyal']];
+  const f = (name, label, ph = '', type = 'text') => `<label>${label}<input type="${type}" data-f="${name}" placeholder="${esc(ph)}"></label>`;
+  const ta = (name, label, ph = '') => `<label>${label}<textarea data-f="${name}" rows="3" placeholder="${esc(ph)}"></textarea></label>`;
+  return `<section class="app app-invoice" id="app" data-app="invoice">
+  <form class="inv-form" autocomplete="off" onsubmit="return false">
+    <div class="inv-row inv-top">
+      <div class="inv-logo"><input type="file" accept="image/png,image/jpeg,image/webp" data-logo-input hidden><button type="button" class="btn btn-ghost btn-sm" data-logo>${icon('image')}Add logo</button><img data-logo-img alt="" hidden><button type="button" class="pt-link" data-logo-del hidden>Remove logo</button></div>
+      <div class="inv-meta">${f('number', 'Invoice number', 'INV-0001')}${f('date', 'Invoice date', '', 'date')}${f('due', 'Due date', '', 'date')}</div>
+    </div>
+    <div class="inv-row inv-parties">
+      <fieldset><legend>From (your business)</legend>${f('fromName', 'Name', 'Your business name')}${ta('fromAddr', 'Address, email, phone, tax number', '123 Main St, Austin, TX 78701\nhello@yourbusiness.com')}</fieldset>
+      <fieldset><legend>Bill to (your client)</legend>${f('toName', 'Name', 'Client name')}${ta('toAddr', 'Address and email', 'Client address\nclient@email.com')}</fieldset>
+    </div>
+    <div class="inv-items-wrap"><table class="inv-items"><thead><tr><th>Description</th><th class="n">Qty</th><th class="n">Rate</th><th class="n">Amount</th><th aria-label="Remove"></th></tr></thead><tbody data-items></tbody></table>
+      <button type="button" class="btn btn-ghost btn-sm" data-add>+ Add item</button></div>
+    <div class="inv-row inv-bottom">
+      <div class="inv-notes">${ta('notes', 'Notes and payment details', 'Payment by bank transfer or PayPal within 30 days. Thank you for your business!')}${f('terms', 'Payment terms', 'Net 30')}</div>
+      <div class="inv-sum">
+        <label>Currency<select data-f="currency">${cur.map(([c, sym, n]) => `<option value="${c}" data-sym="${esc(sym)}">${c} (${n})</option>`).join('')}</select></label>
+        <label>Tax rate (%)<input type="number" data-f="tax" min="0" step="0.01" placeholder="0"></label>
+        <label>Discount (%)<input type="number" data-f="discount" min="0" max="100" step="0.01" placeholder="0"></label>
+        <label>Shipping<input type="number" data-f="shipping" min="0" step="0.01" placeholder="0"></label>
+        <label>Amount paid<input type="number" data-f="paid" min="0" step="0.01" placeholder="0"></label>
+        <dl class="inv-totals" data-totals></dl>
+      </div>
+    </div>
+    <div class="pt-bar inv-bar"><label class="inv-paper">Paper<select data-f="paper"><option value="letter">US Letter</option><option value="a4">A4</option></select></label>
+      <button type="button" class="pt-link" data-new>New invoice</button>
+      <p class="pt-msg" data-msg role="status" aria-live="polite"></p>
+      <button type="button" class="btn btn-brand pt-go" data-pdf>${icon('download')}Download invoice PDF</button></div>
+  </form>
+  <noscript><p class="pt-msg">This tool needs JavaScript. Please turn it on and reload the page.</p></noscript>
+</section>`;
+}
+
+const APP_PRIVACY = {
+  passport: '<strong>How this works:</strong> your photo is cropped and sized in your browser. It is never uploaded to our server and nothing is stored.',
+  ocr: '<strong>How this works:</strong> your file is uploaded over HTTPS and read on this server with Tesseract, the open-source OCR engine, in a private temporary folder that is deleted as soon as the text is ready. Nothing is kept or shared.',
+  invoice: '<strong>How this works:</strong> the invoice is built in your browser with open-source code (pdf-lib) and saved straight to your device. Your details are kept only in this browser so the next invoice is quicker; nothing is sent to our server.',
+};
+function appPage(slug, base) {
+  const t = APP_BY_SLUG.get(slug);
+  if (!knownPaths) knownPaths = new Set(allPaths());
+  const p = `/${t.slug}`;
+  const crumbs = [['Home', '/'], [t.name, p]];
+  const see = t.see.filter((s) => knownPaths.has(s)).map((s) => [s, esc(toolName(s)), true]);
+  const steps = `<section class="howto"><h2>${esc(t.howto)}</h2><ol class="steps">${t.steps
+    .map(([a, d]) => `<li><strong>${a}</strong> ${d}</li>`).join('')}</ol></section>`;
+  const other = APPS.filter((x) => x.slug !== t.slug).map((x) => [`/${x.slug}`, esc(x.name), true]);
+  return renderPage(PAGE_TPL, baseFields(base, p, `${t.title} | ${SITE}`, t.desc, {
+    JSONLD: graph(base, p, t.h1, t.desc, t.faq, crumbs, { features: [t.browser ? 'Runs in the browser, no upload' : 'Files deleted after processing', 'No sign-up', 'No watermark', 'Free'] }),
+    HERO: hero({ h1: t.h1, crumbs, intro: t.intro }),
+    TOOL: appBox(t),
+    CONTENT: steps + usesHtml(p, t.name) + t.sections.map(([h, html]) => `<section class="notes prose-block"><h2>${esc(h)}</h2>${liveLinks(html)}</section>`).join('')
+      + `<section class="related-tools"><h2>Related tools</h2>${chips([...see, ...other])}</section>`
+      + readMore(p) + faqHtml(t.faq),
+    PRIVACY: APP_PRIVACY[t.app],
+    SCRIPTS: `${t.app === 'invoice' ? `<script src="/vendor/pdf-lib.min.js?v=${seo.ASSET_V.pdfTools}" defer></script>\n` : ''}<script type="module" src="/apps.js?v=${seo.ASSET_V.apps}"></script>\n`,
+  }));
+}
+const resolveApp = (slug, base) => (APP_BY_SLUG.has(slug) ? { html: appPage(slug, base) } : null);
+
 function resolvePdfTool(slug, base) {
   if (slug === 'pdf-tools') return { html: pdfToolsHub(base) };
   return PDF_TOOL_BY_SLUG.has(slug) ? { html: pdfToolPage(slug, base) } : null;
@@ -1170,6 +1307,7 @@ const toolName = (p) => {
   if (LANDING_BY_SLUG.has(p.slice(1))) return LANDING_BY_SLUG.get(p.slice(1)).short;
   if (friendlyBySlug(p.slice(1))) return friendlyBySlug(p.slice(1)).h1.replace(/ Converter$/, '');
   if (PDF_TOOL_BY_SLUG.has(p.slice(1))) return PDF_TOOL_BY_SLUG.get(p.slice(1)).name;
+  if (APP_BY_SLUG.has(p.slice(1))) return APP_BY_SLUG.get(p.slice(1)).name;
   if (p === '/pdf-tools') return 'All PDF tools';
   const r = registry.resolveRoute(p, ANY);
   return r && r.type === 'compress' ? `Compress ${r.from.label}` : r ? `${r.from.label} to ${r.to.label}` : p;
@@ -1407,6 +1545,7 @@ function ogSpec(rawKey) {
   }
   if (friendlyBySlug(key)) { const x = friendlyBySlug(key); return { title: x.h1, subtitle: 'Free online converter \u00b7 No sign-up \u00b7 No watermark' }; }
   if (PDF_TOOL_BY_SLUG.has(key)) return { title: PDF_TOOL_BY_SLUG.get(key).h1, subtitle: 'Free online PDF tool \u00b7 No sign-up \u00b7 No watermark' };
+  if (APP_BY_SLUG.has(key)) return { title: APP_BY_SLUG.get(key).h1, subtitle: 'Free online tool \u00b7 No sign-up \u00b7 No watermark' };
   if (key === 'pdf-tools') return { title: 'All PDF Tools', subtitle: 'Merge, split, compress, convert, edit and protect PDFs free' };
   if (key === 'edit-pdf') return { title: 'Free PDF Editor', subtitle: 'Edit, sign and fill PDFs. Resume and invoice templates' };
   if (LANDING_BY_SLUG.has(key)) { const l = LANDING_BY_SLUG.get(key); return { title: l.h1, subtitle: l.kicker }; }
@@ -1465,6 +1604,7 @@ function allPaths() {
     '/guides', ...ARTICLES.map((a) => articlePath(a.slug)),
     ...friendlies().map((x) => `/${x.slug}`),
     '/pdf-tools', ...PDF_TOOLS.map((t) => `/${t.slug}`),
+    ...APPS.map((t) => `/${t.slug}`),
     ...(PDF_EDITOR ? ['/edit-pdf', ...EDITOR_LANDINGS.map((l) => `/${l.slug}`)] : []),
   ];
 }
@@ -1473,7 +1613,7 @@ function allPaths() {
 // (Google ignores priority/changefreq; Bing and others still read them.)
 function sitemapPriority(p) {
   if (p === '/') return '1.0';
-  if (friendlyBySlug(p.slice(1)) || PDF_TOOL_BY_SLUG.has(p.slice(1)) || p === '/pdf-tools') return '1.0';
+  if (friendlyBySlug(p.slice(1)) || PDF_TOOL_BY_SLUG.has(p.slice(1)) || APP_BY_SLUG.has(p.slice(1)) || p === '/pdf-tools') return '1.0';
   if (/-to-|^\/compress-|^\/edit-pdf$/.test(p) || LANDING_BY_SLUG.has(p.slice(1))) return '0.9';
   if (/-converter$/.test(p) || p === '/converters') return '0.8';
   if (p.startsWith('/guides')) return '0.6';
@@ -1488,6 +1628,6 @@ function sitemap(base) {
 const robots = (base) => `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${base}/sitemap.xml\n`;
 
 module.exports = {
-  megaMenu, PDF_TOOLS, resolvePdfTool,
+  megaMenu, PDF_TOOLS, resolvePdfTool, APPS, resolveApp,
   ACCOUNTS, authPage, accountPage, authDonePage, resolveFriendly, friendlies,
   editorPage, PDF_EDITOR, EDITOR_LANDINGS, homePage, resolveGuide, hubPage, notFoundPage, resolvePair, resolveCompress, resolveConverter, resolveInfo, ogSpec, sitemap, robots, allPaths, adsTxt, ADS_ENABLED: !!ADS_CLIENT };

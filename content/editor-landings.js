@@ -61,26 +61,6 @@ const LANDINGS = [
     ],
   },
   {
-    slug: 'invoice-generator', kind: 'template', cat: 'business', short: 'Invoice generator',
-    title: 'Free Invoice Generator - Make an Invoice PDF Online',
-    desc: 'Free invoice generator. Fill in a professional invoice template with your logo, items, tax and total, then download the invoice as a PDF. No sign-up.',
-    kicker: 'Free invoice maker', h1: 'Free Invoice Generator',
-    lede: 'Create a professional invoice in a few minutes. Add your logo and customer details, list the items, and download a PDF invoice to email or print.',
-    panel: ['Start from an invoice template', 'Invoices, quotations, receipts and letterheads for small businesses and freelancers.'],
-    sections: [
-      ['How to make an invoice', `<ol><li><strong>Open the ${T('invoice', 'Invoice template')}.</strong> Replace "Your Company" with your business name and add your logo with Image.</li><li><strong>Fill in the details.</strong> Invoice number, invoice date, due date, and the name and address of the customer you are billing.</li><li><strong>List the items.</strong> The items are a real table: click a cell and type, press Tab to move on, and use the table buttons to add or delete rows.</li><li><strong>Add the totals.</strong> Enter the subtotal, tax (sales tax, VAT or GST) and the total due, plus your bank or payment details.</li><li><strong>Download the invoice PDF</strong> and send it to your client.</li></ol>`],
-      ['What an invoice must include', '<p>A clear invoice gets paid faster. Every invoice should show: the word "Invoice", a unique invoice number, the date, your business name and contact details, the customer\'s name, a description of each product or service with quantity and price, the subtotal, any tax with its rate, the total amount due, the payment due date and how to pay. If you are registered for sales tax, VAT or GST, add your registration number; many countries require it on a tax invoice.</p>'],
-      ['Invoices for freelancers and small businesses', '<p>Freelancers can bill per hour or per project: put the hours or milestones in the quantity column. Shops and small businesses can reuse the same invoice every time: keep your saved PDF, open it again, change the number, customer and items, and download a new invoice. For prices before the work starts, send a <a href="/quotation-maker">quotation</a>; when the money arrives, give a <a href="/receipt-maker">payment receipt</a>.</p>'],
-    ],
-    faq: [
-      ['Is this invoice generator free?', 'Yes, completely. Make as many invoices as you need and download them as PDFs without a watermark or an account.'],
-      ['Can I add my logo to the invoice?', 'Yes. Click Image, choose your logo file (PNG, JPG or WebP) and place it at the top. You can resize it and remove the sample logo.'],
-      ['Does it calculate the total for me?', 'Not automatically yet: type the line totals, tax and grand total yourself. The table keeps everything lined up.'],
-      ['Can I make a tax invoice with GST, VAT or sales tax?', 'Yes. Add rows for the tax and its rate, and type your tax registration number under your business details.'],
-      ['Is my invoice data uploaded anywhere?', 'No. The invoice is made in your browser and downloaded straight to your device; your customer and price details are not sent to our server.'],
-    ],
-  },
-  {
     slug: 'quotation-maker', kind: 'template', cat: 'business', short: 'Quotation maker',
     title: 'Free Quotation Maker - Price Quote Template PDF',
     desc: 'Make a professional quotation, price quote or estimate online for free. Fill in the template with items and prices and download it as a PDF.',

@@ -93,6 +93,30 @@ module.exports = {
     'Make pictures smaller for email, websites and online listings.',
     'Save space on Google Drive, OneDrive or iCloud.',
   ],
+  '/passport-photo-maker': [
+    'Renew a US passport online or by mail (DS-82) with a 2x2 inch photo.',
+    'Apply for a US visa or the Diversity Visa (Green Card) lottery with a 600 x 600 pixel photo.',
+    'Get a 35 x 45 mm photo for a UK passport, a Schengen visa or an EU residence permit.',
+    'Print passport photos at CVS, Walgreens, Walmart or Boots for the price of one 4x6 print.',
+  ],
+  '/image-to-text': [
+    'Copy text from a screenshot, a slide or a photo of a whiteboard.',
+    'Turn a photo of a receipt or invoice into text for an expense report.',
+    'Get quotes from a book page or a printed article without retyping them.',
+    'Copy the details from a photo of a business card or a letter.',
+  ],
+  '/ocr-pdf': [
+    'Make scanned contracts, bank statements and tax records searchable.',
+    'Copy text out of a scanned PDF from your office scanner or a phone scanning app.',
+    'Turn a scanned PDF into text you can paste into Word, Google Docs or an email.',
+    'Make old paper documents easier to find on Google Drive, OneDrive or Dropbox.',
+  ],
+  '/invoice-generator': [
+    'Bill a client as a freelancer, designer, developer, writer or consultant.',
+    'Send an invoice with sales tax for a small business in the US.',
+    'Make a VAT invoice for a client in the UK or the EU.',
+    'Invoice by the hour with your hourly rate, or by the project or milestone.',
+  ],
   '/merge-pdf': [
     'Combine a resume, cover letter and references into one PDF for a job application.',
     'Put signed pages, receipts and forms into a single PDF to email.',

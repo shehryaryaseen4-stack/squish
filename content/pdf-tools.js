@@ -230,7 +230,7 @@ const groups = [
   ['Convert to PDF', [['/jpg-to-pdf', 'JPG to PDF', 'image'], ['/word-to-pdf', 'Word to PDF', 'word'], ['/powerpoint-to-pdf', 'PowerPoint to PDF', 'ppt'],
     ['/excel-to-pdf', 'Excel to PDF', 'excel'], ['/html-to-pdf', 'HTML to PDF', 'html'], ['/image-to-pdf', 'Image to PDF', 'image']]],
   ['Convert from PDF', [['/pdf-to-jpg', 'PDF to JPG', 'image'], ['/pdf-to-word', 'PDF to Word', 'word'], ['/pdf-to-docx', 'PDF to DOCX', 'word'], ['/pdf-to-image', 'PDF to Image', 'image'],
-    ['/pdf-to-pdfa', 'PDF to PDF/A', 'archive'], ['/pdf-to-txt', 'PDF to Text', 'text']]],
+    ['/pdf-to-pdfa', 'PDF to PDF/A', 'archive'], ['/pdf-to-txt', 'PDF to Text', 'text'], ['/ocr-pdf', 'OCR PDF', 'text']]],
   ['Optimize PDF', [['/compress-pdf', 'Compress PDF', 'compress'], ['/repair-pdf', 'Repair PDF', 'repair']]],
   ['PDF security', [['/unlock-pdf', 'Unlock PDF', 'unlock'], ['/protect-pdf', 'Protect PDF', 'lock'], ['/sign-pdf', 'Sign PDF', 'sign'], ['/whiteout-pdf', 'Whiteout PDF', 'whiteout']]],
 ];
@@ -255,6 +255,7 @@ const blurbs = {
   '/pdf-to-word': 'Turn a PDF into an editable Word file.',
   '/pdf-to-docx': 'PDF to an editable DOCX file for Word or Google Docs.',
   '/pdf-to-image': 'PDF pages to JPG, PNG or WEBP.',
+  '/ocr-pdf': 'Make a scanned PDF searchable, or get its text.',
   '/pdf-to-pdfa': 'PDF/A for archives, courts and portals.',
   '/pdf-to-txt': 'Get the plain text out of a PDF.',
   '/edit-pdf': 'Add and change text, images and shapes.',
