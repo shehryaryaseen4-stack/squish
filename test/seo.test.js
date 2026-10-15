@@ -136,6 +136,16 @@ test('target keywords lead the title, H1 and description of their pages', () => 
   }
 });
 
+test('every page in content/uses.js is indexed and shows its Popular uses', () => {
+  const byPath = new Map(indexable.map((x) => [x.p, x.html]));
+  for (const [p, list] of Object.entries(require('../content/uses'))) {
+    const html = byPath.get(p);
+    assert.ok(html, `${p} is in content/uses.js but not an indexable page`);
+    assert.ok(html.includes('<h2>Popular uses for'), `${p} has no Popular uses section`);
+    for (const x of list) assert.ok(html.includes(esc(x)), `${p} is missing the use "${x}"`);
+  }
+});
+
 test('no two indexed pages share an H1, so they never compete for the same search', () => {
   const seen = new Map();
   for (const { p, html } of indexable) {

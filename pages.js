@@ -29,6 +29,7 @@ const GUIDES = { ...require('./content/guides'), ...require('./content/guides-mo
 // Resume guides only exist alongside the Resume Builder (part of the PDF editor).
 const ARTICLES = [...require('./content/articles'), ...(process.env.PDF_EDITOR === '1' ? require('./content/resume-articles') : [])];
 const KEYWORDS = require('./content/keywords');
+const USES = require('./content/uses');
 // Converters under the names people search for: /pdf-to-word, /word-to-pdf ... (friendlyPage)
 const FRIENDLY_ALL = require('./content/friendly-pages');
 // Only the file types this server can really convert (LibreOffice, Calibre ... may be missing):
@@ -663,10 +664,16 @@ function graph(base, urlPath, name, desc, faq, crumbs, { type = 'WebApplication'
 const TOOL_FEATURES = ['Batch conversion', 'Download all as ZIP', 'Adjustable quality', 'Resize to a maximum dimension', 'No sign-up', 'Files are not stored'];
 
 // "How to convert" steps: visible on the page.
+// Everyday jobs the tool is used for (content/uses.js), on the pages that have them.
+function usesHtml(p, what) {
+  const list = USES[p];
+  if (!list) return '';
+  return `<section class="notes uses"><h2>Popular uses for ${esc(what)}</h2><ul>${list.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></section>`;
+}
 function howToSteps(fromLabel, toLabel, verb = 'convert', image = true) {
   return `<section class="howto"><h2>How to ${verb} ${fromLabel}${toLabel ? ` to ${toLabel}` : ''}</h2><ol class="steps">
     <li><strong>Choose your files.</strong> Click <em>Select File</em> or drag your ${fromLabel} files into the upload box. You can add many at once.</li>
-    <li><strong>Pick the settings.</strong> ${toLabel ? `${toLabel} is already selected as the output format.` : 'Choose the output format.'}${image ? (verb === 'compress' ? ' Open Options to choose how much smaller each file should be (50% by default) and an optional maximum size.' : ' Adjust Quality and Max dimension if you want smaller files.') : ' The conversion starts as soon as a file is added.'}</li>
+    <li><strong>Pick the settings.</strong> ${toLabel ? `${toLabel} is already selected as the output format.` : 'Choose the output format.'}${image ? (verb === 'compress' ? ' Open Options to choose how much smaller each file should be (50% by default) and an optional maximum size.' : ' Adjust Quality and Max dimension if you want smaller files.') : verb === 'compress' ? ' Open Options to choose Light, Recommended, Strong or Extreme compression (Recommended by default).' : ' The conversion starts as soon as a file is added.'}</li>
     <li><strong>Download.</strong> Each file appears in the list when it is ready. Download them one by one, or all together with Download all.</li>
   </ol></section>`;
 }
@@ -737,7 +744,7 @@ function pairPage(fromSlug, toSlug, base) {
         : `Convert ${from.name} files to ${to.name} online for free. Upload one file or many and download the ${to.name} results one by one or all together in a ZIP. No sign-up needed.`),
       widget, withSelect: true }),
     TOOL: toolHtml({ inputs: [fromSlug], outputs: outputsFor(fromSlug), dropTitle: `Drop your ${from.label} files here`, dropSub: `or click to choose ${from.label} files` }),
-    CONTENT: howToSteps(from.label, to.label, 'convert', imagePair) + guideHtml(from, to, guide) + cards + compareTable([fromSlug, toSlug])
+    CONTENT: howToSteps(from.label, to.label, 'convert', imagePair) + usesHtml(p, kw ? `${kwCase(kw.primary)} conversion` : `${from.label} to ${to.label}`) + guideHtml(from, to, guide) + cards + compareTable([fromSlug, toSlug])
       + `<section class="notes"><h2>Converting ${from.name} to ${to.name}</h2><ul>${notes.map((x) => `<li>${x}</li>`).join('')}</ul></section>`
       + friendlyLinks(fromSlug, toSlug) + readMore(p) + faqHtml(faq),
     RELATED: relatedForPair(from, to),
@@ -767,7 +774,7 @@ function friendlyPage(slug, base) {
     DEFAULT_FORMAT: F(x.outputs[0]).select,
     HERO: hero({ h1: x.h1, crumbs, intro: x.intro }),
     TOOL: toolHtml({ inputs: x.inputs, outputs: x.outputs, dropTitle: `Drop your ${inLabels.length > 3 ? 'files' : inLabels.join(' or ')} here`, dropSub: `${inLabels.join(', ')}` }),
-    CONTENT: x.sections.map(([h, html]) => `<section class="notes prose-block"><h2>${esc(h)}</h2>${liveLinks(html)}</section>`).join('')
+    CONTENT: usesHtml(p, x.h1.replace(/ Converter$/, '')) + x.sections.map(([h, html]) => `<section class="notes prose-block"><h2>${esc(h)}</h2>${liveLinks(html)}</section>`).join('')
       + `<section class="related-tools"><h2>Related tools</h2>${chips(see)}<h3>More popular converters</h3>${chips(more)}</section>`
       + readMore(p) + faqHtml(x.faq),
   }));
@@ -865,7 +872,7 @@ function pdfToolPage(slug, base) {
     JSONLD: graph(base, p, t.h1, t.desc, t.faq, crumbs, { features: [t.browser ? 'Runs in the browser, no upload' : 'Files deleted after processing', 'No sign-up', 'No watermark', 'Free'] }),
     HERO: hero({ h1: t.h1, crumbs, intro: t.intro }),
     TOOL: pdfToolBox(t),
-    CONTENT: steps + t.sections.map(([h, html]) => `<section class="notes prose-block"><h2>${esc(h)}</h2>${liveLinks(html)}</section>`).join('')
+    CONTENT: steps + usesHtml(p, t.h1) + t.sections.map(([h, html]) => `<section class="notes prose-block"><h2>${esc(h)}</h2>${liveLinks(html)}</section>`).join('')
       + `<section class="related-tools"><h2>Related tools</h2>${chips(see)}<p class="also-try">Need something else? See ${link('/pdf-tools', 'all PDF tools')}.</p></section>`
       + readMore(p) + faqHtml(t.faq),
     PRIVACY: t.browser ? PRIVACY_BROWSER : PRIVACY_PDF_SERVER,
@@ -923,12 +930,16 @@ function compressPage(slug, base) {
     const name = kwCase(kw.primary), alt = kw.secondary.find((x) => x.startsWith('reduce'));
     title = `${name}${alt ? ` - ${kwCase(alt)}` : ''} Online Free | ${SITE}`;
     description = `${name} online for free with our ${kwCase(kw.secondary[0], false)}. ${isImageFmt(slug)
-      ? 'Make files up to 90% smaller' : 'Images inside are reduced to 150 dpi'}, compress many files at once and download a ZIP. No sign-up.`;
+      ? 'Make files up to 90% smaller' : 'Choose from four compression levels'}, compress many files at once and download a ZIP. No sign-up.`;
   }
   const faq = [
     ...(kw && kw.faq ? kw.faq : []),
-    [`How do I compress a ${f.label} file?`, `Click Select File or drop your ${f.name} files onto the upload box, open Options to choose how much smaller each file should be (50% by default) and, if you like, a maximum size. The list shows the original and new size of every file.`],
-    [`How much smaller will my ${f.label} be?`, 'It depends on the image and your settings. Photographs usually shrink the most and simple graphics the least. The list shows the exact before and after size for every file.'],
+    isImageFmt(slug)
+      ? [`How do I compress a ${f.label} file?`, `Click Select File or drop your ${f.name} files onto the upload box, open Options to choose how much smaller each file should be (50% by default) and, if you like, a maximum size. The list shows the original and new size of every file.`]
+      : [`How do I compress a ${f.label} file?`, `Click Select File or drop your ${f.name} files onto the upload box and open Options to choose Light, Recommended, Strong or Extreme compression. The list shows the original and new size of every file.`],
+    isImageFmt(slug)
+      ? [`How much smaller will my ${f.label} be?`, 'It depends on the image and your settings. Photographs usually shrink the most and simple graphics the least. The list shows the exact before and after size for every file.']
+      : [`How much smaller will my ${f.label} be?`, `It depends on what is inside. ${f.label} files full of photos or scans shrink the most, often by 70 to 95% with Strong or Extreme; files that are mostly text are already small and change less. The list shows the exact before and after size.`],
     ...FAQ_COMMON,
   ];
   const conv = outputsFor(slug).slice(0, 6).map((o) => [pairPath(slug, o), pairLabel(slug, o), true]);
@@ -938,10 +949,10 @@ function compressPage(slug, base) {
     HERO: hero({ h1: meta.h1, crumbs: meta.breadcrumbs,
       intro: isImageFmt(slug)
         ? `Make your ${f.name} images smaller without fuss. Upload one file or many, choose how much smaller they should be, and download the compressed versions individually or as a ZIP. No sign-up needed.`
-        : `Make your ${f.name} files smaller without fuss. Upload one file or many and download the compressed versions individually or as a ZIP. Images inside are downsampled to 150 dpi. No sign-up needed.`,
+        : `Make your ${f.name} files smaller without fuss. Upload one file or many, choose Light, Recommended, Strong or Extreme compression, and download the compressed versions individually or as a ZIP. No sign-up needed.`,
       widget, withSelect: true }),
     TOOL: toolHtml({ inputs: [slug], outputs: [slug], compress: true, dropTitle: `Drop your ${f.label} files here`, dropSub: `or click to choose ${f.label} files` }),
-    CONTENT: howToSteps(f.label, '', 'compress', isImageFmt(slug)) + `<section class="fcards" aria-label="About the format">${cardHtml(slug)}</section>` + readMore(p) + faqHtml(faq),
+    CONTENT: howToSteps(f.label, '', 'compress', isImageFmt(slug)) + usesHtml(p, `compressing ${f.label} files`) + `<section class="fcards" aria-label="About the format">${cardHtml(slug)}</section>` + readMore(p) + faqHtml(faq),
     RELATED: `<section class="related"><h2>Related tools</h2>${chips([...others, ...conv])}</section>`,
   }));
 }
