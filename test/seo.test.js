@@ -136,6 +136,16 @@ test('target keywords lead the title, H1 and description of their pages', () => 
   }
 });
 
+test('no two indexed pages share an H1, so they never compete for the same search', () => {
+  const seen = new Map();
+  for (const { p, html } of indexable) {
+    const h1 = decode(attr(html, /<h1[^>]*>([\s\S]*?)<\/h1>/) || '').replace(/<[^>]+>/g, '').trim().toLowerCase();
+    if (!h1) continue;
+    assert.ok(!seen.has(h1), `${p} and ${seen.get(h1)} have the same H1 "${h1}"`);
+    seen.set(h1, p);
+  }
+});
+
 test('rare conversions still work but are left out of the index; popular ones are indexed', () => {
   const inMap = new Set(pages.allPaths());
   assert.ok(inMap.size > 300 && inMap.size < 600, `sitemap has ${inMap.size} URLs`);
