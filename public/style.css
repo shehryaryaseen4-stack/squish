@@ -283,15 +283,18 @@ input[type=range]{width:150px; accent-color:var(--brand);}
 @media (min-width:1560px){ .side-ad{display:flex;} }
 
 /* ----------------------------------------------------------------- footer -- */
-.site-footer{margin-top:20px; background:var(--bg-soft); border-top:1px solid var(--border);}
+.site-footer{margin-top:20px; background:var(--band); color:var(--band-ink); border-top:1px solid var(--band-line);}
+.site-footer .brand{color:var(--band-ink);}
+.site-footer .brand-free{color:#FF5049;}
 .footer-inner{max-width:1180px; margin:0 auto; padding:44px 20px 28px; display:grid; grid-template-columns:1.5fr repeat(4,1fr); gap:28px;}
 .footer-6{grid-template-columns:1.3fr repeat(5,1fr); gap:24px;}
-.footer-brand p{color:var(--dim); font-size:.93rem; line-height:1.6; margin-top:12px; max-width:34ch;}
-.site-footer h4{font-size:.82rem; text-transform:uppercase; letter-spacing:.06em; color:var(--dim); margin-bottom:12px;}
+.footer-brand p{color:var(--band-dim); font-size:.93rem; line-height:1.6; margin-top:12px; max-width:34ch;}
+.site-footer h4{font-size:.82rem; text-transform:uppercase; letter-spacing:.06em; color:var(--band-ink); margin-bottom:12px;}
 .site-footer ul{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:7px;}
-.site-footer ul a{text-decoration:none; font-size:.95rem;}
-.site-footer ul a:hover{color:var(--brand);}
-.footer-bottom{max-width:1180px; margin:0 auto; padding:18px 20px 26px; border-top:1px solid var(--border); color:var(--dim); font-size:.88rem;}
+.site-footer a{color:var(--band-dim);}
+.site-footer ul a{text-decoration:none; font-size:.95rem; color:var(--band-dim);}
+.site-footer ul a:hover{color:var(--band-ink); text-decoration:underline;}
+.footer-bottom{max-width:1180px; margin:0 auto; padding:18px 20px 26px; border-top:1px solid var(--band-line); color:var(--band-dim); font-size:.88rem;}
 @media (max-width:980px){ .footer-inner,.footer-6{grid-template-columns:repeat(3,1fr);} .footer-brand{grid-column:1 / -1;} }
 @media (max-width:640px){ .footer-inner,.footer-6{grid-template-columns:1fr 1fr;} }
 @media (max-width:400px){ .footer-inner,.footer-6{grid-template-columns:1fr;} }
