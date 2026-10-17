@@ -13,18 +13,15 @@ module.exports = [
     slug: 'passport-photo-maker', howto: 'How to make a passport photo at home', name: 'Passport Photo Maker', app: 'passport', browser: true,
     keywords: ['passport photo', 'passport photo maker', '2x2 photo', 'passport photo online free', 'us passport photo', 'visa photo', '35x45 photo'],
     title: 'Passport Photo Maker - Free 2x2 Photo Online',
-    desc: 'Free passport photo maker: crop a 2x2 inch US passport or visa photo (or 35x45 mm) online, then download the digital photo and a 4x6 print sheet.',
+    desc: 'Free passport photo maker for 40+ countries: crop a 2x2 inch US, 35x45 mm UK, EU or Pakistan photo online, then download the digital photo and a 4x6 sheet.',
     h1: 'Passport Photo Maker (2x2 Inch)',
-    intro: 'Make a passport photo at home. Upload a photo, line your face up with the guide, and download a 2x2 inch photo for a US passport or visa, a 35x45 mm photo for the UK, EU and Schengen, or a 50x70 mm Canadian photo. You also get a 4x6 inch sheet to print at CVS, Walgreens, Walmart or any photo kiosk. Free, no sign-up, and your photo never leaves your device.',
+    intro: 'Make a passport photo at home. Upload a photo, pick your country from the list of more than 40, line your face up with the guide, and download a photo in the right size: 2x2 inch for a US passport or visa, 35x45 mm for the UK, the EU, Schengen and Pakistan, 50x70 mm for Canada, and many more. You also get a 4x6 inch sheet to print at CVS, Walgreens, Walmart or any photo kiosk. Free, no sign-up, and your photo never leaves your device.',
     steps: [['Take or upload a photo.', 'Stand in front of a plain white or off-white wall, face the camera, keep a neutral expression and both eyes open. Then click <em>Select photo</em>.'],
       ['Line up your face.', 'Choose the country, then drag and zoom the photo so the top of your head and your chin sit between the guide lines and your face is centred.'],
       ['Download and print.', 'Download the digital photo for online applications, or the 4x6 inch sheet to print at a pharmacy or photo kiosk for a few cents.']],
     sections: [
-      ['Passport photo sizes we make', `<table class="cmp"><thead><tr><th>Country or document</th><th>Photo size</th><th>Head size (chin to top of head)</th><th>Digital file</th></tr></thead><tbody>
-        <tr><td>US passport, US visa, Green Card (DV lottery), India passport</td><td>2 x 2 in (51 x 51 mm)</td><td>1 to 1 3/8 in (25 to 35 mm)</td><td>600 x 600 px JPG</td></tr>
-        <tr><td>UK, EU and Schengen passports and visas, Australia</td><td>35 x 45 mm</td><td>29 to 34 mm</td><td>413 x 531 px JPG (300 dpi)</td></tr>
-        <tr><td>Canada passport</td><td>50 x 70 mm</td><td>31 to 36 mm</td><td>591 x 827 px JPG (300 dpi)</td></tr></tbody></table>
-        <p>Rules change and some offices are stricter than others, so check the current requirements of the office you apply to before printing.</p>`],
+      ['Passport photo sizes by country', `{{PASSPORT_TABLE}}
+        <p>Rules change and some offices are stricter than others, so check the current requirements of the office you apply to before printing. For a country that is not listed, choose <em>Custom size</em> and type the width and height in millimetres.</p>`],
       ['How to take a good passport photo at home', '<ul><li><strong>Background:</strong> a plain white or off-white wall with no pattern, shadows or objects behind you.</li><li><strong>Light:</strong> face a window or a soft light so there are no shadows on your face or behind you. Do not use the flash.</li><li><strong>Pose:</strong> look straight at the camera with a neutral expression, mouth closed, both eyes open. Keep your head straight, not tilted.</li><li><strong>Glasses and hats:</strong> take off glasses (the US no longer accepts them) and anything on your head unless you wear it every day for religious or medical reasons.</li><li><strong>Camera:</strong> ask someone else to take the photo from about 4 feet (1.2 m) away at eye level. A selfie at arm\'s length distorts the face.</li></ul>'],
       ['Printing your passport photo for less', '<p>Download the <strong>4x6 inch print sheet</strong> and order a standard 4x6 photo print at CVS, Walgreens, Walmart, Costco, Boots or any photo kiosk: one print costs well under a dollar and holds several passport photos. Cut along the thin grey lines. Choose matte or glossy photo paper, not plain paper, and do not resize the image when you order the print.</p>'],
       ['Private by design', '<p>Your photo is cropped in your browser. It is never uploaded to our server, so nobody else sees it, and it works even on a slow connection. To make the image file smaller for an upload form, use <a href="/compress-jpg">Compress JPG</a>; to turn an iPhone photo into a JPG first, use <a href="/heic-to-jpg">HEIC to JPG</a>.</p>'],
@@ -36,6 +33,7 @@ module.exports = [
       ['Can I use this photo to renew my passport online?', 'Use the digital 600 x 600 pixel photo. Make sure the photo follows the rules on background, lighting and expression; we cannot check or guarantee that an office accepts it.'],
       ['Does it remove the background?', 'No. It crops and sizes your photo; it does not change the background. Take the photo in front of a plain white or off-white wall for the best result.'],
       ['Is my photo uploaded?', 'No. Everything happens in your browser and the photo never leaves your device.'],
+      ['What size is a Pakistan passport photo?', 'Pakistan passport, CNIC and visa photos are 35 x 45 mm, the same size as UK and Schengen photos. Choose Pakistan in the list and the guide lines show where the head and chin go.'],
       ['What size is a UK or Schengen visa photo?', 'UK, EU and Schengen passport and visa photos are 35 x 45 mm, with the head 29 to 34 mm tall. Choose "UK / EU / Schengen" in the tool.'],
     ],
     see: ['/heic-to-jpg', '/compress-jpg', '/jpg-to-pdf', '/image-to-pdf', '/resume-maker'],

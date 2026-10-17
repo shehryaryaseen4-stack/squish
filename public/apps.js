@@ -20,17 +20,31 @@ function dropZone(onFile) {
 }
 
 // ------------------------------------------------------------- passport photo --
-// Sizes in mm; head = chin to top of head as a share of the photo height (the middle of the allowed
-// range), top = space above the head. px = the digital file.
-const PASSPORT = {
-  us: { name: '2x2', w: 50.8, h: 50.8, top: 0.12, head: 0.595, min: 0.5, max: 0.69, px: [600, 600] },
-  eu: { name: '35x45mm', w: 35, h: 45, top: 0.09, head: 0.71, min: 0.644, max: 0.756, px: [413, 531] },
-  ca: { name: '50x70mm', w: 50, h: 70, top: 0.16, head: 0.479, min: 0.443, max: 0.514, px: [591, 827] },
-};
+// The size picked in the menu (content/passport-specs.js, carried on each option): photo w x h in mm,
+// head = chin to top of head (min, max in mm), px = the digital file. The guides put the head at the
+// middle of the allowed range, with about a third of the space left over above it.
+function specOf(sel, box) {
+  const o = sel.selectedOptions[0];
+  let w, h, hmin, hmax, px;
+  if (o.value === 'custom') {
+    w = Math.min(100, Math.max(20, Number($('[data-cw]', box).value) || 35));
+    h = Math.min(100, Math.max(20, Number($('[data-ch]', box).value) || 45));
+    hmin = h * 0.66; hmax = h * 0.78;
+  } else {
+    w = Number(o.dataset.w); h = Number(o.dataset.h); hmin = Number(o.dataset.hmin); hmax = Number(o.dataset.hmax);
+    px = o.dataset.px && o.dataset.px.split('x').map(Number);
+  }
+  const head = (hmin + hmax) / 2 / h;
+  const name = w === 51 && h === 51 ? '2x2' : `${w}x${h}mm`;
+  return { w, h, name, head, top: Math.max(0.05, (1 - head) * 0.32), min: hmin, max: hmax,
+    px: px || [Math.round((w / 25.4) * 300), Math.round((h / 25.4) * 300)], label: o.textContent };
+}
 function passport() {
   const canvas = $('[data-canvas]'), ctx = canvas.getContext('2d');
-  const st = { img: null, size: 'us', zoom: 1, x: 0, y: 0, rot: 0, bright: 100 };
-  const spec = () => PASSPORT[st.size];
+  const st = { img: null, zoom: 1, x: 0, y: 0, rot: 0, bright: 100 };
+  const sizeSel = $('[data-size]');
+  let cur = specOf(sizeSel, box);
+  const spec = () => cur;
   const W = () => canvas.width, H = () => canvas.height;
   const cover = () => Math.max(W() / st.img.width, H() / st.img.height);
 
@@ -60,10 +74,14 @@ function passport() {
     c.fillText('Top of head', 8, top - 6); c.fillText('Chin', 8, chin - 6);
     c.restore();
   }
-  function setSize(size) {
-    st.size = size;
-    const p = spec();
+  function setSize() {
+    cur = specOf(sizeSel, box);
+    $('[data-custom]').hidden = sizeSel.value !== 'custom';
+    const p = cur, mm = (v) => (Number.isInteger(v) ? v : v.toFixed(1));
+    const inch = p.w === 51 && p.h === 51 ? '2 x 2 in (51 x 51 mm)' : `${p.w} x ${p.h} mm (${(p.w / 25.4).toFixed(2)} x ${(p.h / 25.4).toFixed(2)} in)`;
+    $('[data-spec]').innerHTML = `<strong>Photo:</strong> ${inch} &middot; <strong>Head:</strong> ${mm(p.min)}\u2013${mm(p.max)} mm, chin to top of head &middot; <strong>Digital:</strong> ${p.px[0]} x ${p.px[1]} px`;
     canvas.height = Math.round((600 * p.h) / p.w);
+    try { localStorage.setItem('flipit-passport-size', sizeSel.value); } catch { /* private mode */ }
     draw();
   }
   async function load(file) {
@@ -82,7 +100,8 @@ function passport() {
     draw();
   }
   dropZone(load);
-  $('[data-size]').addEventListener('change', (e) => setSize(e.target.value));
+  sizeSel.addEventListener('change', setSize);
+  $$('[data-cw], [data-ch]').forEach((el) => el.addEventListener('input', setSize));
   $('[data-zoom]').addEventListener('input', (e) => { st.zoom = Number(e.target.value); draw(); });
   $('[data-rot]').addEventListener('input', (e) => { st.rot = Number(e.target.value); draw(); });
   $('[data-bright]').addEventListener('input', (e) => { st.bright = Number(e.target.value); draw(); });
@@ -157,7 +176,8 @@ function passport() {
     save(await jpg(sheet), `passport-photo-${p.name}-4x6-print.jpg`);
     say(`Saved a 4x6 inch sheet with ${cols * rows} photos. Print it as a regular 4x6 photo, without cropping or resizing.`); beacon('Passport sheet');
   });
-  setSize('us');
+  try { const last = localStorage.getItem('flipit-passport-size'); if (last && sizeSel.querySelector(`option[value="${last}"]`)) sizeSel.value = last; } catch { /* private mode */ }
+  setSize();
 }
 
 // ------------------------------------------------------------------ OCR --

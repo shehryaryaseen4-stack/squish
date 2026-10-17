@@ -909,6 +909,11 @@ function pdfToolsHub(base) {
 // Stand-alone tools (content/apps.js): passport photo maker, image to text / OCR PDF, invoice
 // generator. Same layout as the PDF tool pages; the tool box is driven by public/apps.js.
 const OCR_LANGS = () => require('./engines/ocr').langs();
+const PASSPORT_SPECS = require('./content/passport-specs');
+// every size in the menu, as a table on the page (searches like "pakistan passport photo size")
+const passportTableHtml = () => `<table><thead><tr><th>Country</th><th>Document</th><th>Photo size</th><th>Head (chin to top)</th><th>Digital file</th></tr></thead><tbody>${PASSPORT_SPECS
+  .flatMap(([, list]) => list).map((x) => `<tr><td>${esc(x.country)}</td><td>${esc(x.doc)}</td><td>${photoSize(x)}${x.w === 51 && x.h === 51 ? ' (51 x 51 mm)' : ''}</td><td>${x.head[0]}\u2013${x.head[1]} mm</td><td>${(x.px || [Math.round((x.w / 25.4) * 300), Math.round((x.h / 25.4) * 300)]).join(' x ')} px</td></tr>`).join('')}</tbody></table>`;
+const photoSize = (x) => (x.w === 51 && x.h === 51 ? '2 x 2 in' : `${x.w} x ${x.h} mm`);
 function appBox(t) {
   if (t.app === 'passport') {
     return `<section class="app app-passport" id="app" data-app="passport">
@@ -922,10 +927,11 @@ function appBox(t) {
   <div class="pp-work" data-work hidden>
     <div class="pp-stage"><canvas class="pp-canvas" data-canvas width="600" height="600" aria-label="Drag to move the photo, scroll or pinch to zoom"></canvas><p class="pp-hint">Drag to move &middot; scroll, pinch or use the slider to zoom. Top of head on the upper line, chin on the lower line.</p></div>
     <form class="pp-opts" autocomplete="off" onsubmit="return false">
-      <label>Country / document<select data-size>
-        <option value="us">US passport &amp; visa, India (2 x 2 in)</option>
-        <option value="eu">UK, EU, Schengen, Australia (35 x 45 mm)</option>
-        <option value="ca">Canada (50 x 70 mm)</option></select></label>
+      <label>Country and document<select data-size>${PASSPORT_SPECS.map(([group, list]) => `<optgroup label="${esc(group)}">${list
+        .map((x) => `<option value="${x.id}" data-w="${x.w}" data-h="${x.h}" data-hmin="${x.head[0]}" data-hmax="${x.head[1]}"${x.px ? ` data-px="${x.px.join('x')}"` : ''}>${esc(x.country)} \u2013 ${esc(x.doc)} (${photoSize(x)})</option>`).join('')}</optgroup>`).join('')}
+        <optgroup label="Other"><option value="custom">Custom size (any country)</option></optgroup></select></label>
+      <div class="pp-custom" data-custom hidden><label>Width (mm)<input type="number" data-cw min="20" max="100" step="1" value="35"></label><label>Height (mm)<input type="number" data-ch min="20" max="100" step="1" value="45"></label></div>
+      <p class="pp-spec" data-spec aria-live="polite"></p>
       <label>Zoom<input type="range" data-zoom min="0.2" max="4" step="0.01" value="1"></label>
       <label>Straighten<input type="range" data-rot min="-15" max="15" step="0.5" value="0"></label>
       <label>Brightness<input type="range" data-bright min="70" max="140" step="1" value="100"></label>
@@ -1018,6 +1024,7 @@ const APP_PRIVACY = {
 };
 function appPage(slug, base) {
   const t = APP_BY_SLUG.get(slug);
+  const passportTable = t.app === 'passport' ? passportTableHtml() : '';
   if (!knownPaths) knownPaths = new Set(allPaths());
   const p = `/${t.slug}`;
   const crumbs = [['Home', '/'], [t.name, p]];
@@ -1029,7 +1036,7 @@ function appPage(slug, base) {
     JSONLD: graph(base, p, t.h1, t.desc, t.faq, crumbs, { features: [t.browser ? 'Runs in the browser, no upload' : 'Files deleted after processing', 'No sign-up', 'No watermark', 'Free'] }),
     HERO: hero({ h1: t.h1, crumbs, intro: t.intro }),
     TOOL: appBox(t),
-    CONTENT: steps + usesHtml(p, t.name) + t.sections.map(([h, html]) => `<section class="notes prose-block"><h2>${esc(h)}</h2>${liveLinks(html)}</section>`).join('')
+    CONTENT: steps + usesHtml(p, t.name) + t.sections.map(([h, html]) => `<section class="notes prose-block"><h2>${esc(h)}</h2>${liveLinks(html.replace('{{PASSPORT_TABLE}}', passportTable))}</section>`).join('')
       + `<section class="related-tools"><h2>Related tools</h2>${chips([...see, ...other])}</section>`
       + readMore(p) + faqHtml(t.faq),
     PRIVACY: APP_PRIVACY[t.app],
