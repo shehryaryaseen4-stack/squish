@@ -122,4 +122,33 @@ module.exports = {
     'Put signed pages, receipts and forms into a single PDF to email.',
     'Join scanned pages for a rental, loan or school application.',
   ],
+  '/cr2-to-jpg': [
+    'Share Canon RAW photos on Instagram, Facebook or WhatsApp, which do not accept CR2.',
+    'Send photos from a shoot to a client who has no RAW editor.',
+    'Print Canon RAW photos at CVS, Walgreens, Walmart or Boots, which ask for JPG.',
+  ],
+  '/nef-to-jpg': [
+    'Share Nikon RAW photos on social media and messaging apps.',
+    'Open Nikon NEF files on a Windows PC or phone without Lightroom.',
+    'Upload photos to a print shop or photo book site that takes JPG.',
+  ],
+  '/dng-to-jpg': [
+    'Share iPhone ProRAW or Android RAW photos on any app.',
+    'Open DNG files on a computer without Lightroom or Photoshop.',
+  ],
+  '/xps-to-pdf': [
+    'Open an XPS file saved with "Microsoft XPS Document Writer" on a Mac, phone or newer Windows PC.',
+    'Send an XPS bill, statement or report as a PDF anyone can open.',
+    'Upload an XPS document to a portal that only accepts PDF.',
+  ],
+  '/numbers-to-xlsx': [
+    'Open a spreadsheet from a Mac or iPhone user in Excel on Windows.',
+    'Move an Apple Numbers file to Google Sheets or Microsoft 365.',
+    'Send a budget or list made in Numbers to a colleague who uses Excel.',
+  ],
+  '/rar-to-zip': [
+    'Open a RAR download on a Mac, iPhone, Chromebook or Android phone without WinRAR.',
+    'Re-share an archive as ZIP so everyone can open it with built-in tools.',
+    'Upload files to a site or school platform that accepts ZIP but not RAR.',
+  ],
 };

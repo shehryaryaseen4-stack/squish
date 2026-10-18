@@ -158,7 +158,7 @@ test('no two indexed pages share an H1, so they never compete for the same searc
 
 test('rare conversions still work but are left out of the index; popular ones are indexed', () => {
   const inMap = new Set(pages.allPaths());
-  assert.ok(inMap.size > 300 && inMap.size < 600, `sitemap has ${inMap.size} URLs`);
+  assert.ok(inMap.size > 300 && inMap.size < 700, `sitemap has ${inMap.size} URLs`);
   for (const p of ['/jpg-to-png', '/pdf-to-docx', '/mp4-to-mp3', '/heic-to-jpg', '/compress-pdf', '/image-converter']) assert.ok(inMap.has(p), `${p} should be indexed`);
   let rare = 0;
   for (const c of registry.getConverters()) {
