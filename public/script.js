@@ -18,6 +18,36 @@
   window.addEventListener("pe:exported", () => track({ e: "pdf", p: location.pathname }));
   window.addEventListener("pt:done", (e) => track({ e: "tool", p: location.pathname, d: e.detail }));
 
+  // A short thank-you under the download button once a file is ready: no popup, nothing blocked.
+  // It names the site and gives two ways back (bookmark, share), once per page.
+  const SITE_NAME = (document.querySelector('meta[property="og:site_name"]') || {}).content || "Flipit Free";
+  let thanked = false;
+  function thanks(){
+    if (thanked) return;
+    const host = document.querySelector("#app, #pt, #convert");
+    if (!host) return;
+    thanked = true;
+    const touch = window.matchMedia("(pointer: coarse)").matches;
+    const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+    const keep = touch ? "Add us to your home screen" : `Press ${mac ? "⌘" : "Ctrl"}+D to bookmark us`;
+    const card = document.createElement("div");
+    card.className = "thanks-card";
+    card.setAttribute("role", "status");
+    card.innerHTML = `<span class="thanks-ico" aria-hidden="true">❤</span>`
+      + `<p><strong>Thanks for using ${SITE_NAME}!</strong> Free, fast and no sign-up, every time. ${keep} for your next file.</p>`
+      + `<button type="button" class="btn btn-ghost btn-sm thanks-share">Share</button>`;
+    card.querySelector(".thanks-share").addEventListener("click", async (e) => {
+      const data = { title: SITE_NAME, text: `${SITE_NAME}: free online file converter`, url: location.origin + location.pathname };
+      try {
+        if (navigator.share) await navigator.share(data);
+        else { await navigator.clipboard.writeText(data.url); e.target.textContent = "Link copied"; }
+      } catch (_) { /* closed the share sheet */ }
+    });
+    host.appendChild(card);
+  }
+  window.addEventListener("pt:done", thanks);
+  window.addEventListener("ff:converted", thanks);
+
   // Ad slots: present only when ADSENSE_CLIENT and slot IDs are set on the server.
   document.querySelectorAll("ins.adsbygoogle").forEach(() => { (window.adsbygoogle = window.adsbygoogle || []).push({}); });
 
@@ -635,6 +665,7 @@
     if (busy) status = `<span class="spinner" aria-hidden="true"></span> ${compressMode ? "Compressing" : "Converting"} ${busy} file${busy > 1 ? "s" : ""}…`;
     else if (ready) status = `${ready} file${ready > 1 ? "s" : ""} ready`;
     else if (done) status = `<span class="done-check" aria-hidden="true">&#10003;</span> Done${failed ? ` &middot; ${failed} failed` : ""}`;
+    if (done && !busy) window.dispatchEvent(new Event("ff:converted"));
     else status = failed ? `${failed} file${failed > 1 ? "s" : ""} could not be converted` : "";
     barStatus.innerHTML = status;
   }
