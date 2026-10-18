@@ -915,7 +915,5 @@ body:has(.acct) .site-footer{margin-top:0;}
 [data-fitbox]{display:flex; flex-direction:column; gap:10px; margin-top:10px;}
 .rs-result canvas{max-width:360px; max-height:260px; border-radius:6px; border:1px solid var(--border);}
 .rs-label{margin:0 0 4px; font-size:.8rem; text-transform:uppercase; letter-spacing:.04em; color:var(--dim); font-weight:700;}
-/* footer: company links under the brand, two to a row */
-.site-footer .footer-company{display:grid; grid-template-columns:auto auto; justify-content:start; gap:7px 22px; margin-top:18px;}
-.site-footer .footer-company a{white-space:nowrap;}
-.site-footer .footer-company li:last-child:nth-child(odd){grid-column:1 / -1;}
+/* footer: company links under the brand, one list */
+.site-footer .footer-company{margin-top:18px;}

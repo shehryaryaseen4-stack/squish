@@ -334,7 +334,7 @@ function topbar(full = false) {
   return topbarCache[key];
 }
 
-// Footer: brand and company links, then five columns of about ten links each (converters, popular
+// Footer: brand and company links (one list), then five columns of about ten links each (converters, popular
 // conversions, PDF tools, image tools, video/audio and writing tools), so no column runs long.
 const FOOTER_IMAGE = ['/image-resizer', '/remove-background', '/crop-image', '/rotate-image', '/flip-image', '/passport-photo-maker', '/image-to-text', '/favicon-generator', '/compress-jpg', '/compress-png'];
 const FOOTER_MORE = ['/compress-video', '/trim-video', '/mp3-cutter', '/ringtone-maker', '/word-counter', '/signature-generator', '/cover-letter-generator', '/invoice-generator'];
