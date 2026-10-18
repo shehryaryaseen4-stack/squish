@@ -334,22 +334,27 @@ function topbar(full = false) {
   return topbarCache[key];
 }
 
+// Footer: brand and company links, then five columns of about ten links each (converters, popular
+// conversions, PDF tools, image tools, video/audio and writing tools), so no column runs long.
+const FOOTER_IMAGE = ['/image-resizer', '/remove-background', '/crop-image', '/rotate-image', '/flip-image', '/passport-photo-maker', '/image-to-text', '/favicon-generator', '/compress-jpg', '/compress-png'];
+const FOOTER_MORE = ['/compress-video', '/trim-video', '/mp3-cutter', '/ringtone-maker', '/word-counter', '/signature-generator', '/cover-letter-generator', '/invoice-generator'];
 function footer() {
   const pop = [...friendlies().slice(0, 4).map((x) => `<li>${link(`/${x.slug}`, esc(x.h1.replace(/ Converter$/, '')))}</li>`),
     ...POPULAR.slice(0, 8).map(([f, t]) => `<li>${link(pairPath(f, t), pairLabel(f, t))}</li>`)].join('');
   const cats = CATS.map((c) => `<li>${link(categoryPath(c.id), c.converterName)}</li>`).join('');
-  const comp = COMPRESSIBLE.map((s) => `<li>${link(compressPath(s), `Compress ${F(s).label}`)}</li>`).join('');
   if (!knownPaths) knownPaths = new Set(allPaths());
-  const pdf = `<div><h4>PDF tools</h4><ul>${['/edit-pdf', '/merge-pdf', '/split-pdf', '/compress-pdf', '/protect-pdf', '/unlock-pdf', '/resume-maker', '/sign-pdf']
-    .filter((x) => knownPaths.has(x)).map((x) => `<li>${link(x, esc(toolName(x)))}</li>`).join('')}<li>${link('/pdf-tools', 'All PDF tools')}</li></ul></div>`;
-  return `<footer class="site-footer"><div class="footer-inner${pdf ? ' footer-6' : ''}">
+  const name = (x) => (APP_BY_SLUG.has(x.slice(1)) ? APP_BY_SLUG.get(x.slice(1)).name : toolName(x));
+  const list = (paths) => paths.filter((x) => knownPaths.has(x)).map((x) => `<li>${link(x, esc(name(x)))}</li>`).join('');
+  const pdf = `<div><h4>PDF tools</h4><ul>${list(['/edit-pdf', '/merge-pdf', '/split-pdf', '/compress-pdf', '/sign-pdf', '/protect-pdf', '/unlock-pdf', '/ocr-pdf', '/resume-maker'])}<li>${link('/pdf-tools', 'All PDF tools')}</li></ul></div>`;
+  return `<footer class="site-footer"><div class="footer-inner footer-6">
     <div class="footer-brand">${BRAND_LINK}
-      <p>Free online file converter. ${LIVE_COUNT.toLocaleString('en-US')} conversions across ${LIVE_CAT_NAMES.length} categories, free and without sign-up.</p></div>
+      <p>Free online file converter. ${LIVE_COUNT.toLocaleString('en-US')} conversions across ${LIVE_CAT_NAMES.length} categories, free and without sign-up.</p>
+      <ul class="footer-company">${[['/about', 'About'], ['/guides', 'Guides'], ['/privacy', 'Privacy Policy'], ['/terms', 'Terms of Use'], ['/contact', 'Contact']].map(([h, t]) => `<li>${link(h, t)}</li>`).join('')}${CONTACT_EMAIL ? `<li>${mailLink}</li>` : ''}</ul></div>
     <div><h4>Converters</h4><ul>${cats}</ul></div>
     <div><h4>Popular</h4><ul>${pop}</ul></div>
     ${pdf}
-    <div><h4>Tools</h4><ul>${MENU_APPS.map((t) => `<li>${link(`/${t.slug}`, esc(t.name))}</li>`).join('')}${comp}<li>${link('/converters', 'All formats')}</li></ul></div>
-    <div><h4>Company</h4><ul><li>${link('/about', 'About')}</li><li>${link('/guides', 'Guides')}</li><li>${link('/privacy', 'Privacy Policy')}</li><li>${link('/terms', 'Terms of Use')}</li><li>${link('/contact', 'Contact')}</li>${CONTACT_EMAIL ? `<li>${mailLink}</li>` : ''}</ul></div>
+    <div><h4>Image tools</h4><ul>${list(FOOTER_IMAGE)}</ul></div>
+    <div><h4>Video &amp; more</h4><ul>${list(FOOTER_MORE)}<li>${link('/converters', 'All formats')}</li></ul></div>
   </div><div class="footer-bottom">&copy; ${new Date().getFullYear()} ${SITE}. Files are deleted as soon as they are converted.</div></footer>`;
 }
 
