@@ -948,7 +948,8 @@ function toolBox(t) {
   <div class="pt-work" data-work hidden>
     ${fileBar('Choose another image')}
     <div class="rs-grid">
-      <img class="rs-preview" data-preview alt="Your image">
+      <div class="rs-stagewrap"><canvas class="rs-stage" data-stage aria-label="Your image. When cropping, drag the box to choose the part to keep and drag a corner to resize it."></canvas>
+        <p class="rs-hint" data-stage-hint hidden>Drag the box to choose the part to keep. Drag a corner to change its size and shape (hold Shift to keep the shape). <button type="button" class="pt-link" data-recenter>Centre</button></p></div>
       <form class="pt-opts" autocomplete="off" onsubmit="return false">
         <fieldset class="pt-radios"><legend>Resize by</legend>
           <label><input type="radio" name="mode" value="kb"${t.mode === 'px' ? '' : ' checked'}> File size (KB)</label>
@@ -957,15 +958,17 @@ function toolBox(t) {
         <div data-mode-box="kb"><label>Target size (KB)<input type="number" data-kb min="5" max="20000" step="1" value="${kb}"></label>
           <p class="rs-chips">${[20, 50, 100, 200, 500].map((n) => `<button type="button" class="chip-btn" data-kbset="${n}">${n} KB</button>`).join('')}</p></div>
         <div data-mode-box="px" hidden><div class="rs-wh"><label>Width (px)<input type="number" data-w min="1" max="12000"></label><label>Height (px)<input type="number" data-h min="1" max="12000"></label></div>
-          <label class="rs-lock"><input type="checkbox" data-lock checked> Keep proportions</label>
-          <p class="rs-chips">${[['1080x1080', 'Instagram post'], ['1080x1920', 'Story / Reel'], ['1200x630', 'Facebook / link'], ['1280x720', 'YouTube thumbnail'], ['1920x1080', 'Full HD'], ['600x600', 'Passport (2x2)']]
-    .map(([s, n]) => `<button type="button" class="chip-btn" data-preset="${s}">${n}</button>`).join('')}</p></div>
+          <label class="rs-lock"><input type="checkbox" data-lock> <span>Keep proportions (no cropping)</span></label>
+          <div data-fitbox><label>When the shape changes<select data-fit><option value="crop">Crop: choose the part to keep</option><option value="pad">Fit: add borders</option><option value="stretch">Stretch to fit</option></select></label>
+            <label data-padbox hidden>Borders<select data-padbg><option value="white">White</option><option value="clear">Transparent (PNG, WEBP)</option></select></label></div>
+          <p class="rs-chips">${[['1080x1080', 'Instagram post'], ['1080x1350', 'Instagram portrait'], ['1080x1920', 'Story / Reel'], ['1200x630', 'Facebook / link'], ['1280x720', 'YouTube thumbnail'], ['1920x1080', 'Full HD'], ['600x600', 'Passport (2x2)']]
+    .map(([sz, n]) => `<button type="button" class="chip-btn" data-preset="${sz}">${n}</button>`).join('')}</p></div>
         <div data-mode-box="pct" hidden><label>Scale <span data-pct-val>50%</span><input type="range" data-pct min="5" max="100" step="1" value="50"></label></div>
         ${fmtSelect(t.mode === 'px')}
       </form>
     </div>
-    <div class="rs-result" data-result hidden><img data-rimg alt="Resized image"><div><p class="rs-meta" data-rmeta></p><button type="button" class="btn btn-brand" data-dl>${icon('download')}Download</button></div></div>
-    <div class="pt-bar"><p class="pt-msg" data-msg role="status" aria-live="polite"></p><button type="button" class="btn btn-brand pt-go" data-go>Resize image</button></div>
+    <div class="rs-result" data-result><canvas class="checker" data-rimg aria-label="Preview of the result"></canvas><div><p class="rs-label">Result preview</p><p class="rs-meta" data-rmeta></p><button type="button" class="btn btn-ghost btn-sm" data-dl>${icon('download')}Download</button></div></div>
+    <div class="pt-bar"><p class="pt-msg" data-msg role="status" aria-live="polite"></p><button type="button" class="btn btn-brand pt-go" data-go>${icon('download')}Download image</button></div>
   </div>
   ${NOSCRIPT}
 </section>`;

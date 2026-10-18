@@ -60,89 +60,216 @@ function scaled(src, w, h, background) {
 
 // ---------------------------------------------------------------- image resizer --
 function resize() {
-  const st = { file: null, img: null, out: null };
-  const kbIn = $('[data-kb]'), wIn = $('[data-w]'), hIn = $('[data-h]'), lock = $('[data-lock]'), pct = $('[data-pct]'), fmt = $('[data-fmt]');
+  const st = { file: null, img: null, crop: null, cropAspect: 0, out: null, busy: 0 };
+  const kbIn = $('[data-kb]'), wIn = $('[data-w]'), hIn = $('[data-h]'), lock = $('[data-lock]'), pct = $('[data-pct]'), fmt = $('[data-fmt]'), fit = $('[data-fit]');
+  const stage = $('[data-stage]'), sx = stage.getContext('2d'), outCv = $('[data-rimg]');
   const mode = () => ($('input[name="mode"]:checked') || {}).value || 'kb';
-  const syncMode = () => { $$('[data-mode-box]').forEach((el) => { el.hidden = el.dataset.modeBox !== mode(); }); };
-  $$('input[name="mode"]').forEach((r) => r.addEventListener('change', syncMode)); syncMode();
-  const ratio = () => { const [w, h] = dims(st.img); return w / h; };
-  wIn.addEventListener('input', () => { if (lock.checked && st.img && wIn.value) hIn.value = Math.max(1, Math.round(wIn.value / ratio())); });
-  hIn.addEventListener('input', () => { if (lock.checked && st.img && hIn.value) wIn.value = Math.max(1, Math.round(hIn.value * ratio())); });
-  pct.addEventListener('input', () => { $('[data-pct-val]').textContent = `${pct.value}%`; });
-  $$('[data-kbset]').forEach((b) => b.addEventListener('click', () => { kbIn.value = b.dataset.kbset; }));
-  $$('[data-preset]').forEach((b) => b.addEventListener('click', () => {
-    const [w, h] = b.dataset.preset.split('x').map(Number);
-    $('input[name="mode"][value="px"]').checked = true; syncMode(); lock.checked = false; wIn.value = w; hIn.value = h;
-  }));
+  const srcDims = () => dims(st.img);
+  const outType = () => { const orig = st.file && EXT_OF[st.file.type] ? st.file.type : 'image/jpeg'; return fmt.value === 'same' ? orig : MIME[fmt.value]; };
+  // in pixel mode with "keep proportions" off and "crop" chosen, the picture is cropped to the new shape
+  const cropping = () => mode() === 'px' && !lock.checked && fit.value === 'crop';
 
-  dropZone(async (file) => {
-    say('');
-    try { st.img = await loadImage(file); } catch (e) { say(e.message, true); return; }
-    st.file = file;
-    const [w, h] = dims(st.img);
-    $('[data-fname]').textContent = file.name; $('[data-fmeta]').textContent = `${w} x ${h} px · ${fmtSize(file.size)}`;
-    wIn.value = w; hIn.value = h;
-    const pv = $('[data-preview]'); pv.src = URL.createObjectURL(file);
-    $('[data-result]').hidden = true; showWork(true);
+  function targetSize() {
+    const [w0, h0] = srcDims();
+    if (mode() === 'pct') return [Math.max(1, Math.round((w0 * pct.value) / 100)), Math.max(1, Math.round((h0 * pct.value) / 100))];
+    if (mode() === 'px') return [Math.round(Number(wIn.value)), Math.round(Number(hIn.value))];
+    return [w0, h0];
+  }
+  // biggest box of the target shape, centred (or kept where the user put it)
+  function fitCrop(force) {
+    const [W, H] = srcDims(), [tw, th] = targetSize();
+    const a = tw > 0 && th > 0 ? tw / th : W / H;
+    if (!force && st.crop && Math.abs(a - st.cropAspect) / a < 0.01) return; // same shape (rounding aside): keep the user's box
+    const old = st.crop;
+    let w = W, h = w / a; if (h > H) { h = H; w = h * a; }
+    const cx = old ? old.x + old.w / 2 : W / 2, cy = old ? old.y + old.h / 2 : H / 2;
+    st.crop = { x: Math.min(Math.max(0, cx - w / 2), W - w), y: Math.min(Math.max(0, cy - h / 2), H - h), w, h };
+    st.cropAspect = a;
+  }
+
+  // ---- the stage: the photo, with the crop box when cropping
+  let k = 1;
+  function drawStage() {
+    if (!st.img) return;
+    const [W, H] = srcDims();
+    const maxW = Math.max(200, stage.parentElement.clientWidth - 2), maxH = 420;
+    k = Math.min(maxW / W, maxH / H, 1);
+    stage.width = Math.round(W * k); stage.height = Math.round(H * k);
+    sx.clearRect(0, 0, stage.width, stage.height);
+    sx.drawImage(st.img, 0, 0, stage.width, stage.height);
+    stage.classList.toggle('is-crop', cropping());
+    if (!cropping()) return;
+    fitCrop();
+    const c = st.crop;
+    sx.save(); sx.fillStyle = 'rgba(0,0,0,.55)';
+    sx.beginPath(); sx.rect(0, 0, stage.width, stage.height); sx.rect(c.x * k, c.y * k, c.w * k, c.h * k); sx.fill('evenodd');
+    sx.strokeStyle = '#fff'; sx.lineWidth = 2; sx.strokeRect(c.x * k, c.y * k, c.w * k, c.h * k);
+    sx.strokeStyle = 'rgba(255,255,255,.45)'; sx.lineWidth = 1;
+    for (let i = 1; i < 3; i++) {
+      sx.beginPath(); sx.moveTo((c.x + (c.w * i) / 3) * k, c.y * k); sx.lineTo((c.x + (c.w * i) / 3) * k, (c.y + c.h) * k); sx.stroke();
+      sx.beginPath(); sx.moveTo(c.x * k, (c.y + (c.h * i) / 3) * k); sx.lineTo((c.x + c.w) * k, (c.y + (c.h * i) / 3) * k); sx.stroke();
+    }
+    sx.fillStyle = '#fff';
+    for (const [hx, hy] of corners(c)) sx.fillRect(hx * k - 7, hy * k - 7, 14, 14);
+    sx.restore();
+  }
+  const corners = (c) => [[c.x, c.y], [c.x + c.w, c.y], [c.x, c.y + c.h], [c.x + c.w, c.y + c.h]];
+  let drag = null;
+  const pt = (e) => { const r = stage.getBoundingClientRect(); return [(e.clientX - r.left) / k, (e.clientY - r.top) / k]; };
+  stage.addEventListener('mousedown', (e) => e.preventDefault());
+  stage.addEventListener('pointerdown', (e) => {
+    if (!cropping()) return;
+    const [x, y] = pt(e), c = st.crop, tol = 16 / k;
+    const ci = corners(c).findIndex(([hx, hy]) => Math.abs(hx - x) < tol && Math.abs(hy - y) < tol);
+    if (ci >= 0) drag = { kind: 'corner', ci, start: { ...c } };
+    else if (x > c.x && x < c.x + c.w && y > c.y && y < c.y + c.h) drag = { kind: 'move', dx: x - c.x, dy: y - c.y };
+    else return;
+    stage.setPointerCapture(e.pointerId); e.preventDefault();
   });
+  stage.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const [x, y] = pt(e), [W, H] = srcDims(), c = st.crop, a = st.cropAspect;
+    if (drag.kind === 'move') {
+      c.x = Math.min(Math.max(0, x - drag.dx), W - c.w); c.y = Math.min(Math.max(0, y - drag.dy), H - c.h);
+    } else {
+      const s = drag.start, left = drag.ci % 2 === 0, top = drag.ci < 2;
+      const ax = left ? s.x + s.w : s.x, ay = top ? s.y + s.h : s.y;
+      // a corner can change the shape freely (Shift keeps it); the height box follows the new shape
+      let w = Math.max(16, Math.min(Math.abs(Math.min(Math.max(0, x), W) - ax), left ? ax : W - ax));
+      let h = Math.max(16, Math.min(Math.abs(Math.min(Math.max(0, y), H) - ay), top ? ay : H - ay));
+      if (e.shiftKey) { if (w / h > a) w = h * a; else h = w / a; }
+      c.x = left ? ax - w : ax; c.y = top ? ay - h : ay; c.w = w; c.h = h;
+      st.cropAspect = w / h;
+      hIn.value = Math.max(1, Math.round(Number(wIn.value) / st.cropAspect));
+    }
+    drawStage(); update();
+  });
+  const endDrag = () => { drag = null; };
+  stage.addEventListener('pointerup', endDrag); stage.addEventListener('pointercancel', endDrag);
 
+  // ---- the result, made at the real size
+  function render(scale = 1) {
+    const type = outType(), bg = type === 'image/jpeg' ? '#fff' : null;
+    const [w0, h0] = srcDims();
+    if (mode() !== 'px') { const [w, h] = targetSize(); return scaled(st.img, w * scale, h * scale, bg); }
+    const [w, h] = targetSize();
+    if (cropping()) {
+      fitCrop();
+      const c = st.crop, part = document.createElement('canvas');
+      part.width = Math.max(1, Math.round(c.w)); part.height = Math.max(1, Math.round(c.h));
+      part.getContext('2d').drawImage(st.img, Math.round(c.x), Math.round(c.y), part.width, part.height, 0, 0, part.width, part.height);
+      return scaled(part, w * scale, h * scale, bg);
+    }
+    if (!lock.checked && fit.value === 'pad') {
+      const out = document.createElement('canvas'); out.width = Math.round(w * scale); out.height = Math.round(h * scale);
+      const x = out.getContext('2d');
+      if (bg || $('[data-padbg]').value === 'white') { x.fillStyle = '#fff'; x.fillRect(0, 0, out.width, out.height); }
+      const s = Math.min(out.width / w0, out.height / h0), dw = w0 * s, dh = h0 * s;
+      x.drawImage(scaled(st.img, dw, dh, bg), (out.width - dw) / 2, (out.height - dh) / 2);
+      return out;
+    }
+    return scaled(st.img, w * scale, h * scale, bg); // stretch, or proportions kept
+  }
   async function toTarget(type, target) {
-    const [w0, h0] = dims(st.img);
-    let scale = 1; let best = null;
+    const [w0, h0] = srcDims();
+    let scale = 1;
     for (let round = 0; round < 10; round++) {
       const c = scaled(st.img, w0 * scale, h0 * scale, type === 'image/jpeg' ? '#fff' : null);
       if (type === 'image/png') {
         const b = await toBlob(c, type);
-        if (b.size <= target) return { blob: b, w: c.width, h: c.height };
+        if (b.size <= target) return { blob: b, w: c.width, h: c.height, canvas: c };
         scale *= Math.max(0.3, Math.sqrt(target / b.size) * 0.95);
         continue;
       }
-      // highest quality that fits, between 0.35 and 0.95
-      let lo = 0.35, hi = 0.95; best = null;
+      let lo = 0.35, hi = 0.95;
       const low = await toBlob(c, type, lo);
       if (low.size > target) { scale *= Math.max(0.3, Math.sqrt(target / low.size) * 0.95); continue; }
-      best = { blob: low, w: c.width, h: c.height };
+      let best = { blob: low, w: c.width, h: c.height, canvas: c };
       for (let i = 0; i < 7; i++) {
         const q = (lo + hi) / 2; const b = await toBlob(c, type, q);
-        if (b.size <= target) { best = { blob: b, w: c.width, h: c.height }; lo = q; } else hi = q;
+        if (b.size <= target) { best = { blob: b, w: c.width, h: c.height, canvas: c }; lo = q; } else hi = q;
       }
       return best;
     }
     throw new Error('This image could not be made that small. Try a larger size in KB.');
   }
-
-  $('[data-go]').addEventListener('click', async () => {
-    if (!st.img) return;
-    const orig = st.file.type in EXT_OF ? st.file.type : 'image/jpeg';
-    const type = fmt.value === 'same' ? orig : MIME[fmt.value];
-    say('Resizing…');
-    try {
-      let r;
-      if (mode() === 'kb') {
-        const kb = Number(kbIn.value);
-        if (!(kb >= 5)) { say('Enter a size of at least 5 KB.', true); return; }
-        const target = kb * 1024;
-        if (st.file.size <= target && type === st.file.type) {
-          const [w, h] = dims(st.img); r = { blob: st.file, w, h, already: true };
-        } else r = await toTarget(type, target);
-      } else {
-        const [w0, h0] = dims(st.img);
-        const w = mode() === 'px' ? Number(wIn.value) : Math.round((w0 * pct.value) / 100);
-        const h = mode() === 'px' ? Number(hIn.value) : Math.round((h0 * pct.value) / 100);
-        if (!(w >= 1 && h >= 1) || w > 12000 || h > 12000) { say('Enter a width and height between 1 and 12000 pixels.', true); return; }
-        const c = scaled(st.img, w, h, type === 'image/jpeg' ? '#fff' : null);
-        r = { blob: await toBlob(c, type, 0.9), w, h };
+  async function make() {
+    const type = outType();
+    if (mode() === 'kb') {
+      const kb = Number(kbIn.value);
+      if (!(kb >= 5)) throw new Error('Enter a size of at least 5 KB.');
+      if (st.file.size <= kb * 1024 && type === st.file.type) {
+        const [w, h] = srcDims(); return { blob: st.file, w, h, canvas: scaled(st.img, w, h), already: true };
       }
-      const ext = EXT_OF[r.blob.type] || EXT_OF[type] || 'jpg';
-      st.out = { blob: r.blob, name: `${baseName(st.file)}-${mode() === 'kb' ? `${kbIn.value}kb` : `${r.w}x${r.h}`}.${ext}` };
-      $('[data-result]').hidden = false;
-      $('[data-rimg]').src = URL.createObjectURL(r.blob);
-      $('[data-rmeta]').textContent = `${r.w} x ${r.h} px · ${fmtSize(r.blob.size)} (was ${fmtSize(st.file.size)})`;
-      say(r.already ? `This image is already under ${kbIn.value} KB, so it is unchanged.` : 'Done. Download your image below.');
-      beacon('Resize image');
-    } catch (e) { say(e.message, true); }
+      return toTarget(type, kb * 1024);
+    }
+    const [w, h] = targetSize();
+    if (!(w >= 1 && h >= 1) || w > 12000 || h > 12000) throw new Error('Enter a width and height between 1 and 12000 pixels.');
+    const c = render();
+    return { blob: await toBlob(c, type, 0.9), w: c.width, h: c.height, canvas: c };
+  }
+
+  // live preview: redrawn on every change, encoded a moment after the last one
+  let timer = null;
+  function update() {
+    if (!st.img) return;
+    clearTimeout(timer);
+    const job = ++st.busy;
+    $('[data-rmeta]').textContent = 'Updating…';
+    timer = setTimeout(async () => {
+      try {
+        const r = await make();
+        if (job !== st.busy) return;
+        st.out = r;
+        const prev = r.canvas, max = 360, s = Math.min(max / prev.width, 260 / prev.height, 1);
+        outCv.width = Math.max(1, Math.round(prev.width * s)); outCv.height = Math.max(1, Math.round(prev.height * s));
+        const ox = outCv.getContext('2d'); ox.clearRect(0, 0, outCv.width, outCv.height); ox.drawImage(prev, 0, 0, outCv.width, outCv.height);
+        $('[data-rmeta]').textContent = `${r.w} x ${r.h} px · ${fmtSize(r.blob.size)} (was ${fmtSize(st.file.size)})`;
+        say(r.already ? `This image is already under ${kbIn.value} KB, so it stays as it is.` : '');
+      } catch (e) { if (job === st.busy) { st.out = null; $('[data-rmeta]').textContent = ''; say(e.message, true); } }
+    }, mode() === 'kb' ? 450 : 200);
+  }
+
+  const syncMode = () => {
+    $$('[data-mode-box]').forEach((el) => { el.hidden = el.dataset.modeBox !== mode(); });
+    $('[data-fitbox]').hidden = lock.checked;
+    $('[data-padbox]').hidden = lock.checked || fit.value !== 'pad';
+    $('[data-stage-hint]').hidden = !cropping();
+    drawStage(); update();
+  };
+  $$('input[name="mode"]').forEach((r) => r.addEventListener('change', syncMode));
+  const ratio = () => { const [w, h] = srcDims(); return w / h; };
+  wIn.addEventListener('input', () => { if (lock.checked && st.img && wIn.value) hIn.value = Math.max(1, Math.round(wIn.value / ratio())); drawStage(); update(); });
+  hIn.addEventListener('input', () => { if (lock.checked && st.img && hIn.value) wIn.value = Math.max(1, Math.round(hIn.value * ratio())); drawStage(); update(); });
+  lock.addEventListener('change', () => { if (lock.checked && st.img) hIn.value = Math.max(1, Math.round(wIn.value / ratio())); syncMode(); });
+  fit.addEventListener('change', syncMode); $('[data-padbg]').addEventListener('change', update);
+  pct.addEventListener('input', () => { $('[data-pct-val]').textContent = `${pct.value}%`; update(); });
+  kbIn.addEventListener('input', update); fmt.addEventListener('change', update);
+  $$('[data-kbset]').forEach((b) => b.addEventListener('click', () => { kbIn.value = b.dataset.kbset; update(); }));
+  $$('[data-preset]').forEach((b) => b.addEventListener('click', () => {
+    const [w, h] = b.dataset.preset.split('x').map(Number);
+    $('input[name="mode"][value="px"]').checked = true; lock.checked = false; fit.value = 'crop'; wIn.value = w; hIn.value = h;
+    st.crop = null; syncMode();
+  }));
+  $('[data-recenter]').addEventListener('click', () => { st.crop = null; fitCrop(true); drawStage(); update(); });
+  window.addEventListener('resize', drawStage);
+
+  dropZone(async (file) => {
+    say('');
+    try { st.img = await loadImage(file); } catch (e) { say(e.message, true); return; }
+    st.file = file; st.crop = null;
+    const [w, h] = srcDims();
+    $('[data-fname]').textContent = file.name; $('[data-fmeta]').textContent = `${w} x ${h} px · ${fmtSize(file.size)}`;
+    wIn.value = w; hIn.value = h;
+    showWork(true); syncMode();
   });
-  $('[data-dl]').addEventListener('click', () => { if (st.out) save(st.out.blob, st.out.name); });
+  const download = () => {
+    if (!st.out) { say('Wait a moment for the preview, then try again.', true); return; }
+    const ext = EXT_OF[st.out.blob.type] || 'jpg';
+    save(st.out.blob, `${baseName(st.file)}-${mode() === 'kb' ? `${kbIn.value}kb` : `${st.out.w}x${st.out.h}`}.${ext}`);
+    say('Downloaded.'); beacon('Resize image');
+  };
+  $('[data-go]').addEventListener('click', download); $('[data-dl]').addEventListener('click', download);
 }
 
 // ------------------------------------------------------- crop, rotate and flip --
