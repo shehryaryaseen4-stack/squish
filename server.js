@@ -4,6 +4,7 @@
 // once per file, then optionally bundles the results into a zip in-browser.
 
 const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const multer = require('multer');
 const helmet = require('helmet');
@@ -95,7 +96,9 @@ app.use('/api/', (_req, res, next) => { res.set('X-Robots-Tag', 'noindex, nofoll
 app.use('/api/', rateLimit({
   windowMs: 15 * 60 * 1000,
   max: MAX_FILES_PER_WINDOW,
-  skip: (req) => req.path === '/p', // the page-view beacon has its own limit (accounts/index.js)
+  // the page-view beacon has its own limit (accounts/index.js); upload pieces and job polling are
+  // parts of one conversion, which is counted when it starts
+  skip: (req) => req.path === '/p' || /^\/upload\/[a-f0-9]{24}\/\d+$/.test(req.path) || /^\/jobs\//.test(req.path),
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests from this connection. Please wait a few minutes and try again.' },
@@ -291,19 +294,46 @@ app.post('/api/remove-bg', upload.single('file'), async (req, res) => {
   }
 });
 
-// Video compressor, video trimmer, MP3 cutter, ringtone maker. Videos are big, so uploads go to
-// disk (not memory) and the work runs as a background job the page polls (engines/media-tools.js).
+// Video compressor, video trimmer, MP3 cutter, ringtone maker. Videos are big: the page sends the
+// file in pieces of up to 32 MB (a proxy such as Cloudflare's free plan refuses a single request
+// over 100 MB), they are joined on disk here, and the work runs as a background job the page polls
+// (engines/media-tools.js).
 const mediaTools = require('./engines/media-tools');
-const MAX_VIDEO_MB = Number(process.env.MAX_VIDEO_MB || 100); // Cloudflare's free plan accepts up to 100 MB per upload
-const videoUpload = multer({
-  storage: multer.diskStorage({ destination: require('os').tmpdir(), filename: (_r, _f, cb) => cb(null, `squish-up-${require('crypto').randomBytes(10).toString('hex')}`) }),
-  limits: { fileSize: MAX_VIDEO_MB * 1024 * 1024, files: 1 },
+const MAX_VIDEO_MB = Number(process.env.MAX_VIDEO_MB || 500);
+const CHUNK_MAX = 40 * 1024 * 1024;
+const UPLOADS = new Map(); // id -> { path, size, got, next, name, at }
+const UP_DIR = require('os').tmpdir();
+setInterval(() => { // unfinished or unused uploads are dropped after 30 minutes
+  for (const [id, u] of UPLOADS) if (Date.now() - u.at > 30 * 60 * 1000) { UPLOADS.delete(id); fs.promises.rm(u.path, { force: true }).catch(() => {}); }
+}, 60 * 1000).unref();
+app.post('/api/upload', express.json({ limit: '4kb' }), (req, res) => {
+  const size = Number(req.body && req.body.size), name = String((req.body && req.body.name) || 'file').slice(0, 200);
+  if (!(size > 0)) return res.status(400).json({ error: 'No file received.' });
+  if (size > MAX_VIDEO_MB * 1024 * 1024) return res.status(413).json({ error: `File is larger than the ${MAX_VIDEO_MB}MB limit set on this server.` });
+  if (UPLOADS.size >= 50) return res.status(503).json({ error: 'The server is busy with other uploads right now. Please try again in a few minutes.' });
+  const id = require('crypto').randomBytes(12).toString('hex');
+  UPLOADS.set(id, { path: path.join(UP_DIR, `squish-up-${id}`), size, got: 0, next: 0, name, at: Date.now() });
+  res.json({ id, chunk: 32 * 1024 * 1024 });
 });
-const mediaBase = (f) => String(f.originalname || 'file').replace(/\.[^.]+$/, '').replace(/[^\w.-]+/g, '-').slice(0, 80) || 'file';
+app.put('/api/upload/:id/:n', (req, res) => {
+  const u = UPLOADS.get(req.params.id), n = Number(req.params.n);
+  if (!u) return res.status(404).json({ error: 'This upload has expired. Please choose the file again.' });
+  if (n !== u.next) return res.status(409).json({ error: 'The upload got out of step. Please try again.' });
+  let got = 0; let failed = false;
+  const out = fs.createWriteStream(u.path, { flags: 'a' });
+  const fail = (code, msg) => { if (failed) return; failed = true; req.unpipe(out); out.destroy(); res.status(code).json({ error: msg }); };
+  req.on('data', (d) => { got += d.length; if (got > CHUNK_MAX || u.got + got > u.size) fail(413, 'This upload is larger than announced.'); });
+  req.pipe(out);
+  out.on('finish', () => { if (failed) return; u.got += got; u.next += 1; u.at = Date.now(); res.json({ got: u.got }); });
+  out.on('error', () => fail(500, 'The upload could not be saved.'));
+});
+const mediaBase = (name) => String(name || 'file').replace(/\.[^.]+$/, '').replace(/[^\w.-]+/g, '-').slice(0, 80) || 'file';
 const startMedia = (name, work) => (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No file received.' });
+  const u = UPLOADS.get(String(req.body && req.body.upload));
+  if (!u || u.got !== u.size) return res.status(400).json({ error: 'The upload is not complete. Please choose the file again.' });
+  UPLOADS.delete(String(req.body.upload)); // the job owns the file now and deletes it when done
   try {
-    const id = mediaTools.startJob(req.file.path, work.base(req), (dir) => work.run(req.file.path, req.body || {}, dir));
+    const id = mediaTools.startJob(u.path, work.base(u.name, req.body), (dir) => work.run(u.path, req.body, dir));
     res.json({ id });
     analytics.event(req, 'tool', { pair: name, p: fromPage(req) });
   } catch (err) {
@@ -312,15 +342,15 @@ const startMedia = (name, work) => (req, res) => {
     res.status(500).json({ error: 'Unexpected server error.' });
   }
 };
-app.post('/api/video/compress', videoUpload.single('file'), startMedia('Compress video', {
-  base: (req) => `${mediaBase(req.file)}-compressed`,
+app.post('/api/video/compress', express.json({ limit: '4kb' }), startMedia('Compress video', {
+  base: (n) => `${mediaBase(n)}-compressed`,
   run: (file, b, dir) => mediaTools.compressVideo(file, {
     targetMB: Number(b.targetMB) > 0 ? Math.min(Number(b.targetMB), 2000) : 0,
     quality: ['high', 'medium', 'low'].includes(b.quality) ? b.quality : 'medium',
   }, dir),
 }));
-app.post('/api/media/trim', videoUpload.single('file'), startMedia('Trim media', {
-  base: (req) => `${mediaBase(req.file)}-${req.body && req.body.format === 'm4r' ? 'ringtone' : 'cut'}`,
+app.post('/api/media/trim', express.json({ limit: '4kb' }), startMedia('Trim media', {
+  base: (n, b) => `${mediaBase(n)}-${b.format === 'm4r' ? 'ringtone' : 'cut'}`,
   run: (file, b, dir) => mediaTools.trimMedia(file, {
     start: Number(b.start), end: Number(b.end), format: String(b.format || 'mp3'),
     fadeIn: Number(b.fadeIn) || 0, fadeOut: Number(b.fadeOut) || 0, maxLen: b.ringtone === '1' ? 40 : 0,
@@ -460,8 +490,7 @@ app.use((req, res, next) => {
 
 app.use((err, req, res, _next) => {
   if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
-    const mb = /^\/api\/(video|media)\//.test(req.path) ? MAX_VIDEO_MB : MAX_FILE_MB;
-    return res.status(413).json({ error: `File is larger than the ${mb}MB limit set on this server.` });
+    return res.status(413).json({ error: `File is larger than the ${MAX_FILE_MB}MB limit set on this server.` });
   }
   console.error(err);
   res.status(500).json({ error: 'Unexpected server error.' });

@@ -13,7 +13,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { job, run, UserError } = require('./cli');
 
-const TIMEOUT_MS = Math.max(60, Number(process.env.MEDIA_TIMEOUT_S || 900)) * 1000;
+const TIMEOUT_MS = Math.max(60, Number(process.env.MEDIA_TIMEOUT_S || 1800)) * 1000;
 const KEEP_MS = 15 * 60 * 1000; // results can be downloaded for 15 minutes
 const MAX_WAITING = Math.max(1, Number(process.env.MEDIA_MAX_JOBS || 12)); // queued + running
 

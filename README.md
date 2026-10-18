@@ -77,10 +77,11 @@ maker, word counter, signature generator, cover letter generator). Most run in t
 - Background remover: `engines/bgremove.js`, IS-Net (Apache-2.0) with ONNX Runtime on the CPU. The
   Dockerfile downloads the model to `models/` and checks its SHA-256. It needs about 1 GB of memory
   while loaded, runs one image at a time and unloads after `BG_IDLE_MIN` (10) idle minutes.
-- Video compressor and trimmers: `engines/media-tools.js` with FFmpeg. Uploads go to disk (up to
-  `MAX_VIDEO_MB`, default 100, Cloudflare's free-plan upload limit) and run as background jobs the
-  page polls (`/api/jobs/:id`), because encodes can take longer than a proxy waits for one answer.
-  Results are deleted after 15 minutes.
+- Video compressor and trimmers: `engines/media-tools.js` with FFmpeg. The page uploads the file
+  in 32 MB pieces (`/api/upload`), because Cloudflare's free plan refuses one request over 100 MB;
+  the server joins them on disk (up to `MAX_VIDEO_MB`, default 500). The work runs as a background
+  job the page polls (`/api/jobs/:id`), because encodes can take longer than a proxy waits for one
+  answer (`MEDIA_TIMEOUT_S`, default 1800). Results are deleted after 15 minutes.
 
 ### Tests
 

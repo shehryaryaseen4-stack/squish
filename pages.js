@@ -919,7 +919,7 @@ const passportTableHtml = () => `<table><thead><tr><th>Country</th><th>Document<
   .flatMap(([, list]) => list).map((x) => `<tr><td>${esc(x.country)}</td><td>${esc(x.doc)}</td><td>${photoSize(x)}${x.w === 51 && x.h === 51 ? ' (51 x 51 mm)' : ''}</td><td>${x.head[0]}\u2013${x.head[1]} mm</td><td>${(x.px || [Math.round((x.w / 25.4) * 300), Math.round((x.h / 25.4) * 300)]).join(' x ')} px</td></tr>`).join('')}</tbody></table>`;
 const photoSize = (x) => (x.w === 51 && x.h === 51 ? '2 x 2 in' : `${x.w} x ${x.h} mm`);
 // Tool boxes for the newer tools (driven by public/tools.js).
-const MAX_VIDEO_MB = Number(process.env.MAX_VIDEO_MB || 100);
+const MAX_VIDEO_MB = Number(process.env.MAX_VIDEO_MB || 500);
 const SIG_FONTS = [['great-vibes', 'Great Vibes'], ['dancing-script', 'Dancing Script'], ['sacramento', 'Sacramento'], ['allura', 'Allura'],
   ['alex-brush', 'Alex Brush'], ['mr-dafoe', 'Mr Dafoe'], ['herr-von-muellerhoff', 'Herr Von Muellerhoff'], ['homemade-apple', 'Homemade Apple']];
 const dropBox = (accept, label, sub, note) => `<div class="pt-drop" data-drop>

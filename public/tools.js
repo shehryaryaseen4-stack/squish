@@ -591,17 +591,48 @@ function bgremove() {
 }
 
 // --------------------------------------------------------------- video compressor --
-const maxVideoMb = () => Number(box.dataset.maxMb) || 100;
+const maxVideoMb = () => Number(box.dataset.maxMb) || 500;
 function mediaFile(file, kind) {
   const ok = kind === 'audio' ? /^(audio|video)\//.test(file.type) || /\.(mp3|wav|m4a|aac|flac|ogg|oga|opus|wma|aiff?|amr|mp4|mov|webm|mkv|avi)$/i.test(file.name)
     : /^video\//.test(file.type) || /\.(mp4|mov|m4v|webm|mkv|avi|wmv|flv|3gp|mpe?g|ts|mts|m2ts)$/i.test(file.name);
   if (!ok) throw new Error(kind === 'audio' ? 'Choose an audio file (MP3, WAV, M4A ...) or a video.' : 'Choose a video file (MP4, MOV, WEBM, MKV ...).');
   if (file.size > maxVideoMb() * 1024 * 1024) throw new Error(`This file is ${fmtSize(file.size)}; the limit is ${maxVideoMb()} MB. Trim it first with the video trimmer, or compress it on your phone.`);
 }
+// Big files go up in pieces (a proxy may refuse one request over 100 MB); the server joins them.
+function putPiece(url, blob, onProgress) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open('PUT', url);
+    x.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded); };
+    x.onload = () => { if (x.status >= 200 && x.status < 300) resolve(); else { let m = `The server answered ${x.status}.`; try { m = JSON.parse(x.responseText).error || m; } catch { /* not JSON */ } reject(Object.assign(new Error(m), { status: x.status })); } };
+    x.onerror = () => reject(new Error('The upload failed. Check your connection and try again.'));
+    x.send(blob);
+  });
+}
+const postJson = async (url, body) => {
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `The server answered ${r.status}.`);
+  return j;
+};
+async function uploadInPieces(file, onProgress) {
+  const { id, chunk } = await postJson('/api/upload', { name: file.name, size: file.size });
+  for (let n = 0, off = 0; off < file.size; n++, off += chunk) {
+    const piece = file.slice(off, Math.min(file.size, off + chunk));
+    for (let tryNo = 0; ; tryNo++) { // a dropped connection is retried twice
+      try { await putPiece(`/api/upload/${id}/${n}`, piece, (sent) => onProgress((off + sent) / file.size)); break; } catch (e) {
+        if (tryNo >= 2 || (e.status && e.status !== 502 && e.status !== 503 && e.status !== 504)) throw e;
+        await new Promise((r) => setTimeout(r, 2000 * (tryNo + 1)));
+      }
+    }
+  }
+  return id;
+}
 async function runJob(url, fd, doneText) {
   progress(0, 'Uploading…');
-  const res = await upload(url, fd, (p) => progress(p, `Uploading… ${Math.round(p * 100)}%`));
-  const { id } = JSON.parse(await res.text());
+  const file = fd.get('file'), fields = Object.fromEntries([...fd].filter(([k]) => k !== 'file'));
+  const upId = await uploadInPieces(file, (p) => progress(p, `Uploading… ${Math.round(p * 100)}%`));
+  const { id } = await postJson(url, { ...fields, upload: upId });
   progress(null, 'Working on it… this can take a minute or two for long videos. Keep this page open.');
   const j = await waitJob(id, (s) => say(s === 'queued' ? 'Waiting for a free slot… keep this page open.' : 'Working on it… keep this page open.'));
   const dl = $('[data-dl-link]'); dl.href = `/api/jobs/${id}/file`; dl.setAttribute('download', j.name);
