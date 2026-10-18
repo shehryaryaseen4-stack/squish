@@ -151,4 +151,59 @@ module.exports = {
     'Re-share an archive as ZIP so everyone can open it with built-in tools.',
     'Upload files to a site or school platform that accepts ZIP but not RAR.',
   ],
+  '/image-resizer': [
+    'Get a photo or signature under the 20 KB, 50 KB or 100 KB limit of an online application form.',
+    'Make a 1080 x 1080 Instagram post or a 1280 x 720 YouTube thumbnail.',
+    'Shrink product photos before uploading them to Shopify, Etsy or eBay.',
+  ],
+  '/remove-background': [
+    'Put product photos on the pure white background Amazon asks for.',
+    'Make a professional LinkedIn profile photo on a plain colour.',
+    'Cut out a logo, a pet or a person for a sticker, a meme or a Canva design.',
+  ],
+  '/compress-video': [
+    'Send a gameplay clip or a phone video on Discord, which limits free accounts to 10 MB.',
+    "Attach a video to an email under Gmail's 25 MB or Outlook's 20 MB limit.",
+    'Upload a video to a school portal or job application that has a size limit.',
+  ],
+  '/trim-video': [
+    'Cut a clip for Instagram Reels, TikTok or a WhatsApp status.',
+    'Remove the start and end of a screen recording or a Zoom meeting recording.',
+    'Keep just the best part of a phone video before sharing it.',
+  ],
+  '/mp3-cutter': [
+    'Shorten a song to fit a slideshow, a video or a presentation.',
+    'Cut the silence out of a voice memo or a WhatsApp voice note.',
+    'Make a short intro or outro for a podcast.',
+  ],
+  '/ringtone-maker': [
+    'Make an iPhone ringtone (M4R) from a song you own, up to 40 seconds.',
+    'Make an MP3 ringtone or notification sound for Android.',
+    'Set a different ringtone for a family member or a work contact.',
+  ],
+  '/word-counter': [
+    'Check a Common App or college essay against its 650-word limit.',
+    'Keep a cover letter or a blog post at the right length.',
+    'Count characters for an X post, a meta description or an Instagram caption.',
+  ],
+  '/signature-generator': [
+    'Sign a lease, a job offer or a school form you received as a PDF.',
+    'Add your signature to a Word or Google Docs letter.',
+    'Make a transparent signature for your email signature or invoices.',
+  ],
+  '/cover-letter-generator': [
+    'Apply for jobs on LinkedIn, Indeed, Workday or a company careers site.',
+    'Write a cover letter for an internship or your first job after college.',
+    'Explain a career change in a clear, one-page letter.',
+  ],
+  '/crop-image': [
+    'Crop a profile picture to a square for LinkedIn, Instagram or WhatsApp.',
+    'Cut a screenshot down to the part that matters before sharing it.',
+    'Make a 4:5 Instagram post or a 9:16 story from any photo.',
+  ],
+  '/favicon-generator': [
+    'Add a favicon to a new website, a blog or a portfolio.',
+    'Make the Apple touch icon and Android icons for a web app.',
+    'Make a simple letter icon when you do not have a logo yet.',
+  ],
 };

@@ -32,6 +32,9 @@ const KEYWORDS = require('./content/keywords');
 const USES = require('./content/uses');
 const APPS = require('./content/apps');
 const APP_BY_SLUG = new Map(APPS.map((t) => [t.slug, t]));
+// Variants of a tool (resize to 50 KB, compress video for Discord ...) have pages but stay out of menus.
+const MENU_APPS = APPS.filter((t) => t.menu !== false);
+const APP_ICON = { passport: 'jpg', ocr: 'txt', invoice: 'pdf', resize: 'jpg', imgedit: 'png', favicon: 'ico', bgremove: 'png', vcompress: 'mp4', trim: 'mp3', words: 'txt', signature: 'png', cover: 'docx' };
 // Converters under the names people search for: /pdf-to-word, /word-to-pdf ... (friendlyPage)
 const FRIENDLY_ALL = require('./content/friendly-pages');
 // Only the file types this server can really convert (LibreOffice, Calibre ... may be missing):
@@ -287,8 +290,8 @@ function megaMenu() {
     `<a class="mega-head" href="/converters">All ${TOTAL_COUNT.toLocaleString('en-US')} conversions &rarr;</a>`]);
   groups.push(['pdf-tools', 'PDF tools', pdfGroups().flatMap(([, items]) => items).map(([href, label]) => ({ id: 'pdf', href, text: esc(label), live: true })),
     '<a class="mega-head" href="/pdf-tools">All PDF tools &rarr;</a>']);
-  groups.push(['apps', 'More tools', APPS.map((t) => ({ id: { passport: 'jpg', ocr: 'txt', invoice: 'pdf' }[t.app], href: `/${t.slug}`, text: esc(t.name), live: true })),
-    '<span class="mega-head">Photo, text and invoice tools</span>']);
+  groups.push(['apps', 'More tools', MENU_APPS.map((t) => ({ id: APP_ICON[t.app] || 'jpg', href: `/${t.slug}`, text: esc(t.name), live: true })),
+    '<span class="mega-head">Photo, video, text and document tools</span>']);
   CATS.forEach((c) => {
     const items = registry.getFormatsByCategory(c.id).map((f) => ({ id: f.id, href: formatPath(f.id), live: formatIsLive(f.id) }));
     groups.push([c.id, c.converterName, items, `<a class="mega-head" href="${categoryPath(c.id)}">${icon(c.icon)}${c.converterName} &rarr;</a>`]);
@@ -344,7 +347,7 @@ function footer() {
     <div><h4>Converters</h4><ul>${cats}</ul></div>
     <div><h4>Popular</h4><ul>${pop}</ul></div>
     ${pdf}
-    <div><h4>Tools</h4><ul>${APPS.map((t) => `<li>${link(`/${t.slug}`, esc(t.name))}</li>`).join('')}${comp}<li>${link('/converters', 'All formats')}</li></ul></div>
+    <div><h4>Tools</h4><ul>${MENU_APPS.map((t) => `<li>${link(`/${t.slug}`, esc(t.name))}</li>`).join('')}${comp}<li>${link('/converters', 'All formats')}</li></ul></div>
     <div><h4>Company</h4><ul><li>${link('/about', 'About')}</li><li>${link('/guides', 'Guides')}</li><li>${link('/privacy', 'Privacy Policy')}</li><li>${link('/terms', 'Terms of Use')}</li><li>${link('/contact', 'Contact')}</li>${CONTACT_EMAIL ? `<li>${mailLink}</li>` : ''}</ul></div>
   </div><div class="footer-bottom">&copy; ${new Date().getFullYear()} ${SITE}. Files are deleted as soon as they are converted.</div></footer>`;
 }
@@ -914,7 +917,218 @@ const PASSPORT_SPECS = require('./content/passport-specs');
 const passportTableHtml = () => `<table><thead><tr><th>Country</th><th>Document</th><th>Photo size</th><th>Head (chin to top)</th><th>Digital file</th></tr></thead><tbody>${PASSPORT_SPECS
   .flatMap(([, list]) => list).map((x) => `<tr><td>${esc(x.country)}</td><td>${esc(x.doc)}</td><td>${photoSize(x)}${x.w === 51 && x.h === 51 ? ' (51 x 51 mm)' : ''}</td><td>${x.head[0]}\u2013${x.head[1]} mm</td><td>${(x.px || [Math.round((x.w / 25.4) * 300), Math.round((x.h / 25.4) * 300)]).join(' x ')} px</td></tr>`).join('')}</tbody></table>`;
 const photoSize = (x) => (x.w === 51 && x.h === 51 ? '2 x 2 in' : `${x.w} x ${x.h} mm`);
+// Tool boxes for the newer tools (driven by public/tools.js).
+const MAX_VIDEO_MB = Number(process.env.MAX_VIDEO_MB || 100);
+const SIG_FONTS = [['great-vibes', 'Great Vibes'], ['dancing-script', 'Dancing Script'], ['sacramento', 'Sacramento'], ['allura', 'Allura'],
+  ['alex-brush', 'Alex Brush'], ['mr-dafoe', 'Mr Dafoe'], ['herr-von-muellerhoff', 'Herr Von Muellerhoff'], ['homemade-apple', 'Homemade Apple']];
+const dropBox = (accept, label, sub, note) => `<div class="pt-drop" data-drop>
+    <input type="file" accept="${accept}" data-input hidden>
+    ${icon('upload', 'pt-drop-ico')}
+    <button class="btn btn-brand btn-select" type="button" data-pick>${icon('upload')}${label}</button>
+    <p class="pt-drop-sub">${sub}</p>
+    <p class="pt-private">${icon('shield')}${note}</p>
+  </div>`;
+const fileBar = (again = 'Choose another file') => `<div class="pt-filebar">${icon('file')}<span class="pt-fname" data-fname></span><span class="pt-fmeta" data-fmeta></span><button type="button" class="pt-link" data-again>${again}</button></div>`;
+const NOSCRIPT = '<noscript><p class="pt-msg">This tool needs JavaScript. Please turn it on and reload the page.</p></noscript>';
+const IMG_ACCEPT = 'image/*,.heic,.heif';
+const fmtSelect = (same = true) => `<label>Save as<select data-fmt>${same ? '<option value="same">Same as original</option>' : ''}<option value="jpg"${same ? '' : ' selected'}>JPG</option><option value="png">PNG</option><option value="webp">WEBP</option></select></label>`;
+const jobDone = (title, again) => `<div class="pt-done" data-done hidden>
+    <span class="pt-done-ico" aria-hidden="true">&#10003;</span>
+    <h2 class="pt-done-h">${title}</h2>
+    <p class="pt-done-text" data-done-text></p>
+    <div class="pt-done-btns"><a class="btn btn-brand" data-dl-link href="#" download>${icon('download')}Download</a><button type="button" class="btn btn-ghost" data-again>${again}</button></div>
+  </div>`;
+
+function toolBox(t) {
+  const open = (extra = '') => `<section class="app app-${t.app}" id="app" data-app="${t.app}"${extra}>`;
+  if (t.app === 'resize') {
+    const kb = t.kb || 100;
+    return `${open()}
+  ${dropBox(IMG_ACCEPT, 'Select image', 'or drop an image here &middot; JPG, PNG, WEBP, GIF, BMP', 'Your image never leaves your device')}
+  <div class="pt-work" data-work hidden>
+    ${fileBar('Choose another image')}
+    <div class="rs-grid">
+      <img class="rs-preview" data-preview alt="Your image">
+      <form class="pt-opts" autocomplete="off" onsubmit="return false">
+        <fieldset class="pt-radios"><legend>Resize by</legend>
+          <label><input type="radio" name="mode" value="kb"${t.mode === 'px' ? '' : ' checked'}> File size (KB)</label>
+          <label><input type="radio" name="mode" value="px"${t.mode === 'px' ? ' checked' : ''}> Width and height</label>
+          <label><input type="radio" name="mode" value="pct"> Percentage</label></fieldset>
+        <div data-mode-box="kb"><label>Target size (KB)<input type="number" data-kb min="5" max="20000" step="1" value="${kb}"></label>
+          <p class="rs-chips">${[20, 50, 100, 200, 500].map((n) => `<button type="button" class="chip-btn" data-kbset="${n}">${n} KB</button>`).join('')}</p></div>
+        <div data-mode-box="px" hidden><div class="rs-wh"><label>Width (px)<input type="number" data-w min="1" max="12000"></label><label>Height (px)<input type="number" data-h min="1" max="12000"></label></div>
+          <label class="rs-lock"><input type="checkbox" data-lock checked> Keep proportions</label>
+          <p class="rs-chips">${[['1080x1080', 'Instagram post'], ['1080x1920', 'Story / Reel'], ['1200x630', 'Facebook / link'], ['1280x720', 'YouTube thumbnail'], ['1920x1080', 'Full HD'], ['600x600', 'Passport (2x2)']]
+    .map(([s, n]) => `<button type="button" class="chip-btn" data-preset="${s}">${n}</button>`).join('')}</p></div>
+        <div data-mode-box="pct" hidden><label>Scale <span data-pct-val>50%</span><input type="range" data-pct min="5" max="100" step="1" value="50"></label></div>
+        ${fmtSelect(t.mode === 'px')}
+      </form>
+    </div>
+    <div class="rs-result" data-result hidden><img data-rimg alt="Resized image"><div><p class="rs-meta" data-rmeta></p><button type="button" class="btn btn-brand" data-dl>${icon('download')}Download</button></div></div>
+    <div class="pt-bar"><p class="pt-msg" data-msg role="status" aria-live="polite"></p><button type="button" class="btn btn-brand pt-go" data-go>Resize image</button></div>
+  </div>
+  ${NOSCRIPT}
+</section>`;
+  }
+  if (t.app === 'imgedit') {
+    return `${open(` data-mode="${t.mode || 'crop'}"`)}
+  ${dropBox(IMG_ACCEPT, 'Select image', 'or drop an image here &middot; JPG, PNG, WEBP, GIF, BMP', 'Your image never leaves your device')}
+  <div class="pt-work" data-work hidden>
+    ${fileBar('Choose another image')}
+    <div class="ie-tools">
+      <label>Crop shape<select data-aspect><option value="free">Free</option><option value="orig">Original</option><option value="1:1">Square 1:1</option><option value="4:5">Portrait 4:5 (Instagram)</option><option value="9:16">Story 9:16</option><option value="16:9">Wide 16:9</option><option value="4:3">4:3</option><option value="3:2">3:2</option><option value="2:3">2:3</option></select></label>
+      <span class="ie-btns"><button type="button" class="btn btn-ghost btn-sm" data-rot-l title="Rotate left">&#8634; Left</button><button type="button" class="btn btn-ghost btn-sm" data-rot-r title="Rotate right">&#8635; Right</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-flip-h>&#8596; Flip horizontal</button><button type="button" class="btn btn-ghost btn-sm" data-flip-v>&#8597; Flip vertical</button>
+        <button type="button" class="pt-link" data-reset>Reset</button></span>
+      <label class="ie-angle">Angle <span data-angle-val>0&deg;</span><input type="range" data-angle min="-180" max="180" step="1" value="0"></label>
+    </div>
+    <div class="ie-stage"><canvas data-canvas aria-label="Drag the box to move it, drag a corner to resize"></canvas></div>
+    <div class="ie-tools"><label>Width (px)<input type="number" data-cw min="1"></label><label>Height (px)<input type="number" data-ch min="1"></label>
+      ${fmtSelect()}<label>Corners after rotating<select data-bg><option value="clear">Transparent (PNG, WEBP)</option><option value="white">White</option></select></label></div>
+    <div class="pt-bar"><p class="pt-msg" data-msg role="status" aria-live="polite"></p><span class="ie-size" data-size-note></span><button type="button" class="btn btn-brand pt-go" data-go>${icon('download')}Download image</button></div>
+  </div>
+  ${NOSCRIPT}
+</section>`;
+  }
+  if (t.app === 'favicon') {
+    return `${open()}
+  <div class="fv-tabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-src-tab="image">From an image</button><button type="button" role="tab" aria-selected="false" data-src-tab="text">From text</button></div>
+  <div data-src-box="image">${dropBox('image/*,.svg', 'Select image or logo', 'or drop it here &middot; PNG, SVG, JPG or WEBP, ideally square', 'Made in your browser, nothing is uploaded')}
+    <p class="fv-fname" data-fname></p>
+    <div class="pt-opts fv-opts"><label>Fit<select data-fit><option value="contain">Whole image</option><option value="cover">Fill the square</option></select></label>
+      <label>Background<select data-fill><option value="none">Transparent</option><option value="color">Colour</option></select></label><label>Colour<input type="color" data-bgc2 value="#ffffff"></label></div></div>
+  <div data-src-box="text" hidden><div class="pt-opts fv-opts">
+    <label>Letters<input type="text" data-text maxlength="3" value="F"></label>
+    <label>Font<select data-font><option value="system-ui, sans-serif">Sans</option><option value="Georgia, serif">Serif</option><option value="ui-monospace, monospace">Mono</option><option value="'Brush Script MT', cursive">Script</option></select></label>
+    <label>Weight<select data-weight><option value="800">Bold</option><option value="500">Regular</option></select></label>
+    <label>Background<input type="color" data-bgc value="#e5322d"></label><label>Text<input type="color" data-fgc value="#ffffff"></label></div></div>
+  <div class="pt-opts fv-opts"><label>Shape<select data-shape><option value="square">Square</option><option value="rounded">Rounded</option><option value="circle">Circle</option></select></label>
+    <label>Padding<input type="range" data-pad min="0" max="30" step="1" value="0"></label>
+    <label>Website name (for the manifest)<input type="text" data-appname placeholder="My website" maxlength="60"></label></div>
+  <div class="fv-out" data-out hidden>
+    <div class="fv-preview" data-preview>${[16, 32, 48, 180, 192].map((s) => `<figure><canvas data-pv="${s}" width="${s}" height="${s}"></canvas><figcaption>${s} px</figcaption></figure>`).join('')}</div>
+    <label class="fv-code">HTML to add inside &lt;head&gt;<textarea data-snippet rows="5" readonly spellcheck="false"></textarea></label>
+    <div class="pt-bar"><button type="button" class="btn btn-ghost btn-sm" data-copy>Copy HTML</button><p class="pt-msg" data-msg role="status" aria-live="polite"></p><button type="button" class="btn btn-brand pt-go" data-go>${icon('download')}Download favicon.zip</button></div>
+  </div>
+  ${NOSCRIPT}
+</section>`;
+  }
+  if (t.app === 'bgremove') {
+    return `${open(` data-max-mb="${MAX_MB}"`)}
+  ${dropBox(IMG_ACCEPT, 'Select photo', `or drop a photo here &middot; JPG, PNG, WEBP or HEIC, up to ${MAX_MB} MB`, 'Photos are deleted as soon as the background is removed')}
+  <div class="pt-work" data-work hidden>
+    ${fileBar('Choose another photo')}
+    <progress class="pt-prog" data-prog max="1" value="0" hidden></progress>
+    <div class="bg-result" data-result hidden>
+      <div class="bg-stage"><canvas class="checker" data-canvas></canvas></div>
+      <div class="pt-opts bg-opts"><fieldset class="pt-radios"><legend>Background</legend>
+        <label><input type="radio" name="bg" value="transparent" checked> Transparent (PNG)</label>
+        <label><input type="radio" name="bg" value="white"> White</label>
+        <label><input type="radio" name="bg" value="color"> Colour <input type="color" data-color value="#2563eb"></label></fieldset>
+        <button type="button" class="btn btn-ghost btn-sm" data-orig>Hold to see the original</button>
+        <button type="button" class="btn btn-brand" data-dl>${icon('download')}Download</button></div>
+    </div>
+    <p class="pt-msg" data-msg role="status" aria-live="polite"></p>
+  </div>
+  ${NOSCRIPT}
+</section>`;
+  }
+  if (t.app === 'vcompress') {
+    const opts = [['10', 'Discord: under 10 MB'], ['25', 'Email: under 25 MB'], ['50', 'Under 50 MB'], ['custom', 'Custom size'], ['high', 'High quality (smaller)'], ['medium', 'Balanced (much smaller)'], ['low', 'Smallest file']];
+    const def = String(t.targetMB || 'medium');
+    return `${open(` data-max-mb="${MAX_VIDEO_MB}"`)}
+  ${dropBox('video/*,.mkv,.mov,.avi,.wmv,.flv,.3gp,.ts,.mts', 'Select video', `or drop a video here &middot; MP4, MOV, WEBM, MKV, AVI, up to ${MAX_VIDEO_MB} MB`, 'Videos are deleted after 15 minutes')}
+  <div class="pt-work" data-work hidden>
+    ${fileBar('Choose another video')}
+    <form class="pt-opts" autocomplete="off" onsubmit="return false">
+      <fieldset class="pt-radios vc-opts"><legend>Make it</legend>${opts.map(([v, n]) => `<label><input type="radio" name="target" value="${v}"${v === def ? ' checked' : ''}> ${n}</label>`).join('')}</fieldset>
+      <label data-custom hidden>Size (MB)<input type="number" data-mb min="1" max="2000" step="1" value="8"></label>
+    </form>
+    <progress class="pt-prog" data-prog max="1" value="0" hidden></progress>
+    <div class="pt-bar"><p class="pt-msg" data-msg role="status" aria-live="polite"></p><button type="button" class="btn btn-brand pt-go" data-go>Compress video</button></div>
+  </div>
+  ${jobDone('Your video is ready', 'Compress another video')}
+  ${NOSCRIPT}
+</section>`;
+  }
+  if (t.app === 'trim') {
+    const kind = t.kind || 'video';
+    const accept = kind === 'video' ? 'video/*,.mkv,.mov,.avi,.wmv,.flv,.3gp,.ts,.mts' : 'audio/*,video/*,.mp3,.m4a,.wav,.flac,.ogg,.opus,.aac,.wma,.amr';
+    const formats = kind === 'ringtone' ? [['m4r', 'iPhone ringtone (M4R)'], ['mp3', 'Android ringtone (MP3)']] : kind === 'audio' ? [['mp3', 'MP3'], ['m4a', 'M4A'], ['wav', 'WAV']] : [];
+    const player = kind === 'video' ? '<video data-media controls playsinline preload="metadata"></video>' : '<audio data-media controls preload="metadata"></audio>';
+    return `${open(` data-kind="${kind}" data-max-mb="${MAX_VIDEO_MB}"`)}
+  ${dropBox(accept, kind === 'video' ? 'Select video' : 'Select audio or video', `or drop it here &middot; ${kind === 'video' ? 'MP4, MOV, WEBM, MKV' : 'MP3, M4A, WAV, FLAC or a video'}, up to ${MAX_VIDEO_MB} MB`, 'Files are deleted after 15 minutes')}
+  <div class="pt-work" data-work hidden>
+    ${fileBar()}
+    <div class="tr-player">${player}<p class="pt-msg" data-nopreview hidden>This browser cannot play this format, so there is no preview. Type the start and end times; the cut is still made exactly.</p></div>
+    <div class="tr-track" data-track><div class="tr-sel" data-sel></div><span class="tr-head" data-head></span>
+      <button type="button" class="tr-h" data-h="s" aria-label="Start"></button><button type="button" class="tr-h" data-h="e" aria-label="End"></button></div>
+    <div class="tr-times">
+      <label>Start<input type="text" data-start inputmode="decimal" value="0:00.0"></label><button type="button" class="btn btn-ghost btn-sm" data-set-s>Set to current</button>
+      <label>End<input type="text" data-end inputmode="decimal" value="0:00.0"></label><button type="button" class="btn btn-ghost btn-sm" data-set-e>Set to current</button>
+      <button type="button" class="btn btn-ghost btn-sm" data-play-sel>&#9654; Play selection</button><span class="tr-len" data-len></span>
+    </div>
+    ${kind === 'video' ? '' : `<div class="pt-opts tr-opts"><fieldset class="pt-radios"><legend>Save as</legend>${formats.map(([v, n], i) => `<label><input type="radio" name="fmt" value="${v}"${i === 0 ? ' checked' : ''}> ${n}</label>`).join('')}</fieldset>
+      <fieldset class="pt-radios"><legend>Fade</legend><label><input type="checkbox" data-fade-in${kind === 'ringtone' ? ' checked' : ''}> Fade in</label><label><input type="checkbox" data-fade-out${kind === 'ringtone' ? ' checked' : ''}> Fade out</label></fieldset></div>`}
+    <progress class="pt-prog" data-prog max="1" value="0" hidden></progress>
+    <div class="pt-bar"><p class="pt-msg" data-msg role="status" aria-live="polite"></p><button type="button" class="btn btn-brand pt-go" data-go>${kind === 'video' ? 'Cut video' : kind === 'ringtone' ? 'Make ringtone' : 'Cut audio'}</button></div>
+  </div>
+  ${jobDone(kind === 'video' ? 'Your video is ready' : kind === 'ringtone' ? 'Your ringtone is ready' : 'Your audio is ready', 'Start over')}
+  ${NOSCRIPT}
+</section>`;
+  }
+  if (t.app === 'words') {
+    const stats = [['words', 'Words'], ['chars', 'Characters'], ['nospace', 'Characters without spaces'], ['sentences', 'Sentences'], ['paragraphs', 'Paragraphs'], ['read', 'Reading time'], ['speak', 'Speaking time'], ['avg', 'Average word length'], ['pages', 'Pages (500 words each)']];
+    const order = t.focus === 'chars' ? ['chars', 'nospace', 'words', ...stats.map((s) => s[0]).filter((k) => !['chars', 'nospace', 'words'].includes(k))] : stats.map((s) => s[0]);
+    const limits = [[280, 'X (Twitter) post'], [60, 'Google title'], [160, 'Meta description'], [160, 'SMS text'], [2200, 'Instagram caption'], [3000, 'LinkedIn post'], [100, 'YouTube title'], [5000, 'YouTube description']];
+    return `${open()}
+  <div class="wc-grid">
+    <div class="wc-main"><textarea class="wc-text" data-text rows="14" placeholder="Type or paste your text here" aria-label="Your text"></textarea>
+      <div class="wc-bar"><span>${[['upper', 'UPPERCASE'], ['lower', 'lowercase'], ['title', 'Title Case'], ['sentence', 'Sentence case']].map(([k, n]) => `<button type="button" class="btn btn-ghost btn-sm" data-case="${k}">${n}</button>`).join('')}</span>
+        <span><button type="button" class="btn btn-ghost btn-sm" data-copy>Copy</button><button type="button" class="btn btn-ghost btn-sm" data-clear>Clear</button></span></div>
+      <p class="pt-msg" data-msg role="status" aria-live="polite"></p></div>
+    <aside class="wc-side"><dl class="wc-stats">${order.map((k) => `<div><dt>${stats.find((s) => s[0] === k)[1]}</dt><dd data-stat="${k}">0</dd></div>`).join('')}</dl>
+      <h3>Character limits</h3><ul class="wc-limits">${limits.map(([n, l]) => `<li data-limit="${n}"><span>${l} <small>(${n.toLocaleString('en-US')})</small></span><progress></progress><small data-left></small></li>`).join('')}</ul>
+      <h3>Most used words</h3><ol class="wc-kw" data-kw></ol></aside>
+  </div>
+  ${NOSCRIPT}
+</section>`;
+  }
+  if (t.app === 'signature') {
+    return `${open()}
+  <div class="fv-tabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-mode-tab="draw">Draw</button><button type="button" role="tab" aria-selected="false" data-mode-tab="type">Type</button></div>
+  <div class="sg-pens">Ink ${[['#111827', 'Black'], ['#1d3fb8', 'Blue'], ['#0b1f5c', 'Dark blue']].map(([c, n], i) => `<button type="button" class="sg-pen" data-pen="${c}" style="background:${c}" aria-label="${n}" aria-pressed="${i === 0}"></button>`).join('')}
+    <label>Thickness<input type="range" data-thick min="1" max="8" step="0.5" value="3"></label></div>
+  <div data-mode-box="draw"><div class="sg-padwrap"><canvas class="sg-pad" data-pad></canvas><p class="sg-hint" data-hint>Sign here with your mouse, finger or stylus</p></div>
+    <div class="sg-row"><button type="button" class="btn btn-ghost btn-sm" data-undo>Undo</button><button type="button" class="btn btn-ghost btn-sm" data-clear>Clear</button></div></div>
+  <div data-mode-box="type" hidden><label class="sg-name">Your name<input type="text" data-name maxlength="40" placeholder="Your Name" autocomplete="name"></label>
+    <div class="sg-fonts">${SIG_FONTS.map(([id, n], i) => `<button type="button" class="sg-font" data-font-opt="${id}" aria-pressed="${i === 0}" title="${n}"><span>Your Name</span></button>`).join('')}</div></div>
+  <div class="pt-bar"><p class="pt-msg" data-msg role="status" aria-live="polite"></p><button type="button" class="btn btn-ghost" data-dl-jpg>${icon('download')}JPG (white)</button><button type="button" class="btn btn-brand pt-go" data-dl-png>${icon('download')}Transparent PNG</button></div>
+  ${NOSCRIPT}
+</section>`;
+  }
+  // cover letter
+  const f = (name, label, ph = '', type = 'text') => `<label>${label}<input type="${type}" data-f="${name}" placeholder="${esc(ph)}"></label>`;
+  return `${open()}
+  <form class="cl-form" autocomplete="off" onsubmit="return false">
+    <fieldset><legend>About you</legend><div class="cl-grid">${f('name', 'Full name', 'Jane Smith')}${f('email', 'Email', 'jane@email.com', 'email')}${f('phone', 'Phone', '(555) 123-4567')}${f('city', 'City', 'Austin, TX')}${f('link', 'LinkedIn or website', 'linkedin.com/in/janesmith')}${f('date', 'Date', '', 'date')}</div></fieldset>
+    <fieldset><legend>The job</legend><div class="cl-grid">${f('job', 'Job title', 'Marketing Coordinator')}${f('company', 'Company', 'Acme Inc.')}${f('manager', 'Hiring manager (if known)', 'Ms. Taylor Brown')}${f('address', 'Company address (optional)', '100 Market St, Austin, TX')}</div></fieldset>
+    <fieldset><legend>Write it for me</legend><div class="cl-grid">
+      <label>Letter style<select data-f="style"><option value="professional">Experienced professional</option><option value="entry">Student or first job</option><option value="change">Career change</option></select></label>
+      ${f('years', 'Years of experience', '5', 'number')}${f('field', 'Your field or degree', 'digital marketing')}${f('skills', 'Top skills', 'social media, SEO and content writing')}
+      ${f('achievement', 'One achievement (optional)', 'I grew our email list by 40% in one year')}${f('why', 'Why this company? (optional)', 'your focus on sustainable products')}</div>
+      <button type="button" class="btn btn-ghost" data-write>Write my letter</button></fieldset>
+    <label class="cl-body">Your letter (edit freely; leave a blank line between paragraphs)<textarea data-f="body" rows="14" placeholder="Click 'Write my letter' for a first draft, or write your own."></textarea></label>
+    <div class="pt-bar"><label class="inv-paper">Paper<select data-f="paper"><option value="letter">US Letter</option><option value="a4">A4</option></select></label>
+      <button type="button" class="btn btn-ghost btn-sm" data-copy>Copy text</button><p class="pt-msg" data-msg role="status" aria-live="polite"></p>
+      <button type="button" class="btn btn-ghost" data-docx>${icon('download')}Word (DOCX)</button><button type="button" class="btn btn-brand pt-go" data-pdf>${icon('download')}PDF</button></div>
+  </form>
+  ${NOSCRIPT}
+</section>`;
+}
+
 function appBox(t) {
+  if (TOOLS_JS.has(t.app)) return toolBox(t);
   if (t.app === 'passport') {
     return `<section class="app app-passport" id="app" data-app="passport">
   <div class="pt-drop" data-drop>
@@ -1017,7 +1231,14 @@ function appBox(t) {
 </section>`;
 }
 
+const TOOLS_JS = new Set(['resize', 'imgedit', 'favicon', 'bgremove', 'vcompress', 'trim', 'words', 'signature', 'cover']);
+const IN_BROWSER = '<strong>How this works:</strong> everything happens in your browser with open-source code. Nothing is uploaded to our server and nothing is stored.';
 const APP_PRIVACY = {
+  resize: IN_BROWSER, imgedit: IN_BROWSER, favicon: IN_BROWSER, words: '<strong>How this works:</strong> your text is counted in your browser and never sent to our server. It is kept only in this browser so it is still here if you reload the page.',
+  signature: IN_BROWSER, cover: '<strong>How this works:</strong> the letter is written and saved as PDF or Word in your browser. Your details are kept only in this browser for next time; nothing is sent to our server.',
+  bgremove: '<strong>How this works:</strong> your photo is uploaded over HTTPS and processed on this server with an open-source image segmentation model (IS-Net), in memory. Nothing is kept or shared.',
+  vcompress: '<strong>How this works:</strong> your video is uploaded over HTTPS and re-encoded on this server with FFmpeg. The upload is deleted when the work is done and the result 15 minutes later.',
+  trim: '<strong>How this works:</strong> the file is uploaded over HTTPS and cut on this server with FFmpeg. The upload is deleted when the work is done and the result 15 minutes later.',
   passport: '<strong>How this works:</strong> your photo is cropped and sized in your browser. It is never uploaded to our server and nothing is stored.',
   ocr: '<strong>How this works:</strong> your file is uploaded over HTTPS and read on this server with Tesseract, the open-source OCR engine, in a private temporary folder that is deleted as soon as the text is ready. Nothing is kept or shared.',
   invoice: '<strong>How this works:</strong> the invoice is built in your browser with open-source code (pdf-lib) and saved straight to your device. Your details are kept only in this browser so the next invoice is quicker; nothing is sent to our server.',
@@ -1031,7 +1252,7 @@ function appPage(slug, base) {
   const see = t.see.filter((s) => knownPaths.has(s)).map((s) => [s, esc(toolName(s)), true]);
   const steps = `<section class="howto"><h2>${esc(t.howto)}</h2><ol class="steps">${t.steps
     .map(([a, d]) => `<li><strong>${a}</strong> ${d}</li>`).join('')}</ol></section>`;
-  const other = APPS.filter((x) => x.slug !== t.slug).map((x) => [`/${x.slug}`, esc(x.name), true]);
+  const other = MENU_APPS.filter((x) => x.slug !== t.slug && !t.see.includes(`/${x.slug}`)).map((x) => [`/${x.slug}`, esc(x.name), true]);
   return renderPage(PAGE_TPL, baseFields(base, p, `${t.title} | ${SITE}`, t.desc, {
     JSONLD: graph(base, p, t.h1, t.desc, t.faq, crumbs, { features: [t.browser ? 'Runs in the browser, no upload' : 'Files deleted after processing', 'No sign-up', 'No watermark', 'Free'] }),
     HERO: hero({ h1: t.h1, crumbs, intro: t.intro }),
@@ -1040,7 +1261,8 @@ function appPage(slug, base) {
       + `<section class="related-tools"><h2>Related tools</h2>${chips([...see, ...other])}</section>`
       + readMore(p) + faqHtml(t.faq),
     PRIVACY: APP_PRIVACY[t.app],
-    SCRIPTS: `${t.app === 'invoice' ? `<script src="/vendor/pdf-lib.min.js?v=${seo.ASSET_V.pdfTools}" defer></script>\n` : ''}<script type="module" src="/apps.js?v=${seo.ASSET_V.apps}"></script>\n`,
+    SCRIPTS: `${t.app === 'invoice' || t.app === 'cover' ? `<script src="/vendor/pdf-lib.min.js?v=${seo.ASSET_V.pdfTools}" defer></script>\n` : ''}${TOOLS_JS.has(t.app)
+      ? `<script type="module" src="/tools.js?v=${seo.ASSET_V.tools}"></script>` : `<script type="module" src="/apps.js?v=${seo.ASSET_V.apps}"></script>`}\n`,
   }));
 }
 const resolveApp = (slug, base) => (APP_BY_SLUG.has(slug) ? { html: appPage(slug, base) } : null);

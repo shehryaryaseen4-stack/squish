@@ -21,6 +21,7 @@
     "jimp": "^1.6.1",
     "jszip": "^3.10.1",
     "multer": "^2.0.1",
+    "onnxruntime-node": "^1.30.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.4.299",
     "png-to-ico": "^2.1.8",

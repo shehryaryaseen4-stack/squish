@@ -67,6 +67,21 @@ Still planned, because they could not be tested here: XCF, DXF/DWG, CDR, VSD, CG
 Pages/Keynote, HWP/LWP/WPD, LHA/ARJ/ACE/DMG input, AMR/APE/SHN/DSS (no samples; AMR output has
 no encoder), PML/SNB/CBC input, TTF to OTF outlines, OTF to EOT.
 
+### Stand-alone tools
+
+`content/apps.js` lists the tool pages (passport photo, OCR, invoice, image resizer, crop/rotate/
+flip, favicon generator, background remover, video compressor, video trimmer, MP3 cutter, ringtone
+maker, word counter, signature generator, cover letter generator). Most run in the browser
+(`public/apps.js`, `public/tools.js`). Three use the server:
+
+- Background remover: `engines/bgremove.js`, IS-Net (Apache-2.0) with ONNX Runtime on the CPU. The
+  Dockerfile downloads the model to `models/` and checks its SHA-256. It needs about 1 GB of memory
+  while loaded, runs one image at a time and unloads after `BG_IDLE_MIN` (10) idle minutes.
+- Video compressor and trimmers: `engines/media-tools.js` with FFmpeg. Uploads go to disk (up to
+  `MAX_VIDEO_MB`, default 100, Cloudflare's free-plan upload limit) and run as background jobs the
+  page polls (`/api/jobs/:id`), because encodes can take longer than a proxy waits for one answer.
+  Results are deleted after 15 minutes.
+
 ### Tests
 
 ```bash

@@ -50,12 +50,15 @@ const CSP = pages.ADS_ENABLED
     'img-src': ["'self'", 'data:', 'blob:', 'https:'],
     'frame-src': ["'self'", 'https:'],
     'connect-src': ["'self'", 'https:'],
+    'media-src': ["'self'", 'blob:'],
   }
   : {
     'img-src': ["'self'", 'data:', 'blob:'],
     // Cloudflare Web Analytics (visitor counts without cookies), injected by Cloudflare when enabled.
     'script-src': ["'self'", 'https://static.cloudflareinsights.com'],
     'connect-src': ["'self'", 'https://cloudflareinsights.com'],
+    // the video trimmer and MP3 cutter preview the chosen file from a blob: URL
+    'media-src': ["'self'", 'blob:'],
   };
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -270,6 +273,70 @@ app.post('/api/ocr', upload.single('file'), async (req, res) => {
   }
 });
 
+// Background remover: a PNG with a transparent background (engines/bgremove.js).
+const bgEngine = require('./engines/bgremove');
+app.post('/api/remove-bg', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file received.' });
+    const out = await bgEngine.removeBackground({ buffer: req.file.buffer });
+    const base = String(req.file.originalname || 'image').replace(/\.[^.]+$/, '').replace(/[^\w.-]+/g, '-').slice(0, 80) || 'image';
+    res.set({ 'Content-Type': 'image/png', 'Content-Disposition': disposition(`${base}-no-background.png`) });
+    res.send(out.buffer);
+    analytics.event(req, 'tool', { pair: 'Remove background', p: fromPage(req) });
+  } catch (err) {
+    analytics.event(req, 'fail', { pair: 'Remove background', p: fromPage(req) });
+    if (err.userMessage) return res.status(err.statusCode || 422).json({ error: err.userMessage });
+    console.error('Background removal error:', err);
+    res.status(500).json({ error: 'The background could not be removed from this image.' });
+  }
+});
+
+// Video compressor, video trimmer, MP3 cutter, ringtone maker. Videos are big, so uploads go to
+// disk (not memory) and the work runs as a background job the page polls (engines/media-tools.js).
+const mediaTools = require('./engines/media-tools');
+const MAX_VIDEO_MB = Number(process.env.MAX_VIDEO_MB || 100); // Cloudflare's free plan accepts up to 100 MB per upload
+const videoUpload = multer({
+  storage: multer.diskStorage({ destination: require('os').tmpdir(), filename: (_r, _f, cb) => cb(null, `squish-up-${require('crypto').randomBytes(10).toString('hex')}`) }),
+  limits: { fileSize: MAX_VIDEO_MB * 1024 * 1024, files: 1 },
+});
+const mediaBase = (f) => String(f.originalname || 'file').replace(/\.[^.]+$/, '').replace(/[^\w.-]+/g, '-').slice(0, 80) || 'file';
+const startMedia = (name, work) => (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file received.' });
+  try {
+    const id = mediaTools.startJob(req.file.path, work.base(req), (dir) => work.run(req.file.path, req.body || {}, dir));
+    res.json({ id });
+    analytics.event(req, 'tool', { pair: name, p: fromPage(req) });
+  } catch (err) {
+    if (err.userMessage) return res.status(err.statusCode || 422).json({ error: err.userMessage });
+    console.error(err);
+    res.status(500).json({ error: 'Unexpected server error.' });
+  }
+};
+app.post('/api/video/compress', videoUpload.single('file'), startMedia('Compress video', {
+  base: (req) => `${mediaBase(req.file)}-compressed`,
+  run: (file, b, dir) => mediaTools.compressVideo(file, {
+    targetMB: Number(b.targetMB) > 0 ? Math.min(Number(b.targetMB), 2000) : 0,
+    quality: ['high', 'medium', 'low'].includes(b.quality) ? b.quality : 'medium',
+  }, dir),
+}));
+app.post('/api/media/trim', videoUpload.single('file'), startMedia('Trim media', {
+  base: (req) => `${mediaBase(req.file)}-${req.body && req.body.format === 'm4r' ? 'ringtone' : 'cut'}`,
+  run: (file, b, dir) => mediaTools.trimMedia(file, {
+    start: Number(b.start), end: Number(b.end), format: String(b.format || 'mp3'),
+    fadeIn: Number(b.fadeIn) || 0, fadeOut: Number(b.fadeOut) || 0, maxLen: b.ringtone === '1' ? 40 : 0,
+  }, dir),
+}));
+app.get('/api/jobs/:id', (req, res) => {
+  const j = mediaTools.getJob(req.params.id);
+  if (!j) return res.status(404).json({ error: 'This result has expired. Please upload the file again.' });
+  res.set('Cache-Control', 'no-store').json({ status: j.status, error: j.error, size: j.size, name: j.name, note: j.note });
+});
+app.get('/api/jobs/:id/file', (req, res) => {
+  const j = mediaTools.getJob(req.params.id);
+  if (!j || j.status !== 'done') return res.status(404).json({ error: 'This result has expired. Please upload the file again.' });
+  res.set({ 'Content-Type': j.type, 'Content-Disposition': disposition(j.name), 'Cache-Control': 'no-store' }).sendFile(j.file);
+});
+
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
 
@@ -353,10 +420,11 @@ app.get('/vendor/pdf-lib.min.js', (_req, res) => res.set('Cache-Control', 'publi
     app.use(`/vendor/pdfjs${dir === 'build' ? '' : `/${dir}`}`, express.static(path.join(pdfjsDir, dir === 'build' ? 'legacy/build' : dir), vendorOpts));
   }
 }
+// Google fonts kept on this server: the PDF editor and the signature generator use them.
+require('./fonts').routes(app);
 if (pages.PDF_EDITOR) {
   app.get('/vendor/fontkit.umd.min.js', (_req, res) => res.set('Cache-Control', 'public, max-age=604800')
     .sendFile(require.resolve('@pdf-lib/fontkit/dist/fontkit.umd.min.js')));
-  require('./fonts').routes(app);
   app.get('/edit-pdf', (req, res) => sendHtml(res, pages.editorPage(baseOf(req))));
 }
 
@@ -390,9 +458,10 @@ app.use((req, res, next) => {
   res.status(404).type('html').send(pages.notFoundPage(baseOf(req)));
 });
 
-app.use((err, _req, res, _next) => {
+app.use((err, req, res, _next) => {
   if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
-    return res.status(413).json({ error: `File is larger than the ${MAX_FILE_MB}MB limit set on this server.` });
+    const mb = /^\/api\/(video|media)\//.test(req.path) ? MAX_VIDEO_MB : MAX_FILE_MB;
+    return res.status(413).json({ error: `File is larger than the ${mb}MB limit set on this server.` });
   }
   console.error(err);
   res.status(500).json({ error: 'Unexpected server error.' });

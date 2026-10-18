@@ -38,11 +38,26 @@ COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
 
 WORKDIR /app
+# Background remover model (IS-Net general use, Apache-2.0, from the rembg project), checked against
+# its known SHA-256 so a changed or broken download stops the build.
+RUN mkdir -p models && node -e " \
+  const want = '60920e99c45464f2ba57bee2ad08c919a52bbf852739e96947fbb4358c0d964a'; \
+  fetch('https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx').then(async (r) => { \
+    if (!r.ok) throw new Error('model download: HTTP ' + r.status); \
+    const b = Buffer.from(await r.arrayBuffer()); \
+    const got = require('crypto').createHash('sha256').update(b).digest('hex'); \
+    if (got !== want) throw new Error('model checksum mismatch: ' + got); \
+    require('fs').writeFileSync('models/isnet-general-use.onnx', b); console.log('background model ok'); \
+  }).catch((e) => { console.error(e.message); process.exit(1); });"
 COPY package*.json ./
+# ONNX Runtime (background remover) ships CPU binaries in the package; skip its optional GPU download
+ENV ONNXRUNTIME_NODE_INSTALL=skip
 # npm can occasionally crash yet still exit 0 ("Exit handler never called"), so prove the
 # libraries the site needs are really there; otherwise the build stops here instead of
 # shipping an image whose image conversions all fail.
 RUN npm ci --omit=dev \
+  && rm -rf node_modules/onnxruntime-node/bin/napi-v*/darwin node_modules/onnxruntime-node/bin/napi-v*/win32 \
+  && node -e "require('onnxruntime-node')" \
   && node -e "for (const m of ['express','multer','sharp','jimp','png-to-ico','pdf-lib','wawoff2','jszip','helmet']) require(m); require('sharp')({create:{width:1,height:1,channels:3,background:'#fff'}}).png().toBuffer().then(()=>console.log('dependencies ok'))"
 
 COPY . .
