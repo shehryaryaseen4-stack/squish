@@ -250,7 +250,8 @@ input[type=range]{width:150px; accent-color:var(--brand);}
 .hub-section h2 a:hover{color:var(--brand);}
 .conv-group{margin-top:18px;}
 .conv-group h3{font-size:.85rem; color:var(--dim); text-transform:uppercase; letter-spacing:.05em; margin-bottom:10px;}
-.notes ul{margin:0; padding-left:20px; line-height:1.7; font-size:1rem; max-width:76ch;}
+.notes ul, .notes ol{margin:0; padding-left:20px; line-height:1.7; font-size:1rem; max-width:76ch;}
+.notes li + li{margin-top:2px;}
 .faq details{border-bottom:1px solid var(--border); padding:14px 0;}
 .faq summary{cursor:pointer; font-weight:700; font-size:1.02rem;}
 .faq details p{margin-top:8px; font-size:.97rem; line-height:1.6; color:var(--dim); max-width:76ch;}
