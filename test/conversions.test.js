@@ -40,6 +40,8 @@ const MAGIC = {
 const SAMPLE_FOR = {
   'woff>otf': 'woff-cff', 'woff2>otf': 'woff2-cff',
 };
+MAGIC.xps = MAGIC.zip;
+MAGIC.tiff = (b) => ['II*\0', 'MM\0*'].includes(b.subarray(0, 4).toString('latin1'));
 // Single-file compressors need a single-file input.
 const SINGLE_FILE_OUT = ['gz', 'bz2', 'xz'];
 // Refusals that are the correct behaviour for our samples (asserted, not skipped).
@@ -87,3 +89,11 @@ for (const c of cases) {
     else if (MAGIC[to.id]) assert.ok(MAGIC[to.id](out.buffer), `output does not look like ${to.label}`);
   });
 }
+
+// Both RAR decoders: the default sample is an old solid RAR (unar), this one a solid RAR5 (bsdtar).
+test('rar5 -> zip (archive-live, bsdtar)', { timeout: 60000 }, async (t) => {
+  const from = registry.getFormat('rar'), to = registry.getFormat('zip');
+  if (registry.getConverter(from, to)?.status !== 'live') return t.skip('archive tools not installed');
+  const res = await getHandler('archive')({ buffer: await sample('rar5'), inputExt: 'rar', from, to, filename: 'sample.rar' });
+  assert.ok(MAGIC.zip(res.buffer));
+});

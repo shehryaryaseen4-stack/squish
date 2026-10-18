@@ -20,6 +20,7 @@ const LOADERS = {
   font: () => require('./font').convertFont,
   ebook: () => require('./ebook').convertEbook,
   djvu: () => require('./djvu').convertDjvu,
+  xps: () => require('./xps').convertXps,
 };
 const HANDLER_IDS = Object.keys(LOADERS);
 

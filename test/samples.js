@@ -27,6 +27,9 @@ const FODP = `<?xml version="1.0" encoding="UTF-8"?>
 <draw:page draw:name="Two"><draw:frame svg:x="2cm" svg:y="2cm" svg:width="20cm" svg:height="3cm"><draw:text-box><text:p>Slide two</text:p></draw:text-box></draw:frame></draw:page>
 </office:presentation></office:body></office:document>`;
 
+const ABW = '<?xml version="1.0" encoding="UTF-8"?>\n<abiword xmlns="http://www.abisource.com/awml.dtd" version="1.0" fileformat="1.0">'
+  + '<section><p>Quarterly report</p><p>Revenue grew 12% this quarter.</p></section></abiword>\n';
+
 // Convert an existing sample with the server's own handler (the tests check that path separately).
 async function via(fromId, toId, handlerOverride) {
   const from = registry.getFormat(fromId), to = registry.getFormat(toId);
@@ -66,6 +69,11 @@ const MAKERS = {
   // real HEIC file is kept in the repo: the test then checks decoding on any machine.
   heic: () => fs.readFileSync(path.join(__dirname, 'fixtures', 'sample.heic')),
   heif: () => sample('heic'),
+  // Camera RAW cannot be written by open tools, so real files are kept (LibRaw reads every RAW
+  // format by its content; the other RAW extensions use the DNG).
+  dng: () => fs.readFileSync(path.join(__dirname, 'fixtures', 'sample.dng')),
+  nef: () => fs.readFileSync(path.join(__dirname, 'fixtures', 'sample.nef')),
+  icns: async () => { fs.writeFileSync(file('i128.png'), await require('sharp')(await sample('png')).resize(128, 128).png().toBuffer()); sh('png2icns', ['s.icns', 'i128.png']); return fs.readFileSync(file('s.icns')); },
   // vector
   eps: () => vec('eps'), ps: () => vec('ps'), emf: () => vec('emf'), wmf: () => vec('wmf'), dxf: () => vec('dxf'),
   ai: () => vec('pdf'), // AI files are read through their PDF compatibility stream
@@ -86,6 +94,12 @@ const MAKERS = {
     return (await convertOffice({ buffer: Buffer.from(FODP), inputExt: 'fodp', from: registry.getFormat('odp'), to: registry.getFormat('odp') })).buffer;
   },
   pdf: () => via('docx', 'pdf'),
+  xps: () => via('pdf', 'xps'),
+  // Kingsoft (WPS Office) files share the Microsoft binary layout; Works/Kingsoft .wps likewise
+  wps: () => sample('doc'), et: () => sample('xls'), dps: () => sample('ppt'),
+  numbers: () => fs.readFileSync(path.join(__dirname, 'fixtures', 'sample.numbers')),
+  abw: () => Buffer.from(ABW),
+  zabw: () => zlib.gzipSync(Buffer.from(ABW)),
   djvu: async () => { fs.writeFileSync(file('j.png'), await sample('png')); sh('convert', ['j.png', 'j.ppm']); sh('c44', ['j.ppm', 'j.djvu']); return fs.readFileSync(file('j.djvu')); },
   cbz: async () => { const JSZip = require('jszip'); const z = new JSZip(); z.file('page-01.jpg', await sample('jpg')); z.file('page-02.jpg', await sample('jpg')); return z.generateAsync({ type: 'nodebuffer' }); },
   azw: () => sample('mobi'), prc: () => sample('mobi'),
@@ -100,6 +114,9 @@ const MAKERS = {
   tar: () => { sh('bsdtar', ['--format', 'pax', '-cf', 's.tar', '-C', archiveTree(), '.']); return fs.readFileSync(file('s.tar')); },
   zip: () => { sh('bsdtar', ['--format', 'zip', '-cf', 's.zip', '-C', archiveTree(), '.']); return fs.readFileSync(file('s.zip')); },
   jar: () => sample('zip'),
+  rar: () => fs.readFileSync(path.join(__dirname, 'fixtures', 'sample.rar')),
+  'rar5': () => fs.readFileSync(path.join(__dirname, 'fixtures', 'sample-rar5.rar')),
+  cab: () => fs.readFileSync(path.join(__dirname, 'fixtures', 'sample.cab')),
   '7z': () => { sh('bsdtar', ['--format', '7zip', '-cf', 's.7z', '-C', archiveTree(), '.']); return fs.readFileSync(file('s.7z')); },
   'tar-gz': () => { sh('bsdtar', ['-czf', 's.tgz', '-C', archiveTree(), '.']); return fs.readFileSync(file('s.tgz')); },
   'tar-bz2': () => { sh('bsdtar', ['-cjf', 's.tbz2', '-C', archiveTree(), '.']); return fs.readFileSync(file('s.tbz2')); },
@@ -161,10 +178,13 @@ const DERIVE = {
   ebook: ['epub', (id) => via('epub', id)],
 };
 
+const RAW = ['3fr', 'arw', 'cr2', 'cr3', 'crw', 'dcr', 'erf', 'mos', 'mrw', 'orf', 'pef', 'raf', 'raw', 'rw2', 'x3f'];
+
 async function sample(id) {
   if (!cache.has(id)) {
     cache.set(id, (async () => {
       if (MAKERS[id]) return Buffer.from(await MAKERS[id]());
+      if (RAW.includes(id)) return sample('dng');
       const f = registry.getFormat(id);
       for (const cat of [f.category, ...f.categories]) if (DERIVE[cat]) return Buffer.from(await DERIVE[cat][1](id));
       throw new Error(`no way to make a ${id} sample`);

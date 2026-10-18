@@ -2,7 +2,7 @@
 // Documents, spreadsheets and presentations with LibreOffice in headless mode.
 // Each job uses its own LibreOffice profile directory so several conversions can run at once.
 // Presentation -> JPG/PNG renders every slide (via PDF + pdftoppm) and returns a ZIP when there
-// is more than one slide.
+// is more than one slide. XPS is made from LibreOffice's PDF with Ghostscript.
 
 const fs = require('fs/promises');
 const path = require('path');
@@ -56,6 +56,13 @@ async function convertOffice({ buffer, inputExt, from, to }) {
       await fs.mkdir(imgDir);
       await run('pdftoppm', [to.id === 'jpg' ? '-jpeg' : '-png', '-r', '110', pdf, path.join(imgDir, 'page')]);
       return collect(await listFiles(imgDir), to.extension, imgDir);
+    }
+
+    if (to.id === 'xps') {
+      const [pdf] = await soffice(dir, input, 'pdf', inFilter);
+      const xps = path.join(dir, 'output.xps');
+      await require('./xps').pdfFileToXps(pdf, xps);
+      return { buffer: await fs.readFile(xps), ext: 'xps' };
     }
 
     const filter = to.id === 'html' ? HTML_FILTER[kindOf(from)] : FILTERS[to.id];

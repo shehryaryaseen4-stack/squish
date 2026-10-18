@@ -22,8 +22,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa tesseract-ocr-fra tesseract-ocr-deu tesseract-ocr-ita tesseract-ocr-por tesseract-ocr-nld \
     # extra image formats (PSD, ICO, PPM, BMP/PSD/EPS output; HEIC/HEIF)
     imagemagick libheif-examples libheif-plugin-libde265 \
-    # archives
-    libarchive-tools p7zip-full gzip bzip2 xz-utils lzip lzop ncompress \
+    # camera RAW photos (dcraw_emu), macOS icons (icns2png), XPS documents (mutool), EOT fonts (mkeot)
+    libraw-bin icnsutils mupdf-tools eot-utils \
+    # archives (unar opens old solid RAR files that bsdtar cannot)
+    libarchive-tools p7zip-full gzip bzip2 xz-utils lzip lzop ncompress unar \
     # DjVu
     djvulibre-bin \
     # fonts: text in share images and faithful office/PDF rendering

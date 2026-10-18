@@ -3,9 +3,12 @@
 // WOFF (1.0) is implemented here (it is just zlib-compressed font tables); WOFF2 uses Google's
 // encoder compiled to WebAssembly (wawoff2). Outline conversion (TTF <-> OTF) is not done:
 // a WOFF that holds an OpenType/CFF font unwraps to OTF, a TrueType one to TTF.
+// EOT (for old Internet Explorer) is made from TrueType fonts with mkeot (eot-utils).
 
 const zlib = require('zlib');
-const { UserError } = require('./cli');
+const fs = require('fs/promises');
+const path = require('path');
+const { job, run, UserError } = require('./cli');
 
 const pad4 = (n) => (n + 3) & ~3;
 const tagOf = (buf, off) => buf.toString('latin1', off, off + 4);
@@ -100,6 +103,16 @@ async function convertFont({ buffer, inputExt, to }) {
   if (to.id === 'ttf' && isCff(sfnt)) throw new UserError('This font has OpenType (CFF) outlines, so it unwraps to OTF. Choose OTF instead.');
   if (to.id === 'otf' && !isCff(sfnt)) throw new UserError('This font has TrueType outlines, so it unwraps to TTF. Choose TTF instead.');
   if (to.id === 'ttf' || to.id === 'otf') return { buffer: sfnt, ext: to.extension };
+  if (to.id === 'eot') {
+    if (isCff(sfnt)) throw new UserError('EOT fonts need TrueType outlines, and this font has OpenType (CFF) outlines. Use WOFF or WOFF2 instead.');
+    return job(async (dir) => {
+      const input = path.join(dir, 'font.ttf');
+      await fs.writeFile(input, sfnt);
+      const { stdout } = await run('mkeot', [input]);
+      if (!stdout.length) throw new UserError('This font could not be converted to EOT.', 415);
+      return { buffer: stdout, ext: 'eot' };
+    });
+  }
   throw new UserError(`Converting to ${to.label} is not supported yet.`);
 }
 

@@ -1,6 +1,7 @@
 'use strict';
 // Image formats Sharp cannot read or write by itself:
-//   read:  HEIC/HEIF (libheif), PSD/ICO/PPM (ImageMagick), EPS/PS (Ghostscript)
+//   read:  HEIC/HEIF (libheif), PSD/ICO/PPM (ImageMagick), EPS/PS (Ghostscript),
+//          camera RAW (LibRaw's dcraw_emu, white balance as shot), ICNS (icns2png, largest size)
 //   write: BMP, PSD (ImageMagick), EPS/PS (ImageMagick), PDF (pdf-lib)
 // Everything is decoded to PNG first; common targets are then encoded by the normal image handler.
 
@@ -13,6 +14,7 @@ const SHARP_OUT = ['jpg', 'png', 'webp', 'avif', 'tiff', 'gif', 'ico'];
 const IM_IN = ['psd', 'ico', 'ppm'];
 const GS_IN = ['eps', 'ps'];
 const HEIF_IN = ['heic', 'heif'];
+const RAW_IN = ['3fr', 'arw', 'cr2', 'cr3', 'crw', 'dcr', 'dng', 'erf', 'mos', 'mrw', 'nef', 'orf', 'pef', 'raf', 'raw', 'rw2', 'x3f'];
 
 async function decodeToPng(dir, buffer, inputExt) {
   const input = path.join(dir, `input.${inputExt}`);
@@ -28,6 +30,25 @@ async function decodeToPng(dir, buffer, inputExt) {
     if (GS_IN.includes(inputExt)) {
       await run('gs', ['-q', '-dSAFER', '-dBATCH', '-dNOPAUSE', '-dEPSCrop', '-sDEVICE=pngalpha', '-r150', '-dFirstPage=1', '-dLastPage=1', `-sOutputFile=${png}`, input]);
       return fs.readFile(png);
+    }
+    if (RAW_IN.includes(inputExt)) {
+      // 8-bit TIFF, camera white balance, auto-rotated; Sharp then encodes the target
+      const tiff = path.join(dir, 'decoded.tiff');
+      await run('dcraw_emu', ['-T', '-w', '-Z', tiff, input], { timeoutMs: 120000 });
+      return require('sharp')(tiff).png().toBuffer();
+    }
+    if (inputExt === 'icns') {
+      const out = path.join(dir, 'icns');
+      await fs.mkdir(out);
+      await run('icns2png', ['-x', '-o', out, input]);
+      const sharp = require('sharp');
+      let best = null; let bestW = 0;
+      for (const f of (await listFiles(out)).filter((n) => /\.png$/i.test(n))) {
+        const { width = 0 } = await sharp(f).metadata().catch(() => ({}));
+        if (width > bestW) { best = f; bestW = width; }
+      }
+      if (!best) throw new UserError('This icon file has no images that could be read.', 415);
+      return fs.readFile(best);
     }
     if (IM_IN.includes(inputExt)) {
       // [0] = first layer/frame (PSD composite, largest ICO entry is chosen by -flatten below)
@@ -65,4 +86,4 @@ async function convertImageX(params) {
   });
 }
 
-module.exports = { convertImageX, IM_IN, GS_IN, HEIF_IN };
+module.exports = { convertImageX, IM_IN, GS_IN, HEIF_IN, RAW_IN };

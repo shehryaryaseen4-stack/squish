@@ -41,7 +41,11 @@ and only offers those conversions; everything else stays in the menus as "coming
 | ImageMagick | `imagemagick` | PSD, ICO, PPM input; BMP, PSD, EPS, PS output |
 | libheif | `libheif-examples libheif-plugin-libde265` | HEIC/HEIF (iPhone photos) to every image format and PDF |
 | DjVuLibre | `djvulibre-bin` | DjVu to PDF, TIFF, TXT, JPG, PNG |
-| libarchive + 7-Zip | `libarchive-tools p7zip-full xz-utils lzip lzop ncompress` | ZIP, JAR, 7Z, TAR, TAR.GZ/BZ2/XZ/7Z/Z/LZO, GZ, BZ2, XZ, LZ, LZMA, LZO, Z, CPIO, ISO, DEB to ZIP, 7Z, TAR (+GZ/BZ2/XZ/7Z), GZ, BZ2, XZ |
+| libarchive + 7-Zip + unar | `libarchive-tools p7zip-full xz-utils lzip lzop ncompress unar` | ZIP, RAR, CAB, JAR, 7Z, TAR, TAR.GZ/BZ2/XZ/7Z/Z/LZO, GZ, BZ2, XZ, LZ, LZMA, LZO, Z, CPIO, ISO, DEB to ZIP, 7Z, TAR (+GZ/BZ2/XZ/7Z), GZ, BZ2, XZ |
+| LibRaw | `libraw-bin` | Camera RAW (CR2, CR3, NEF, ARW, DNG, ORF, RAF, RW2 ...) to every image format and PDF |
+| libicns | `icnsutils` | ICNS (macOS icons) to every image format and PDF |
+| MuPDF | `mupdf-tools` | XPS to PDF, images and TXT (XPS output: Ghostscript, from PDF and documents) |
+| eot-utils | `eot-utils` | TTF/WOFF/WOFF2 (TrueType) to EOT |
 
 How it is wired:
 
@@ -56,9 +60,12 @@ How it is wired:
   escape the folder.
 - Conversions that produce several files (PDF pages, slides) return a ZIP.
 
-Still planned, because they could not be tested here: camera RAW files, XCF, ICNS, DXF/DWG,
-CDR, VSD, CGM, XPS, Apple Pages/Numbers/Keynote, HWP/LWP/WPD/WPS, RAR/CAB/LHA/ARJ/DMG input,
-AMR output, TTF to OTF outlines, EOT, PDF to DOCX via LibreOffice (Calibre handles PDF to DOCX).
+LibreOffice also reads Apple Numbers, Kingsoft (WPS Office) ET/DPS, Works/Kingsoft WPS and
+AbiWord ABW/ZABW.
+
+Still planned, because they could not be tested here: XCF, DXF/DWG, CDR, VSD, CGM, Apple
+Pages/Keynote, HWP/LWP/WPD, LHA/ARJ/ACE/DMG input, AMR/APE/SHN/DSS (no samples; AMR output has
+no encoder), PML/SNB/CBC input, TTF to OTF outlines, OTF to EOT.
 
 ### Tests
 

@@ -2,7 +2,9 @@
 // PDF in and out:
 //   PDF -> JPG/PNG/WebP/TIFF   every page rendered (pdftoppm); several pages come back as a ZIP
 //   PDF -> TXT / HTML          pdftotext / pdftohtml
+//   PDF -> GIF / AVIF          pages rendered as PNG, then encoded with Sharp
 //   PDF -> SVG / EPS / PS      pdftocairo (SVG: one file per page)
+//   PDF -> XPS                 Ghostscript (xpswrite)
 //   PDF -> PDF                 compression with Ghostscript (pictures down to 300, 150, 100 or 72 dpi)
 //   images -> PDF              pdf-lib, one page per image, page size = image size
 
@@ -10,7 +12,7 @@ const fs = require('fs/promises');
 const path = require('path');
 const { job, run, listFiles, collect, UserError } = require('./cli');
 
-const RASTER = { jpg: 'jpeg', png: 'png', webp: 'png', tiff: 'png' };
+const RASTER = { jpg: 'jpeg', png: 'png', webp: 'png', tiff: 'png', gif: 'png', avif: 'png' };
 
 // Compression levels: Ghostscript preset and the resolution pictures are brought down to
 const PDF_LEVELS = { low: ['printer', 300], recommended: ['ebook', 150], strong: ['ebook', 100], extreme: ['ebook', 72] };
@@ -30,11 +32,12 @@ async function pdfOut({ buffer, to, level }) {
       if (RASTER[to.id]) {
         await run('pdftoppm', [`-${RASTER[to.id]}`, '-r', '150', input, path.join(out, 'page')]);
         let files = await listFiles(out);
-        if (to.id === 'webp' || to.id === 'tiff') {
+        if (to.id !== 'jpg' && to.id !== 'png') {
           const sharp = require('sharp');
+          const enc = { webp: { quality: 85 }, tiff: { quality: 85 }, avif: { quality: 60 }, gif: {} }[to.id];
           files = await Promise.all(files.map(async (f) => {
             const dest = f.replace(/\.png$/, `.${to.extension}`);
-            await sharp(f)[to.id === 'webp' ? 'webp' : 'tiff']({ quality: 85 }).toFile(dest);
+            await sharp(f)[to.id](enc).toFile(dest);
             await fs.unlink(f);
             return dest;
           }));
@@ -51,6 +54,7 @@ async function pdfOut({ buffer, to, level }) {
         }
       } else if (to.id === 'eps') { await run('pdftocairo', ['-eps', '-f', '1', '-l', '1', input, path.join(out, 'output.eps')]); }
       else if (to.id === 'ps') { await run('pdftocairo', ['-ps', input, path.join(out, 'output.ps')]); }
+      else if (to.id === 'xps') { await require('./xps').pdfFileToXps(input, path.join(out, 'output.xps')); }
       else if (to.id === 'pdf') {
         const [preset, dpi] = PDF_LEVELS[level] || PDF_LEVELS.recommended;
         await run('gs', ['-q', '-dNOPAUSE', '-dBATCH', '-dSAFER', '-sDEVICE=pdfwrite', '-dCompatibilityLevel=1.5',

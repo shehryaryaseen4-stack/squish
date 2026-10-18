@@ -7,11 +7,18 @@
 //   - bsdtar refuses absolute paths and ".." by default; after unpacking, anything that
 //     resolves outside the job directory (e.g. a symlink) is deleted before repacking
 //   - RAR and the other legacy formats are read-only
+// RAR and CAB: bsdtar first (it reads RAR5, including solid ones); old solid RAR (v2.9/3/4) is
+// opened with unar when bsdtar cannot.
 
 const fs = require('fs/promises');
 const path = require('path');
 const { spawn } = require('child_process');
+const fsSync = require('fs');
 const { job, run, listFiles, UserError } = require('./cli');
+
+const has = (bin) => (process.env.PATH || '').split(':').some((d) => { try { fsSync.accessSync(path.join(d, bin), fsSync.constants.X_OK); return true; } catch { return false; } });
+const UNAR = has('unar') && has('lsar');
+const UNAR_FALLBACK = new Set(['rar', 'cab']);
 
 const MAX_EXTRACT = Math.max(1, Number(process.env.MAX_EXTRACT_MB || 500)) * 1024 * 1024;
 const TOO_BIG = () => new UserError(`This archive unpacks to more than ${MAX_EXTRACT / 1024 / 1024}MB, which is over this server's limit.`, 413);
@@ -43,7 +50,6 @@ const PACK = {
 function pipeThrough(cmd, args, inFile, outFile, cap) {
   return new Promise((resolve, reject) => {
     const child = spawn(cmd, [...args, inFile], { stdio: ['ignore', 'pipe', 'pipe'] });
-    const fsSync = require('fs');
     const out = fsSync.createWriteStream(outFile);
     let n = 0; let killed = false; let err = '';
     child.stdout.on('data', (d) => {
@@ -67,6 +73,7 @@ async function listedSize(cmd, args) {
   const { stdout } = await run(cmd, args);
   const text = stdout.toString();
   if (cmd === '7z') return [...text.matchAll(/^Size = (\d+)/gm)].reduce((s, m) => s + Number(m[1]), 0);
+  if (cmd === 'lsar') return [...text.matchAll(/"XADFileSize":\s*(\d+)/g)].reduce((s, m) => s + Number(m[1]), 0);
   // bsdtar -tv: "-rw-r--r--  0 user group  1234 Jan  1 00:00 name"
   return text.split('\n').reduce((s, line) => s + (Number(line.trim().split(/\s+/)[4]) || 0), 0);
 }
@@ -105,7 +112,27 @@ async function unpack(dir, input, fromId, filename) {
     if (!tarFile) throw new UserError('This archive is empty.');
     return unpackWith(dir, x, tarFile, false);
   }
-  return unpackWith(dir, x, input, SEVEN_ZIP_IN.has(fromId));
+  try {
+    return await unpackWith(dir, x, input, SEVEN_ZIP_IN.has(fromId));
+  } catch (e) {
+    if (!UNAR || !UNAR_FALLBACK.has(fromId) || e.statusCode === 413 || /password/.test(e.userMessage || '')) throw e;
+    await fs.rm(x, { recursive: true, force: true });
+    await fs.mkdir(x);
+    return unpackWithUnar(x, input);
+  }
+}
+
+async function unpackWithUnar(x, input) {
+  try {
+    if (await listedSize('lsar', ['-j', input]) > MAX_EXTRACT) throw TOO_BIG();
+    await run('unar', ['-q', '-f', '-D', '-p', '', '-o', x, input]);
+  } catch (e) {
+    if (e.userMessage) throw e;
+    if (/passw|encrypt/i.test(`${e.stderr || ''}${e.stdout || ''}`)) throw new UserError('This archive is password-protected.');
+    throw new UserError('This archive could not be read. It may be damaged or use an unsupported variant.', 415);
+  }
+  await removeEscapes(x);
+  return x;
 }
 
 async function unpackWith(dir, x, input, use7z) {

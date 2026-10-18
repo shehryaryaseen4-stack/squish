@@ -69,18 +69,20 @@ const ARCHIVE_ALL_OUT = [...ARCHIVE_OUT, 'xz', 'tar-xz', 'tar-7z'];
 const VIDEO_LIVE = ['mp4', 'm4v', 'mov', 'mkv', 'webm', 'avi', 'flv', 'wmv', 'mpeg', 'mpg', 'mod', 'vob', '3gp', '3gpp', '3g2', 'ogv',
   'ts', 'mts', 'm2ts', 'mxf', 'dv', 'rm', 'rmvb', 'swf', 'wtv'];
 const AUDIO_LIVE = ['mp3', 'wav', 'aac', 'flac', 'ogg', 'oga', 'm4a', 'm4b', 'wma', 'aiff', 'aifc', 'opus', 'ac3', 'alac', 'au', 'caf', 'voc', 'weba'];
-const DOC_LIVE_IN = ['doc', 'docx', 'docm', 'dot', 'dotx', 'odt', 'rtf', 'txt', 'html'];
+const DOC_LIVE_IN = ['doc', 'docx', 'docm', 'dot', 'dotx', 'odt', 'rtf', 'txt', 'html', 'wps', 'abw', 'zabw'];
 const DOC_LIVE_OUT = ['doc', 'docx', 'docm', 'dot', 'dotx', 'odt', 'rtf', 'txt', 'html', 'pdf'];
 const SHEETS_LIVE = ['xls', 'xlsx', 'xlsm', 'ods', 'csv', 'tsv'];
+const SHEETS_LIVE_IN = [...SHEETS_LIVE, 'numbers', 'et']; // Apple Numbers and Kingsoft are read, not written
 const SLIDES_LIVE = ['ppt', 'pptx', 'pptm', 'pps', 'ppsx', 'pot', 'potx', 'odp'];
+const SLIDES_LIVE_IN = [...SLIDES_LIVE, 'dps'];
 const VECTOR_LIVE_IN = ['svg', 'svgz', 'eps', 'ps', 'ai', 'emf', 'wmf'];
 const VECTOR_LIVE_OUT = ['svg', 'svgz', 'eps', 'ps', 'pdf', 'emf', 'wmf'];
 const IMG_IM_OUT = ['bmp', 'psd', 'eps', 'ps'];
 const EBOOK_LIVE_IN = ['epub', 'mobi', 'azw', 'azw3', 'prc', 'fb2', 'htmlz', 'lit', 'lrf', 'pdb', 'rb', 'tcr', 'txtz', 'cbz',
   'docx', 'odt', 'rtf', 'txt', 'html', 'pdf'];
-const EBOOK_LIVE_OUT = ['epub', 'mobi', 'azw3', 'fb2', 'htmlz', 'lit', 'lrf', 'oeb', 'pdb', 'rb', 'tcr', 'txtz', 'docx', 'rtf', 'txt', 'pdf'];
-const ARCHIVE_LIVE_IN = ['zip', 'jar', '7z', 'tar', 'tar-gz', 'tar-bz2', 'tar-xz', 'tar-7z', 'tar-z', 'tar-lzo', 'gz', 'bz2', 'xz', 'lz', 'lzma', 'lzo', 'z',
-  'cpio', 'iso', 'deb'];
+const EBOOK_LIVE_OUT = ['epub', 'mobi', 'azw3', 'fb2', 'htmlz', 'lit', 'lrf', 'oeb', 'pdb', 'rb', 'snb', 'tcr', 'txtz', 'docx', 'rtf', 'txt', 'pdf'];
+const ARCHIVE_LIVE_IN = ['zip', 'rar', 'jar', '7z', 'tar', 'tar-gz', 'tar-bz2', 'tar-xz', 'tar-7z', 'tar-z', 'tar-lzo', 'gz', 'bz2', 'xz', 'lz', 'lzma', 'lzo', 'z',
+  'cpio', 'iso', 'deb', 'cab'];
 const ARCHIVE_LIVE_OUT = ['zip', '7z', 'tar', 'tar-gz', 'tar-bz2', 'tar-xz', 'tar-7z', 'gz', 'bz2', 'xz'];
 
 const CONVERSION_RULES = [
@@ -127,11 +129,12 @@ const CONVERSION_RULES = [
   // ---- office documents, spreadsheets, presentations (LibreOffice)
   { id: 'office-documents', status: 'live', engine: 'libreoffice', handler: 'office', from: DOC_LIVE_IN, to: DOC_LIVE_OUT, quality: 'good',
     notes: 'Layout fidelity depends on the fonts installed on the server.' },
-  { id: 'office-spreadsheets', status: 'live', engine: 'libreoffice', handler: 'office', from: SHEETS_LIVE, to: [...SHEETS_LIVE, 'html', 'pdf'],
+  { id: 'office-spreadsheets', status: 'live', engine: 'libreoffice', handler: 'office', from: SHEETS_LIVE_IN, to: [...SHEETS_LIVE, 'html', 'pdf'],
     notes: 'CSV and TSV keep only the first sheet and no formatting.' },
-  { id: 'office-presentations', status: 'live', engine: 'libreoffice', handler: 'office', from: SLIDES_LIVE, to: [...SLIDES_LIVE, 'pdf'] },
-  { id: 'office-slides-to-image', status: 'live', engine: 'libreoffice', requires: ['poppler'], handler: 'office', from: SLIDES_LIVE, to: ['jpg', 'png'],
+  { id: 'office-presentations', status: 'live', engine: 'libreoffice', handler: 'office', from: SLIDES_LIVE_IN, to: [...SLIDES_LIVE, 'pdf'] },
+  { id: 'office-slides-to-image', status: 'live', engine: 'libreoffice', requires: ['poppler'], handler: 'office', from: SLIDES_LIVE_IN, to: ['jpg', 'png'],
     notes: 'One image per slide; decks with several slides are downloaded as a ZIP.' },
+  { id: 'office-documents-to-xps', status: 'live', engine: 'libreoffice', requires: ['ghostscript'], handler: 'office', from: DOC_LIVE_IN, to: ['xps'] },
 
   // ---- markup documents (Pandoc)
   { id: 'markup-from', status: 'live', engine: 'pandoc', handler: 'markup', from: ['md', 'rst', 'tex'],
@@ -140,10 +143,14 @@ const CONVERSION_RULES = [
   { id: 'markup-to', status: 'live', engine: 'pandoc', handler: 'markup', from: ['html', 'docx', 'odt', 'txt', 'rtf', 'epub'], to: ['md', 'rst', 'tex'] },
 
   // ---- PDF (Poppler, Ghostscript, pdf-lib)
-  { id: 'pdf-out', status: 'live', engine: 'poppler', handler: 'pdf', from: ['pdf'], to: ['jpg', 'png', 'webp', 'tiff', 'txt', 'html', 'svg', 'eps', 'ps'],
+  { id: 'pdf-out', status: 'live', engine: 'poppler', handler: 'pdf', from: ['pdf'], to: ['jpg', 'png', 'webp', 'tiff', 'gif', 'avif', 'txt', 'html', 'svg', 'eps', 'ps', 'xps'],
     notes: 'Images: one per page, several pages are downloaded as a ZIP.' },
   { id: 'image-to-pdf-live', status: 'live', engine: 'pdf-lib', handler: 'pdf', from: ['jpg', 'jfif', 'png', 'webp', 'avif', 'tiff', 'gif', 'bmp', 'svg'], to: ['pdf'],
     notes: 'One page per image, at the image\'s own size.' },
+
+  // ---- XPS documents (MuPDF, then the PDF tools)
+  { id: 'xps-live', status: 'live', engine: 'mupdf', requires: ['poppler'], handler: 'xps', from: ['xps'], to: ['pdf', 'jpg', 'png', 'webp', 'tiff', 'txt'],
+    notes: 'Images: one per page, several pages are downloaded as a ZIP.' },
 
   // ---- vector graphics (Inkscape)
   { id: 'vector-live', status: 'live', engine: 'inkscape', requires: ['ghostscript'], handler: 'vector', from: VECTOR_LIVE_IN, to: VECTOR_LIVE_OUT, quality: 'good' },
@@ -155,6 +162,10 @@ const CONVERSION_RULES = [
   { id: 'image-heif-more', status: 'live', engine: 'libheif', requires: ['imagemagick'], handler: 'imagex', from: ['heic', 'heif'], to: IMG_IM_OUT },
   { id: 'image-im-input', status: 'live', engine: 'imagemagick', handler: 'imagex', from: ['psd', 'ico', 'ppm'], to: [...IMG_OUT, ...IMG_IM_OUT, 'pdf'],
     notes: 'Layered files are flattened; for icons the largest size is used.' },
+  { id: 'image-raw-live', status: 'live', engine: 'libraw', handler: 'imagex', from: RAW_CAMERA, to: [...IMG_OUT, 'pdf'], quality: 'good',
+    notes: 'RAW photos are developed with default settings (white balance as shot).' },
+  { id: 'image-raw-more', status: 'live', engine: 'libraw', requires: ['imagemagick'], handler: 'imagex', from: RAW_CAMERA, to: IMG_IM_OUT },
+  { id: 'image-icns', status: 'live', engine: 'icnsutils', handler: 'imagex', from: ['icns'], to: [...IMG_OUT, 'pdf'], notes: 'The largest icon size is used.' },
   { id: 'image-ps-input', status: 'live', engine: 'ghostscript', handler: 'imagex', from: ['eps', 'ps'], to: IMG_OUT, notes: 'The first page is rendered at 150 dpi.' },
   { id: 'image-im-output', status: 'live', engine: 'imagemagick', handler: 'imagex', from: ['jpg', 'jfif', 'png', 'webp', 'avif', 'tiff', 'gif', 'bmp', 'svg'], to: IMG_IM_OUT },
 
@@ -172,6 +183,8 @@ const CONVERSION_RULES = [
   // ---- fonts (pure JS)
   { id: 'font-woff', status: 'live', engine: 'woff', handler: 'font', from: ['ttf', 'otf', 'woff', 'woff2'], to: ['ttf', 'otf', 'woff', 'woff2'],
     except: [['ttf', 'otf'], ['otf', 'ttf']], notes: 'Wraps or unwraps fonts; outlines are not changed, so a WOFF unwraps to the TTF or OTF it was made from.' },
+  { id: 'font-eot', status: 'live', engine: 'eot-utils', handler: 'font', from: ['ttf', 'woff', 'woff2'], to: ['eot'],
+    notes: 'For old Internet Explorer. Needs a TrueType font; OpenType (CFF) fonts cannot be made into EOT.' },
 
   // =============================================================== PLANNED ==
   // ---- images
