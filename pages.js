@@ -278,9 +278,10 @@ function picker(label, groups, { current, align = '', role = '', dataFmt = false
 }
 
 // ----------------------------------------------------------------- header --
-// The Tools mega menu lists every format (about 900 elements). The home page carries it in full;
-// other pages load it from /menu.html (cached) when the menu is first hovered or opened, which
-// keeps their HTML small. The menu looks and works the same either way.
+// The Tools mega menu lists every format (about 900 elements, ~7 KB gzipped). Every page carries it
+// in full, so it opens instantly and never depends on a second request (an on-demand copy from
+// /menu.html could be held back by a CDN or browser cache). topbar(false) still gives the lazy
+// version for pages that want a smaller header.
 let megaCache = null, megaVersion = null;
 function megaMenu() {
   if (megaCache) return megaCache;
@@ -607,7 +608,7 @@ function baseFields(base, urlPath, title, desc, extra) {
   return {
     TITLE: esc(title), META_DESC: esc(desc), ROBOTS: 'index, follow, max-image-preview:large, max-snippet:-1', URL: url,
     CANONICAL_TAG: `<link rel="canonical" href="${url}">`,
-    TOPBAR: topbar(), FOOTER: footer(), DEFAULT_FORMAT: 'auto', JSONLD: '{}', TOOL: '', CONTENT: '', RELATED: '', BODY: '', PRIVACY: PRIVACY_SERVER, SCRIPTS: '',
+    TOPBAR: topbar(true), FOOTER: footer(), DEFAULT_FORMAT: 'auto', JSONLD: '{}', TOOL: '', CONTENT: '', RELATED: '', BODY: '', PRIVACY: PRIVACY_SERVER, SCRIPTS: '',
     CSS_V: seo.ASSET_V.css, JS_V: seo.ASSET_V.js,
     _url: url, _title: esc(title), _desc: esc(desc), _image: `${base}/og/${ogKey(urlPath)}.png`, _noindex: false,
     ...extra,

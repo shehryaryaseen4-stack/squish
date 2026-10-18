@@ -171,11 +171,13 @@ test('rare conversions still work but are left out of the index; popular ones ar
   assert.ok(rare > 1500, `only ${rare} pages left out`);
 });
 
-test('pages other than home load the Tools menu on demand; home keeps it in the page', () => {
+test('every page carries the full Tools menu, like the home page', () => {
   assert.match(pages.homePage(BASE), /class="fmt-panel mega/);
-  const html = fetchPath('/jpg-to-png').html;
-  assert.doesNotMatch(html, /class="fmt-panel mega/);
-  assert.match(html, /data-lazy="\/menu\.html\?v=[0-9a-f]{10}"/);
+  for (const p of ['/jpg-to-png', '/compress-video', '/merge-pdf', '/png-converter', '/guides']) {
+    const html = fetchPath(p).html;
+    assert.match(html, /class="fmt-panel mega/, p);
+    assert.doesNotMatch(html, /data-lazy=/, p);
+  }
   assert.match(pages.megaMenu(), /^<div class="fmt-panel mega/);
 });
 
