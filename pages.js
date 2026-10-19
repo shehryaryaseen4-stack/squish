@@ -178,6 +178,7 @@ const BRAND_LINK = SITE === brand.NAME
 
 // Small line icons per category (and a few UI icons). currentColor so they follow the theme.
 const ICON_PATHS = {
+  search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4.2-4.2"/>',
   archive: '<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/>',
   audio: '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>',
   cad: '<path d="M3 21h18M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/>',
@@ -367,7 +368,7 @@ function breadcrumbs(crumbs) {
     ? `<li aria-current="page">${n}</li>` : `<li>${link(p, n)}</li>`).join('')}</ol></nav>`;
 }
 
-function hero({ h1, intro, widget, withSelect, short, crumbs }) {
+function hero({ h1, intro, widget, withSelect, short, crumbs, search }) {
   const select = withSelect
     ? `<button class="btn btn-brand btn-select" id="selectBtn" type="button">${icon('upload')}Select File</button>`
     : '';
@@ -375,6 +376,7 @@ function hero({ h1, intro, widget, withSelect, short, crumbs }) {
     ${breadcrumbs(crumbs)}
     <h1>${h1}</h1>
     <p class="hero-text">${intro}</p>
+    ${search || ''}
     ${widget || select ? `<div class="converter-box">${widget || ''}${select}</div>
     <ul class="hero-free"><li>100% free</li><li>No sign-up</li><li>No watermark</li><li>Files deleted after conversion</li></ul>` : ''}
   </div></section>`;
@@ -1393,6 +1395,42 @@ function categoryPage(catId, base) {
   return renderPage(PAGE_TPL, live ? fields : noindex(fields));
 }
 
+// Site search (home page): every tool, every working conversion and every format page, as
+// [label, path, kind, extra words]. Served as /search.json and fetched when the box is first used.
+let searchCache = null;
+function searchIndex() {
+  if (searchCache) return searchCache;
+  const items = []; const seen = new Set();
+  const add = (label, href, kind, words = '') => { if (!href || seen.has(href)) return; seen.add(href); items.push([label, href, kind, words]); };
+  APPS.forEach((t) => add(t.name, `/${t.slug}`, 'tool', (t.keywords || []).join(' ')));
+  pdfGroups().flatMap(([, list]) => list).forEach(([href, label]) => add(label, href, 'pdf', 'pdf'));
+  EDITOR_LANDINGS.forEach((l) => add(l.h1 || l.name || l.slug, `/${l.slug}`, 'pdf', 'pdf editor'));
+  friendlies().forEach((x) => add(x.h1.replace(/ Converter$/, ''), `/${x.slug}`, 'convert', (x.inputs || []).join(' ')));
+  ALL_COMPRESSORS.filter((c) => c.status === 'live').forEach((c) => add(`Compress ${F(c.from).label}`, c.route, 'compress', `reduce size smaller ${c.from}`));
+  registry.getConverters({ type: 'all' }).forEach((c) => add(`${F(c.from).label} to ${F(c.to).label}`, c.route, 'convert', `${c.from} ${c.to}`));
+  registry.getFormats().filter((f) => formatIsLive(f.id)).forEach((f) => add(`${f.label} Converter`, formatPath(f.id), 'format', `${f.id} ${f.fullName || ''}`));
+  // popularity, so "heic" lists HEIC to JPG before HEIC to PS: 2 = a page we target, 1 = indexed
+  const indexed = new Set(allPaths());
+  items.forEach((it) => { it.push(KEYWORDS[it[1]] || POPULAR_SET.has(it[1].slice(1).replace('-to-', '>')) || it[2] === 'tool' ? 2 : indexed.has(it[1]) ? 1 : 0); });
+  const body = JSON.stringify(items);
+  searchCache = { body, version: require('crypto').createHash('sha1').update(body).digest('hex').slice(0, 10) };
+  return searchCache;
+}
+const QUICK = [['/pdf-to-word', 'PDF to Word'], ['/compress-pdf', 'Compress PDF'], ['/heic-to-jpg', 'HEIC to JPG'], ['/remove-background', 'Remove Background'],
+  ['/image-resizer', 'Image Resizer'], ['/merge-pdf', 'Merge PDF'], ['/compress-video', 'Compress Video'], ['/jpg-to-pdf', 'JPG to PDF']];
+function siteSearch() {
+  if (!knownPaths) knownPaths = new Set(allPaths());
+  return `<div class="site-search" data-search="/search.json?v=${searchIndex().version}">
+    <form class="ss-box" role="search" action="/converters" onsubmit="return false">
+      ${icon('search', 'ss-ico')}
+      <input type="search" class="ss-input" id="siteSearch" placeholder="Search tools: try &quot;pdf to word&quot; or &quot;resize image&quot;" autocomplete="off" spellcheck="false" aria-label="Search conversions and tools" aria-controls="ssList" aria-expanded="false" role="combobox">
+      <kbd class="ss-kbd">/</kbd>
+      <ul class="ss-list" id="ssList" role="listbox" hidden></ul>
+    </form>
+    <p class="ss-quick"><span>Popular:</span>${QUICK.filter(([h]) => knownPaths.has(h)).map(([h, t]) => link(h, t)).join('')}</p>
+  </div>`;
+}
+
 function homePage(base) {
   const title = `File Converter - Convert Any File Online Free | ${SITE}`;
   const desc = `Free online file converter for video, audio, images, documents, ebooks, archives and fonts. ${LIVE_COUNT.toLocaleString('en-US')} conversions, batch upload, no sign-up.`;
@@ -1400,7 +1438,7 @@ function homePage(base) {
   return renderPage(PAGE_TPL, baseFields(base, '/', title, desc, {
     TOPBAR: topbar(true),
     JSONLD: graph(base, '/', `${SITE} File Converter`, desc, faq, [['Home', '/']], { features: TOOL_FEATURES }),
-    HERO: hero({ h1: 'File Converter',
+    HERO: hero({ h1: 'File Converter', search: siteSearch(),
       intro: `${SITE} is an online file converter. We support ${LIVE_COUNT.toLocaleString('en-US')} conversions between audio, video, document, ebook, archive, image, spreadsheet, presentation and font formats. To get started, choose your formats or use the button below to select files from your computer.`,
       widget: convertRow(anyInputPicker(ALL_INPUTS, null), emptyToPicker()), withSelect: true }),
     TOOL: anyTool(),
@@ -1866,6 +1904,6 @@ function sitemap(base) {
 const robots = (base) => `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${base}/sitemap.xml\n`;
 
 module.exports = {
-  megaMenu, PDF_TOOLS, resolvePdfTool, APPS, resolveApp,
+  megaMenu, PDF_TOOLS, resolvePdfTool, APPS, resolveApp, searchIndex,
   ACCOUNTS, authPage, accountPage, authDonePage, resolveFriendly, friendlies,
   editorPage, PDF_EDITOR, EDITOR_LANDINGS, homePage, resolveGuide, hubPage, notFoundPage, resolvePair, resolveCompress, resolveConverter, resolveInfo, ogSpec, sitemap, robots, allPaths, adsTxt, ADS_ENABLED: !!ADS_CLIENT };

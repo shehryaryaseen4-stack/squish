@@ -133,6 +133,70 @@
     d.addEventListener("toggle", () => { if (d.open) load(); });
   });
 
+  // Site search on the home page: tools, conversions and formats, matched as you type.
+  (function siteSearch(){
+    const wrap = document.querySelector(".site-search");
+    if (!wrap) return;
+    const input = wrap.querySelector(".ss-input"), list = wrap.querySelector(".ss-list");
+    let items = null, loading = null, hits = [], active = -1;
+    const KIND = { tool: "Tool", pdf: "PDF tool", convert: "Convert", compress: "Compress", format: "Format" };
+    const RANK = { tool: 0, pdf: 1, compress: 2, convert: 3, format: 4 };
+    const load = () => loading || (loading = fetch(wrap.dataset.search).then(r => r.json()).then(d => {
+      items = d.map(([label, href, kind, words, pop]) => ({ label, href, kind, pop: pop || 0, hay: (label + " " + words).toLowerCase() }));
+      if (input.value) run();
+    }).catch(() => { loading = null; }));
+    const esc = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    function score(it, q, words, pair){
+      const l = it.label.toLowerCase();
+      if (pair){ // "png to jpg", "png 2 jpg", "png into jpg", "png jpg"
+        if (it.kind === "convert" && l === pair[0] + " to " + pair[1]) return 0;
+        if (it.kind === "convert" && l.startsWith(pair[0] + " to ") && l.endsWith(" " + pair[1])) return 1;
+      }
+      if (l === q) return 2;
+      if (l.startsWith(q)) return 3 + RANK[it.kind] * 0.1;
+      if (!words.every(w => it.hay.includes(w))) return null;
+      return (words.every(w => l.includes(w)) ? 5 : 8) + RANK[it.kind] * 0.1;
+    }
+    function run(){
+      const q = input.value.trim().toLowerCase().replace(/\s+/g, " ");
+      if (!q){ close(); return; }
+      if (!items){ load(); return; }
+      const words = q.replace(/\b(to|into|2|convert|converter|online|free)\b/g, " ").split(" ").filter(Boolean);
+      const m = /^\.?([\w-]+)\s+(?:to|2|into)\s+\.?([\w-]+)$/.exec(q) || (words.length === 2 && /^[a-z0-9-]{2,6}$/.test(words[0]) && /^[a-z0-9-]{2,6}$/.test(words[1]) ? [0, words[0], words[1]] : null);
+      const pair = m ? [m[1], m[2]] : null;
+      const scored = [];
+      for (const it of items){ const s = score(it, q, words.length ? words : [q], pair); if (s !== null) scored.push([s - it.pop * 0.3, it]); }
+      scored.sort((a, b) => a[0] - b[0] || a[1].label.length - b[1].label.length);
+      hits = scored.slice(0, 8).map(x => x[1]);
+      active = hits.length ? 0 : -1;
+      list.innerHTML = hits.length
+        ? hits.map((h, i) => `<li role="option" id="ss-${i}" class="ss-item${i === active ? " is-active" : ""}"><a href="${h.href}"><span class="ss-label">${esc(h.label)}</span><span class="ss-kind ss-${h.kind}">${KIND[h.kind]}</span></a></li>`).join("")
+        : `<li class="ss-empty">No match for "${esc(input.value.trim())}". Try a format like PDF, JPG or MP4.</li>`;
+      list.hidden = false; input.setAttribute("aria-expanded", "true");
+      input.setAttribute("aria-activedescendant", active >= 0 ? "ss-" + active : "");
+    }
+    function close(){ list.hidden = true; input.setAttribute("aria-expanded", "false"); }
+    function move(d){
+      if (!hits.length) return;
+      active = (active + d + hits.length) % hits.length;
+      list.querySelectorAll(".ss-item").forEach((el, i) => el.classList.toggle("is-active", i === active));
+      input.setAttribute("aria-activedescendant", "ss-" + active);
+    }
+    input.addEventListener("focus", load);
+    input.addEventListener("input", run);
+    input.addEventListener("keydown", e => {
+      if (e.key === "ArrowDown"){ e.preventDefault(); move(1); }
+      else if (e.key === "ArrowUp"){ e.preventDefault(); move(-1); }
+      else if (e.key === "Enter"){ e.preventDefault(); if (hits[active]) location.href = hits[active].href; }
+      else if (e.key === "Escape"){ close(); }
+    });
+    document.addEventListener("click", e => { if (!wrap.contains(e.target)) close(); });
+    // "/" jumps to the search box, like on many sites
+    document.addEventListener("keydown", e => {
+      if (e.key === "/" && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName) && !e.ctrlKey && !e.metaKey){ e.preventDefault(); input.focus(); }
+    });
+  })();
+
   // Conversion map (home, category and format pages): formats, pairs, which pairs are live,
   // file extension -> format, and the pairs the hero animation cycles through.
   let MAP = null;

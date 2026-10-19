@@ -462,6 +462,7 @@ if (pages.PDF_EDITOR) {
 // Accounts (ACCOUNTS=1): sign up / sign in, the account page and the owner's dashboard.
 accounts.mount(app, { pages, baseOf });
 
+app.get('/search.json', (_req, res) => res.set({ 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Robots-Tag': 'noindex' }).type('json').send(pages.searchIndex().body));
 app.get('/menu.html', (_req, res) => res.set({ 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Robots-Tag': 'noindex' }).type('html').send(pages.megaMenu()));
 app.get('/formats', (_req, res) => res.redirect(301, '/converters'));
 app.get(/^\/(about|privacy|terms|contact)$/, (req, res, next) => {
