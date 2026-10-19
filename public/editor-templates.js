@@ -363,6 +363,14 @@ const LOOKS = [
   ['creative', 'creative', 'Creative pink', ['#db2777', '#500724', '#fce7f3'], 'raleway', 'lato'],
 ];
 
+// A resume for any person (the AI resume builder): design i (0-based) of LOOKS with this person's text.
+export const RESUME_DESIGNS = LOOKS.map(([, style, name], i) => ({ i, id: `resume-${i + 1}`, name, style }));
+export function resumeFor(p, i) {
+  const [layout, style, name, [acc, dark, soft], hf, bf] = LOOKS[((i % LOOKS.length) + LOOKS.length) % LOOKS.length];
+  return { id: 'my-resume', name: `${p.name} resume (${name})`, cat: 'resume', style, size: A4,
+    items: LAYOUTS[layout](p, { acc, dark, soft, ink: '#374151', mute: '#6b7280', hf, bf }) };
+}
+
 export const RESUME_STYLES = [['resumes', 'Resumes'], ['modern', 'Modern'], ['classic', 'Classic'], ['simple', 'Simple'], ['creative', 'Creative'], ['ats', 'ATS-friendly'], ['letter', 'Cover letter']];
 
 const RESUMES = LOOKS.map(([layout, style, name, [acc, dark, soft], hf, bf], i) => ({

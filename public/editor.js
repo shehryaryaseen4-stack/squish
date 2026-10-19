@@ -4849,7 +4849,11 @@ function init() {
     buildGallery($('[data-gallery="start"]'), 'start');
     // /edit-pdf?template=invoice opens that template straight away (links from the landing pages)
     const tq = new URLSearchParams(location.search).get('template');
-    if (tq) loadTemplates().then(({ TEMPLATES }) => { const t = TEMPLATES.find((x) => x.id === tq); if (t) useTemplate(t, 'start'); });
+    // ?template=generated: a resume made by the AI resume builder, handed over in this browser's storage
+    if (tq === 'generated') {
+      let g = null; try { g = JSON.parse(localStorage.getItem('flipit-resume-gen') || 'null'); } catch { g = null; }
+      if (g && g.person) loadTemplates().then(({ resumeFor }) => { if (resumeFor) useTemplate(resumeFor(g.person, g.design || 0), 'start'); });
+    } else if (tq) loadTemplates().then(({ TEMPLATES }) => { const t = TEMPLATES.find((x) => x.id === tq); if (t) useTemplate(t, 'start'); });
   });
   lib().catch(() => {}); // start loading pdf.js while the visitor picks a file
 }

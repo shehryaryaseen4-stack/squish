@@ -34,7 +34,7 @@ const APPS = require('./content/apps');
 const APP_BY_SLUG = new Map(APPS.map((t) => [t.slug, t]));
 // Variants of a tool (resize to 50 KB, compress video for Discord ...) have pages but stay out of menus.
 const MENU_APPS = APPS.filter((t) => t.menu !== false);
-const APP_ICON = { passport: 'jpg', ocr: 'txt', invoice: 'pdf', resize: 'jpg', imgedit: 'png', favicon: 'ico', bgremove: 'png', vcompress: 'mp4', trim: 'mp3', words: 'txt', signature: 'png', cover: 'docx' };
+const APP_ICON = { passport: 'jpg', ocr: 'txt', invoice: 'pdf', resize: 'jpg', imgedit: 'png', favicon: 'ico', bgremove: 'png', vcompress: 'mp4', trim: 'mp3', words: 'txt', signature: 'png', cover: 'docx', aires: 'docx' };
 // Converters under the names people search for: /pdf-to-word, /word-to-pdf ... (friendlyPage)
 const FRIENDLY_ALL = require('./content/friendly-pages');
 // Only the file types this server can really convert (LibreOffice, Calibre ... may be missing):
@@ -1118,6 +1118,34 @@ function toolBox(t) {
   ${NOSCRIPT}
 </section>`;
   }
+  if (t.app === 'aires') {
+    const g = (name, label, ph = '', type = 'text', extra = '') => `<label>${label}<input type="${type}" data-f="${name}" placeholder="${esc(ph)}"${extra}></label>`;
+    const lv = [['fresher', 'Student or recent graduate'], ['junior', '1 to 2 years'], ['mid', '3 to 5 years'], ['senior', '6 to 10 years'], ['lead', 'More than 10 years']];
+    return `${open()}
+  <form class="cl-form ar-form" autocomplete="off" onsubmit="return false">
+    <fieldset><legend>1. The job you want</legend><div class="cl-grid">
+      ${g('job', 'Job title', 'e.g. Registered Nurse, Sales Representative', 'text', ' list="airesJobs"')}<datalist id="airesJobs"></datalist>
+      <label>Experience<select data-f="level">${lv.map(([v, n]) => `<option value="${v}"${v === 'mid' ? ' selected' : ''}>${n}</option>`).join('')}</select></label></div></fieldset>
+    <fieldset><legend>2. About you</legend><div class="cl-grid">${g('name', 'Full name', 'Jane Smith')}${g('email', 'Email', 'jane@email.com', 'email')}${g('phone', 'Phone', '(555) 123-4567')}${g('city', 'City, country', 'Austin, TX')}${g('link', 'LinkedIn or website (optional)', 'linkedin.com/in/janesmith')}</div></fieldset>
+    <fieldset><legend>3. Skills</legend><div class="ar-skills" data-skills><p class="ar-hint">Type a job title above to see the skills employers look for.</p></div>
+      ${g('extraSkills', 'More skills (comma separated, optional)', 'Spanish, Excel, forklift licence')}</fieldset>
+    <details class="ar-more"><summary>4. Work history and education (optional: leave empty and edit them in the resume later)</summary>
+      ${[1, 2, 3].map((n) => `<div class="cl-grid">${g(`j${n}title`, `Job ${n} title`, n === 1 ? 'Most recent job' : '')}${g(`j${n}company`, 'Company, city', 'Acme Inc., Austin')}${g(`j${n}dates`, 'Dates', n === 1 ? '2022 - Present' : '2019 - 2022')}</div>`).join('')}
+      <div class="cl-grid">${g('degree', 'Degree or diploma', 'BSc Nursing')}${g('school', 'School or university', 'University of Texas')}${g('eduYears', 'Year', '2020')}</div>
+      <div class="cl-grid">${g('langs', 'Languages (comma separated)', 'English, Spanish')}</div>
+      <label>Achievements or certificates (one per line, optional)<textarea data-f="achievements" rows="3" placeholder="BLS certified\nEmployee of the month, March 2024"></textarea></label></details>
+    <div class="pt-bar"><p class="pt-msg" data-msg role="status" aria-live="polite"></p><button type="button" class="btn btn-brand pt-go" data-go>Write my resume</button></div>
+  </form>
+  <div class="ar-result" data-result hidden>
+    <div class="ar-head"><h2>Your resume is ready</h2><p>Read it through and make it yours: add real names, dates and results. Then pick a design and open it to edit and download as PDF.</p></div>
+    <div class="ar-preview" data-preview></div>
+    <div class="ar-actions"><button type="button" class="btn btn-ghost" data-regen>&#8635; Try other wording</button>
+      <label class="ar-design">Design<select data-design><option value="0">Loading designs…</option></select></label>
+      <button type="button" class="btn btn-brand" data-open>${icon('edit')}Open in editor &amp; download PDF</button></div>
+  </div>
+  ${NOSCRIPT}
+</section>`;
+  }
   // cover letter
   const f = (name, label, ph = '', type = 'text') => `<label>${label}<input type="${type}" data-f="${name}" placeholder="${esc(ph)}"></label>`;
   return `${open()}
@@ -1242,10 +1270,11 @@ function appBox(t) {
 </section>`;
 }
 
-const TOOLS_JS = new Set(['resize', 'imgedit', 'favicon', 'bgremove', 'vcompress', 'trim', 'words', 'signature', 'cover']);
+const TOOLS_JS = new Set(['resize', 'imgedit', 'favicon', 'bgremove', 'vcompress', 'trim', 'words', 'signature', 'cover', 'aires']);
 const IN_BROWSER = '<strong>How this works:</strong> everything happens in your browser with open-source code. Nothing is uploaded to our server and nothing is stored.';
 const APP_PRIVACY = {
   resize: IN_BROWSER, imgedit: IN_BROWSER, favicon: IN_BROWSER, words: '<strong>How this works:</strong> your text is counted in your browser and never sent to our server. It is kept only in this browser so it is still here if you reload the page.',
+  aires: '<strong>How this works:</strong> your resume is written in your browser from your answers and ready-made, job-specific content; it does not use an online AI service. Nothing is sent to our server.',
   signature: IN_BROWSER, cover: '<strong>How this works:</strong> the letter is written and saved as PDF or Word in your browser. Your details are kept only in this browser for next time; nothing is sent to our server.',
   bgremove: '<strong>How this works:</strong> your photo is uploaded over HTTPS and processed on this server with an open-source image segmentation model (IS-Net), in memory. Nothing is kept or shared.',
   vcompress: '<strong>How this works:</strong> your video is uploaded over HTTPS and re-encoded on this server with FFmpeg. The upload is deleted when the work is done and the result 15 minutes later.',

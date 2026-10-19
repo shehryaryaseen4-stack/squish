@@ -983,4 +983,134 @@ function cover() {
   });
 }
 
-({ resize, imgedit, favicon, bgremove, vcompress, trim, words, signature, cover }[box && box.dataset.app] || (() => {}))();
+
+// -------------------------------------------------------------- AI resume builder --
+// No AI service: the person's answers plus ready-written content for their job
+// (public/resume-library.js) make the resume, which opens in the resume editor in any design.
+const LEVELS = { fresher: [0, 'Student or recent graduate'], junior: [2, '1 to 2 years'], mid: [4, '3 to 5 years'], senior: [8, '6 to 10 years'], lead: [12, 'More than 10 years'] };
+// split text into at most `max` lines of about `width` characters (the designs do not wrap text)
+function wrapLines(text, width = 62, max = 2) {
+  const out = []; let line = '';
+  for (const w of String(text).split(/\s+/).filter(Boolean)) {
+    if ((line + ' ' + w).trim().length > width && line) { out.push(line); line = w; } else line = (line + ' ' + w).trim();
+  }
+  if (line) out.push(line);
+  return out.length <= max ? out.join('\n') : null;
+}
+const pick = (arr, n, seed) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(((Math.sin(seed * 9301 + i * 49297) + 1) / 2) * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a.slice(0, n); };
+const an = (w) => (/^[aeiou]/i.test(w) ? 'an' : 'a');
+function summaryFor(job, level, seed) {
+  // "Patient assessment" -> "patient assessment", but "Microsoft Office", "Python", "SQL" stay as they are
+  const PROPER = /^(Python|Excel|Figma|WordPress|Canva|Salesforce|Photoshop|Espresso|Instagram|Google|Adobe|AutoCAD|SolidWorks|QuickBooks|React|JavaScript|HTML|Windows|Power|Microsoft)\b/;
+  const low = (x) => (PROPER.test(x) || /[A-Z]/.test(x.slice(1)) ? x : x.charAt(0).toLowerCase() + x.slice(1));
+  const [y] = LEVELS[level], t = job.title.replace(/ \/.*/, ''), lt = t.toLowerCase(), [s1, s2] = job.skills.map(low);
+  const st = job.strengths.map((s) => s.toLowerCase());
+  const yrs = level === 'junior' ? `${y} years` : `${y}+ years`;
+  const options = job.id === 'student' ? [
+    `Motivated graduate looking for a first full-time role. Skilled in ${s1}; ${st[0]}.`,
+    `Recent graduate keen to learn and grow in a new team. ${job.strengths[1]} with a ${st[2]}.`,
+  ] : level === 'fresher' ? [
+    `Motivated graduate seeking a first role as ${an(lt)} ${lt}. Skilled in ${s1}; ${st[0]}.`,
+    `Entry-level ${lt} ready to start a career in ${job.field}. ${job.strengths[0]} and keen to learn.`,
+    `Recent graduate seeking ${an(lt)} ${lt} role. ${job.strengths[1]}, skilled in ${s1}.`,
+  ] : [
+    `${level === 'senior' || level === 'lead' ? 'Senior ' : ''}${t} with ${yrs} of experience in ${job.field}. Skilled in ${s1}; ${st[0]}.`,
+    `${t} with ${yrs} in ${job.field}. ${job.strengths[1]}, skilled in ${s1} and ${s2}.`,
+    `${t} with ${yrs} of experience in ${job.field}. ${job.strengths[0]} and ${st[2]}.`,
+  ];
+  const order = pick(options, options.length, seed);
+  for (const o of order) { const w = wrapLines(o, 64); if (w) return w; }
+  return wrapLines(`${t} with ${level === 'fresher' ? 'a fresh start' : yrs} in ${job.field}. ${job.strengths[0]}.`, 64) || wrapLines(`${t}. ${job.strengths[0]}.`, 64);
+}
+function aires() {
+  let JOBS = null, findJob = null;
+  const ready = import('/resume-library.js').then((m) => { JOBS = m.JOBS; findJob = m.findJob; fillJobs(); });
+  const F = (k) => $(`[data-f="${k}"]`);
+  const KEYS = $$('[data-f]').map((el) => el.dataset.f);
+  const saved = store.get('flipit-aires') || {};
+  for (const k of KEYS) if (saved[k] != null && F(k)) F(k).value = saved[k];
+  const persist = () => store.set('flipit-aires', Object.fromEntries(KEYS.map((k) => [k, F(k).value])));
+  $$('[data-f]').forEach((el) => el.addEventListener('input', persist));
+  let seed = Number(saved.seed) || 1, skillsFor = null;
+  const designSel = $('[data-design]');
+  import('/editor-templates.js').then(({ RESUME_DESIGNS }) => {
+    if (!RESUME_DESIGNS) return;
+    const groups = {};
+    RESUME_DESIGNS.forEach((x) => { (groups[x.style] = groups[x.style] || []).push(x); });
+    const names = { modern: 'Modern', classic: 'Classic', simple: 'Simple', creative: 'Creative', ats: 'ATS-friendly' };
+    designSel.innerHTML = Object.entries(groups).map(([st, list]) => `<optgroup label="${names[st] || st}">${list.map((x) => `<option value="${x.i}">${x.name}</option>`).join('')}</optgroup>`).join('');
+    if (saved.design) designSel.value = saved.design;
+  }).catch(() => {});
+  designSel.addEventListener('change', () => store.set('flipit-aires', { ...(store.get('flipit-aires') || {}), design: designSel.value }));
+  function fillJobs() {
+    $('#airesJobs').innerHTML = JOBS.map((j) => `<option value="${j.title}"></option>`).join('');
+    updateSkills();
+  }
+  // skill checkboxes for the chosen job; the first six start ticked
+  function updateSkills() {
+    const job = findJob && findJob(F('job').value);
+    if (!job || job === skillsFor) return;
+    skillsFor = job;
+    if (!F('degree').value) F('degree').placeholder = job.degree;
+    $('[data-skills]').innerHTML = job.skills.map((s, i) => `<label class="ar-skill"><input type="checkbox" value="${s.replace(/"/g, '&quot;')}"${i < 6 ? ' checked' : ''}> ${s}</label>`).join('');
+  }
+  F('job').addEventListener('input', updateSkills);
+  F('job').addEventListener('change', updateSkills);
+
+  function build() {
+    const d = Object.fromEntries(KEYS.map((k) => [k, F(k).value.trim()]));
+    if (!d.name) throw new Error('Add your full name first.');
+    const job = findJob(d.job || 'student');
+    if (!job) throw new Error('Type the job you want, for example "Registered Nurse" or "Sales Representative".');
+    const level = LEVELS[d.level] ? d.level : 'mid';
+    const title = d.job && d.job.length < 40 ? d.job.replace(/\b\w/g, (c) => c.toUpperCase()) : job.title;
+    const skills = [...$$('[data-skills] input:checked').map((c) => c.value), ...d.extraSkills.split(',').map((s) => s.trim()).filter(Boolean)];
+    while (skills.length < 6) skills.push(job.skills[skills.length] || 'Teamwork');
+    const duties = pick(job.duties, 5, seed);
+    const year = new Date().getFullYear();
+    // past jobs: what was typed, or editable placeholders sized to the experience level
+    const typed = [1, 2, 3].map((n) => [d[`j${n}title`], d[`j${n}company`], d[`j${n}dates`]]).filter(([t, c]) => t || c);
+    const rows = typed.length ? typed : level === 'fresher'
+      ? [['Intern', 'Company name, City', `Summer ${year - 1}`], ['Part-time job or volunteer role', 'Organisation, City', `${year - 2} - ${year - 1}`], ['Student project', 'University name', String(year - 1)]]
+      : [[title, 'Company name, City', `${year - Math.min(LEVELS[level][0], 4)} - Present`], [title, 'Company name, City', `${year - LEVELS[level][0] - 2} - ${year - Math.min(LEVELS[level][0], 4)}`], [level === 'junior' ? 'Intern' : `Junior ${title}`, 'Company name, City', `${year - LEVELS[level][0] - 3} - ${year - LEVELS[level][0] - 2}`]];
+    const split = [[0, 2], [2, 4], [4, 5]];
+    const jobs = rows.slice(0, 3).map(([t, c, dt], i) => [t || title, c || 'Company name, City', dt || 'Year - Year', duties.slice(...split[i]).join('\n') || duties[0]]);
+    const awards = (d.achievements ? d.achievements.split(/\n+/).map((s) => s.trim()).filter(Boolean) : job.strengths).slice(0, 3);
+    return {
+      name: d.name, role: title, phone: d.phone || 'Phone', email: d.email || 'email@example.com', city: d.city || 'City, Country', web: d.link || 'linkedin.com/in/yourname',
+      summary: summaryFor(job, level, seed),
+      jobs,
+      edu: [[d.degree || job.degree, d.school || 'University or college name', d.eduYears || String(year - (level === 'fresher' ? 0 : LEVELS[level][0] + 1))]],
+      skills: skills.slice(0, 8), langs: (d.langs || 'English').split(',').map((s) => s.trim()).filter(Boolean).slice(0, 4),
+      awards: awards.join('\n'),
+    };
+  }
+  function preview(p) {
+    const e = (s) => String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    $('[data-preview]').innerHTML = `<h3>${e(p.name)}</h3><p class="ar-role">${e(p.role)}</p><p class="ar-contact">${[p.email, p.phone, p.city, p.web].map(e).join('  ·  ')}</p>
+      <h4>Profile</h4><p>${e(p.summary.replace(/\n/g, ' '))}</p>
+      <h4>Experience</h4>${p.jobs.map(([t, c, dt, txt]) => `<p><strong>${e(t)}</strong>, ${e(c)} <span class="ar-date">${e(dt)}</span></p><ul>${txt.split('\n').map((l) => `<li>${e(l)}</li>`).join('')}</ul>`).join('')}
+      <h4>Education</h4>${p.edu.map(([g, s, y]) => `<p><strong>${e(g)}</strong>, ${e(s)} <span class="ar-date">${e(y)}</span></p>`).join('')}
+      <h4>Skills</h4><p>${p.skills.map(e).join('  ·  ')}</p>
+      <h4>Languages</h4><p>${p.langs.map(e).join(', ')}</p>
+      <h4>Achievements</h4><ul>${p.awards.split('\n').map((l) => `<li>${e(l)}</li>`).join('')}</ul>`;
+  }
+  let current = null;
+  async function generate() {
+    await ready;
+    try { current = build(); } catch (e) { say(e.message, true); return false; }
+    preview(current); $('[data-result]').hidden = false; say('');
+    return true;
+  }
+  $('[data-go]').addEventListener('click', async () => {
+    if (await generate()) { $('[data-result]').scrollIntoView({ behavior: 'smooth', block: 'start' }); beacon('AI resume'); }
+  });
+  $('[data-regen]').addEventListener('click', async () => { seed += 1; store.set('flipit-aires', { ...(store.get('flipit-aires') || {}), seed }); await generate(); });
+  $('[data-open]').addEventListener('click', async () => {
+    if (!current && !(await generate())) return;
+    store.set('flipit-resume-gen', { person: current, design: Number(designSel.value) || 0 });
+    location.href = '/resume-maker?template=generated';
+  });
+}
+
+({ resize, imgedit, favicon, bgremove, vcompress, trim, words, signature, cover, aires }[box && box.dataset.app] || (() => {}))();

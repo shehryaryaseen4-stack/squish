@@ -498,4 +498,28 @@ module.exports = [
     ],
     see: ['/resume-maker', '/word-counter', '/signature-generator', '/merge-pdf', '/docx-to-pdf'],
   },
+  // ------------------------------------------------------------ AI resume builder --
+  {
+    slug: 'ai-resume-builder', howto: 'How to write a resume in two minutes', name: 'AI Resume Builder', app: 'aires', browser: true,
+    keywords: ['ai resume builder', 'free ai resume builder', 'resume generator', 'resume writer', 'write my resume', 'resume maker free'],
+    title: 'AI Resume Builder - Free Resume Writer, No Sign-Up',
+    desc: 'AI resume builder: type the job you want and get a ready-written resume with summary, skills and experience in 30 designs. Edit it and download a free PDF.',
+    h1: 'Free AI Resume Builder',
+    intro: 'Tell us the job you want and your experience, and the resume builder writes your resume for you: a professional summary, the skills employers look for, and clear experience lines for 45 common jobs, from nurse and teacher to software engineer, cashier and truck driver. Pick one of 30 designs, edit anything, and download a clean PDF. Free, no sign-up, and your details stay in your browser.',
+    steps: [['Type the job you want.', 'For example <em>Registered Nurse</em>, <em>Sales Representative</em> or <em>Student</em>, and choose your experience.'],
+      ['Add your details.', 'Your name and contact details, tick your skills, and add past jobs and education if you like.'],
+      ['Write, pick a design and download.', 'Click <em>Write my resume</em>, read the draft, choose a design and open it in the editor to change anything and download the PDF.']],
+    sections: [
+      ['How the resume is written', '<p>For each of 45 common jobs we wrote the skills recruiters search for and resume lines that describe the work in clear, active language. The builder combines them with your answers, writes a summary that fits your experience level, and lays everything out in the design you choose. Nothing is made up about you: there are no invented numbers or awards, and the draft is a starting point to make your own. Add real results wherever you can, such as <em>"served 60 customers a day"</em> or <em>"cut costs by 10%"</em>.</p>'],
+      ['Make it pass applicant tracking systems (ATS)', '<ul><li>Use the exact job title and skills from the job advert.</li><li>Choose an <em>ATS-friendly</em> design if you apply through Workday, Greenhouse, Taleo or similar portals.</li><li>Keep it to one page unless you have more than eight years of experience.</li><li>Send it as a PDF unless the employer asks for Word.</li></ul><p>Then write a matching letter with the <a href="/cover-letter-generator">cover letter generator</a>.</p>'],
+    ],
+    faq: [
+      ['Is this AI resume builder free?', 'Yes. Write, edit and download as many resumes as you like, with no sign-up and no watermark.'],
+      ['Does it use ChatGPT or another AI service?', 'No. It is a smart generator that combines your answers with resume content written for each job, right in your browser. Your details are never sent to an AI company, and there is no daily limit.'],
+      ['Which jobs does it cover?', 'Forty-five common jobs, including nurse, nursing assistant, teacher, software engineer, data analyst, accountant, sales, customer service, cashier, retail, warehouse, driver, chef, server, security and students looking for a first job. For other jobs, pick the closest one and edit the lines.'],
+      ['Can I change the text and design?', 'Yes. The resume opens in the editor, where you can change every word, colour and section, then download a PDF.'],
+      ['Is my information saved?', 'Only in this browser, so you can come back later. Nothing is uploaded.'],
+    ],
+    see: ['/resume-maker', '/cover-letter-generator', '/word-counter', '/signature-generator'],
+  },
 ];

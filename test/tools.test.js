@@ -66,3 +66,14 @@ test('every tool page has its tool box and script', () => {
     assert.ok(!/onclick=/.test(html.split('id="app"')[1].split('</section>')[0]), `${t.slug}: inline handlers are blocked by the CSP`);
   }
 });
+
+test('resume library: every job has six skills and short lines that fit the designs', async () => {
+  const { JOBS, findJob } = await import('../public/resume-library.js');
+  assert.ok(JOBS.length >= 40);
+  for (const j of JOBS) {
+    assert.ok(j.skills.length >= 6 && j.duties.length >= 5 && j.strengths.length === 3, j.id);
+    for (const d of j.duties) assert.ok(d.length <= 56, `${j.id}: "${d}" is ${d.length} characters`);
+  }
+  assert.equal(findJob('rn nurse').id, 'registered-nurse');
+  assert.equal(findJob('cashier').id, 'cashier');
+});
