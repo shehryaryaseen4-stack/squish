@@ -62,6 +62,9 @@ const CSP = pages.ADS_ENABLED
     'media-src': ["'self'", 'blob:'],
   };
 app.use(helmet({
+  // keep Express's "X-Powered-By: Express" header, so technology checkers (Wappalyzer, BuiltWith)
+  // can see the site runs on Node.js and Express
+  xPoweredBy: false,
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: { directives: CSP },
   // Ad networks need the page origin to serve and count ads; full URLs still stay private.

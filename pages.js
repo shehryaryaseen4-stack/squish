@@ -1764,6 +1764,18 @@ const INFO_PAGES = {
       <p>${SITE} is a free online file converter. It started as an image compressor and now handles ${LIVE_SUMMARY}.</p>
       <h2>How it works</h2>
       <p>Your file is uploaded over an encrypted connection, converted on our server with open-source engines (<a href="https://sharp.pixelplumbing.com/" rel="noopener">libvips</a>, <a href="https://ffmpeg.org/" rel="noopener">FFmpeg</a>, <a href="https://www.libreoffice.org/" rel="noopener">LibreOffice</a>, <a href="https://pandoc.org/" rel="noopener">Pandoc</a>, <a href="https://calibre-ebook.com/" rel="noopener">Calibre</a>, Ghostscript and Inkscape), and sent straight back to your browser. Nothing is kept afterwards.</p>
+      <h2>Technology</h2>
+      <p>${SITE} is written in <strong>JavaScript</strong> and runs on <strong>Node.js</strong> with the <strong>Express</strong> web framework. Pages are built with <strong>HTML5</strong> and <strong>CSS3</strong>, and the tools in your browser use plain JavaScript (no framework).</p>
+      <ul>
+        <li><strong>Languages:</strong> JavaScript (Node.js), HTML5, CSS3, SVG, JSON</li>
+        <li><strong>Server:</strong> Node.js 20, Express, Docker on Ubuntu Linux, served through Caddy and Cloudflare</li>
+        <li><strong>Images:</strong> Sharp (libvips), ImageMagick, libheif, LibRaw</li>
+        <li><strong>Video and audio:</strong> FFmpeg</li>
+        <li><strong>Documents and ebooks:</strong> LibreOffice, Pandoc, Calibre, Ghostscript, Poppler, qpdf, MuPDF</li>
+        <li><strong>PDF in the browser:</strong> pdf.js and pdf-lib</li>
+        <li><strong>Text recognition and background removal:</strong> Tesseract OCR, and the IS-Net model run with ONNX Runtime</li>
+        <li><strong>Vectors, fonts and archives:</strong> Inkscape, WOFF2, libarchive, 7-Zip</li>
+      </ul>
       <h2>What we are adding</h2>
       <p>Our catalogue lists ${FORMAT_COUNT} formats across ${CATS.length} categories. Conversions that are not ready yet are clearly marked <span class="soon-tag">soon</span>; we only switch one on once it really works.</p>
       <h2>Contact</h2>
