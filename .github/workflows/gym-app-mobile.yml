@@ -41,6 +41,89 @@ jobs:
   android:
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gym-app/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - run: npm ci
+      - name: Build the app (connects to your server)
+        run: |
+          node scripts/build-mobile.js
+          npx cap sync android
+          cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon -PversionCode=${{ github.run_number }}
+          mkdir -p ../apk && cp app/build/outputs/apk/debug/app-debug.apk ../apk/gym-app.apk
+      # A second app that needs no server, for trying everything on a phone.
+      # It has its own app id and name, so both can be installed side by side.
+      - name: Build the offline demo app
+        run: |
+          DEMO=1 node scripts/build-mobile.js
+          npx cap sync android
+          cd android
+          sed -i 's#<string name="app_name">.*</string>#<string name="app_name">Gym App Demo</string>#; s#<string name="title_activity_main">.*</string>#<string name="title_activity_main">Gym App Demo</string>#' app/src/main/res/values/strings.xml
+          ./gradlew assembleDebug --no-daemon -PdemoApp -PversionCode=${{ github.run_number }}
+          cp app/build/outputs/apk/debug/app-debug.apk ../apk/gym-app-demo.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apks
+          path: gym-app/apk/*.apk
+          if-no-files-found: error
+      # Direct download links (no zip, no login on a public repo):
+      # https://github.com/<owner>/<repo>/releases/download/app-latest/gym-app-demo.apk
+      - name: Publish to the "app-latest" release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-latest
+          name: Gym app · latest test build
+          prerelease: true
+          body: |
+            Test builds from the latest push (build ${{ github.run_number }}).
+            - **gym-app-demo.apk**: works without a server. Install it to try everything on your phone.
+            - **gym-app.apk**: the real app. It connects to your gym's server.
+            On the phone: download, open the file, allow "Install unknown apps" for your browser, then Install.
+          files: |
+            gym-app/apk/gym-app.apk
+            gym-app/apk/gym-app-demo.apk
+
+  ios:
+        description: 'Also build the iOS app (uses macOS minutes)'
+        type: boolean
+        default: true
+
+defaults:
+  run:
+    working-directory: gym-app
+
+env:
+  # Set a repository variable GYM_API_URL (Settings → Secrets and variables → Actions → Variables)
+  # so every build talks to your live server without asking.
+  API_URL: ${{ inputs.api_url || vars.GYM_API_URL }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gym-app/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  android:
+    needs: test
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

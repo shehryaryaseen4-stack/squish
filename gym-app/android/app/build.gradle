@@ -7,8 +7,9 @@ android {
         applicationId "pk.ironrepublic.gym"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // CI passes the build number so each new APK installs as an update.
+        versionCode((project.findProperty('versionCode') ?: '1') as Integer)
+        versionName "1.0.${project.findProperty('versionCode') ?: '0'}"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,7 +17,25 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Test builds (the APKs from GitHub Actions) are all signed with this one
+    // key, so a newer APK installs over an older one. It is for testing only:
+    // sign Play Store releases with your own private key.
+    signingConfigs {
+        testBuilds {
+            storeFile file('test-builds.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+    // -PdemoApp installs the offline demo as its own app next to the real one.
+    if (project.hasProperty('demoApp')) {
+        defaultConfig.applicationIdSuffix = '.demo'
+    }
     buildTypes {
+        debug {
+            signingConfig signingConfigs.testBuilds
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
