@@ -1,0 +1,25 @@
+{
+  "name": "slotly",
+  "version": "1.0.0",
+  "description": "White-label booking app for salons, barbers, spas and gyms: customer PWA plus owner dashboard, zero dependencies.",
+  "main": "server.js",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test test/*.test.js",
+    "mobile:build": "node scripts/build-mobile.js && cap sync",
+    "mobile:android": "node scripts/build-mobile.js && cap sync android && cap open android",
+    "mobile:ios": "node scripts/build-mobile.js && cap sync ios && cap open ios",
+    "mobile:icons": "npx @capacitor/assets@3 generate --android --ios --iconBackgroundColor '#7c5cff' --iconBackgroundColorDark '#1b1340' --splashBackgroundColor '#7c5cff' --splashBackgroundColorDark '#0c0c11'"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/cli": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/ios": "^8.5.3"
+  }
+}
