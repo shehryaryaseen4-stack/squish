@@ -239,3 +239,6 @@ img { max-width: 100%; display: block; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+/* Keep a sheet's main buttons in reach when its content is long. */
+.sheet .sheet-actions { position: sticky; bottom: calc(-20px - env(safe-area-inset-bottom)); background: var(--surface); padding: 12px 0 calc(4px + env(safe-area-inset-bottom)); margin-bottom: calc(-4px - env(safe-area-inset-bottom)); z-index: 2; }
+@media (min-width: 720px) { .sheet .sheet-actions { bottom: -24px; padding-bottom: 4px; margin-bottom: -4px; } }

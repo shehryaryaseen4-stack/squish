@@ -36,9 +36,9 @@
   }
 
   function renderTabs() {
-    const route = location.hash.split('?')[0] || '#/';
+    const route = (location.hash.split('?')[0] || '#/').replace('#/workout/library', '#/workout');
     const tabs = state.token
-      ? [['#/', 'home', 'Home'], ['#/classes', 'calendar', 'Classes'], ['#/progress', 'activity', 'Progress'], ['#/fees', 'wallet', 'Fees'], ['#/profile', 'user', 'Profile']]
+      ? [['#/', 'home', 'Home'], ['#/workout', 'dumbbell', 'Workout'], ['#/classes', 'calendar', 'Classes'], ['#/progress', 'activity', 'Progress'], ['#/profile', 'user', 'Profile']]
       : [['#/', 'home', 'Home'], ['#/classes', 'calendar', 'Classes'], ['#/login', 'lock', 'Member login']];
     tabbar.innerHTML = tabs.map(([href, ic, label]) => `<a class="tab" href="${href}" ${route === href ? 'aria-current="page"' : ''}>${icon(ic)}${label}</a>`).join('');
   }
@@ -208,6 +208,7 @@
       ${dead ? `<div class="alert-card bad">${icon('alert')}<span class="tx">${s.status === 'unpaid' ? 'Your fee is not paid yet.' : 'Your membership has ended.'} Renew at the front desk to keep training.</span>${b.whatsapp ? `<a class="btn btn-primary btn-sm" href="${UI.waLink(b.whatsapp, `Hi! I'm ${m.name} (member ${m.memberNo}). I want to renew my membership.`)}" target="_blank" rel="noopener">Renew</a>` : ''}</div>` : ''}
       ${s.status === 'expiring' ? `<div class="alert-card warn">${icon('clock')}<span class="tx">Only ${s.daysLeft} day${s.daysLeft === 1 ? '' : 's'} left. Renew before ${dateShort(s.expiry)} so your training doesn't stop.</span></div>` : ''}
       ${s.balance > 0 ? `<div class="alert-card bad">${icon('wallet')}<span class="tx"><b>${rs(s.balance)}</b> is still pending on your fee.</span><a class="btn btn-ghost btn-sm" href="#/fees">Details</a></div>` : ''}
+      <section class="section"><div class="section-head"><h2>Workout</h2><a class="link" href="#/workout">My plan</a></div><div id="today-workout"><div class="skel" style="height:96px;margin:0 20px;border-radius:22px"></div></div></section>
       <section class="section"><div class="section-head"><h2>This month</h2><a class="link" href="#/progress">See all</a></div>
         <div class="mini-stats"><div class="stat"><span>Visits</span><b>${s.visitsThisMonth}</b></div><div class="stat"><span>Avg. workout</span><b>${fmtMinutes(s.avgMinutes)}</b></div><div class="stat"><span>Last visit</span><b>${s.lastVisit ? (s.daysSinceVisit === 0 ? 'Today' : `${s.daysSinceVisit}d ago`) : '—'}</b></div></div></section>
       ${s.inside ? `<div class="alert-card" style="background:var(--good-soft)">${icon('login')}<span class="tx">You're checked in. Have a great workout!</span></div>` : ''}
@@ -215,7 +216,8 @@
         ${nextClass ? `<div class="card next-card" style="cursor:default"><div class="date-tile"><b>${dayNum(nextClass.date)}</b><span>${dayName(nextClass.date)}</span></div><div class="meta"><small>Booked</small><h3>${esc(nextClass.className)}</h3><p>${time12(nextClass.start)} – ${time12(nextClass.end)}</p></div></div>`
           : `<div class="card box"><p class="muted">No class booked. Grab a spot in HIIT, yoga or strength.</p><a class="btn btn-soft btn-sm" style="margin-top:12px" href="#/classes">Book a class</a></div>`}</section>
       <section class="section"><div class="section-head"><h2>Check-in</h2></div><div class="card box" style="text-align:center"><p class="muted" style="font-size:14px">Tell the front desk or type at the kiosk:</p><div style="font-size:40px;font-weight:800;letter-spacing:.12em;margin-top:6px">${m.memberNo}</div></div></section>
-      <div class="footer">${esc(b.name)} · <a href="#/profile">Contact & hours</a></div>`);
+      <div class="footer">${esc(b.name)} · <a href="#/fees">Fees & receipts</a> · <a href="#/profile">Contact & hours</a></div>`);
+    todayWorkoutCard(d).then((html) => { const el = document.getElementById('today-workout'); if (el) el.innerHTML = html; }).catch(() => {});
   }
 
   // ---- classes ----------------------------------------------------------------
@@ -266,6 +268,66 @@
       draw();
     }));
     draw();
+  }
+
+  // ---- workout plan ---------------------------------------------------------------
+
+  const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const todayKey = () => DAY_KEYS[weekday(today())];
+
+  const savePlan = async (plan) => {
+    const saved = await api('/api/member/plan', { method: 'PUT', body: plan });
+    state.me.member.workoutPlan = saved;
+    route();
+  };
+  const tick = async (date, done) => {
+    await api('/api/member/workout-log', { method: 'PUT', body: { date, done } });
+    state.me.member.workoutLog = { ...(state.me.member.workoutLog || {}), [date]: done };
+  };
+
+  async function workoutView(params) {
+    const d = await me();
+    render(`<div class="page-title"><h1>My workout</h1><p>Your weekly plan. Tap an exercise to see how it's done.</p></div><div id="wk" style="margin-top:14px"><div class="boot"><div class="skel" style="height:300px;border-radius:22px"></div></div></div>`);
+    await Workout.planView(document.getElementById('wk'), {
+      plan: d.member.workoutPlan,
+      log: d.member.workoutLog?.[today()] || [],
+      todayKey: todayKey(),
+      todayDate: today(),
+      selected: params.get('day'),
+      onSelect: (day) => { history.replaceState(null, '', `#/workout?day=${day}`); workoutView(new URLSearchParams({ day })); },
+      save: savePlan,
+      tick,
+    });
+  }
+
+  async function libraryPage(params) {
+    const d = await me();
+    render(`<header class="page-head"><a class="icon-btn" href="#/workout" aria-label="Back">${icon('chevronLeft')}</a><h1>Exercises</h1></header><div id="lib"></div>`);
+    await Workout.libraryView(document.getElementById('lib'), {
+      group: params.get('g') || 'all',
+      onAdd: async (day, id) => {
+        try {
+          const plan = Workout.addToDay(d.member.workoutPlan, day, id);
+          const saved = await api('/api/member/plan', { method: 'PUT', body: plan });
+          state.me.member.workoutPlan = saved;
+          toast(`Added to ${DAY_LABELS[day]}`);
+        } catch (e) { toast(e.message, 'bad'); }
+      },
+    });
+  }
+
+  async function todayWorkoutCard(d) {
+    const plan = d.member.workoutPlan;
+    if (!plan || !Object.keys(plan.days || {}).length) {
+      return `<a class="card today-workout" href="#/workout"><div class="empty-icon" style="width:56px;height:56px;margin:0;border-radius:18px">${icon('dumbbell')}</div><div class="tx"><small>Workout</small><h3>Make your weekly plan</h3><p>Chest on Monday, back on Tuesday… with photos of every exercise.</p></div>${icon('chevronRight', 'muted')}</a>`;
+    }
+    const lib = await Workout.library();
+    const day = plan.days[todayKey()];
+    if (!day) return `<a class="card today-workout" href="#/workout"><div class="empty-icon" style="width:56px;height:56px;margin:0;border-radius:18px">${icon('moon')}</div><div class="tx"><small>Today</small><h3>Rest day</h3><p>Recover well. Tap to see the rest of your week.</p></div>${icon('chevronRight', 'muted')}</a>`;
+    const done = (d.member.workoutLog?.[today()] || []).length;
+    const first = day.exercises.find((x) => lib.byId[x.id]);
+    return `<a class="card today-workout" href="#/workout">${first ? `<div class="ex-anim"><img src="${window.APP_CONFIG?.demo ? '' : '/'}exercises/img/${first.id}-0.jpg" alt=""><img src="${window.APP_CONFIG?.demo ? '' : '/'}exercises/img/${first.id}-1.jpg" alt=""></div>` : ''}
+      <div class="tx"><small>Today's workout</small><h3>${esc(Workout.dayLabel(day))}</h3><p>${day.exercises.length} exercises${done ? ` · ${Math.min(done, day.exercises.length)} done` : ''}</p></div>${icon('chevronRight', 'muted')}</a>`;
   }
 
   // ---- progress -----------------------------------------------------------------
@@ -332,7 +394,7 @@
     render(`<div class="page-title"><h1>Profile</h1></div>
       <div class="card box" style="margin-top:14px;display:flex;gap:14px;align-items:center"><span class="avatar lg">${esc(initials(m.name))}</span><div><b style="font-size:17px">${esc(m.name)}</b><p class="muted">Member no. ${m.memberNo} · ${esc(m.phone)}</p></div></div>
       <div class="card recap"><div class="recap-row"><span>Joined</span><b>${dateLong(m.joinDate)}</b></div>${trainer ? `<div class="recap-row"><span>Trainer</span><b>${esc(trainer.name)}</b></div>` : ''}${m.goal ? `<div class="recap-row"><span>Goal</span><b>${esc(m.goal)}</b></div>` : ''}${m.emergencyName ? `<div class="recap-row"><span>Emergency contact</span><b>${esc(m.emergencyName)}</b></div>` : ''}</div>
-      <div class="detail-actions" style="margin-top:16px"><button class="btn btn-ghost" data-pin>${icon('lock')}Change PIN</button><button class="btn btn-danger" data-out>${icon('logout')}Sign out</button></div>
+      <div class="detail-actions" style="margin-top:16px"><a class="btn btn-ghost" href="#/fees">${icon('wallet')}Fees & receipts</a><button class="btn btn-ghost" data-pin>${icon('lock')}Change PIN</button><button class="btn btn-danger" data-out>${icon('logout')}Sign out</button></div>
       <section class="section"><div class="section-head"><h2>Gym</h2></div>${infoCard()}</section>`);
     view.querySelector('[data-out]').addEventListener('click', () => logout());
     view.querySelector('[data-pin]').addEventListener('click', () => sheet({
@@ -357,6 +419,8 @@
     try {
       if (page === 'classes') return await classesView(params);
       if (!state.token) return page === 'login' ? loginView() : publicHome();
+      if (page === 'workout' && path.includes('library')) return await libraryPage(params);
+      if (page === 'workout') return await workoutView(params);
       if (page === 'progress') return await progressView(params);
       if (page === 'fees') return await feesView();
       if (page === 'profile') return await profileView();

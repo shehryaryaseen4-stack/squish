@@ -500,6 +500,20 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
         store.save();
         return { ok: true };
       }
+      if (m === 'PUT' && pathname === '/api/member/plan') {
+        member.workoutPlan = { ...v.workoutPlan(body), updatedAt: stamp(), updatedBy: 'member' };
+        store.save();
+        return member.workoutPlan;
+      }
+      if (m === 'PUT' && pathname === '/api/member/workout-log') {
+        const date = v.isoDate(body.date);
+        const done = (Array.isArray(body.done) ? body.done : []).filter((x) => /^[a-z0-9-]{2,80}$/.test(String(x))).slice(0, 30);
+        // Keep about two months of ticks so trainers can see how the plan is followed.
+        const log = { ...(member.workoutLog || {}), [date]: done };
+        member.workoutLog = Object.fromEntries(Object.entries(log).sort().slice(-60));
+        store.save();
+        return { date, done };
+      }
       if (m === 'POST' && pathname === '/api/member/classes') return bookClass(member, body.classId, body.date);
       if (m === 'POST' && (match = pathname.match(/^\/api\/member\/classes\/([\w-]+)\/cancel$/))) {
         const b = d.classBookings.find((x) => x.id === match[1] && x.memberId === member.id) || fail('Booking not found', 404);
@@ -631,6 +645,11 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
         return memberDetail(member);
       }
       if (m === 'POST' && action === 'classes') return bookClass(member, body.classId, body.date, { asStaff: true });
+      if (m === 'PUT' && action === 'plan') {
+        member.workoutPlan = { ...v.workoutPlan(body), updatedAt: stamp(), updatedBy: 'trainer' };
+        store.save();
+        return member.workoutPlan;
+      }
     }
 
     // Payments

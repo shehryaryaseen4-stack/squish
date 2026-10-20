@@ -18,9 +18,10 @@ const lib = (f) => fs.readFileSync(path.join(root, 'lib', f), 'utf8');
 
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
-for (const f of ['base.css', 'gym.css', 'app.css', 'admin.css', 'kiosk.css', 'icons.js', 'common.js', 'app.js', 'admin.js', 'kiosk.js']) {
+for (const f of ['base.css', 'gym.css', 'app.css', 'admin.css', 'kiosk.css', 'icons.js', 'common.js', 'workout.js', 'app.js', 'admin.js', 'kiosk.js']) {
   fs.writeFileSync(path.join(out, f), pub(f));
 }
+fs.cpSync(path.join(root, 'public', 'exercises'), path.join(out, 'exercises'), { recursive: true });
 fs.writeFileSync(path.join(out, 'config.js'), "window.APP_CONFIG = { apiBase: '', demo: true };\n");
 
 // The browser stand-in for lib/store.js: same API, kept in localStorage.
@@ -50,6 +51,12 @@ function createStore({ seed = 'demo', ownerPin = '1234', staffPin = '0000', now 
     if (seed === 'demo') generateDemo(db, nowIn(db.business.timeZone, now()), { memberPin: hashPin('1111') });
   }
   for (const key of [...DATA, 'plans', 'staff', 'classes', 'memberSessions', 'devices']) db[key] = db[key] || [];
+  // Demos saved before workout plans existed get member 1001's sample plan.
+  if (db.demo && db.members[0] && !db.members[0].workoutPlan) {
+    const fresh = { ...JSON.parse(JSON.stringify(SEED)), members: [], payments: [], attendance: [], measurements: [], expenses: [], leads: [], classBookings: [] };
+    generateDemo(fresh, nowIn(db.business.timeZone, now()), { memberPin: '' });
+    db.members[0].workoutPlan = fresh.members[0].workoutPlan;
+  }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { /* storage full or blocked */ } }
   function clearData() {
     for (const key of DATA) db[key] = [];
@@ -171,8 +178,8 @@ const page = `<title>Iron Republic Gym App</title>
 <script>
 (function () {
   const MODES = {
-    member: { css: ['base.css', 'gym.css', 'app.css'], js: ['app.js'], html: '<div class="app"><main id="view" tabindex="-1"></main><nav class="tabbar" id="tabbar" aria-label="Main" hidden></nav></div>', pins: 'Member 1001 · PIN 1111' },
-    manager: { css: ['base.css', 'gym.css', 'admin.css'], js: ['admin.js'], html: '<div id="root"></div>', pins: 'Owner PIN 1234 · Front desk 0000' },
+    member: { css: ['base.css', 'gym.css', 'app.css'], js: ['workout.js', 'app.js'], html: '<div class="app"><main id="view" tabindex="-1"></main><nav class="tabbar" id="tabbar" aria-label="Main" hidden></nav></div>', pins: 'Member 1001 · PIN 1111' },
+    manager: { css: ['base.css', 'gym.css', 'admin.css'], js: ['workout.js', 'admin.js'], html: '<div id="root"></div>', pins: 'Owner PIN 1234 · Front desk 0000' },
     kiosk: { css: ['base.css', 'gym.css', 'admin.css', 'kiosk.css'], js: ['kiosk.js'], html: '<div id="root"></div>', pins: 'PIN 0000, then type 1001–1100' },
   };
   const read = (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } };

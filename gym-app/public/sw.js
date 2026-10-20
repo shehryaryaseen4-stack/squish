@@ -1,7 +1,7 @@
 // App shell cache: screens open instantly and still load on a bad connection.
 // API calls always go to the network so slots and bookings are never stale.
 const CACHE = 'gym-shell-v1';
-const SHELL = ['/', '/index.html', '/base.css', '/gym.css', '/app.css', '/config.js', '/icons.js', '/common.js', '/app.js', '/icon.svg'];
+const SHELL = ['/', '/index.html', '/base.css', '/gym.css', '/app.css', '/config.js', '/icons.js', '/common.js', '/app.js', '/workout.js', '/icon.svg'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

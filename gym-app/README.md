@@ -39,7 +39,11 @@ A complete management app for a gym, plus an app for its members. It is built to
 - fee receipts
 - class booking
 
+- **Weekly workout plan:** the member picks the muscles for each day (for example chest + biceps on Monday, back on Tuesday), or starts from a ready plan (body-part split, push/pull/legs, upper/lower, full body, fat loss) and changes it. Each day lists its exercises with sets and reps. Every exercise shows a two-photo animation of how to do it and step-by-step instructions, and members tick exercises off as they go. Trainers see and can set the plan from the member's profile.
+
 Visitors who aren't members see plans, coaches, timings and a "Join" form.
+
+The exercise library (84 exercises in 11 muscle groups) comes from [free-exercise-db](https://github.com/yuhonas/free-exercise-db), which is public domain. `scripts/build-exercises.py` downloads it and shrinks the photos into `public/exercises/`. Edit the `GROUPS` list in that script to add or swap exercises.
 
 ## Run it
 

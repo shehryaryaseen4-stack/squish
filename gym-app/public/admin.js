@@ -698,6 +698,9 @@
         }).join('')}</div>${d.payments.length > 3 ? `<button class="btn btn-ghost btn-sm" style="margin-top:12px" data-allreceipts>Show all ${d.payments.length} receipts</button>` : ''}` : emptyLine('No payments yet.')}
       </section>
 
+      <section class="card panel section-gap"><div class="panel-head"><h2>Workout plan</h2><div style="display:flex;gap:6px"><button class="btn btn-ghost btn-sm" data-wpreset>${icon('star')}Ready plans</button><button class="btn btn-soft btn-sm" data-wday>${icon('edit')}Edit a day</button></div></div>
+        <div data-plan><div class="skel" style="height:70px"></div></div></section>
+
       <div class="grid-2">
         <section class="card panel"><div class="panel-head"><h2>Body measurements</h2><button class="btn btn-soft btn-sm" data-measure>${icon('plus')}Add</button></div>${measurementsView(d.measurements)}</section>
         <section class="card panel"><div class="panel-head"><h2>Freeze membership</h2><button class="btn btn-soft btn-sm" data-freeze>${icon('snow')}Freeze</button></div>
@@ -779,6 +782,30 @@
       location.hash = '#/members';
     });
     memberPageCalBind(id, d, m);
+    // Workout plan: trainers can see and set it; the member sees it in their app.
+    const savePlan = async (plan) => { await api(`/api/admin/members/${id}/plan`, { method: 'PUT', body: plan }); reload(); };
+    Workout.summary(m.workoutPlan).then((html) => {
+      const box = root.querySelector('[data-plan]');
+      if (!box) return;
+      const log = m.workoutLog || {};
+      const recent = Object.entries(log).filter(([, ids]) => ids.length).slice(-7);
+      box.innerHTML = html
+        ? `${html}<p class="muted" style="font-size:12.5px;margin-top:10px">${m.workoutPlan.updatedBy === 'trainer' ? 'Set by a trainer' : 'Set by the member'} on ${dateShort(m.workoutPlan.updatedAt.slice(0, 10))}${recent.length ? ` · last ticked a workout on ${dateShort(recent[recent.length - 1][0])}` : ''}</p>`
+        : emptyLine('No plan yet. The member can make one in the app, or set one here.');
+    }).catch(() => {});
+    root.querySelector('[data-wpreset]').addEventListener('click', async () => { await Workout.library(); Workout.presetSheet(Boolean(m.workoutPlan && Object.keys(m.workoutPlan.days || {}).length), savePlan); });
+    root.querySelector('[data-wday]').addEventListener('click', async () => {
+      await Workout.library();
+      sheet({
+        title: 'Which day?',
+        html: `<div class="more-grid">${Workout.ORDER.map((dk) => `<a href="#" data-pickday="${dk}">${icon('calendar')}${DAY_LABELS[dk]}</a>`).join('')}</div>`,
+        onMount: (el, close) => el.querySelectorAll('[data-pickday]').forEach((a) => a.addEventListener('click', (e) => {
+          e.preventDefault();
+          close();
+          setTimeout(() => Workout.editDaySheet(m.workoutPlan || { days: {} }, a.dataset.pickday, savePlan), 240);
+        })),
+      });
+    });
   }
 
   function memberPageCalBind(id, d, m) {

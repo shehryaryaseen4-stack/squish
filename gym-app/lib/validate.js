@@ -151,6 +151,24 @@ function payment(b) {
   };
 }
 
+// A weekly workout plan: for each day, the muscle groups and the exercises
+// (from the exercise library) with sets and reps. An empty day is a rest day.
+function workoutPlan(b) {
+  const days = b && typeof b.days === 'object' && b.days ? b.days : {};
+  const out = {};
+  for (const day of DAYS) {
+    const raw = days[day];
+    if (!raw) continue;
+    const groups = (Array.isArray(raw.groups) ? raw.groups : []).filter((g) => /^[a-z]{2,20}$/.test(g)).slice(0, 6);
+    const exercises = (Array.isArray(raw.exercises) ? raw.exercises : []).slice(0, 20).map((e) => {
+      if (!e || !/^[a-z0-9-]{2,80}$/.test(String(e.id))) fail('Unknown exercise');
+      return { id: e.id, sets: num(e.sets || 3, { min: 1, max: 10, field: 'Sets' }), reps: str(e.reps || '10-12', { max: 12, field: 'Reps' }) };
+    });
+    if (groups.length || exercises.length) out[day] = { groups, exercises };
+  }
+  return { days: out };
+}
+
 function business(b, current) {
   return {
     ...current,
@@ -193,4 +211,4 @@ function safeUrl(v) {
   return s;
 }
 
-module.exports = { HttpError, fail, str, num, phone, color, isoDate, method, METHODS, collections, member, payment, business };
+module.exports = { HttpError, fail, str, num, phone, color, isoDate, method, METHODS, collections, member, payment, business, workoutPlan };

@@ -204,3 +204,25 @@ test('native app origins get CORS, others do not; static files are safe', async 
   const manifest = await (await fetch(`http://127.0.0.1:${port}/manifest.webmanifest`)).json();
   assert.equal(manifest.name, 'Iron Republic');
 });
+
+test('members save a weekly workout plan and tick off exercises; trainers can set it too', async (t) => {
+  const app = await start();
+  t.after(app.close);
+  const token = await app.login('1234');
+  const { body } = await app.call('/api/admin/members', { method: 'POST', token, body: { ...newMember(), payment: { planId: 'plan-1m', periodStart: TODAY, date: TODAY, paid: 5000 } } });
+  const mt = (await app.call('/api/member/login', { method: 'POST', body: { id: 1001, pin: body.pin } })).body.token;
+  const plan = { days: { mon: { groups: ['chest', 'biceps'], exercises: [{ id: 'barbell-bench-press-medium-grip', sets: 4, reps: '8-10' }, { id: 'barbell-curl' }] }, tue: { groups: [], exercises: [] } } };
+  const saved = await app.call('/api/member/plan', { method: 'PUT', token: mt, body: plan });
+  assert.equal(saved.status, 200);
+  assert.deepEqual(Object.keys(saved.body.days), ['mon']);
+  assert.equal(saved.body.days.mon.exercises[1].sets, 3);
+  assert.equal((await app.call('/api/member/plan', { method: 'PUT', token: mt, body: { days: { mon: { exercises: [{ id: '../x' }] } } } })).status, 400);
+  await app.call('/api/member/workout-log', { method: 'PUT', token: mt, body: { date: TODAY, done: ['barbell-curl'] } });
+  const me = await app.call('/api/member/me', { token: mt });
+  assert.deepEqual(me.body.member.workoutLog[TODAY], ['barbell-curl']);
+  assert.equal(me.body.member.workoutPlan.updatedBy, 'member');
+  await app.call(`/api/admin/members/${body.member.id}/plan`, { method: 'PUT', token, body: { days: { wed: { groups: ['legs'], exercises: [{ id: 'barbell-squat' }] } } } });
+  const detail = await app.call(`/api/admin/members/${body.member.id}`, { token });
+  assert.deepEqual(Object.keys(detail.body.member.workoutPlan.days), ['wed']);
+  assert.equal(detail.body.member.workoutPlan.updatedBy, 'trainer');
+});

@@ -169,6 +169,12 @@ function generateDemo(db, now, { memberPin }) {
     });
   }
 
+  const ex = (id, sets = 3, reps = '10-12') => ({ id, sets, reps });
+  const push = { groups: ['chest', 'shoulders', 'triceps'], exercises: [ex('barbell-bench-press-medium-grip', 4, '8-10'), ex('barbell-incline-bench-press-medium-grip'), ex('dumbbell-flyes'), ex('dumbbell-shoulder-press'), ex('side-lateral-raise', 3, '12-15'), ex('triceps-pushdown'), ex('ez-bar-skullcrusher')] };
+  const pull = { groups: ['back', 'biceps'], exercises: [ex('wide-grip-lat-pulldown'), ex('bent-over-barbell-row', 4, '8-10'), ex('seated-cable-rows'), ex('one-arm-dumbbell-row'), ex('barbell-curl'), ex('hammer-curls')] };
+  const legs = { groups: ['legs', 'abs'], exercises: [ex('barbell-squat', 4, '8-10'), ex('leg-press'), ex('lying-leg-curls'), ex('leg-extensions'), ex('standing-calf-raises', 4, '15'), ex('hanging-leg-raise', 3, '15'), ex('plank', 3, '45s')] };
+  db.members[0].workoutPlan = { days: { mon: push, tue: pull, wed: legs, thu: push, fri: pull, sat: legs }, updatedAt: `${today}T08:00:00.000Z`, updatedBy: 'member' };
+
   db.receiptSeq = receipt;
   db.memberSeq = 1001 + COUNT;
   db.demo = true;
