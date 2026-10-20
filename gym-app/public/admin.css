@@ -262,3 +262,24 @@ body { background: var(--bg); }
 .more-grid a .ico { width: 24px; height: 24px; color: var(--accent); }
 .bars-list { display: grid; gap: 12px; }
 @media (max-width: 560px) { .hide-sm { display: none; } .m-row { flex-wrap: wrap; } .m-row .end:not(:empty) { width: 100%; justify-content: flex-end; flex-wrap: wrap; padding-left: 56px; } }
+/* Register & fingerprint */
+.kpi.picked { outline: 2px solid var(--accent); outline-offset: -2px; }
+button.kpi { text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.reg-rows { display: none; }
+@media (max-width: 760px) { .reg-table { display: none; } .reg-rows { display: grid; } }
+.tbl tfoot td { border-top: 2px solid var(--line); border-bottom: 0; }
+.tbl td { vertical-align: top; }
+.month-glance { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.month-glance a { padding: 14px; border-radius: 16px; background: var(--surface-2); display: grid; gap: 2px; transition: background .2s; }
+.month-glance a:hover { background: var(--surface-3); }
+.month-glance b { font-size: 24px; letter-spacing: -.02em; }
+.month-glance b small { font-size: 14px; color: var(--ink-3); font-weight: 700; }
+.month-glance b.warn { color: var(--warn); }
+.month-glance b.bad { color: var(--bad); }
+.month-glance span { font-size: 12.5px; font-weight: 700; color: var(--ink-3); }
+.steps { margin: 4px 0 0; padding-left: 20px; display: grid; gap: 8px; font-size: 14px; color: var(--ink-2); }
+.steps code { background: var(--surface-2); padding: 2px 6px; border-radius: 6px; font-size: 13px; word-break: break-all; }
+.fp-test { margin-top: 18px; padding: 14px 16px; border-radius: 16px; background: var(--surface-2); }
+.fp-test p { font-size: 13px; }
+.src-ico { width: 15px; height: 15px; color: var(--accent); vertical-align: -3px; }
+.form-section h2 .ico { vertical-align: -4px; color: var(--accent); }

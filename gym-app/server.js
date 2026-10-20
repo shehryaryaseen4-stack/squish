@@ -40,6 +40,22 @@ function send(res, status, body, type = 'application/json; charset=utf-8', extra
   res.end(body);
 }
 
+function readText(req, limit = 512 * 1024) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > limit) {
+        reject(new HttpError(413, 'Request is too large'));
+        req.destroy();
+      } else chunks.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('error', reject);
+  });
+}
+
 function readBody(req, limit = 64 * 1024) {
   return new Promise((resolve, reject) => {
     let size = 0;
@@ -121,6 +137,13 @@ function createServer(options = {}) {
       }
     }
     try {
+      // Fingerprint attendance machines (ZKTeco push protocol) talk plain text.
+      if (pathname.startsWith('/iclock/')) {
+        const text = req.method === 'POST' ? await readText(req) : '';
+        const [status, reply] = api.handleDevice(req.method, url, text);
+        res.writeHead(status, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
+        return res.end(reply);
+      }
       if (pathname.startsWith('/api/')) {
         const body = ['POST', 'PUT', 'PATCH'].includes(req.method) ? await readBody(req) : {};
         const result = await api.handle(req, res, url, body);

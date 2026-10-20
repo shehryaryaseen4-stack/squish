@@ -49,6 +49,7 @@ function createStore({ seed = 'demo', ownerPin = '1234', staffPin = '0000', now 
     db.memberSeq = 1001;
     if (seed === 'demo') generateDemo(db, nowIn(db.business.timeZone, now()), { memberPin: hashPin('1111') });
   }
+  for (const key of [...DATA, 'plans', 'staff', 'classes', 'memberSessions', 'devices']) db[key] = db[key] || [];
   function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { /* storage full or blocked */ } }
   function clearData() {
     for (const key of DATA) db[key] = [];

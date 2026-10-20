@@ -315,6 +315,126 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     return booking;
   }
 
+  // ---- monthly register ----------------------------------------------------------
+
+  /**
+   * One row per member for a day or a month: did they come, is the fee paid for
+   * that period, and what money came in from them during it.
+   */
+  function register(from, to) {
+    const d = db();
+    const t = today();
+    const ix = indexDb(d);
+    const rows = d.members
+      .filter((m) => m.joinDate <= to && (!m.left || (ix.payments.get(m.id) || []).some((p) => p.installments.some((i) => i.date >= from && i.date <= to))))
+      .map((m) => {
+        const pays = ix.payments.get(m.id) || [];
+        const days = new Set((ix.visits.get(m.id) || []).filter((v) => v.date >= from && v.date <= to).map((v) => v.date));
+        const covering = pays.filter((p) => p.periodStart <= to && p.periodEnd >= from).sort((a, b) => b.periodEnd.localeCompare(a.periodEnd));
+        const frozen = (m.freezes || []).some((f) => f.from <= to && f.to >= from);
+        const received = [];
+        for (const p of pays) for (const i of p.installments) if (i.date >= from && i.date <= to) received.push({ amount: i.amount, method: i.method, date: i.date, planName: p.planName, receiptNo: p.receiptNo });
+        const s = summarize(d, m, t, ix);
+        return {
+          id: m.id, memberNo: m.memberNo, name: m.name, phone: m.phone, gender: m.gender,
+          plan: s.plan, status: s.status, expiry: s.expiry, balance: s.balance,
+          visits: days.size, lastVisit: [...days].sort().pop() || null,
+          paid: covering.length > 0, paidTill: covering[0]?.periodEnd || null, frozen: frozen && !covering.length,
+          received: received.sort((a, b) => a.date.localeCompare(b.date)),
+          receivedTotal: sum(received, (r) => r.amount),
+        };
+      });
+    const came = rows.filter((r) => r.visits > 0);
+    const paid = rows.filter((r) => r.paid);
+    const payers = rows.filter((r) => r.receivedTotal > 0);
+    return {
+      from, to,
+      totals: {
+        members: rows.length,
+        came: came.length,
+        notCame: rows.length - came.length,
+        paid: paid.length,
+        notPaid: rows.filter((r) => !r.paid && !r.frozen).length,
+        frozen: rows.filter((r) => r.frozen).length,
+        collected: sum(rows, (r) => r.receivedTotal),
+        payers: payers.length,
+        visits: sum(rows, (r) => r.visits),
+      },
+      rows: rows.sort((a, b) => a.memberNo - b.memberNo),
+    };
+  }
+
+  // ---- fingerprint machines ------------------------------------------------------
+  //
+  // ZKTeco-style attendance machines speak the "push" (ADMS / iclock) protocol:
+  // pointed at this server they say hello with a GET, then POST every punch as a
+  // tab-separated ATTLOG line: user id, "YYYY-MM-DD HH:MM:SS", status, verify type.
+  // The user id on the machine is the member number, so a thumb on the sensor
+  // checks that member in, and the next punch checks them out.
+
+  const DUPLICATE_MINUTES = 2;
+
+  function recordPunch(memberNo, date, time, source) {
+    const d = db();
+    const member = d.members.find((m) => m.memberNo === Number(memberNo));
+    if (!member) return 'unknown';
+    const mins = toMin(time);
+    const todays = d.attendance.filter((a) => a.memberId === member.id && a.date === date).sort((a, b) => a.in.localeCompare(b.in));
+    const last = todays[todays.length - 1];
+    if (last && !last.out) {
+      if (mins - toMin(last.in) < DUPLICATE_MINUTES && mins >= toMin(last.in)) return 'duplicate';
+      if (mins < toMin(last.in)) return 'duplicate';
+      last.out = time;
+      return 'out';
+    }
+    if (last && last.out && Math.abs(mins - toMin(last.out)) < DUPLICATE_MINUTES) return 'duplicate';
+    d.attendance.push({ id: newId('att'), memberId: member.id, date, in: time, out: null, source });
+    return 'in';
+  }
+
+  function deviceOptions(sn) {
+    return [
+      `GET OPTION FROM: ${sn}`,
+      'ATTLOGStamp=None', 'OPERLOGStamp=9999', 'ATTPHOTOStamp=None',
+      'ErrorDelay=30', 'Delay=10', 'TransTimes=00:00;14:05', 'TransInterval=1',
+      'TransFlag=TransData AttLog', 'Realtime=1', 'Encrypt=None',
+    ].join('\n');
+  }
+
+  // Returns [status, text] for the machine. Unknown machines wait for approval
+  // and keep their punches until the owner approves them in Settings.
+  function handleDevice(method, url, text) {
+    const d = db();
+    const sn = String(url.searchParams.get('SN') || '').trim().slice(0, 40);
+    if (!sn) return [400, 'ERROR: SN missing'];
+    let device = d.devices.find((x) => x.sn === sn);
+    if (!device) {
+      device = { sn, name: `Fingerprint machine ${d.devices.length + 1}`, approved: false, firstSeen: stamp(), lastSeen: null, punches: 0, unknownIds: [] };
+      d.devices.push(device);
+    }
+    device.lastSeen = stamp();
+    if (!device.approved) { store.save(); return [403, 'ERROR: waiting for approval in the gym app']; }
+    const path = url.pathname;
+    if (method === 'GET' && path === '/iclock/cdata') { store.save(); return [200, deviceOptions(sn)]; }
+    if (method === 'POST' && path === '/iclock/cdata') {
+      const table = url.searchParams.get('table');
+      if (table !== 'ATTLOG') return [200, 'OK'];
+      const lines = String(text || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      const punches = lines.map((l) => l.split('\t')).filter((f) => f.length >= 2 && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(f[1]))
+        .map(([pin, at, , verify]) => ({ pin: pin.trim(), date: at.slice(0, 10), time: at.slice(11, 16), verify }))
+        .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+      for (const p of punches) {
+        const r = recordPunch(p.pin, p.date, p.time, p.verify === '15' ? 'face' : p.verify === '4' ? 'card' : 'fingerprint');
+        if (r === 'unknown' && !device.unknownIds.includes(p.pin)) device.unknownIds = [...device.unknownIds, p.pin].slice(-20);
+        if (r === 'in' || r === 'out') device.punches++;
+      }
+      store.save();
+      return [200, `OK: ${lines.length}`];
+    }
+    store.save();
+    return [200, 'OK'];
+  }
+
   // ---- routing ------------------------------------------------------------------
 
   const OWNER_ONLY = new Set(['plans', 'staff', 'classes', 'expenses']);
@@ -590,6 +710,40 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
       return b;
     }
 
+    // Monthly register (a day or a month)
+    if (m === 'GET' && pathname === '/api/admin/register') {
+      const t = today();
+      if (isDate(q.day)) return register(q.day, q.day);
+      const month = /^\d{4}-\d{2}$/.test(q.month || '') ? q.month : monthKey(t);
+      return register(`${month}-01`, monthEnd(month) < t ? monthEnd(month) : t);
+    }
+
+    // Fingerprint machines
+    if (m === 'GET' && pathname === '/api/admin/devices') return d.devices;
+    if (m === 'POST' && pathname === '/api/admin/devices/test-punch') {
+      const n = now();
+      const result = recordPunch(v.str(body.memberNo, { max: 10, required: true, field: 'Member number' }), n.date, fromMin(n.minutes), 'fingerprint');
+      if (result === 'unknown') fail(`No member with number ${body.memberNo}`, 404);
+      store.save();
+      const member = d.members.find((x) => x.memberNo === Number(body.memberNo));
+      return { result, member: memberPublic(member), summary: summaryOf(member) };
+    }
+    if ((match = pathname.match(/^\/api\/admin\/devices\/([\w.-]+)$/))) {
+      owner();
+      const device = d.devices.find((x) => x.sn === match[1]) || fail('Machine not found', 404);
+      if (m === 'PUT') {
+        if (body.approved !== undefined) device.approved = Boolean(body.approved);
+        if (body.name !== undefined) device.name = v.str(body.name, { max: 60 }) || device.name;
+        store.save();
+        return device;
+      }
+      if (m === 'DELETE') {
+        d.devices = d.devices.filter((x) => x.sn !== device.sn);
+        store.save();
+        return { ok: true };
+      }
+    }
+
     // Reports and owner settings
     if (m === 'GET' && pathname === '/api/admin/report') {
       owner();
@@ -663,7 +817,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     fail('Not found', 404);
   }
 
-  return { handle };
+  return { handle, handleDevice };
 }
 
 module.exports = { createApi, HttpError, weekdayOf };

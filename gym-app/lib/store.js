@@ -34,11 +34,12 @@ function createStore({ file, seed = 'demo', ownerPin = '1234', staffPin = '0000'
     for (const key of DATA) db[key] = [];
     db.admin = { ownerPin: hashPin(ownerPin), staffPin: hashPin(staffPin), sessions: [] };
     db.memberSessions = [];
+    db.devices = [];
     db.receiptSeq = 1;
     db.memberSeq = 1001;
     if (seed === 'demo') generateDemo(db, nowIn(db.business.timeZone, now()), { memberPin: hashPin('1111') });
   }
-  for (const key of [...DATA, ...CONFIG, 'memberSessions']) db[key] ||= [];
+  for (const key of [...DATA, ...CONFIG, 'memberSessions', 'devices']) db[key] ||= [];
   db.expenseCategories ||= ['Rent', 'Salaries', 'Electricity', 'Equipment', 'Maintenance', 'Other'];
 
   function save() {

@@ -131,6 +131,7 @@
     ['home', 'chart', 'Dashboard'],
     ['desk', 'login', 'Front desk'],
     ['members', 'users', 'Members'],
+    ['register', 'list', 'Register'],
     ['fees', 'wallet', 'Fees'],
     ['attendance', 'clock', 'Attendance'],
     ['classes', 'calendar', 'Classes'],
@@ -138,7 +139,7 @@
     ['leads', 'inbox', 'Enquiries'],
     ...(isOwner() ? [['settings', 'settings', 'Settings']] : []),
   ];
-  const BOTTOM = ['home', 'desk', 'members', 'fees'];
+  const BOTTOM = ['home', 'desk', 'register', 'members'];
 
   function shell(page, title, sub, body, { fab = null, actions = '' } = {}) {
     const b = S.data.business;
@@ -217,12 +218,21 @@
 
   async function homePage() {
     shell('home', greeting(), dateLong(today()), '<div class="kpis six">' + '<div class="skel" style="height:104px;border-radius:22px"></div>'.repeat(6) + '</div>', { fab: { label: 'Add member', icon: 'userPlus', onClick: () => addMemberSheet() } });
-    const o = await api('/api/admin/dashboard');
+    const [o, month] = await Promise.all([api('/api/admin/dashboard'), api(`/api/admin/register?month=${monthOf(today())}`)]);
+    const M = month.totals;
     const c = o.counts;
     const kpi = (ic, label, val, sub, href, tone = '') => `<a class="card kpi link" href="${href}"><div class="k-head">${icon(ic)}${label}</div><div class="k-val tnum ${tone}">${val}</div><div class="k-sub">${sub}</div></a>`;
     const owner = o.money;
     const body = `
       ${o.demo && isOwner() ? `<div class="demo-bar">${icon('info')}<span>This is demo data so you can try everything. Clear it from <b>Settings → Data</b> when you start for real.</span></div>` : ''}
+      <section class="card panel" style="margin-bottom:16px"><div class="panel-head"><h2>${monthLabel(monthOf(today()), true)} so far</h2><a class="link" href="#/register">Open register</a></div>
+        <div class="month-glance">
+          <a href="#/register?f=came"><b class="tnum">${M.came}<small>/${M.members}</small></b><span>members came</span></a>
+          <a href="#/register?f=absent"><b class="tnum ${M.notCame ? 'warn' : ''}">${M.notCame}</b><span>didn't come yet</span></a>
+          <a href="#/register?f=paid"><b class="tnum">${M.paid}</b><span>fee paid</span></a>
+          <a href="#/register?f=unpaid"><b class="tnum ${M.notPaid ? 'bad' : ''}">${M.notPaid}</b><span>fee not paid</span></a>
+          <a href="#/register?f=collected"><b class="tnum">${rs(M.collected)}</b><span>collected from ${M.payers}</span></a>
+        </div></section>
       <div class="kpis six">
         ${kpi('login', 'In the gym now', c.insideNow, `${c.checkinsToday} check-ins today`, '#/desk')}
         ${kpi('users', 'Active members', c.active, `${c.newThisMonth} joined this month`, '#/members?status=active')}
@@ -326,7 +336,7 @@
       const el = document.getElementById('desk-lists');
       if (!el) return;
       el.innerHTML = panel(`In the gym now · ${inside.length}`, inside.length ? `<div class="rows">${inside.map((a) => memberRow({ ...a.member, id: a.memberId }, { sub: `In ${time12(a.in)} · <span class="dur">${fmtMinutes(nowHere().minutes - toMin(a.in))}</span>`, end: `<button class="btn btn-ghost btn-sm" data-outbtn="${esc(a.memberId)}">${icon('logout')}Out</button>` })).join('')}</div>` : emptyLine('Nobody inside right now.'))
-        + panel(`Today's log · ${day.list.length}`, day.list.length ? `<div class="rows">${day.list.slice(0, 30).map((a) => memberRow({ ...a.member, id: a.memberId }, { sub: `${time12(a.in)} → ${a.out ? time12(a.out) : 'inside'}` })).join('')}</div>` : emptyLine('No check-ins yet today.'), '<a class="link" href="#/attendance">Full log</a>');
+        + panel(`Today's log · ${day.list.length}`, day.list.length ? `<div class="rows">${day.list.slice(0, 30).map((a) => memberRow({ ...a.member, id: a.memberId }, { sub: `${a.source ? '☝ ' : ''}${time12(a.in)} → ${a.out ? time12(a.out) : 'inside'}` })).join('')}</div>` : emptyLine('No check-ins yet today.'), '<a class="link" href="#/attendance">Full log</a>');
       bindMemberRows(el);
       el.querySelectorAll('[data-outbtn]').forEach((b) => b.addEventListener('click', () => toggle(b, { memberId: b.dataset.outbtn })));
     };
@@ -641,6 +651,7 @@
             <div><span>Trainer</span><b>${esc(trainer?.name || 'None')}</b></div><div><span>Goal</span><b>${esc(m.goal || '—')}</b></div>
             <div><span>Date of birth</span><b>${m.dob ? dateShort(m.dob) : '—'}</b></div><div><span>Area</span><b>${esc(m.address || '—')}</b></div>
             <div><span>Emergency</span><b>${esc(m.emergencyName || '—')}${m.emergencyPhone ? ` · ${esc(m.emergencyPhone)}` : ''}</b></div><div><span>Total paid</span><b class="tnum">${rs(s.totalPaid)}</b></div>
+            <div style="grid-column:1/-1"><span>Fingerprint machine ID</span><b>${icon('fingerprint')} ${m.memberNo}</b> <small class="muted">enroll the thumb on the machine under this user ID</small></div>
           </div>
           ${m.notes ? `<div class="note-box" style="margin:12px 0 0">${icon('info')}<span>${esc(m.notes)}</span></div>` : ''}
         </section>
@@ -672,7 +683,7 @@
       <div class="grid-2">
         <section class="card panel">${calendar(d.attendance, calMonth, m.joinDate)}</section>
         <section class="card panel"><div class="panel-head"><h2>Recent visits</h2></div>
-          ${d.attendance.length ? `<div class="tbl-wrap"><table class="tbl"><tr><th>Date</th><th>In</th><th>Out</th><th class="num">Time</th></tr>${d.attendance.slice(0, 12).map((a) => `<tr><td>${dateShort(a.date)}</td><td>${time12(a.in)}</td><td>${a.out ? time12(a.out) : '<span class="muted">—</span>'}</td><td class="num">${a.out ? fmtMinutes(toMin(a.out) - toMin(a.in)) : ''}</td></tr>`).join('')}</table></div>` : emptyLine('No visits yet.')}
+          ${d.attendance.length ? `<div class="tbl-wrap"><table class="tbl"><tr><th>Date</th><th>In</th><th>Out</th><th class="num">Time</th></tr>${d.attendance.slice(0, 12).map((a) => `<tr><td>${dateShort(a.date)}${a.source ? ` ${icon('fingerprint', 'src-ico')}` : ''}</td><td>${time12(a.in)}</td><td>${a.out ? time12(a.out) : '<span class="muted">—</span>'}</td><td class="num">${a.out ? fmtMinutes(toMin(a.out) - toMin(a.in)) : ''}</td></tr>`).join('')}</table></div>` : emptyLine('No visits yet.')}
         </section>
       </div>
 
@@ -844,6 +855,88 @@
     });
   }
 
+  // ---- monthly register ---------------------------------------------------------
+
+  const REG_FILTERS = [['all', 'Everyone'], ['came', 'Came'], ['absent', "Didn't come"], ['paid', 'Fee paid'], ['unpaid', 'Fee not paid'], ['collected', 'Paid this period']];
+
+  async function registerPage(params) {
+    const t = today();
+    const day = /^\d{4}-\d{2}-\d{2}$/.test(params.get('day') || '') ? params.get('day') : null;
+    const month = day ? null : (params.get('month') || monthOf(t));
+    const filter = params.get('f') || 'all';
+    const go = (over) => {
+      const p = new URLSearchParams(day ? { day } : { month });
+      if (filter !== 'all') p.set('f', filter);
+      for (const [k, val] of Object.entries(over)) { if (val == null) p.delete(k); else p.set(k, val); }
+      location.hash = `#/register?${p}`;
+    };
+    const label = day ? (day === t ? 'Today' : dateLong(day)) : monthLabel(month, true);
+    shell('register', 'Register', label, `
+      <div class="toolbar"><div class="seg" role="group"><button data-today aria-pressed="${day === t}">Today</button><button data-thismonth aria-pressed="${month === monthOf(t)}">This month</button></div></div>
+      <div class="date-nav">
+        <button class="icon-btn" data-prev aria-label="Previous">${icon('chevronLeft')}</button><span class="label">${esc(label)}</span><button class="icon-btn" data-next ${(day || `${month}-01`) >= (day ? t : `${monthOf(t)}-01`) ? 'disabled' : ''} aria-label="Next">${icon('chevronRight')}</button>
+      </div>
+      <div id="reg"><div class="kpis six">${'<div class="skel" style="height:96px;border-radius:22px"></div>'.repeat(6)}</div></div>`);
+    root.querySelector('[data-today]').addEventListener('click', () => go({ day: t, month: null }));
+    root.querySelector('[data-thismonth]').addEventListener('click', () => go({ month: monthOf(t), day: null }));
+    root.querySelector('[data-prev]').addEventListener('click', () => (day ? go({ day: addDays(day, -1) }) : go({ month: shiftMonth(month, -1) })));
+    root.querySelector('[data-next]').addEventListener('click', () => (day ? go({ day: addDays(day, 1) }) : go({ month: shiftMonth(month, 1) })));
+
+    const r = await api(`/api/admin/register?${day ? `day=${day}` : `month=${month}`}`);
+    const T = r.totals;
+    const period = day ? 'today' : 'this month';
+    const tile = (f, ic, title, val, sub, tone = '') => `<button class="card kpi link${filter === f ? ' picked' : ''}" data-f="${f}"><div class="k-head">${icon(ic)}${title}</div><div class="k-val tnum ${tone}">${val}</div><div class="k-sub">${sub}</div></button>`;
+    const el = document.getElementById('reg');
+    el.innerHTML = `
+      <div class="kpis six">
+        ${tile('all', 'users', 'Members', T.members, `${T.visits} visits in total`)}
+        ${tile('came', 'login', 'Came', T.came, `${T.members ? Math.round((T.came / T.members) * 100) : 0}% of members`, 'good')}
+        ${tile('absent', 'moon', "Didn't come", T.notCame, `not even once ${period}`, T.notCame ? 'warn' : '')}
+        ${tile('paid', 'check', 'Fee paid', T.paid, `fee covers ${period}`, 'good')}
+        ${tile('unpaid', 'alert', 'Fee not paid', T.notPaid, T.frozen ? `${T.frozen} frozen` : `no fee for ${period}`, T.notPaid ? 'bad' : '')}
+        ${tile('collected', 'wallet', 'Collected', rs(T.collected), `from ${T.payers} member${T.payers === 1 ? '' : 's'}`)}
+      </div>
+      <div class="toolbar section-gap">
+        <div class="chips-row" style="margin:0;flex:1" role="group" aria-label="Show">${REG_FILTERS.map(([id, l]) => `<button class="chip" data-f="${id}" aria-pressed="${filter === id}">${l}</button>`).join('')}</div>
+      </div>
+      <div class="toolbar"><div class="grow input-group">${icon('search')}<input class="input" type="search" placeholder="Search name, phone or member no." data-q aria-label="Search"></div><button class="btn btn-ghost btn-sm" data-csv style="min-height:50px">${icon('download')}CSV</button></div>
+      <section class="card panel" id="reg-list"></section>`;
+    el.querySelectorAll('[data-f]').forEach((b) => b.addEventListener('click', () => go({ f: b.dataset.f === 'all' ? null : b.dataset.f })));
+
+    const pick = (row) => ({ all: true, came: row.visits > 0, absent: row.visits === 0, paid: row.paid, unpaid: !row.paid && !row.frozen, collected: row.receivedTotal > 0 })[filter] ?? true;
+    const feeCell = (x) => (x.paid ? `<span class="badge badge-good">${icon('check')}Paid${x.paidTill ? ` · till ${dateShort(x.paidTill)}` : ''}</span>` : x.frozen ? `<span class="badge badge-info">${icon('snow')}Frozen</span>` : '<span class="badge badge-bad">Not paid</span>');
+    const receivedCell = (x) => (x.received.length ? x.received.map((i) => `<b class="tnum">${rs(i.amount)}</b> <span class="muted">${dateShort(i.date)} · ${esc(i.method)}</span>`).join('<br>') : '<span class="muted">—</span>');
+    const actions = (x) => {
+      const m = { name: x.name, phone: x.phone };
+      const s = { ...x, daysLeft: x.expiry ? Math.round((Date.parse(x.expiry) - Date.parse(t)) / 864e5) : null, daysSinceVisit: null };
+      return `${!x.paid && !x.frozen ? `${waBtn(x.phone, s.expiry ? MSG.expired(m, s) : `Assalam o Alaikum ${x.name}! ${S.data.business.name} ki fee abhi tak jama nahi hui. Barah-e-karam jald jama karwa dein. Shukriya!`)}<button class="btn btn-primary btn-sm" data-collect="${esc(x.id)}">${icon('wallet')}<span class="hide-sm">Collect</span></button>` : x.visits === 0 ? waBtn(x.phone, `Assalam o Alaikum ${x.name}! ${day ? 'Aaj' : 'Is mahine'} aap gym nahi aaye. Sab khairiyat? Hum aap ka intezar kar rahe hain! 💪`) : ''}`;
+    };
+    const input = el.querySelector('[data-q]');
+    const draw = () => {
+      const term = input.value.trim().toLowerCase();
+      const rows = r.rows.filter(pick).filter((x) => !term || x.name.toLowerCase().includes(term) || x.phone.includes(term) || String(x.memberNo).includes(term));
+      const list = document.getElementById('reg-list');
+      if (!rows.length) { list.innerHTML = `<div class="empty"><div class="empty-icon">${icon('list')}</div><h3>Nobody here</h3><p>${term ? 'Nothing matches your search.' : 'No member in this group.'}</p></div>`; return; }
+      const collected = rows.reduce((a, x) => a + x.receivedTotal, 0);
+      list.innerHTML = `<div class="panel-head"><h2>${rows.length} member${rows.length === 1 ? '' : 's'}${filter === 'collected' || collected ? ` · ${rs(collected)} received` : ''}</h2></div>
+        <div class="reg-table tbl-wrap"><table class="tbl"><thead><tr><th>No.</th><th>Member</th><th>Plan</th><th>Fee ${day ? 'today' : 'this month'}</th><th>Paid ${day ? 'today' : 'in month'}</th><th class="num">Visits</th><th>Last visit</th><th></th></tr></thead><tbody>
+        ${rows.map((x) => `<tr><td class="no">${x.memberNo}</td><td><a href="#/member/${esc(x.id)}"><b>${esc(x.name)}</b></a><br><span class="muted">${esc(x.phone)}</span></td><td>${esc(x.plan?.name || '—')}</td><td>${feeCell(x)}</td><td>${receivedCell(x)}</td>
+          <td class="num"><b class="${x.visits ? '' : 'money-neg'}">${x.visits}</b></td><td>${x.lastVisit ? dateShort(x.lastVisit) : '<span class="muted">—</span>'}</td><td><div style="display:flex;gap:6px;justify-content:flex-end">${actions(x)}</div></td></tr>`).join('')}
+        </tbody><tfoot><tr><td></td><td><b>Total</b></td><td></td><td><b>${rows.filter((x) => x.paid).length} paid</b></td><td><b class="tnum">${rs(collected)}</b></td><td class="num"><b>${rows.reduce((a, x) => a + x.visits, 0)}</b></td><td></td><td></td></tr></tfoot></table></div>
+        <div class="reg-rows rows">${rows.map((x) => memberRow(x, {
+          sub: `${x.visits ? `Came ${x.visits} day${x.visits === 1 ? '' : 's'}` : "Didn't come"}${x.receivedTotal ? ` · paid ${rs(x.receivedTotal)} on ${dateShort(x.received[x.received.length - 1].date)}` : ''}`,
+          end: `${feeCell(x)}${actions(x)}`,
+        })).join('')}</div>`;
+      bindMemberRows(list);
+      list.querySelectorAll('[data-collect]').forEach((b) => b.addEventListener('click', () => collectFeeSheet(b.dataset.collect, () => registerPage(params))));
+    };
+    input.addEventListener('input', draw);
+    el.querySelector('[data-csv]').addEventListener('click', () => downloadCsv(`register-${day || month}.csv`,
+      ['Member no', 'Name', 'Phone', 'Plan', 'Fee covers period', 'Paid till', 'Received in period', 'Payment dates', 'Visits', 'Last visit', 'Status', 'Balance due'],
+      r.rows.filter(pick).map((x) => [x.memberNo, x.name, x.phone, x.plan?.name || '', x.paid ? 'Yes' : x.frozen ? 'Frozen' : 'No', x.paidTill || '', x.receivedTotal, x.received.map((i) => `${i.date} ${i.amount} ${i.method}`).join('; '), x.visits, x.lastVisit || '', x.status, x.balance])));
+    draw();
+  }
+
   // ---- fees -------------------------------------------------------------------
 
   async function feesPage(params) {
@@ -919,7 +1012,7 @@
         <div class="card kpi"><div class="k-head">${icon('chart')}Busiest hour</div><div class="k-val tnum">${r.list.length ? time12(`${String(hours.reduce((a, b) => (b.count > a.count ? b : a)).hour).padStart(2, '0')}:00`) : '—'}</div></div></div>
       <section class="card panel section-gap"><div class="panel-head"><h2>Check-ins by hour</h2></div>${barChart(hours.map((h) => ({ ...h, short: h.hour % 3 === 0 ? time12(`${String(h.hour).padStart(2, '0')}:00`).replace(':00', '').replace(' ', '') : '' })), [{ key: 'count', label: 'Check-ins', color: 'var(--accent)' }], { label: (x) => time12(`${String(x.hour).padStart(2, '0')}:00`), height: 140 })}</section>
       <section class="card panel section-gap"><div class="panel-head"><h2>Log</h2><button class="btn btn-ghost btn-sm" data-csv>${icon('download')}CSV</button></div>
-        ${r.list.length ? `<div class="tbl-wrap"><table class="tbl"><tr><th>Member</th><th>In</th><th>Out</th><th class="num">Time</th><th></th></tr>${r.list.map((a) => `<tr><td><a href="#/member/${esc(a.memberId)}"><b>${esc(a.member?.name || 'Deleted member')}</b> <span class="no">#${a.member?.memberNo ?? ''}</span></a></td><td>${time12(a.in)}</td><td>${a.out ? time12(a.out) : '<span class="badge badge-accent">Inside</span>'}</td><td class="num">${a.out ? fmtMinutes(toMin(a.out) - toMin(a.in)) : ''}</td><td class="num"><button class="icon-btn" style="width:34px;height:34px" data-fix="${esc(a.id)}" aria-label="Edit times">${icon('edit')}</button></td></tr>`).join('')}</table></div>` : emptyLine('No check-ins on this day.')}
+        ${r.list.length ? `<div class="tbl-wrap"><table class="tbl"><tr><th>Member</th><th>In</th><th>Out</th><th class="num">Time</th><th></th></tr>${r.list.map((a) => `<tr><td><a href="#/member/${esc(a.memberId)}"><b>${esc(a.member?.name || 'Deleted member')}</b> <span class="no">#${a.member?.memberNo ?? ''}</span></a>${a.source ? ` ${icon('fingerprint', 'src-ico')}` : ''}</td><td>${time12(a.in)}</td><td>${a.out ? time12(a.out) : '<span class="badge badge-accent">Inside</span>'}</td><td class="num">${a.out ? fmtMinutes(toMin(a.out) - toMin(a.in)) : ''}</td><td class="num"><button class="icon-btn" style="width:34px;height:34px" data-fix="${esc(a.id)}" aria-label="Edit times">${icon('edit')}</button></td></tr>`).join('')}</table></div>` : emptyLine('No check-ins on this day.')}
       </section>`;
     root.querySelector('[data-csv]').addEventListener('click', () => downloadCsv(`attendance-${date}.csv`, ['Date', 'Member no', 'Name', 'In', 'Out', 'Minutes'], r.list.map((a) => [a.date, a.member?.memberNo, a.member?.name, a.in, a.out || '', a.out ? toMin(a.out) - toMin(a.in) : ''])));
     root.querySelectorAll('[data-fix]').forEach((b) => b.addEventListener('click', () => {
@@ -1169,6 +1262,18 @@
       <section class="card form-section"><div class="panel-head"><div><h2>Trainers & staff</h2><p class="muted" style="font-size:13.5px">Coaches can be assigned to members and classes.</p></div><button class="btn btn-primary btn-sm" data-addstaff>${icon('plus')}Add</button></div>
         <div class="item-list">${S.data.staff.map((s) => `<div class="card item${s.active === false ? ' inactive' : ''}"><span class="avatar" style="--c:${esc(s.color)}">${esc(initials(s.name))}</span><div class="tx"><b>${esc(s.name)}</b><span>${esc(s.role || '')}${s.salary ? ` · salary ${rs(s.salary)}` : ''}${s.phone ? ` · ${esc(s.phone)}` : ''}</span></div><div class="acts"><button class="icon-btn" data-staff="${esc(s.id)}" aria-label="Edit ${esc(s.name)}">${icon('edit')}</button></div></div>`).join('')}</div></section>
 
+      <section class="card form-section" id="fp"><div class="panel-head"><div><h2>${icon('fingerprint')} Fingerprint machine</h2><p class="muted" style="font-size:13.5px">Members check in and out with their thumb. Works with ZKTeco and other machines that support "Cloud server / ADMS" push.</p></div></div>
+        <ol class="steps">
+          <li>On the machine open <b>Menu → Comm → Cloud Server Setting</b> (or <b>ADMS</b>).</li>
+          <li>Set <b>Server address</b> to <code>${esc(serverHost().host)}</code> and <b>port</b> to <code>${serverHost().port}</code>${serverHost().https ? ', and turn on <b>HTTPS</b>' : ''}.</li>
+          <li>Enroll each member's thumb on the machine with <b>User ID = their member number</b> (shown on every member's profile).</li>
+          <li>The machine appears below. Press <b>Approve</b>, and every thumb punch becomes a check-in, then a check-out.</li>
+        </ol>
+        <div id="devices" class="item-list" style="margin-top:14px"></div>
+        <div class="fp-test"><b>Try it without a machine</b><p class="muted">Enter a member number to record a thumb punch now.</p>
+          <form class="toolbar" style="margin:8px 0 0" data-fptest><input class="input" name="memberNo" inputmode="numeric" placeholder="Member no., e.g. 1001" style="max-width:220px"><button class="btn btn-soft">${icon('fingerprint')}Punch</button></form></div>
+      </section>
+
       <section class="card form-section"><h2>PINs</h2><p>The owner PIN opens everything. The front desk PIN can check members in, add members and collect fees, but can't see reports, expenses or settings.</p>
         <form class="form-grid two" id="pin-form" novalidate>
           <label class="field span"><span>Current owner PIN</span><input class="input" name="current" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password"></label>
@@ -1228,6 +1333,18 @@
     root.querySelectorAll('[data-plan]').forEach((x) => x.addEventListener('click', () => editPlan(S.data.plans.find((p) => p.id === x.dataset.plan))));
     root.querySelector('[data-addstaff]').addEventListener('click', () => editStaff({}));
     root.querySelectorAll('[data-staff]').forEach((x) => x.addEventListener('click', () => editStaff(S.data.staff.find((s) => s.id === x.dataset.staff))));
+    drawDevices();
+    root.querySelector('[data-fptest]').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const f = e.target;
+      busy(f.querySelector('button'), async () => {
+        try {
+          const r = await api('/api/admin/devices/test-punch', { method: 'POST', body: { memberNo: f.memberNo.value } });
+          toast(r.result === 'in' ? `${r.member.name} checked in by thumb` : r.result === 'out' ? `${r.member.name} checked out by thumb` : 'Same punch twice within 2 minutes, ignored');
+          f.reset();
+        } catch (err) { toast(err.message, 'bad'); }
+      });
+    });
     document.getElementById('pin-form').addEventListener('submit', (e) => {
       e.preventDefault();
       const f = e.target;
@@ -1243,6 +1360,34 @@
         try { await api('/api/admin/clear-data', { method: 'POST', body: { confirm: el.querySelector('[data-confirm]').value.trim() } }); await refreshData(); close(); toast('Data cleared'); location.hash = '#/home'; } catch (err) { toast(err.message, 'bad'); }
       }),
     }));
+  }
+
+  function serverHost() {
+    const u = new URL(UI.apiBase() || location.origin);
+    const https = u.protocol === 'https:';
+    return { host: u.hostname, port: u.port || (https ? 443 : 80), https };
+  }
+
+  async function drawDevices() {
+    const box = document.getElementById('devices');
+    if (!box) return;
+    const list = await api('/api/admin/devices');
+    box.innerHTML = list.length ? list.map((dv) => `<div class="card item"><div class="ic-tile">${icon('fingerprint')}</div>
+      <div class="tx"><b>${esc(dv.name)} ${dv.approved ? '<span class="badge badge-good"><i class="dot"></i>Connected</span>' : '<span class="badge badge-warn">Waiting for approval</span>'}</b>
+        <span>Serial ${esc(dv.sn)} · last seen ${dv.lastSeen ? new Date(dv.lastSeen).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : 'never'} · ${dv.punches} punches${dv.unknownIds?.length ? ` · unknown IDs: ${dv.unknownIds.map(esc).join(', ')}` : ''}</span></div>
+      <div class="acts">${dv.approved ? '' : `<button class="btn btn-primary btn-sm" data-approve="${esc(dv.sn)}">Approve</button>`}<button class="icon-btn" data-rename="${esc(dv.sn)}" aria-label="Rename">${icon('edit')}</button><button class="icon-btn" data-rmdev="${esc(dv.sn)}" aria-label="Remove">${icon('trash')}</button></div></div>`).join('')
+      : `<div class="note-box" style="margin:0;background:var(--surface-2)">${icon('info')}<span>No machine has connected yet. Once you enter the server address on the machine it shows up here within a minute.</span></div>`;
+    box.querySelectorAll('[data-approve]').forEach((b) => b.addEventListener('click', async () => { await api(`/api/admin/devices/${b.dataset.approve}`, { method: 'PUT', body: { approved: true } }); toast('Machine approved'); drawDevices(); }));
+    box.querySelectorAll('[data-rmdev]').forEach((b) => b.addEventListener('click', async () => {
+      if (!(await confirmSheet({ title: 'Remove this machine?', message: 'It stops sending punches until you approve it again.', confirm: 'Remove', danger: true }))) return;
+      await api(`/api/admin/devices/${b.dataset.rmdev}`, { method: 'DELETE' });
+      drawDevices();
+    }));
+    box.querySelectorAll('[data-rename]').forEach((b) => b.addEventListener('click', () => sheet({
+      title: 'Rename machine',
+      html: `<input class="input" data-name value="${esc(list.find((x) => x.sn === b.dataset.rename).name)}" maxlength="60"><div class="sheet-actions"><button class="btn btn-primary" data-ok>Save</button></div>`,
+      onMount: (el, close) => el.querySelector('[data-ok]').addEventListener('click', async () => { await api(`/api/admin/devices/${b.dataset.rename}`, { method: 'PUT', body: { name: el.querySelector('[data-name]').value } }); close(); drawDevices(); }),
+    })));
   }
 
   function editPlan(p) {
@@ -1287,6 +1432,7 @@
       if (page === 'desk') return await deskPage();
       if (page === 'members') return await membersPage(params);
       if (page === 'fees') return await feesPage(params);
+      if (page === 'register') return await registerPage(params);
       if (page === 'attendance') return await attendancePage(params);
       if (page === 'classes') return await classesPage(params);
       if (page === 'leads') return await leadsPage();

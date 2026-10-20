@@ -17,6 +17,7 @@ A complete management app for a gym, plus an app for its members. It is built to
   - body measurements (weight, body fat, waist, chest, arms) with progress
   - membership freeze, which extends the expiry automatically
   - app PIN reset, mark as left or rejoin, delete
+- **Register:** one table of every member for today or any month: who came and how many days, who didn't come at all, whose fee covers the period and whose doesn't, and exactly who paid how much, on which date and by which method. It has a monthly total and CSV export.
 - **Fees:** monthly, quarterly, half-yearly, annual or any custom plan. Collect or renew with the right start date filled in, take part payments and keep the rest as dues, and see what was collected by day, week or month and by payment method (Cash, Bank transfer, JazzCash, EasyPaisa, Card). Lists of dues, expiring, expired and never-paid members come with one-tap WhatsApp reminders in Roman Urdu.
 - **Attendance:** daily log, check-ins by hour, average workout, and corrections for forgotten check-outs.
 - **Classes:** weekly timetable, daily bookings with capacity, and adding members to a class.
@@ -25,6 +26,8 @@ A complete management app for a gym, plus an app for its members. It is built to
 - **Enquiries:** people who asked to join from the app, with WhatsApp follow-up and one-tap "make member".
 - **Settings** (owner only): gym details, brand colour, admission fee, reminder days, blocking expired members at check-in, opening hours, plans, trainers and staff with salaries, PINs, and clearing the demo data.
 - **Two PINs:** the owner PIN opens everything. The front desk PIN can check members in, add members and collect fees, but cannot see money reports, expenses or settings.
+
+**Fingerprint machine:** ZKTeco and other attendance machines that support "Cloud server / ADMS" push send every thumb punch to `/iclock/cdata`. Enroll each member's thumb on the machine with User ID = member number, set the machine's server address to your domain, and approve it in **Settings → Fingerprint machine**. The first punch of the day checks the member in, the next one checks them out, and double taps within 2 minutes are ignored. Punches from IDs that aren't members are listed so you can fix the enrollment. Settings also has a "Punch" button to try it without a machine.
 
 **Check-in kiosk (`/kiosk`):** put a tablet at the entrance. Members type their number to check in or out, and the screen shows days left or a "please renew" warning.
 
