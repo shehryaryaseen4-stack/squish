@@ -1326,7 +1326,15 @@
         body.hours = readHours();
         body.closedDates = b.closedDates || [];
         body.blockExpiredCheckin = form.blockExpiredCheckin.checked;
-        try { await api('/api/admin/business', { method: 'PUT', body }); await refreshData(); toast('Settings saved'); } catch (err) { toast(err.message, 'bad'); }
+        try {
+          await api('/api/admin/business', { method: 'PUT', body });
+          await refreshData();
+          document.title = `${S.data.business.name} · Manager`;
+          const y = window.scrollY;
+          settingsPage();
+          window.scrollTo(0, y);
+          toast('Settings saved');
+        } catch (err) { toast(err.message, 'bad'); }
       });
     });
     root.querySelector('[data-addplan]').addEventListener('click', () => editPlan({}));
