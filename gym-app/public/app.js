@@ -421,7 +421,7 @@
     }
     offlineBanner();
     route();
-    if ('serviceWorker' in navigator && !window.Capacitor?.isNativePlatform?.()) navigator.serviceWorker.register('/sw.js').catch(() => {});
+    if (!window.APP_CONFIG?.demo && 'serviceWorker' in navigator && !window.Capacitor?.isNativePlatform?.()) navigator.serviceWorker.register('/sw.js').catch(() => {});
   }
 
   boot();

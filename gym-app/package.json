@@ -14,7 +14,8 @@
     "mobile:build": "node scripts/build-mobile.js && cap sync",
     "mobile:android": "node scripts/build-mobile.js && cap sync android && cap open android",
     "mobile:ios": "node scripts/build-mobile.js && cap sync ios && cap open ios",
-    "mobile:icons": "npx @capacitor/assets@3 generate --android --ios --iconBackgroundColor '#f97316' --iconBackgroundColorDark '#3b1a06' --splashBackgroundColor '#f97316' --splashBackgroundColorDark '#0c0c11'"
+    "mobile:icons": "npx @capacitor/assets@3 generate --android --ios --iconBackgroundColor '#f97316' --iconBackgroundColorDark '#3b1a06' --splashBackgroundColor '#f97316' --splashBackgroundColorDark '#0c0c11'",
+    "demo:build": "node scripts/build-demo.js"
   },
   "devDependencies": {
     "@capacitor/android": "^8.5.3",
