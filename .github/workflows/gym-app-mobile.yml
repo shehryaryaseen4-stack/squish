@@ -1,0 +1,92 @@
+name: Gym app · Android & iOS
+
+on:
+  push:
+    paths:
+      - 'gym-app/**'
+      - '.github/workflows/gym-app-mobile.yml'
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: 'Gym server URL baked into the app (blank = ask on first launch)'
+        required: false
+        default: ''
+      ios:
+        description: 'Also build the iOS app (uses macOS minutes)'
+        type: boolean
+        default: true
+
+defaults:
+  run:
+    working-directory: gym-app
+
+env:
+  # Set a repository variable GYM_API_URL (Settings → Secrets and variables → Actions → Variables)
+  # so every build talks to your live server without asking.
+  API_URL: ${{ inputs.api_url || vars.GYM_API_URL }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gym-app/package-lock.json
+      - run: npm ci
+      - run: npm test
+
+  android:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gym-app/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - run: npm ci
+      - run: node scripts/build-mobile.js
+      - run: npx cap sync android
+      - name: Build APK
+        working-directory: gym-app/android
+        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: gym-app/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+  ios:
+    needs: test
+    if: github.event_name == 'workflow_dispatch' && inputs.ios
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gym-app/package-lock.json
+      - run: npm ci
+      - run: node scripts/build-mobile.js
+      - run: npx cap sync ios
+      - name: Build for the iOS Simulator (unsigned)
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+      - name: Zip the simulator app
+        run: cd build/Build/Products/Debug-iphonesimulator && zip -qr ../../../../ios-simulator-app.zip App.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-app
+          path: gym-app/ios-simulator-app.zip

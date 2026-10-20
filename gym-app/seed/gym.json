@@ -1,0 +1,58 @@
+{
+  "business": {
+    "name": "Iron Republic",
+    "tagline": "Train hard. Train smart.",
+    "accent": "#f97316",
+    "currency": "PKR",
+    "currencySymbol": "Rs",
+    "locale": "en-PK",
+    "timeZone": "Asia/Karachi",
+    "phone": "+923211234567",
+    "whatsapp": "923211234567",
+    "email": "team@ironrepublic.pk",
+    "address": "Plot 7, Khayaban-e-Ittehad, DHA Phase 6, Karachi",
+    "mapUrl": "https://maps.google.com/?q=DHA+Phase+6+Karachi",
+    "instagram": "ironrepublic.pk",
+    "admissionFee": 2000,
+    "expiringDays": 7,
+    "inactiveDays": 10,
+    "blockExpiredCheckin": false,
+    "bookingWindowDays": 7,
+    "hours": {
+      "mon": [["06:00", "23:00"]],
+      "tue": [["06:00", "23:00"]],
+      "wed": [["06:00", "23:00"]],
+      "thu": [["06:00", "23:00"]],
+      "fri": [["06:00", "12:30"], ["14:30", "23:00"]],
+      "sat": [["07:00", "22:00"]],
+      "sun": [["08:00", "20:00"]]
+    },
+    "closedDates": []
+  },
+  "plans": [
+    { "id": "plan-1m", "name": "Monthly", "months": 1, "price": 5000, "features": ["Full gym access", "Group classes", "Locker & shower"], "highlight": false, "active": true },
+    { "id": "plan-3m", "name": "Quarterly", "months": 3, "price": 13500, "features": ["Everything in Monthly", "Save Rs 1,500", "1 body composition scan"], "highlight": true, "active": true },
+    { "id": "plan-6m", "name": "Half-yearly", "months": 6, "price": 25000, "features": ["Everything in Quarterly", "Save Rs 5,000", "Freeze up to 15 days"], "highlight": false, "active": true },
+    { "id": "plan-12m", "name": "Annual", "months": 12, "price": 45000, "features": ["Everything in Half-yearly", "Save Rs 15,000", "Diet plan", "Freeze up to 30 days"], "highlight": false, "active": true }
+  ],
+  "staff": [
+    { "id": "co-usman", "name": "Usman Tariq", "role": "Head Coach · Strength", "phone": "03001112233", "salary": 45000, "color": "#f97316", "active": true },
+    { "id": "co-ayesha", "name": "Ayesha Malik", "role": "Nutrition & HIIT Coach", "phone": "03002223344", "salary": 35000, "color": "#8b5cf6", "active": true },
+    { "id": "co-bilal", "name": "Bilal Shah", "role": "Mobility & Recovery", "phone": "03003334455", "salary": 30000, "color": "#10b981", "active": true },
+    { "id": "co-kamran", "name": "Kamran Ali", "role": "Front desk", "phone": "03004445566", "salary": 25000, "color": "#0ea5e9", "active": true }
+  ],
+  "classes": [
+    { "id": "c-hiit-mon", "name": "HIIT Burn", "staffId": "co-ayesha", "weekday": 1, "start": "07:00", "duration": 45, "capacity": 16, "level": "All levels", "active": true },
+    { "id": "c-yoga-mon", "name": "Flow Yoga", "staffId": "co-bilal", "weekday": 1, "start": "19:00", "duration": 60, "capacity": 14, "level": "Beginner", "active": true },
+    { "id": "c-str-tue", "name": "Strength Club", "staffId": "co-usman", "weekday": 2, "start": "18:30", "duration": 60, "capacity": 10, "level": "Intermediate", "active": true },
+    { "id": "c-hiit-wed", "name": "HIIT Burn", "staffId": "co-ayesha", "weekday": 3, "start": "07:00", "duration": 45, "capacity": 16, "level": "All levels", "active": true },
+    { "id": "c-box-wed", "name": "Boxing Conditioning", "staffId": "co-usman", "weekday": 3, "start": "20:00", "duration": 60, "capacity": 12, "level": "All levels", "active": true },
+    { "id": "c-mob-thu", "name": "Mobility & Stretch", "staffId": "co-bilal", "weekday": 4, "start": "08:00", "duration": 45, "capacity": 14, "level": "Beginner", "active": true },
+    { "id": "c-str-thu", "name": "Strength Club", "staffId": "co-usman", "weekday": 4, "start": "18:30", "duration": 60, "capacity": 10, "level": "Intermediate", "active": true },
+    { "id": "c-hiit-fri", "name": "HIIT Burn", "staffId": "co-ayesha", "weekday": 5, "start": "07:00", "duration": 45, "capacity": 16, "level": "All levels", "active": true },
+    { "id": "c-spin-sat", "name": "Spin & Core", "staffId": "co-ayesha", "weekday": 6, "start": "09:00", "duration": 50, "capacity": 12, "level": "All levels", "active": true },
+    { "id": "c-boot-sun", "name": "Sunday Bootcamp", "staffId": "co-usman", "weekday": 0, "start": "09:00", "duration": 60, "capacity": 20, "level": "All levels", "active": true },
+    { "id": "c-yoga-sun", "name": "Flow Yoga", "staffId": "co-bilal", "weekday": 0, "start": "17:00", "duration": 60, "capacity": 14, "level": "Beginner", "active": true }
+  ],
+  "expenseCategories": ["Rent", "Salaries", "Electricity", "Water & gas", "Equipment", "Maintenance", "Marketing", "Supplements stock", "Other"]
+}

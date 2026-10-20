@@ -1,0 +1,669 @@
+'use strict';
+
+const crypto = require('node:crypto');
+const { checkPin, hashPin } = require('./store');
+const { isDate, toMin, fromMin, addDays, addMonths, diffDays, monthKey, monthsBetween, monthEnd, nowIn, weekdayOf } = require('./time');
+const { classesOn } = require('./availability');
+const { summarize, indexDb, paidOf } = require('./members');
+const v = require('./validate');
+
+const { fail, HttpError } = v;
+const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
+const MEMBER_SESSION_MS = 180 * 24 * 60 * 60 * 1000;
+
+function rateLimiter(limit, windowMs) {
+  const hits = new Map();
+  return (key) => {
+    const now = Date.now();
+    const list = (hits.get(key) || []).filter((t) => now - t < windowMs);
+    if (list.length >= limit) fail('Too many attempts. Please wait a few minutes and try again.', 429);
+    list.push(now);
+    hits.set(key, list);
+  };
+}
+
+const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
+const newId = (prefix) => `${prefix}-${crypto.randomBytes(5).toString('hex')}`;
+const randomPin = () => String(crypto.randomInt(0, 10000)).padStart(4, '0');
+const sum = (list, f) => list.reduce((a, x) => a + (f(x) || 0), 0);
+const bearer = (req) => (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+const normalPhone = (p) => String(p || '').replace(/\D/g, '').replace(/^92/, '0');
+
+function memberPublic(m) {
+  const { pin, ...rest } = m;
+  return rest;
+}
+
+function createApi(store, { now: clock = () => new Date() } = {}) {
+  const loginLimit = rateLimiter(8, 10 * 60 * 1000);
+  const memberLoginLimit = rateLimiter(10, 10 * 60 * 1000);
+  const leadLimit = rateLimiter(5, 60 * 60 * 1000);
+  const db = () => store.db;
+  const now = () => nowIn(db().business.timeZone, clock());
+  const today = () => now().date;
+  const stamp = () => new Date(clock()).toISOString();
+
+  const findMember = (id) => db().members.find((m) => m.id === id) || fail('Member not found', 404);
+  const summaryOf = (m, opts) => summarize(db(), m, today(), indexDb(db()), opts);
+
+  function summaries() {
+    const d = db();
+    const ix = indexDb(d);
+    const t = today();
+    return d.members.map((m) => ({ member: m, s: summarize(d, m, t, ix) }));
+  }
+
+  function listItem({ member: m, s }) {
+    return {
+      id: m.id, memberNo: m.memberNo, name: m.name, phone: m.phone, gender: m.gender, joinDate: m.joinDate,
+      trainerId: m.trainerId, dob: m.dob, ...s,
+    };
+  }
+
+  // ---- sessions -----------------------------------------------------------
+
+  function adminRole(req) {
+    const token = bearer(req);
+    const s = token && (db().admin.sessions || []).find((x) => x.hash === sha(token) && x.expires > Date.now());
+    if (!s) fail('Please sign in again', 401);
+    return s.role;
+  }
+
+  function memberOf(req) {
+    const token = bearer(req);
+    const s = token && db().memberSessions.find((x) => x.hash === sha(token) && x.expires > Date.now());
+    const m = s && db().members.find((x) => x.id === s.memberId);
+    if (!m || m.left) fail('Please sign in again', 401);
+    return m;
+  }
+
+  function openSession(list, extra, ms) {
+    const token = crypto.randomBytes(24).toString('hex');
+    const kept = list.filter((s) => s.expires > Date.now()).slice(-200);
+    kept.push({ hash: sha(token), expires: Date.now() + ms, ...extra });
+    return { token, kept };
+  }
+
+  // ---- payments -------------------------------------------------------------
+
+  function createPayment(body) {
+    const d = db();
+    const p = v.payment(body);
+    const member = findMember(p.memberId);
+    const plan = d.plans.find((x) => x.id === p.planId) || fail('Pick a plan');
+    const total = plan.price - p.discount + p.admissionFee;
+    if (total < 0) fail('Discount is larger than the fee');
+    if (p.paid > total) fail('Amount received is more than the total');
+    const payment = {
+      id: newId('pay'),
+      receiptNo: d.receiptSeq++,
+      memberId: member.id,
+      planId: plan.id,
+      planName: plan.name,
+      months: plan.months,
+      periodStart: p.periodStart,
+      periodEnd: addDays(addMonths(p.periodStart, plan.months), -1),
+      price: plan.price,
+      discount: p.discount,
+      admissionFee: p.admissionFee,
+      total,
+      installments: p.paid > 0 ? [{ amount: p.paid, method: p.method, date: p.date }] : [],
+      date: p.date,
+      note: p.note,
+      createdAt: stamp(),
+    };
+    d.payments.push(payment);
+    if (member.left) member.left = false;
+    return payment;
+  }
+
+  // Where a renewal should start: the day after the current period, or today if it lapsed.
+  function suggestedStart(member) {
+    const s = summaryOf(member);
+    if (s.expiry && s.expiry >= today()) return addDays(s.expiry, 1);
+    return today();
+  }
+
+  // ---- attendance -----------------------------------------------------------
+
+  function checkInOut(body, role) {
+    const d = db();
+    const n = now();
+    let member;
+    if (body.memberId) member = findMember(body.memberId);
+    else {
+      const no = Number(String(body.memberNo || '').trim());
+      member = d.members.find((m) => m.memberNo === no) || fail(`No member with number ${body.memberNo}`, 404);
+    }
+    const open = d.attendance.find((a) => a.memberId === member.id && a.date === n.date && !a.out);
+    if (open) {
+      open.out = fromMin(n.minutes);
+      store.save();
+      return { action: 'out', visit: open, member: memberPublic(member), summary: summaryOf(member) };
+    }
+    const s = summaryOf(member);
+    const blocked = ['expired', 'unpaid', 'left'].includes(s.status);
+    if (blocked && d.business.blockExpiredCheckin && !(body.force && role === 'owner')) {
+      fail(s.status === 'unpaid' ? `${member.name} has not paid a membership fee yet` : `${member.name}'s membership ${s.status === 'left' ? 'is closed' : `expired on ${s.expiry}`}. Please renew first.`, 409);
+    }
+    const visit = { id: newId('att'), memberId: member.id, date: n.date, in: fromMin(n.minutes), out: null };
+    d.attendance.push(visit);
+    store.save();
+    return { action: 'in', visit, member: memberPublic(member), summary: { ...s, inside: true }, warning: blocked || s.balance > 0 || s.status === 'expiring' };
+  }
+
+  // ---- dashboard & reports ----------------------------------------------------
+
+  function collected(from, to) {
+    const out = [];
+    for (const p of db().payments) for (const i of p.installments || []) if (i.date >= from && i.date <= to) out.push({ ...i, payment: p });
+    return out;
+  }
+  const spent = (from, to) => db().expenses.filter((e) => e.date >= from && e.date <= to);
+
+  function dashboard(role) {
+    const d = db();
+    const n = now();
+    const t = n.date;
+    const all = summaries();
+    const live = all.filter((x) => !x.member.left);
+    const byStatus = (st) => live.filter((x) => x.s.status === st);
+    const month = monthKey(t);
+    const todays = d.attendance.filter((a) => a.date === t);
+    const inside = todays.filter((a) => !a.out);
+    const memberName = (id) => d.members.find((m) => m.id === id);
+    const inactiveDays = d.business.inactiveDays || 10;
+    const inactive = live.filter((x) => ['active', 'expiring'].includes(x.s.status) && (x.s.daysSinceVisit === null || x.s.daysSinceVisit >= inactiveDays))
+      .sort((a, b) => (b.s.daysSinceVisit ?? 999) - (a.s.daysSinceVisit ?? 999));
+    const recentExpired = byStatus('expired').filter((x) => diffDays(x.s.expiry, t) <= 60).sort((a, b) => b.s.expiry.localeCompare(a.s.expiry));
+    const dues = live.filter((x) => x.s.balance > 0).sort((a, b) => b.s.balance - a.s.balance);
+    const birthdays = live.filter((x) => {
+      if (!x.member.dob) return false;
+      for (let i = 0; i < 7; i++) if (addDays(t, i).slice(5) === x.member.dob.slice(5)) return true;
+      return false;
+    });
+
+    // Average check-ins per hour of day over the last 28 days.
+    const since = addDays(t, -28);
+    const hours = Array.from({ length: 24 }, () => 0);
+    for (const a of d.attendance) if (a.date >= since && a.date < t) hours[Math.floor(toMin(a.in) / 60)] += 1;
+    const peak = hours.map((c, h) => ({ hour: h, avg: Math.round((c / 28) * 10) / 10 })).filter((x) => x.hour >= 5 && x.hour <= 23);
+
+    const out = {
+      today: t,
+      now: n,
+      demo: Boolean(d.demo),
+      counts: {
+        members: live.length,
+        active: byStatus('active').length + byStatus('expiring').length,
+        expiring: byStatus('expiring').length,
+        expired: byStatus('expired').length,
+        unpaid: byStatus('unpaid').length,
+        frozen: byStatus('frozen').length,
+        inactive: inactive.length,
+        dues: dues.length,
+        duesAmount: sum(dues, (x) => x.s.balance),
+        newThisMonth: live.filter((x) => monthKey(x.member.joinDate) === month).length,
+        checkinsToday: new Set(todays.map((a) => a.memberId)).size,
+        insideNow: inside.length,
+        newLeads: d.leads.filter((l) => l.status === 'new').length,
+      },
+      inside: inside.map((a) => ({ ...a, member: pick(memberName(a.memberId)) })).sort((a, b) => b.in.localeCompare(a.in)),
+      expiring: byStatus('expiring').sort((a, b) => a.s.daysLeft - b.s.daysLeft).slice(0, 8).map(listItem),
+      expired: recentExpired.slice(0, 8).map(listItem),
+      dues: dues.slice(0, 8).map(listItem),
+      inactive: inactive.slice(0, 8).map(listItem),
+      birthdays: birthdays.map(listItem),
+      peak,
+    };
+    if (role === 'owner') {
+      const from = `${month}-01`;
+      const months = monthsBetween(addMonths(from, -5), t).map((key) => ({
+        month: key,
+        revenue: sum(collected(`${key}-01`, monthEnd(key)), (i) => i.amount),
+        expenses: sum(spent(`${key}-01`, monthEnd(key)), (e) => e.amount),
+      }));
+      const rev = sum(collected(from, t), (i) => i.amount);
+      const exp = sum(spent(from, t), (e) => e.amount);
+      out.money = { today: sum(collected(t, t), (i) => i.amount), month: rev, expenses: exp, profit: rev - exp, months };
+    }
+    return out;
+  }
+
+  function pick(m) {
+    return m ? { id: m.id, name: m.name, memberNo: m.memberNo, phone: m.phone, gender: m.gender } : null;
+  }
+
+  function report(month) {
+    const d = db();
+    const from = `${month}-01`;
+    const to = monthEnd(month);
+    const income = collected(from, to);
+    const costs = spent(from, to);
+    const group = (list, key, val) => {
+      const g = {};
+      for (const x of list) g[key(x)] = (g[key(x)] || 0) + val(x);
+      return Object.entries(g).map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount);
+    };
+    const visits = d.attendance.filter((a) => a.date >= from && a.date <= to);
+    const visitors = new Set(visits.map((a) => a.memberId));
+    const days = monthsBetween(from, to).length && Array.from({ length: diffDays(from, to) + 1 }, (_, i) => addDays(from, i));
+    const newMembers = d.members.filter((m) => m.joinDate >= from && m.joinDate <= to);
+    const firstPayment = new Map();
+    for (const p of [...d.payments].sort((a, b) => a.periodStart.localeCompare(b.periodStart))) if (!firstPayment.has(p.memberId)) firstPayment.set(p.memberId, p.id);
+    const paymentsInMonth = d.payments.filter((p) => p.date >= from && p.date <= to);
+    const ix = indexDb(d);
+    // Members whose fee ran out this month and who have not renewed since.
+    const lapsed = d.members.filter((m) => {
+      const s = summarize(d, m, to < today() ? to : today(), ix);
+      return s.expiry && s.expiry >= from && s.expiry <= to && s.expiry < today();
+    });
+    return {
+      month,
+      revenue: sum(income, (i) => i.amount),
+      expenses: sum(costs, (e) => e.amount),
+      byMethod: group(income, (i) => i.method, (i) => i.amount),
+      byPlan: group(income, (i) => i.payment.planName, (i) => i.amount),
+      byCategory: group(costs, (e) => e.category, (e) => e.amount),
+      admissionFees: sum(paymentsInMonth, (p) => p.admissionFee),
+      discounts: sum(paymentsInMonth, (p) => p.discount),
+      daily: days.map((date) => ({
+        date,
+        revenue: sum(income.filter((i) => i.date === date), (i) => i.amount),
+        visits: visits.filter((a) => a.date === date).length,
+      })),
+      newMembers: newMembers.length,
+      renewals: paymentsInMonth.filter((p) => firstPayment.get(p.memberId) !== p.id).length,
+      lapsed: lapsed.map((m) => ({ id: m.id, name: m.name, memberNo: m.memberNo, phone: m.phone })),
+      visits: visits.length,
+      visitors: visitors.size,
+      payments: paymentsInMonth.length,
+    };
+  }
+
+  // ---- member detail ------------------------------------------------------------
+
+  function memberDetail(m) {
+    const d = db();
+    return {
+      member: memberPublic(m),
+      summary: summaryOf(m, { timeline: true }),
+      payments: d.payments.filter((p) => p.memberId === m.id).sort((a, b) => b.periodStart.localeCompare(a.periodStart)),
+      attendance: d.attendance.filter((a) => a.memberId === m.id).sort((a, b) => (b.date + b.in).localeCompare(a.date + a.in)),
+      measurements: d.measurements.filter((x) => x.memberId === m.id).sort((a, b) => a.date.localeCompare(b.date)),
+      bookings: d.classBookings.filter((b) => b.memberId === m.id && b.date >= today()).sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start)),
+      suggestedStart: suggestedStart(m),
+    };
+  }
+
+  // ---- class bookings -------------------------------------------------------------
+
+  function bookClass(member, classId, date, { asStaff = false } = {}) {
+    const d = db();
+    if (!isDate(date)) fail('Pick a date');
+    const n = now();
+    if (date < n.date || (!asStaff && date > addDays(n.date, (d.business.bookingWindowDays || 7) - 1))) fail('That date is not open for booking yet');
+    const s = summaryOf(member);
+    if (!asStaff && !['active', 'expiring'].includes(s.status)) fail('Your membership is not active. Please renew at the front desk.', 409);
+    const cls = classesOn(d, date, n).find((c) => c.id === classId) || fail('That class does not run on this day', 404);
+    if (cls.started && !asStaff) fail('This class has already started', 409);
+    if (cls.spotsLeft <= 0) fail('This class is full', 409);
+    if (d.classBookings.some((b) => b.classId === classId && b.date === date && b.memberId === member.id && b.status === 'booked')) fail('Already booked for this class', 409);
+    const booking = { id: newId('cb'), classId, className: cls.name, date, start: cls.start, end: cls.end, memberId: member.id, status: 'booked', createdAt: stamp() };
+    d.classBookings.push(booking);
+    store.save();
+    return booking;
+  }
+
+  // ---- routing ------------------------------------------------------------------
+
+  const OWNER_ONLY = new Set(['plans', 'staff', 'classes', 'expenses']);
+
+  async function handle(req, res, url, body) {
+    const { pathname } = url;
+    const q = Object.fromEntries(url.searchParams);
+    const m = req.method;
+    const ip = req.socket.remoteAddress || 'local';
+    const d = db();
+    let match;
+
+    // Public
+    if (m === 'GET' && pathname === '/api/gym') {
+      const { closedDates, ...business } = d.business;
+      return {
+        business: { ...business, closedDates },
+        plans: d.plans.filter((p) => p.active !== false),
+        classes: d.classes.filter((c) => c.active !== false),
+        staff: d.staff.filter((s) => s.active !== false).map(({ id, name, role, color }) => ({ id, name, role, color })),
+        today: today(),
+      };
+    }
+    if (m === 'GET' && pathname === '/api/classes') {
+      if (!isDate(q.date)) fail('Pick a date');
+      return classesOn(d, q.date, now());
+    }
+    if (m === 'POST' && pathname === '/api/leads') {
+      leadLimit(ip);
+      const lead = { id: newId('lead'), ...v.collections.leads({ ...body, status: 'new' }), createdAt: stamp() };
+      d.leads.push(lead);
+      store.save();
+      return { ok: true };
+    }
+
+    // Member app
+    if (m === 'POST' && pathname === '/api/member/login') {
+      memberLoginLimit(ip);
+      const idText = String(body.id || '').trim();
+      const member = d.members.find((x) => !x.left && (String(x.memberNo) === idText || (normalPhone(idText).length >= 10 && normalPhone(x.phone) === normalPhone(idText))));
+      if (!member || !checkPin(String(body.pin || ''), member.pin)) fail('Member number or PIN is wrong', 401);
+      const { token, kept } = openSession(d.memberSessions, { memberId: member.id }, MEMBER_SESSION_MS);
+      d.memberSessions = kept;
+      store.save();
+      return { token };
+    }
+    if (pathname.startsWith('/api/member/')) {
+      const member = memberOf(req);
+      if (m === 'GET' && pathname === '/api/member/me') {
+        const detail = memberDetail(member);
+        detail.attendance = detail.attendance.slice(0, 400);
+        return detail;
+      }
+      if (m === 'POST' && pathname === '/api/member/logout') {
+        d.memberSessions = d.memberSessions.filter((s) => s.hash !== sha(bearer(req)));
+        store.save();
+        return { ok: true };
+      }
+      if (m === 'POST' && pathname === '/api/member/pin') {
+        if (!checkPin(String(body.current || ''), member.pin)) fail('Current PIN is wrong', 401);
+        if (!/^\d{4,8}$/.test(String(body.next || ''))) fail('New PIN must be 4 to 8 digits');
+        member.pin = hashPin(body.next);
+        store.save();
+        return { ok: true };
+      }
+      if (m === 'POST' && pathname === '/api/member/classes') return bookClass(member, body.classId, body.date);
+      if (m === 'POST' && (match = pathname.match(/^\/api\/member\/classes\/([\w-]+)\/cancel$/))) {
+        const b = d.classBookings.find((x) => x.id === match[1] && x.memberId === member.id) || fail('Booking not found', 404);
+        b.status = 'cancelled';
+        store.save();
+        return b;
+      }
+      fail('Not found', 404);
+    }
+
+    // Owner and front desk
+    if (m === 'POST' && pathname === '/api/admin/login') {
+      loginLimit(ip);
+      const pin = String(body.pin || '');
+      const role = checkPin(pin, d.admin.ownerPin) ? 'owner' : checkPin(pin, d.admin.staffPin) ? 'staff' : null;
+      if (!role) fail('Wrong PIN', 401);
+      const { token, kept } = openSession(d.admin.sessions || [], { role }, SESSION_MS);
+      d.admin.sessions = kept;
+      store.save();
+      return { token, role };
+    }
+    if (!pathname.startsWith('/api/admin/')) fail('Not found', 404);
+    const role = adminRole(req);
+    const owner = () => { if (role !== 'owner') fail('Only the owner can do this', 403); };
+
+    if (m === 'POST' && pathname === '/api/admin/logout') {
+      d.admin.sessions = d.admin.sessions.filter((s) => s.hash !== sha(bearer(req)));
+      store.save();
+      return { ok: true };
+    }
+    if (m === 'GET' && pathname === '/api/admin/data') {
+      return {
+        role,
+        business: d.business,
+        plans: d.plans,
+        staff: role === 'owner' ? d.staff : d.staff.map(({ salary, ...s }) => s),
+        classes: d.classes,
+        expenseCategories: d.expenseCategories,
+        methods: v.METHODS,
+        now: now(),
+        demo: Boolean(d.demo),
+      };
+    }
+    if (m === 'GET' && pathname === '/api/admin/dashboard') return dashboard(role);
+
+    // Members
+    if (m === 'GET' && pathname === '/api/admin/members') {
+      const term = String(q.q || '').trim().toLowerCase();
+      return summaries()
+        .filter((x) => (q.status === 'left' ? x.member.left : !x.member.left || q.status === 'all'))
+        .filter((x) => {
+          const st = q.status || 'all';
+          if (st === 'all' || st === 'left') return true;
+          if (st === 'active') return ['active', 'expiring'].includes(x.s.status);
+          if (st === 'dues') return x.s.balance > 0;
+          if (st === 'inactive') return ['active', 'expiring'].includes(x.s.status) && (x.s.daysSinceVisit === null || x.s.daysSinceVisit >= (d.business.inactiveDays || 10));
+          if (st === 'inside') return x.s.inside;
+          return x.s.status === st;
+        })
+        .filter((x) => !q.trainer || x.member.trainerId === q.trainer)
+        .filter((x) => !term || [x.member.name, x.member.phone, String(x.member.memberNo)].some((f) => String(f).toLowerCase().includes(term)))
+        .map(listItem)
+        .sort((a, b) => (q.sort === 'expiry' ? String(a.expiry || '').localeCompare(String(b.expiry || '')) : q.sort === 'name' ? a.name.localeCompare(b.name) : b.memberNo - a.memberNo));
+    }
+    if (m === 'POST' && pathname === '/api/admin/members') {
+      const data = v.member(body);
+      if (d.members.some((x) => !x.left && normalPhone(x.phone) === normalPhone(data.phone))) fail('A member with this phone number already exists', 409);
+      const pin = randomPin();
+      const member = { id: newId('mem'), memberNo: d.memberSeq++, ...data, pin: hashPin(pin), freezes: [], left: false, createdAt: stamp() };
+      d.members.push(member);
+      let payment = null;
+      if (body.payment && body.payment.planId) {
+        try {
+          payment = createPayment({ ...body.payment, memberId: member.id });
+        } catch (e) {
+          d.members.pop();
+          d.memberSeq--;
+          throw e;
+        }
+      }
+      store.save();
+      return { member: memberPublic(member), pin, payment };
+    }
+    if ((match = pathname.match(/^\/api\/admin\/members\/([\w-]+)(?:\/(\w+))?(?:\/(\d+))?$/))) {
+      const [, id, action, index] = match;
+      const member = findMember(id);
+      if (m === 'GET' && !action) return memberDetail(member);
+      if (m === 'PUT' && !action) {
+        const data = v.member(body);
+        if (d.members.some((x) => x.id !== member.id && !x.left && normalPhone(x.phone) === normalPhone(data.phone))) fail('Another member already uses this phone number', 409);
+        Object.assign(member, data);
+        store.save();
+        return memberPublic(member);
+      }
+      if (m === 'DELETE' && !action) {
+        owner();
+        d.members = d.members.filter((x) => x.id !== id);
+        for (const key of ['payments', 'attendance', 'measurements', 'classBookings']) d[key] = d[key].filter((x) => x.memberId !== id);
+        d.memberSessions = d.memberSessions.filter((s) => s.memberId !== id);
+        store.save();
+        return { ok: true };
+      }
+      if (m === 'POST' && action === 'left') {
+        member.left = Boolean(body.left);
+        if (member.left) d.memberSessions = d.memberSessions.filter((s) => s.memberId !== id);
+        store.save();
+        return memberPublic(member);
+      }
+      if (m === 'POST' && action === 'pin') {
+        const pin = randomPin();
+        member.pin = hashPin(pin);
+        d.memberSessions = d.memberSessions.filter((s) => s.memberId !== id);
+        store.save();
+        return { pin };
+      }
+      if (m === 'POST' && action === 'freeze') {
+        const from = v.isoDate(body.from, 'From');
+        const to = v.isoDate(body.to, 'To');
+        if (to < from) fail('The freeze must end after it starts');
+        if (diffDays(from, to) > 365) fail('A freeze can be at most a year');
+        if ((member.freezes || []).some((f) => f.from <= to && f.to >= from)) fail('This overlaps another freeze');
+        member.freezes = [...(member.freezes || []), { from, to, reason: v.str(body.reason, { max: 100 }) }].sort((a, b) => a.from.localeCompare(b.from));
+        store.save();
+        return memberDetail(member);
+      }
+      if (m === 'DELETE' && action === 'freeze' && index !== undefined) {
+        member.freezes = (member.freezes || []).filter((_, i) => i !== Number(index));
+        store.save();
+        return memberDetail(member);
+      }
+      if (m === 'POST' && action === 'classes') return bookClass(member, body.classId, body.date, { asStaff: true });
+    }
+
+    // Payments
+    if (m === 'GET' && pathname === '/api/admin/payments') {
+      const term = String(q.q || '').trim().toLowerCase();
+      const names = new Map(d.members.map((x) => [x.id, x]));
+      return d.payments
+        .filter((p) => (!q.from || p.date >= q.from) && (!q.to || p.date <= q.to))
+        .filter((p) => !q.balance || p.total - paidOf(p) > 0)
+        .map((p) => ({ ...p, paid: paidOf(p), member: pick(names.get(p.memberId)) }))
+        .filter((p) => !term || [p.member?.name, p.member?.phone, String(p.member?.memberNo), String(p.receiptNo)].some((f) => String(f || '').toLowerCase().includes(term)))
+        .sort((a, b) => b.date.localeCompare(a.date) || b.receiptNo - a.receiptNo)
+        .slice(0, 1000);
+    }
+    if (m === 'POST' && pathname === '/api/admin/payments') {
+      const payment = createPayment(body);
+      store.save();
+      return payment;
+    }
+    if ((match = pathname.match(/^\/api\/admin\/payments\/([\w-]+)(\/installments)?$/))) {
+      const p = d.payments.find((x) => x.id === match[1]) || fail('Payment not found', 404);
+      if (m === 'POST' && match[2]) {
+        const amount = v.num(body.amount, { min: 1, max: 100000000, field: 'Amount' });
+        if (amount > p.total - paidOf(p)) fail(`Only ${p.total - paidOf(p)} is left to pay on this receipt`);
+        p.installments.push({ amount, method: v.method(body.method), date: v.isoDate(body.date || today()) });
+        store.save();
+        return p;
+      }
+      if (m === 'DELETE' && !match[2]) {
+        owner();
+        d.payments = d.payments.filter((x) => x.id !== p.id);
+        store.save();
+        return { ok: true };
+      }
+    }
+
+    // Attendance
+    if (m === 'POST' && pathname === '/api/admin/checkin') return checkInOut(body, role);
+    if (m === 'GET' && pathname === '/api/admin/attendance') {
+      const date = isDate(q.date) ? q.date : today();
+      const names = new Map(d.members.map((x) => [x.id, x]));
+      const list = d.attendance.filter((a) => a.date === date).map((a) => ({ ...a, member: pick(names.get(a.memberId)) })).sort((a, b) => b.in.localeCompare(a.in));
+      const hours = Array.from({ length: 24 }, (_, h) => ({ hour: h, count: list.filter((a) => Math.floor(toMin(a.in) / 60) === h).length }));
+      return { date, list, hours };
+    }
+    if ((match = pathname.match(/^\/api\/admin\/attendance\/([\w-]+)$/))) {
+      const a = d.attendance.find((x) => x.id === match[1]) || fail('Visit not found', 404);
+      if (m === 'PATCH') {
+        const inT = body.in ?? a.in;
+        const outT = body.out === '' ? null : body.out ?? a.out;
+        if (!/^\d{2}:\d{2}$/.test(inT) || (outT && !/^\d{2}:\d{2}$/.test(outT))) fail('Times must look like 18:30');
+        if (outT && outT < inT) fail('Check-out must be after check-in');
+        Object.assign(a, { in: inT, out: outT });
+        store.save();
+        return a;
+      }
+      if (m === 'DELETE') {
+        d.attendance = d.attendance.filter((x) => x.id !== a.id);
+        store.save();
+        return { ok: true };
+      }
+    }
+
+    // Classes
+    if (m === 'GET' && pathname === '/api/admin/class-day') {
+      const date = isDate(q.date) ? q.date : today();
+      const names = new Map(d.members.map((x) => [x.id, x]));
+      return classesOn(d, date, now()).map((c) => ({
+        ...c,
+        attendees: d.classBookings.filter((b) => b.classId === c.id && b.date === date && b.status === 'booked').map((b) => ({ bookingId: b.id, ...pick(names.get(b.memberId)) })),
+      }));
+    }
+    if (m === 'POST' && (match = pathname.match(/^\/api\/admin\/class-bookings\/([\w-]+)\/cancel$/))) {
+      const b = d.classBookings.find((x) => x.id === match[1]) || fail('Booking not found', 404);
+      b.status = 'cancelled';
+      store.save();
+      return b;
+    }
+
+    // Reports and owner settings
+    if (m === 'GET' && pathname === '/api/admin/report') {
+      owner();
+      return report(/^\d{4}-\d{2}$/.test(q.month || '') ? q.month : monthKey(today()));
+    }
+    if (m === 'GET' && pathname === '/api/admin/expenses') {
+      owner();
+      return d.expenses.filter((e) => !q.month || monthKey(e.date) === q.month).sort((a, b) => b.date.localeCompare(a.date));
+    }
+    if (m === 'GET' && pathname === '/api/admin/leads') return [...d.leads].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    if (m === 'PUT' && pathname === '/api/admin/business') {
+      owner();
+      d.business = v.business(body, d.business);
+      store.save();
+      return d.business;
+    }
+    if (m === 'PUT' && pathname === '/api/admin/expense-categories') {
+      owner();
+      const list = (Array.isArray(body.categories) ? body.categories : []).map((c) => v.str(c, { max: 40 })).filter(Boolean);
+      if (!list.length) fail('Keep at least one category');
+      d.expenseCategories = [...new Set(list)].slice(0, 30);
+      store.save();
+      return d.expenseCategories;
+    }
+    if (m === 'POST' && pathname === '/api/admin/pins') {
+      owner();
+      if (!checkPin(String(body.current || ''), d.admin.ownerPin)) fail('Current owner PIN is wrong', 401);
+      for (const [key, field] of [['ownerPin', 'owner'], ['staffPin', 'staff']]) {
+        if (!body[field]) continue;
+        if (!/^\d{4,8}$/.test(String(body[field]))) fail('PINs must be 4 to 8 digits');
+        d.admin[key] = hashPin(body[field]);
+      }
+      if (body.owner && body.staff && body.owner === body.staff) fail('Owner and front desk PINs must be different');
+      if (body.staff) d.admin.sessions = d.admin.sessions.filter((s) => s.role === 'owner');
+      store.save();
+      return { ok: true };
+    }
+    if (m === 'POST' && pathname === '/api/admin/clear-data') {
+      owner();
+      if (body.confirm !== 'DELETE') fail('Type DELETE to confirm');
+      store.clearData();
+      return { ok: true };
+    }
+
+    // Simple collections
+    if ((match = pathname.match(/^\/api\/admin\/(plans|staff|classes|expenses|measurements|leads)(?:\/([\w-]+))?$/))) {
+      const [, collection, id] = match;
+      if (OWNER_ONLY.has(collection) && !(collection === 'staff' && m === 'GET')) owner();
+      const list = d[collection];
+      if (m === 'POST' && !id) {
+        const clean = v.collections[collection](body);
+        if (collection === 'measurements') findMember(clean.memberId);
+        const item = { id: newId(collection.slice(0, 3)), ...clean, ...(collection === 'leads' ? { createdAt: stamp() } : {}) };
+        list.push(item);
+        store.save();
+        return item;
+      }
+      if (m === 'PUT' && id) {
+        const item = list.find((x) => x.id === id) || fail('Not found', 404);
+        Object.assign(item, v.collections[collection]({ ...item, ...body }));
+        store.save();
+        return item;
+      }
+      if (m === 'DELETE' && id) {
+        if (collection === 'plans' && d.plans.length === 1) fail('Keep at least one plan');
+        d[collection] = list.filter((x) => x.id !== id);
+        store.save();
+        return { ok: true };
+      }
+    }
+    fail('Not found', 404);
+  }
+
+  return { handle };
+}
+
+module.exports = { createApi, HttpError, weekdayOf };

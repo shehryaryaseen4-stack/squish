@@ -1,0 +1,17 @@
+{
+  "appId": "pk.ironrepublic.gym",
+  "appName": "Iron Republic",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  },
+  "ios": {
+    "contentInset": "never"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 600,
+      "backgroundColor": "#f97316"
+    }
+  }
+}

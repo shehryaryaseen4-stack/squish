@@ -1,0 +1,55 @@
+/* Gym components shared by the member app and the dashboard. */
+.badge-info { background: color-mix(in srgb, #3b82f6 15%, transparent); color: #3b82f6; }
+.progress-track { height: 10px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.progress-track i { display: block; height: 100%; border-radius: 99px; background: var(--good); }
+.progress-track.warn i { background: var(--warn); }
+.progress-track.bad i { background: var(--bad); }
+.stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+@media (min-width: 700px) { .stat-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1100px) { .stat-grid { grid-template-columns: repeat(5, 1fr); } }
+.stat { padding: 14px; border-radius: 16px; background: var(--surface-2); }
+.stat span { display: block; font-size: 12px; font-weight: 700; color: var(--ink-3); }
+.stat b { display: block; font-size: 20px; letter-spacing: -.02em; margin-top: 2px; }
+.stat small { font-size: 12px; color: var(--ink-3); font-weight: 600; }
+.months { display: grid; grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); gap: 8px; }
+.month { border-radius: 14px; padding: 10px 8px; text-align: center; border: 1.5px solid transparent; position: relative; }
+.month b { display: block; font-size: 13px; }
+.month span { display: block; font-size: 11.5px; font-weight: 700; margin-top: 2px; }
+.month .tag { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; }
+.month.paid-came { background: var(--good-soft); color: var(--good); }
+.month.paid-missed { background: var(--warn-soft); color: var(--warn); }
+.month.unpaid-came { background: var(--bad-soft); color: var(--bad); }
+.month.gap { background: var(--surface-2); color: var(--ink-3); border-style: dashed; border-color: var(--line); }
+.month.frozen { background: color-mix(in srgb, #3b82f6 13%, transparent); color: #3b82f6; }
+.month b, .month span { color: inherit; }
+.month-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; font-size: 12.5px; font-weight: 650; color: var(--ink-2); }
+.month-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 4px; margin-right: 6px; vertical-align: -2px; }
+.cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.cal .dow { text-align: center; font-size: 11.5px; font-weight: 800; color: var(--ink-3); padding-bottom: 2px; }
+.cal .day { aspect-ratio: 1; border-radius: 10px; display: grid; place-items: center; font-size: 13px; font-weight: 700; background: var(--surface-2); color: var(--ink-3); position: relative; }
+.cal .day.came { background: var(--accent); color: var(--accent-ink); }
+.cal .day.today { outline: 2px solid var(--ink); outline-offset: -2px; }
+.cal .day.out { opacity: .35; }
+.cal .day.blank { background: none; }
+.cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.cal-head b { font-size: 15px; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tbl th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-3); padding: 8px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.tbl td { padding: 10px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.tbl tr:last-child td { border-bottom: 0; }
+.tbl .num { text-align: right; font-variant-numeric: tabular-nums; }
+.tbl-wrap { overflow-x: auto; }
+.delta { font-size: 12px; font-weight: 700; margin-left: 4px; }
+.delta.down { color: var(--good); }
+.delta.up { color: var(--bad); }
+.receipt { padding: 14px; border-radius: 16px; border: 1px solid var(--line); display: grid; gap: 8px; }
+.receipt .r-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.receipt .r-top b { font-size: 15px; }
+.receipt .r-top span { display: block; font-size: 12.5px; color: var(--ink-3); }
+.receipt .amounts { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--ink-2); }
+.receipt .amounts b { color: var(--ink); }
+.receipt .acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.sum-line { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14.5px; }
+.sum-line.total { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 12px; font-size: 17px; font-weight: 800; }
+.money-pos { color: var(--good); }
+.money-neg { color: var(--bad); }

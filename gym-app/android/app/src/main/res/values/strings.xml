@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Iron Republic</string>
+    <string name="title_activity_main">Iron Republic</string>
+    <string name="package_name">pk.ironrepublic.gym</string>
+    <string name="custom_url_scheme">pk.ironrepublic.gym</string>
+</resources>
