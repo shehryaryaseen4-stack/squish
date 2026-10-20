@@ -64,6 +64,18 @@ jobs:
           name: android-apk
           path: gym-app/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+      # A second APK that works without a server, for trying the app on a phone.
+      - name: Build offline demo APK
+        run: |
+          DEMO=1 node scripts/build-mobile.js
+          npx cap sync android
+          cd android && ./gradlew assembleDebug --no-daemon
+          mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/gym-app-demo.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-demo-apk
+          path: gym-app/android/app/build/outputs/apk/debug/gym-app-demo.apk
+          if-no-files-found: error
 
   ios:
     needs: test

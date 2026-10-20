@@ -25,6 +25,16 @@ if (apiBase.startsWith('http://') && !/localhost|127\.0\.0\.1|10\.0\.2\.2/.test(
 }
 
 fs.rmSync(out, { recursive: true, force: true });
+
+if (process.env.DEMO === '1') {
+  // A demo app that needs no server: everything runs and is saved on the phone.
+  require('node:child_process').execFileSync(process.execPath, [path.join(__dirname, 'build-demo.js'), out], { stdio: 'inherit' });
+  const page = fs.readFileSync(path.join(out, 'index.html'), 'utf8');
+  fs.writeFileSync(path.join(out, 'index.html'), `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n<style>:root{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0}</style>\n</head>\n<body>\n${page}\n</body>\n</html>\n`);
+  console.log('www/ ready · offline demo');
+  process.exit(0);
+}
+
 fs.cpSync(src, out, { recursive: true });
 // The service worker is for the website only; the native shell already ships every file.
 fs.rmSync(path.join(out, 'sw.js'), { force: true });
