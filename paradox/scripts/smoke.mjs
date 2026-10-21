@@ -138,6 +138,11 @@ try {
   check('pause stops input', await page.evaluate(() => window.__paradox.controller.paused));
   await page.click('.modal-backdrop .modal-actions .btn.primary');
   await page.waitForTimeout(300);
+  await page.goBack();
+  await page.waitForSelector('.modal-backdrop .modal');
+  check('back button pauses instead of leaving the game', (await page.evaluate(() => window.__paradox.current)) === 'game');
+  await page.click('.modal-backdrop .modal-actions .btn.primary');
+  await page.waitForTimeout(300);
   check('resume restores input', await page.evaluate(() => !window.__paradox.controller.paused));
 
   // Daily gift and cosmetics.

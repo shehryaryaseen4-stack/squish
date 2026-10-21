@@ -80,7 +80,26 @@ export class Game {
   start() {
     this.stage.setTheme(WORLDS[0]);
     this.stage.start();
+    // Android back button / browser back: pause the level or go to the menu
+    // instead of leaving the game.
+    history.replaceState({ paradox: 'menu' }, '');
+    window.addEventListener('popstate', () => this.onBack());
     this.show('menu');
+  }
+
+  private onBack() {
+    if (document.querySelector('.modal-backdrop')) {
+      // Close a dismissible dialog the same way Escape does; others stay open.
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      history.pushState({ paradox: this.current }, '');
+      return;
+    }
+    if (this.current === 'game' && this.controller && !this.controller.finished) {
+      history.pushState({ paradox: 'game' }, '');
+      this.controller.command('pause');
+      return;
+    }
+    if (this.current !== 'menu') this.show('menu');
   }
 
   applySettings() {
@@ -124,6 +143,7 @@ export class Game {
     if (name !== 'game') this.endLevel();
     this.current = name;
     document.body.dataset.screen = name;
+    if (name !== 'menu' && history.state?.paradox === 'menu') history.pushState({ paradox: name }, '');
     this.ui.innerHTML = '';
     const menuLike = name !== 'game' && name !== 'ending';
     this.menuScene.show(menuLike);
