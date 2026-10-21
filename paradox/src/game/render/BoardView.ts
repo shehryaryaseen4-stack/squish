@@ -624,7 +624,7 @@ export class BoardView {
     // Seams (non-Euclidean links): a glowing frame on each joined edge.
     for (const l of L.def.links ?? []) {
       const mat = this.track(
-        new THREE.MeshBasicMaterial({ color: 0xff7ae0, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending, map: glowTexture() }),
+        new THREE.MeshBasicMaterial({ color: 0xff8ae8, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending, map: swirlTexture() }),
       );
       for (const end of [l.a, l.b]) {
         const [x, y, side] = end;
@@ -963,7 +963,8 @@ export class BoardView {
     }
     for (const lv of this.linkVis) {
       const on = condActive(L, s, lv.when);
-      lv.mat.opacity = on ? 0.55 + Math.sin(t * 3) * 0.2 : 0.08;
+      lv.mat.opacity = on ? 0.75 + Math.sin(t * 3) * 0.2 : 0.1;
+      if (lv.mat.map) lv.mat.map.rotation = t * 0.5;
     }
     const ex = this.exitVis;
     ex.on = approach(ex.on, s.exitOpen ? 1 : 0, dt, 6);
@@ -1066,17 +1067,24 @@ export class BoardView {
   showHint(cells: number[], dirs: (number | null)[]) {
     this.clearHint();
     const lift = this.bodyLift();
-    const mat = this.track(new THREE.MeshBasicMaterial({ color: 0xfff27a, transparent: true, opacity: 0.9, depthWrite: false }));
+    const mat = this.track(new THREE.MeshBasicMaterial({ color: 0xfff27a, transparent: true, opacity: 0.95, depthWrite: false, depthTest: false }));
     cells.forEach((cell, i) => {
       const d = dirs[i];
+      const grp = new THREE.Group();
       let m: THREE.Mesh;
       if (d !== null && d !== undefined) {
-        m = new THREE.Mesh(this.track(new THREE.ConeGeometry(0.14, 0.32, 12)), mat);
+        m = new THREE.Mesh(this.track(new THREE.ConeGeometry(0.22, 0.5, 14)), mat);
         m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), this.dirVec(d));
-      } else m = new THREE.Mesh(this.track(new THREE.SphereGeometry(0.1, 10, 8)), mat);
-      m.position.copy(this.cellPos(cell, this.gravityMode ? 0.5 : lift + 0.55));
-      m.scale.setScalar(1 - i * 0.12);
-      this.hintGroup.add(m);
+        // Sit the arrow on the edge between this cell and the next.
+        grp.position.copy(this.dirVec(d).multiplyScalar(0.5));
+      } else m = new THREE.Mesh(this.track(new THREE.SphereGeometry(0.16, 12, 10)), mat);
+      m.renderOrder = 20;
+      const glow = this.glowSprite(0xfff27a, 1.1, 0.7);
+      glow.renderOrder = 19;
+      grp.add(m, glow);
+      grp.position.add(this.cellPos(cell, this.gravityMode ? 0.6 : lift + 0.35));
+      grp.scale.setScalar(1 - i * 0.15);
+      this.hintGroup.add(grp);
     });
   }
 

@@ -34,6 +34,7 @@ export function gameScreen(game: Game, root: HTMLElement, params: Record<string,
         <span class="chip"><small>${esc(t('hud.moves'))}</small> <b data-moves>0</b></span>
         <span class="chip star-meter" title="3 stars at ${par} actions or fewer, 2 stars at ${two}">${stars(3)}<small data-par>${esc(t('hud.par', { n: par }))}</small></span>
         <span class="chip"><small>Time</small> <b data-time>0:00</b></span>
+        ${game.progress.record(def.id)?.done ? `<span class="chip"><small>Best</small> <b>${game.progress.record(def.id)!.bestMoves}</b></span>` : ''}
       </div>
       <div class="hud-status" data-status aria-live="polite"></div>
       <p class="objective" data-objective>${esc(def.objective)}</p>
@@ -324,7 +325,8 @@ export function gameScreen(game: Game, root: HTMLElement, params: Record<string,
         ${res.newBestMoves && !res.firstClear ? '<p class="good">New best!</p>' : ''}
         <div class="reward-lines">${lines.map((l) => `<p>${l}</p>`).join('')}</div>
         ${worldDone ? `<div class="world-done"><h3>Fragment recovered: ${esc(worldDone.name)}</h3><p>+100 coins, +3 hints${cos ? `, and the <b>${esc(cos.name)}</b> skin` : ''}.</p></div>` : ''}
-        ${def.story ? `<p class="story">${esc(def.story)}</p>` : ''}`,
+        ${def.story ? `<p class="story">${esc(def.story)}</p>` : ''}
+        ${next && next.tutorial && !game.progress.isDone(next.id) ? `<p class="muted">Up next: <b>${esc(next.title)}</b> introduces something new.</p>` : ''}`,
       actions,
     });
     root.querySelector('.modal.panel .complete-stars')?.classList.add('animate');

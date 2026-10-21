@@ -118,6 +118,42 @@ try {
   const coins2 = await page.evaluate(() => window.__paradox.rewards.coins);
   check('replay does not pay first-clear coins again', coins2 === coins, `coins=${coins2}`);
 
+  // Hints, pause and resume on level 2.
+  await page.click('.modal-actions .btn.primary'); // Next level
+  await page.waitForSelector('.screen.game');
+  await closeModals(page);
+  await page.click('[data-cmd="hint"]');
+  await page.waitForSelector('.modal-backdrop .hint-text');
+  await page.click('.modal-backdrop .modal-actions .btn.primary');
+  await page.waitForTimeout(400);
+  const hint = await page.evaluate(() => ({
+    steps: window.__paradox.controller.hintActions?.length ?? 0,
+    free: window.__paradox.daily.freeHintAvailable(),
+    tokens: window.__paradox.rewards.hints,
+  }));
+  check('path hint reveals moves using the daily free hint', hint.steps > 0 && !hint.free && hint.tokens === 3, JSON.stringify(hint));
+  await page.screenshot({ path: 'test-results/05b-hint.png' });
+  await page.click('[data-cmd="pause"]');
+  await page.waitForSelector('.modal-backdrop .modal');
+  check('pause stops input', await page.evaluate(() => window.__paradox.controller.paused));
+  await page.click('.modal-backdrop .modal-actions .btn.primary');
+  await page.waitForTimeout(300);
+  check('resume restores input', await page.evaluate(() => !window.__paradox.controller.paused));
+
+  // Daily gift and cosmetics.
+  await page.evaluate(() => window.__paradox.show('daily'));
+  await page.waitForSelector('[data-claim]');
+  const c0 = await page.evaluate(() => window.__paradox.rewards.coins);
+  await page.click('[data-claim]');
+  await page.waitForTimeout(200);
+  const c1 = await page.evaluate(() => window.__paradox.rewards.coins);
+  check('daily gift pays once', c1 > c0 && !(await page.$('[data-claim]')), `${c0} -> ${c1}`);
+  await page.screenshot({ path: 'test-results/05c-daily.png' });
+  await page.evaluate(() => window.__paradox.show('rewards'));
+  await page.waitForSelector('.cos');
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: 'test-results/05d-rewards.png' });
+
   await page.reload();
   await page.waitForSelector('.screen.menu', { timeout: 20000 });
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('paradox.save')));
@@ -169,6 +205,31 @@ try {
   const end = await p2.evaluate(() => ({ owns: window.__paradox.rewards.owns('skin-paradox'), ach: !!window.__paradox.saves.data.achievements.paradox }));
   check('Level 100 unlocks the ending reward and achievement', end.owns && end.ach);
   await ctx2.close();
+
+  // ---- Offline (installed PWA) ----
+  const { ctx: ctx5, page: p5 } = await newPage({ width: 412, height: 860 });
+  await p5.goto(BASE);
+  await p5.waitForSelector('.screen.menu', { timeout: 20000 });
+  await p5.evaluate(() => navigator.serviceWorker.ready);
+  await p5.waitForTimeout(800);
+  await ctx5.setOffline(true);
+  await p5.reload();
+  const offlineOk = await p5.waitForSelector('.screen.menu', { timeout: 20000 }).then(() => true, () => false);
+  check('reloads and runs offline via the service worker', offlineOk);
+  await ctx5.close();
+
+  // ---- Phone landscape layout ----
+  const { ctx: ctx4, page: p4 } = await newPage({ width: 860, height: 400 });
+  await p4.goto(BASE);
+  await p4.waitForSelector('.screen.menu', { timeout: 20000 });
+  await p4.waitForTimeout(600);
+  await p4.screenshot({ path: 'test-results/13-landscape-menu.png' });
+  await p4.evaluate(() => window.__paradox.play(window.__paradox.worldLevels(1)[0]));
+  await p4.waitForSelector('.screen.game');
+  await closeModals(p4);
+  await p4.waitForTimeout(600);
+  await p4.screenshot({ path: 'test-results/14-landscape-game.png' });
+  await ctx4.close();
 
   // ---- Desktop landscape layout ----
   const { ctx: ctx3, page: p3 } = await newPage({ width: 1366, height: 768 });

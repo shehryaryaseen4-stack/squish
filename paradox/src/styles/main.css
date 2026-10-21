@@ -985,6 +985,12 @@ body.hide-pad .hud-actions {
   width: min(92vw, 420px);
 }
 
+body[data-screen='ending'] #toasts,
+body[data-screen='menu'] #toasts {
+  top: auto;
+  bottom: calc(24px + var(--safe-b));
+}
+
 .toast {
   padding: 10px 16px;
   border-radius: 12px;
