@@ -183,22 +183,41 @@ export class BoardView {
     }
 
     if (this.gravityMode) {
-      // Laboratory backdrop and abyss markers.
-      const back = new THREE.Mesh(
-        this.track(new THREE.PlaneGeometry(L.w + 0.6, L.h + 0.6)),
-        this.std(th.floorEdge, { map: panelTexture(), roughness: 0.6, metalness: 0.2 }),
-      );
-      const panel = (back.material as THREE.MeshStandardMaterial).map!;
-      panel.repeat.set(L.w + 0.6, L.h + 0.6);
-      back.position.set(0, 0, -0.52);
+      // Laboratory backdrop behind every cell of the chamber, and dark abyss
+      // tiles only where the abyss is actually reachable (next to open air).
+      const open = (i: number) => L.terrain[i] !== T_WALL && L.terrain[i] !== T_VOID;
+      const nearOpen = (i: number) => {
+        const x = i % L.w;
+        const y = (i / L.w) | 0;
+        return [0, 1, 2, 3].some((d) => {
+          const nx = x + DX[d];
+          const ny = y + DY[d];
+          return nx >= 0 && ny >= 0 && nx < L.w && ny < L.h && open(ny * L.w + nx);
+        });
+      };
+      const backCells: number[] = [];
+      const abyssCells: number[] = [];
+      for (let i = 0; i < L.w * L.h; i++) {
+        const isVoid = L.terrain[i] === T_VOID && L.bridgeAt[i] < 0;
+        if (!isVoid) backCells.push(i);
+        else if (nearOpen(i)) abyssCells.push(i);
+      }
+      const panelMat = this.std(th.floorEdge, { map: panelTexture(), roughness: 0.6, metalness: 0.2 });
+      const back = new THREE.InstancedMesh(this.track(new THREE.PlaneGeometry(1, 1)), panelMat, Math.max(1, backCells.length));
+      const m = new THREE.Matrix4();
+      backCells.forEach((cell, k) => {
+        const p = this.cellPos(cell, -0.52);
+        back.setMatrixAt(k, m.makeTranslation(p.x, p.y, p.z));
+      });
       back.receiveShadow = true;
       this.pivot.add(back);
-      const voidMat = this.track(new THREE.MeshBasicMaterial({ color: 0x05030c }));
-      const voidGeo = this.track(new THREE.PlaneGeometry(0.98, 0.98));
-      for (let i = 0; i < L.w * L.h; i++) {
-        if (L.terrain[i] !== T_VOID || L.bridgeAt[i] >= 0) continue;
-        const m = new THREE.Mesh(voidGeo, voidMat);
-        this.place(m, i, -0.5);
+      if (abyssCells.length) {
+        const abyss = new THREE.InstancedMesh(this.track(new THREE.PlaneGeometry(1, 1)), this.track(new THREE.MeshBasicMaterial({ color: 0x05030c })), abyssCells.length);
+        abyssCells.forEach((cell, k) => {
+          const p = this.cellPos(cell, -0.5);
+          abyss.setMatrixAt(k, m.makeTranslation(p.x, p.y, p.z));
+        });
+        this.pivot.add(abyss);
       }
     } else {
       const tiles = new THREE.InstancedMesh(geoTile, floorMat, Math.max(1, floorCells.length));

@@ -48,6 +48,7 @@ export class GameController {
     this.session = new GameSession(def);
     this.view = new BoardView(stage, this.session.L, this.session.state, theme, skin);
     cam.frameBoard(this.session.L.w, this.session.L.h, this.view.gravityMode);
+    this.frameGravity();
     this.removeUpdater = stage.addUpdater((dt, t) => this.tick(dt, t));
   }
 
@@ -149,6 +150,7 @@ export class GameController {
     }
     const rewound = out.events.some((e) => e.t === 'rewind');
     this.view.sync(out.state, rewound ? [] : out.events, !rewound);
+    this.frameGravity();
     if (rewound) this.view.rewindFlash();
     this.playSounds(out.events, a);
     this.busyUntil = performance.now() + (this.stage.reducedMotion ? 70 : 140) + this.extraDelay(out.events);
@@ -156,6 +158,11 @@ export class GameController {
     this.hooks.onChange();
     if (out.state.status === 2) this.die(out.events);
     else if (out.state.status === 1) this.win();
+  }
+
+  /** Keep a sideways gravity chamber fitted to the screen. */
+  private frameGravity() {
+    if (this.view.gravityMode) this.cam.setSwapped(this.state.grav === 1 || this.state.grav === 3);
   }
 
   private extraDelay(ev: GameEvent[]) {
@@ -208,6 +215,7 @@ export class GameController {
       this.deathTimer = null;
       this.session.undo();
       this.view.sync(this.session.state, [], false);
+      this.frameGravity();
       this.view.reveal();
       this.hooks.onChange();
     }, 750);
@@ -233,6 +241,7 @@ export class GameController {
       return false;
     }
     this.view.sync(s, [], false);
+    this.frameGravity();
     this.audio.play('ui');
     this.refreshHint();
     this.hooks.onChange();
@@ -250,6 +259,7 @@ export class GameController {
     this.session.restart();
     this.view.reveal();
     this.view.sync(this.session.state, [], false);
+    this.frameGravity();
     this.hintActions = null;
     this.hooks.onChange();
   }

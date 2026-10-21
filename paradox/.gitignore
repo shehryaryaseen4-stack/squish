@@ -1,3 +1,7 @@
 node_modules/
 dist/
 test-results/
+
+# The repository root ignores data/ (converter runtime data); the game keeps
+# its level data in src/data, which must be committed.
+!src/data/
