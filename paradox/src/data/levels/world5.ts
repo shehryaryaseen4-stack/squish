@@ -45,19 +45,18 @@ export const WORLD5: LevelDef[] = [
   }),
   L(3, {
     title: 'Rift Sokoban',
-    objective: 'Deliver both stones through the rift to their plates.',
+    objective: 'Deliver the stone through the rift to its plate.',
     difficulty: 4,
-    hint: 'The far stone must travel first and go all the way to the end. Each push into the rift sends you home.',
+    hint: 'Push the stone into the rift, follow it through the other rift, and shove it onto the plate. The push sends you home.',
     map: String.raw`
       #########
-      #S.B.B.(#
+      #S...B.(#
       #.......#
       #[#P#####
-      ###Q#
         #E#
         ###
 
-        ].).p.q.
+        ].).p.
     `,
   }),
   L(4, {

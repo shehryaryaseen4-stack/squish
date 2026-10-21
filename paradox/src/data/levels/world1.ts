@@ -47,11 +47,11 @@ export const WORLD1: LevelDef[] = [
     objective: 'Collect both light shards to awaken the exit.',
     difficulty: 1,
     tutorial: 'The exit stays dormant until every shard in the chamber is collected.',
-    hint: 'Visit the far left and far right ends of the ruins, then return to the centre.',
+    hint: 'Grab the shard on the left, then the one on the right, then come back down to the exit.',
     map: String.raw`
-      *..#...#..*
-      .#.#.#.#.#.
-      ...S...E...
+      *..S..*
+         .
+         E
     `,
   }),
   L(4, {
@@ -59,13 +59,11 @@ export const WORLD1: LevelDef[] = [
     objective: 'Find the key and open the sealed gate.',
     difficulty: 1,
     tutorial: 'Walk over a key to pick it up. Walk into a lock while holding a key to open it.',
-    hint: 'The key waits in the upper alcove.',
+    hint: 'Go up for the key, then walk into the lock.',
     map: String.raw`
-      ..k..
-      .###.
-      S...#.....
-      ###.L.###.
-        #.#.#E..
+      .k.
+      ...#
+      S..L.E
     `,
   }),
   L(5, {
@@ -133,15 +131,13 @@ export const WORLD1: LevelDef[] = [
     title: 'Twin Keys',
     objective: 'Two locks, two keys. Choose your order.',
     difficulty: 2,
-    hint: 'Collect the key in the lower hall before opening the first lock.',
+    hint: 'Take both keys first: one below you, one to the west. Then open both locks on the east side.',
     map: String.raw`
-      ###########
-      #S...L...k#
-      #.#####.###
-      #...k.#.#
-      #####.#L#
-          ###.#
-            #E#
+      #######
+      #k.S.L#
+      #.#.#.#
+      #..k#L#
+      #####E#
     `,
   }),
   L(10, {
@@ -242,15 +238,11 @@ export const WORLD1: LevelDef[] = [
     title: 'Alternating Halls',
     objective: 'The switch opens one gate and closes another.',
     difficulty: 3,
-    hint: 'Take the key, open the solid gate with the left switch, then use the right switch to open the striped gate.',
+    hint: 'After the solid gate, step down onto the second switch to open the striped gate.',
     map: String.raw`
-      ###########
-      #S..P...T.#
-      #.###.###.#
-      #t#k#.#t#.#
-      #...#...#L#
-      #########.#
-              #E#
+      #############
+      #S.t.P...T.E#
+      ######t######
     `,
   }),
   L(17, {

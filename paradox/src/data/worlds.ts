@@ -124,3 +124,22 @@ export const ENDING_TEXT = [
   'This time you do not reach. You let the loop close, gently, the way a door closes behind someone who is finally home.',
   'The sky heals. The islands drift back together. Somewhere, a cube of light rests on warm stone and waits for the next explorer.',
 ];
+
+/** Coin Rush arcade mode shown as its own "world" (id 6) in menus. */
+export const RUSH_THEME: WorldTheme = {
+  ...WORLDS[0],
+  id: 6,
+  name: 'Coin Rush',
+  subtitle: 'Arcade dash: coins, drones and the clock',
+  intro:
+    'Quick arcade boards between the worlds. Grab every coin to open the exit, dodge the patrolling drones, and beat the clock for a time bonus. Each board takes about a minute.',
+  mechanics: 'Coins, drones, speed',
+  css: 'linear-gradient(160deg,#3a1d00 0%,#c2620e 50%,#ffd36a 100%)',
+};
+
+/** Visual theme for any level: campaign worlds, the daily pool and Coin Rush. */
+export function themeFor(def: { world: number; number: number }): WorldTheme {
+  if (def.world >= 1 && def.world <= 5) return WORLDS[def.world - 1];
+  if (def.world === 6) return WORLDS[(def.number - 1) % 5];
+  return WORLDS[def.number % 5];
+}

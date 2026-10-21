@@ -74,7 +74,7 @@ try {
   await page.waitForSelector('.world-card');
   await page.waitForTimeout(600);
   await page.screenshot({ path: 'test-results/02-map.png' });
-  check('map shows 5 worlds', (await page.$$('.world-card')).length === 5);
+  check('map shows 5 worlds plus Coin Rush', (await page.$$('.world-card:not(.rush-card)')).length === 5 && !!(await page.$('.rush-card')));
   check('worlds 2-5 locked at start', (await page.$$('.world-card.locked')).length === 4);
 
   await page.click('.world-card[data-world="1"]');
@@ -131,7 +131,8 @@ try {
     free: window.__paradox.daily.freeHintAvailable(),
     tokens: window.__paradox.rewards.hints,
   }));
-  check('path hint reveals moves using the daily free hint', hint.steps > 0 && !hint.free && hint.tokens === 3, JSON.stringify(hint));
+  check('Easy mode path hint is free and shows the next moves', hint.steps > 0 && hint.free && hint.tokens === 3, JSON.stringify(hint));
+  check('goal checklist is shown', (await page.$$('.goals li')).length >= 1);
   await page.screenshot({ path: 'test-results/05b-hint.png' });
   await page.click('[data-cmd="pause"]');
   await page.waitForSelector('.modal-backdrop .modal');
@@ -144,6 +145,21 @@ try {
   await page.click('.modal-backdrop .modal-actions .btn.primary');
   await page.waitForTimeout(300);
   check('resume restores input', await page.evaluate(() => !window.__paradox.controller.paused));
+
+  // Coin Rush: drones, coins, combo popups.
+  await page.evaluate(() => window.__paradox.show('levels', { world: 6 }));
+  await page.waitForSelector('.level-tile');
+  await closeModals(page);
+  await page.click('.level-tile[data-id="rush-01"]');
+  await page.waitForSelector('.screen.game');
+  await closeModals(page);
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: 'test-results/05e-rush.png' });
+  const rc0 = await page.evaluate(() => window.__paradox.rewards.coins);
+  await playSolution(page, 'rush-01');
+  const rc1 = await page.evaluate(() => window.__paradox.rewards.coins);
+  check('Coin Rush board completes and pays coins', rc1 > rc0, `${rc0} -> ${rc1}`);
+  await page.screenshot({ path: 'test-results/05f-rush-complete.png' });
 
   // Daily gift and cosmetics.
   await page.evaluate(() => window.__paradox.show('daily'));

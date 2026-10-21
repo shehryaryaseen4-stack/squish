@@ -30,6 +30,8 @@ export function initialState(L: Compiled): State {
     mirrors: L.mirrors.map((m) => m.orient),
     plat: L.platforms.map((p) => p.start),
     platDir: L.platforms.map((p) => (p.start >= p.path.length - 1 ? -1 : 1)),
+    drones: L.drones.map((d) => d.cell),
+    droneDir: L.drones.map((d) => d.dir),
     grav: L.def.gravity ?? -1,
     flips: L.def.flips ?? 0,
     tick: 0,
@@ -62,6 +64,8 @@ export function cloneState(s: State): State {
     mirrors: s.mirrors.slice(),
     plat: s.plat.slice(),
     platDir: s.platDir.slice(),
+    drones: s.drones.slice(),
+    droneDir: s.droneDir.slice(),
     grav: s.grav,
     flips: s.flips,
     tick: s.tick,
@@ -103,6 +107,7 @@ function snapId(L: Compiled, snap: State): string {
 export function stateKey(L: Compiled, s: State): string {
   const blocks = s.blocks.length > 1 ? s.blocks.slice().sort((a, b) => a - b).join(',') : s.blocks.join(',');
   let k = `${s.p}|${s.keys}|${s.items.join('')}|${blocks}|${s.toggles.join('')}|${s.timers.join(',')}|${s.mirrors.join('')}|${s.plat.join(',')}/${s.platDir.join(',')}|${s.grav}|${s.flips}|${L.clockPeriod > 1 ? s.tick % L.clockPeriod : 0}|${s.echo}`;
+  if (s.drones.length) k += `|d${s.drones.join(',')}/${s.droneDir.join('')}`;
   if (s.echo === 1) k += `|${s.rec.join('')}|${s.snap ? snapId(L, s.snap) : ''}`;
   else if (s.echo === 2) k += `|${s.ghost}|${s.gm.slice(s.gt).join('')}`;
   return k;
@@ -228,6 +233,7 @@ function blockTarget(L: Compiled, s: State, cell: number): number {
   if (cell < 0) return -1;
   if (solid(L, s, cell)) return -1;
   if (blockAt(s, cell) >= 0 || s.p === cell) return -1;
+  if (s.drones.includes(cell)) return -1;
   if (L.terrain[cell] === T_HAZARD) return -1;
   const it = L.itemAt[cell];
   if (it >= 0) {
@@ -323,6 +329,39 @@ function moveGhost(L: Compiled, s: State, d: number, ev: GameEvent[]) {
   ev.push({ t: nx.linked ? 'link' : 'move', who: 'g', from, to: t });
   if (dest !== t) ev.push({ t: 'teleport', who: 'g', from: t, to: dest });
   onEnter(L, s, dest, 'g', ev);
+}
+
+/** Can a drone fly into this cell? Drones avoid walls, gaps, closed gates, stones, rifts and each other. */
+function droneCanEnter(L: Compiled, s: State, cell: number, self: number): boolean {
+  if (cell < 0 || solid(L, s, cell) || !groundAt(L, s, cell)) return false;
+  if (L.terrain[cell] === T_RAIL || L.portalPartner[cell] >= 0) return false;
+  if (blockAt(s, cell) >= 0) return false;
+  return !s.drones.some((d, j) => j !== self && d === cell);
+}
+
+/** Drones patrol in straight lines, turning back at obstacles. Returns false if one hits the player. */
+function moveDrones(L: Compiled, s: State, ev: GameEvent[]): boolean {
+  let hit = false;
+  for (let i = 0; i < s.drones.length; i++) {
+    const from = s.drones[i];
+    let to = from;
+    const fwd = nextCell(L, s, from, s.droneDir[i]);
+    if (!fwd.linked && droneCanEnter(L, s, fwd.cell, i)) to = fwd.cell;
+    else {
+      s.droneDir[i] = opposite(s.droneDir[i]);
+      const back = nextCell(L, s, from, s.droneDir[i]);
+      if (!back.linked && droneCanEnter(L, s, back.cell, i)) to = back.cell;
+    }
+    s.drones[i] = to;
+    if (to !== from) ev.push({ t: 'drone', index: i, from, to });
+    // Touching a drone, or swapping places with one, is a hit.
+    if (to === s.p || from === s.p) hit = true;
+  }
+  if (hit) {
+    s.status = 2;
+    ev.push({ t: 'dead', reason: 'drone' });
+  }
+  return !hit;
 }
 
 function movePlatforms(L: Compiled, s: State, ev: GameEvent[]) {
@@ -568,6 +607,11 @@ export function step(L: Compiled, s0: State, a: Action): StepResult | null {
   }
 
   movePlatforms(L, s, ev);
+  if (L.drones.length && !moveDrones(L, s, ev)) {
+    s.moves++;
+    derive(L, s);
+    return { state: s, events: ev };
+  }
   if (!settleGravity(L, s, ev)) {
     s.moves++;
     derive(L, s);

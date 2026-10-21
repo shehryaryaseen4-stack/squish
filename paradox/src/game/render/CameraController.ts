@@ -47,7 +47,7 @@ export class CameraController {
     const hfov = 2 * Math.atan(Math.tan(vfov / 2) * cam.aspect);
     // Leave room for the HUD at the top and controls at the bottom.
     const padW = this.gravity ? 1.6 : 1.8;
-    const padH = this.gravity ? 3.2 : 3.4;
+    const padH = this.gravity ? 3.6 : 4.2;
     if (this.gravity) {
       const sw = this.swapped ? h : w;
       const sh = this.swapped ? w : h;

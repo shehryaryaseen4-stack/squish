@@ -13,6 +13,12 @@ export interface LevelRecord {
   bestTime: number;
   /** Completed at least once without a path hint. */
   hintFree: boolean;
+  /** Skipped (counts as unlocking the next level, earns nothing). */
+  skipped?: boolean;
+  /** Most bonus coins picked up on the board in one clear (paid once each). */
+  coinBest?: number;
+  /** Time bonus already paid. */
+  speedBonus?: boolean;
 }
 
 export interface Settings {
@@ -24,6 +30,8 @@ export interface Settings {
   reducedMotion: boolean;
   showPad: boolean;
   language: string;
+  /** Free unlimited hints, automatic hints when stuck, a helpful tip on screen. */
+  easyMode: boolean;
 }
 
 export interface SaveData {
@@ -61,6 +69,7 @@ export const DEFAULT_SETTINGS: Settings = {
   reducedMotion: false,
   showPad: true,
   language: 'en',
+  easyMode: true,
 };
 
 export function defaultSave(now = Date.now()): SaveData {
@@ -129,6 +138,9 @@ export function sanitize(input: unknown, knownLevels?: Set<string>): SaveData {
         bestMoves: int(r.bestMoves, 0, 0, 100000),
         bestTime: num(r.bestTime, 0, 0, 1e7),
         hintFree: bool(r.hintFree, false),
+        skipped: bool(r.skipped, false),
+        coinBest: int(r.coinBest, 0, 0, 1000),
+        speedBonus: bool(r.speedBonus, false),
       };
     }
   }
@@ -158,6 +170,7 @@ export function sanitize(input: unknown, knownLevels?: Set<string>): SaveData {
       reducedMotion: bool(st.reducedMotion, false),
       showPad: bool(st.showPad, true),
       language: str(st.language, 'en') ?? 'en',
+      easyMode: bool(st.easyMode, true),
     };
   }
   if (isObj(raw.daily)) {

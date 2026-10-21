@@ -161,7 +161,7 @@ export const WORLD2: LevelDef[] = [
     difficulty: 2,
     hint: 'The key waits on the far side. The platform keeps cycling, so you can ride it back.',
     map: String.raw`
-      S..=----.k
+      S.=--.k
       .
       L
       .
@@ -295,12 +295,12 @@ export const WORLD2: LevelDef[] = [
     story: 'The second fragment pulses with blue light. The islands drift closer together, as if remembering where they belong.',
     legend: { r: { kind: 'receiver', ch: 1 } },
     map: String.raw`
-      > (     ) /.
-               ...
-      S...=---..r
-      ..B.     d
-      ...p     d
-      #P##     .k
+      > (   ) /.
+             ...
+      S...=-..r
+      ..B.   d
+      ...p   d
+      #P##   .k
       #L#
       #E#
     `,

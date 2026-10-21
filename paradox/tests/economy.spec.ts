@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_LEVELS } from '../src/data/levels/index';
+import { ALL_LEVELS, RUSH_LEVELS } from '../src/data/levels/index';
 import { RewardManager, MAX_AD_HINTS_PER_DAY } from '../src/game/RewardManager';
-import { FIRST_CLEAR_COINS, ProgressionManager, STAR_COINS, parMoves, starsFor } from '../src/game/ProgressionManager';
+import { FIRST_CLEAR_COINS, ProgressionManager, SPEED_BONUS, STAR_COINS, parMoves, starsFor } from '../src/game/ProgressionManager';
 import { AchievementManager } from '../src/game/AchievementManager';
 import { guardCallbacks } from '../src/game/ads/AdProvider';
 import { freshSaves } from './helpers';
@@ -63,15 +63,15 @@ describe('completion rewards', () => {
     const { progress, rewards } = setup();
     const def = ALL_LEVELS[0];
     const par = parMoves(def);
-    const r1 = progress.complete(def, par + 1000, 10, false);
+    const r1 = progress.complete(def, par + 1000, 9999, false);
     expect(r1.firstClear).toBe(true);
     expect(r1.coins).toBe(FIRST_CLEAR_COINS(1) + STAR_COINS * 1);
-    const r2 = progress.complete(def, par + 1000, 10, false);
+    const r2 = progress.complete(def, par + 1000, 9999, false);
     expect(r2.firstClear).toBe(false);
     expect(r2.coins).toBe(0);
-    const r3 = progress.complete(def, par, 10, false);
+    const r3 = progress.complete(def, par, 9999, false);
     expect(r3.coins).toBe(STAR_COINS * 2);
-    const r4 = progress.complete(def, par, 10, false);
+    const r4 = progress.complete(def, par, 9999, false);
     expect(r4.coins).toBe(0);
     expect(rewards.coins).toBe(FIRST_CLEAR_COINS(1) + STAR_COINS * 3);
   });
@@ -93,6 +93,45 @@ describe('completion rewards', () => {
     const { progress } = setup();
     const hintsPaid = ALL_LEVELS.slice(0, 10).map((d) => progress.complete(d, 999, 1, true).hints);
     expect(hintsPaid.filter((h) => h > 0)).toHaveLength(2);
+  });
+});
+
+describe('skips, board coins and the speed bonus', () => {
+  it('skipping opens the next level but pays nothing and does not count as done', () => {
+    const { progress, rewards } = setup();
+    progress.skip(ALL_LEVELS[0]);
+    expect(progress.isUnlocked(ALL_LEVELS[1])).toBe(true);
+    expect(progress.isDone(ALL_LEVELS[0].id)).toBe(false);
+    expect(rewards.coins).toBe(0);
+    expect(progress.nextRecommended().id).toBe(ALL_LEVELS[1].id);
+    progress.complete(ALL_LEVELS[0], 999, 999, false);
+    expect(progress.record(ALL_LEVELS[0].id).skipped).toBe(false);
+  });
+
+  it('pays board coins only above the previous best', () => {
+    const { progress } = setup();
+    const d = ALL_LEVELS[2];
+    expect(progress.complete(d, 999, 999, false, { boardCoins: 2 }).boardCoins).toBe(2);
+    expect(progress.complete(d, 999, 999, false, { boardCoins: 2 }).boardCoins).toBe(0);
+    expect(progress.complete(d, 999, 999, false, { boardCoins: 4 }).boardCoins).toBe(2);
+  });
+
+  it('pays the speed bonus once', () => {
+    const { progress } = setup();
+    const d = ALL_LEVELS[3];
+    expect(progress.complete(d, 999, 1, false).speedBonus).toBe(SPEED_BONUS);
+    expect(progress.complete(d, 999, 1, false).speedBonus).toBe(0);
+    expect(progress.complete(ALL_LEVELS[4], 999, 99999, false).speedBonus).toBe(0);
+  });
+
+  it('runs Coin Rush as its own chain', () => {
+    const { progress } = setup();
+    expect(progress.isUnlocked(RUSH_LEVELS[0])).toBe(true);
+    expect(progress.isUnlocked(RUSH_LEVELS[1])).toBe(false);
+    const r = progress.complete(RUSH_LEVELS[0], 999, 999, false);
+    expect(r.coins).toBeGreaterThanOrEqual(FIRST_CLEAR_COINS(6));
+    expect(progress.isUnlocked(RUSH_LEVELS[1])).toBe(true);
+    expect(progress.completedCount()).toBe(0); // campaign count unaffected
   });
 });
 

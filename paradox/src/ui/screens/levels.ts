@@ -2,15 +2,15 @@ import type { Game } from '../../game/Game';
 import { esc, modal, stars } from '../dom';
 import { icons } from '../icons';
 import { t } from '../../i18n/index';
-import { WORLDS } from '../../data/worlds';
+import { RUSH_THEME, WORLDS } from '../../data/worlds';
 import { topBar } from './common';
 
 export function levelsScreen(game: Game, root: HTMLElement, params: Record<string, unknown>) {
   const world = Number(params.world ?? 1);
-  const w = WORLDS[world - 1];
+  const w = world === 6 ? RUSH_THEME : WORLDS[world - 1];
   const levels = game.worldLevels(world);
-  const next = game.progress.nextRecommended();
-  const bar = topBar(game, `${w.name}`, 'map');
+  const next = world === 6 ? game.progress.nextRush() : game.progress.nextRecommended();
+  const bar = topBar(game, `${w.name}`, world === 6 ? 'menu' : 'map');
   root.innerHTML = `
     <section class="screen levels" style="--world-bg:${w.css}">
       ${bar.html}
@@ -21,7 +21,7 @@ export function levelsScreen(game: Game, root: HTMLElement, params: Record<strin
             const rec = game.progress.record(l.id);
             const unlocked = game.progress.isUnlocked(l);
             const isNext = l.id === next.id && unlocked && !rec?.done;
-            return `<button class="level-tile ${unlocked ? '' : 'locked'} ${rec?.done ? 'done' : ''} ${isNext ? 'next' : ''}" data-id="${l.id}"
+            return `<button class="level-tile ${unlocked ? '' : 'locked'} ${rec?.done ? 'done' : ''} ${rec?.skipped && !rec.done ? 'skipped' : ''} ${isNext ? 'next' : ''}" data-id="${l.id}"
                 aria-label="Level ${l.number}: ${esc(l.title)}${unlocked ? '' : ' (locked)'}">
               <span class="n">${l.number}</span>
               ${unlocked ? stars(rec?.stars ?? 0) : `<span class="lock">${icons.lock}</span>`}

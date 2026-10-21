@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_LEVELS, DAILY_LEVELS, WORLDS_LEVELS } from '../src/data/levels/index';
+import { ALL_LEVELS, DAILY_LEVELS, RUSH_LEVELS, WORLDS_LEVELS } from '../src/data/levels/index';
 import SOLUTIONS from '../src/data/solutions.json';
 import { compileLevel } from '../src/game/core/compile';
 import { replay } from '../src/game/core/engine';
@@ -19,12 +19,12 @@ describe('level catalogue', () => {
       expect(l.number).toBe(i + 1);
       expect(l.world).toBe(Math.floor(i / 20) + 1);
     });
-    const ids = new Set([...ALL_LEVELS, ...DAILY_LEVELS].map((l) => l.id));
-    expect(ids.size).toBe(ALL_LEVELS.length + DAILY_LEVELS.length);
+    const ids = new Set([...ALL_LEVELS, ...DAILY_LEVELS, ...RUSH_LEVELS].map((l) => l.id));
+    expect(ids.size).toBe(ALL_LEVELS.length + DAILY_LEVELS.length + RUSH_LEVELS.length);
   });
 
   it('gives every level a title, objective, hint and difficulty', () => {
-    for (const l of [...ALL_LEVELS, ...DAILY_LEVELS]) {
+    for (const l of [...ALL_LEVELS, ...DAILY_LEVELS, ...RUSH_LEVELS]) {
       expect(l.title.length, l.id).toBeGreaterThan(2);
       expect(l.objective.length, l.id).toBeGreaterThan(5);
       expect(l.hint.length, l.id).toBeGreaterThan(5);
@@ -34,7 +34,7 @@ describe('level catalogue', () => {
   });
 
   it('compiles every level with exactly one start and one exit', () => {
-    for (const l of [...ALL_LEVELS, ...DAILY_LEVELS]) {
+    for (const l of [...ALL_LEVELS, ...DAILY_LEVELS, ...RUSH_LEVELS]) {
       const c = compileLevel(l);
       expect(c.start, l.id).toBeGreaterThanOrEqual(0);
       expect(c.exit, l.id).toBeGreaterThanOrEqual(0);
@@ -51,6 +51,20 @@ describe('level catalogue', () => {
     }
   });
 
+  it('keeps campaign levels short (no level needs more than 32 actions)', () => {
+    for (const l of ALL_LEVELS) expect(solutions[l.id].length, l.id).toBeLessThanOrEqual(32);
+  });
+
+  it('has 15 short Coin Rush boards with coins and drones', () => {
+    expect(RUSH_LEVELS).toHaveLength(15);
+    for (const l of RUSH_LEVELS) {
+      const c = compileLevel(l);
+      expect(c.items.some((i) => i.kind === 'shard'), l.id).toBe(true);
+      expect(solutions[l.id].length, l.id).toBeLessThanOrEqual(30);
+    }
+    expect(RUSH_LEVELS.filter((l) => compileLevel(l).drones.length).length).toBeGreaterThanOrEqual(12);
+  });
+
   it('places the World 5 themes in their promised ranges', () => {
     const w5 = WORLDS_LEVELS[4].map((l) => compileLevel(l));
     for (const c of w5.slice(0, 4)) expect(c.mechanics).toContain('portals');
@@ -63,7 +77,7 @@ describe('level catalogue', () => {
 });
 
 describe('stored solutions', () => {
-  for (const l of [...ALL_LEVELS, ...DAILY_LEVELS]) {
+  for (const l of [...ALL_LEVELS, ...DAILY_LEVELS, ...RUSH_LEVELS]) {
     it(`${l.id} "${l.title}" is completed by its stored solution`, () => {
       const sol = solutions[l.id];
       expect(sol, `missing solution for ${l.id}`).toBeTruthy();
@@ -74,9 +88,9 @@ describe('stored solutions', () => {
 });
 
 describe('independent solvability check (BFS) for levels without echoes', () => {
-  for (const l of [...ALL_LEVELS, ...DAILY_LEVELS].filter((d) => !d.echo)) {
+  for (const l of [...ALL_LEVELS, ...DAILY_LEVELS, ...RUSH_LEVELS].filter((d) => !d.echo)) {
     it(`${l.id} is solvable and its par is optimal`, () => {
-      const r = solve(compileLevel(l), undefined, 300000);
+      const r = solve(compileLevel(l), undefined, 500000);
       expect(r.solution, `${l.id} not solved`).not.toBeNull();
       expect(r.solution!.length).toBe(solutions[l.id].length);
     });

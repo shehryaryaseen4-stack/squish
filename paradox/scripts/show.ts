@@ -1,9 +1,9 @@
 // Debug helper: print a level with coordinates and replay a move string.
 import { compileLevel } from '../src/game/core/compile';
 import { initialState, step } from '../src/game/core/engine';
-import { ALL_LEVELS, DAILY_LEVELS } from '../src/data/levels/index';
+import { ALL_LEVELS, DAILY_LEVELS, RUSH_LEVELS } from '../src/data/levels/index';
 const [id, moves = ''] = process.argv.slice(2);
-const def = [...ALL_LEVELS, ...DAILY_LEVELS].find((d) => d.id === id)!;
+const def = [...ALL_LEVELS, ...DAILY_LEVELS, ...RUSH_LEVELS].find((d) => d.id === id)!;
 const L = compileLevel(def);
 let s = initialState(L);
 const show = () => {
@@ -13,7 +13,7 @@ const show = () => {
     let r = '';
     for (let x = 0; x < L.w; x++) {
       const i = y * L.w + x;
-      r += s.p === i ? '@' : s.ghost === i ? 'g' : s.blocks.includes(i) ? 'B' : '.#xE-'[L.terrain[i] - 1] ?? ' ';
+      r += s.p === i ? '@' : s.drones.includes(i) ? 'H' : s.ghost === i ? 'g' : s.blocks.includes(i) ? 'B' : '.#xE-'[L.terrain[i] - 1] ?? ' ';
     }
     console.log(String(y).padStart(2) + ' ' + r);
   }

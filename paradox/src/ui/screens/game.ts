@@ -4,19 +4,45 @@ import type { LevelDef } from '../../game/core/types';
 import { $, esc, formatTime, modal, stars, toast } from '../dom';
 import { icons } from '../icons';
 import { t } from '../../i18n/index';
-import { WORLDS } from '../../data/worlds';
+import { RUSH_THEME, WORLDS, themeFor } from '../../data/worlds';
 import { cosmeticById } from '../../data/cosmetics';
-import { parMoves, parTime, starThresholds, starsFor } from '../../game/ProgressionManager';
+import { SPEED_BONUS, parMoves, parTime, starThresholds, starsFor } from '../../game/ProgressionManager';
+import type { Compiled, State } from '../../game/core/types';
 import { DAILY_CHALLENGE_REWARD } from '../../game/DailyManager';
 import { refreshWallet } from './common';
 import { settingsBody, bindSettings } from './settings';
 
 const DIR_NAMES = ['north', 'east', 'south', 'west'];
 
+/** Plain-language checklist of what the level needs, updated live. */
+function goals(L: Compiled, s: State, rush: boolean): { text: string; done: boolean }[] {
+  const out: { text: string; done: boolean }[] = [];
+  const shards = L.items.map((it, i) => (it.kind === 'shard' ? s.items[i] : -1)).filter((v) => v >= 0);
+  if (shards.length) {
+    const got = shards.filter((v) => v === 1).length;
+    out.push({ text: `${rush ? 'Grab every coin' : 'Collect every shard'} (${got}/${shards.length})`, done: got === shards.length });
+  }
+  const locks = L.items.filter((it) => it.kind === 'lock').length;
+  if (locks) {
+    const opened = L.items.filter((it, i) => it.kind === 'lock' && s.items[i] === 1).length;
+    const keys = L.items.filter((it, i) => it.kind === 'key' && s.items[i] === 1).length;
+    out.push({ text: `Pick up the key${locks > 1 ? 's' : ''} (${keys}/${locks})`, done: keys >= locks || opened >= locks });
+    out.push({ text: `Open the lock${locks > 1 ? 's' : ''} (${opened}/${locks})`, done: opened >= locks });
+  }
+  const crystals = L.receivers.map((r, i) => (r.ch === undefined ? i : -1)).filter((i) => i >= 0);
+  if (crystals.length) out.push({ text: 'Shine the light on the crystal', done: crystals.every((i) => s.pow[i]) });
+  out.push({ text: s.exitOpen ? 'Reach the glowing exit' : 'Then reach the exit', done: s.status === 1 });
+  return out;
+}
+
 export function gameScreen(game: Game, root: HTMLElement, params: Record<string, unknown>) {
   const def = params.def as LevelDef;
   const isDaily = def.world === 0;
-  const world = WORLDS[(isDaily ? (def.number % 5) + 1 : def.world) - 1];
+  const isRush = def.style === 'rush';
+  const world = isRush ? RUSH_THEME : themeFor(def);
+  const easy = () => game.saves.data.settings.easyMode;
+  const speedPaid = !!game.progress.record(def.id)?.speedBonus;
+  const target = parTime(def);
   const [par, two] = starThresholds(def);
   const L = { echo: !!def.echo, flips: !!def.flips };
 
@@ -25,7 +51,7 @@ export function gameScreen(game: Game, root: HTMLElement, params: Record<string,
       <header class="hud-top">
         <button class="icon-btn" data-cmd="pause" aria-label="${esc(t('hud.pause'))}">${icons.pause}</button>
         <div class="hud-title">
-          <small>${isDaily ? 'Daily challenge' : `${esc(world.name)} · Level ${def.number}`}</small>
+          <small>${isDaily ? 'Daily challenge' : isRush ? `⚡ Coin Rush · ${def.number}` : `${esc(world.name)} · Level ${def.number}`}</small>
           <strong>${esc(def.title)}</strong>
         </div>
         <button class="icon-btn hint-btn" data-cmd="hint" aria-label="${esc(t('hud.hint'))}">${icons.hint}<b data-hints>${game.rewards.hints}</b></button>
@@ -35,9 +61,16 @@ export function gameScreen(game: Game, root: HTMLElement, params: Record<string,
         <span class="chip star-meter" title="3 stars at ${par} actions or fewer, 2 stars at ${two}">${stars(3)}<small data-par>${esc(t('hud.par', { n: par }))}</small></span>
         <span class="chip"><small>Time</small> <b data-time>0:00</b></span>
         ${game.progress.record(def.id)?.done ? `<span class="chip"><small>Best</small> <b>${game.progress.record(def.id)!.bestMoves}</b></span>` : ''}
+        <span class="chip coins" data-coinchip hidden>${icons.coin} <b data-coincount>0</b></span>
       </div>
+      ${speedPaid || isDaily ? '' : `<div class="race" title="Finish within ${formatTime(target)} for +${SPEED_BONUS} coins"><span data-race></span><small data-race-label>⚡ Speed bonus +${SPEED_BONUS}</small></div>`}
       <div class="hud-status" data-status aria-live="polite"></div>
-      <p class="objective" data-objective>${esc(def.objective)}</p>
+      <div class="goal-card" data-goalcard>
+        <p class="objective">${esc(def.objective)}</p>
+        <ul class="goals" data-goals></ul>
+        <p class="tip" data-tip ${easy() ? '' : 'hidden'}>💡 ${esc(def.hint)}</p>
+      </div>
+      <div class="popups" data-popups aria-hidden="true"></div>
       <div class="hud-msg" data-msg aria-live="assertive"></div>
       <footer class="hud-bottom">
         <div class="hud-actions">
@@ -78,9 +111,28 @@ export function gameScreen(game: Game, root: HTMLElement, params: Record<string,
     onHint: () => openHint(),
     onMessage: showMsg,
     vibrate: (p) => game.vibrate(p),
+    onCoin: (cell, combo) => popup(cell, combo),
   });
   const session = ctrl.session;
   if (!session.canWait) root.querySelector('[data-needs="wait"]')?.remove();
+  const coinTotal = isRush ? session.L.items.filter((i) => i.kind === 'shard').length : ctrl.bonusCells.length;
+  const coinChip = root.querySelector<HTMLElement>('[data-coinchip]')!;
+  if (coinTotal && !isRush) coinChip.hidden = false;
+  const goalsEl = $(root, '[data-goals]');
+  const popupsEl = $(root, '[data-popups]');
+
+  /** Floating "+1" / combo text above the cell where a coin was taken. */
+  function popup(cell: number, combo: number) {
+    const v = ctrl.view.cellWorld(cell).project(game.stage.camera);
+    const el = document.createElement('div');
+    el.className = `popup ${combo >= 3 ? 'big' : ''}`;
+    el.textContent = combo >= 2 ? `COMBO ×${combo}!` : '+1';
+    el.style.left = `${((v.x + 1) / 2) * 100}%`;
+    el.style.top = `${((1 - v.y) / 2) * 100}%`;
+    popupsEl.appendChild(el);
+    setTimeout(() => el.remove(), 1000);
+    if (combo >= 3) game.vibrate(15);
+  }
 
   function updateHud() {
     const s = session.state;
@@ -89,10 +141,6 @@ export function gameScreen(game: Game, root: HTMLElement, params: Record<string,
     starEls.forEach((e, i) => e.classList.toggle('on', i < st));
     const chips: string[] = [];
     const Lc = session.L;
-    const keysTotal = Lc.items.filter((i) => i.kind === 'key').length;
-    if (keysTotal) chips.push(`<span class="chip">🗝 ${s.keys}</span>`);
-    const shards = Lc.items.map((it, i) => (it.kind === 'shard' ? s.items[i] : -1)).filter((v) => v >= 0);
-    if (shards.length) chips.push(`<span class="chip">◆ ${shards.filter((v) => v === 1).length}/${shards.length}</span>`);
     s.timers.forEach((v, ch) => {
       if (v > 0) chips.push(`<span class="chip timer ch${ch}">⌛ ${v}</span>`);
     });
@@ -102,8 +150,11 @@ export function gameScreen(game: Game, root: HTMLElement, params: Record<string,
       if (s.echo === 1) chips.push(`<span class="chip rec">● ${esc(t('hud.recording', { n: s.rec.length, max: def.echo }))}</span>`);
       else if (s.echo === 2) chips.push(`<span class="chip echoing">◎ Echo ${s.ghost >= 0 ? `replaying ${Math.min(s.gt, s.gm.length)}/${s.gm.length}` : 'faded'}</span>`);
     }
-    if (Lc.receivers.some((r) => r.ch === undefined) || shards.length) chips.push(`<span class="chip ${s.exitOpen ? 'ok' : ''}">${s.exitOpen ? 'Exit awake' : 'Exit dormant'}</span>`);
     statusEl.innerHTML = chips.join('');
+    const list = goals(Lc, s, isRush);
+    const current = list.findIndex((g) => !g.done);
+    goalsEl.innerHTML = list.map((g, i) => `<li class="${g.done ? 'done' : ''} ${i === current ? 'now' : ''}">${g.done ? '✓' : i === current ? '➜' : '○'} ${esc(g.text)}</li>`).join('');
+    root.querySelector('[data-coincount]')!.textContent = `${ctrl.coinsCollected}/${coinTotal}`;
     const echoLabel = root.querySelector('[data-echo-label]');
     if (echoLabel) echoLabel.textContent = s.echo === 1 ? t('hud.rewind') : t('hud.echo');
     root.querySelector('.act.echo')?.classList.toggle('recording', s.echo === 1);
@@ -114,8 +165,26 @@ export function gameScreen(game: Game, root: HTMLElement, params: Record<string,
   }
   updateHud();
 
+  const raceEl = root.querySelector<HTMLElement>('[data-race]');
+  const raceLabel = root.querySelector<HTMLElement>('[data-race-label]');
+  let idleHintShown = false;
   const timer = window.setInterval(() => {
-    timeEl.textContent = formatTime(session.elapsedSeconds());
+    const sec = session.elapsedSeconds();
+    timeEl.textContent = formatTime(sec);
+    if (raceEl && raceLabel) {
+      const left = Math.max(0, 1 - sec / target);
+      raceEl.style.width = `${left * 100}%`;
+      raceEl.parentElement!.classList.toggle('low', left < 0.25);
+      raceLabel.textContent = left > 0 ? `⚡ Speed bonus +${SPEED_BONUS} · ${Math.ceil(target - sec)}s` : 'Speed bonus missed (no problem!)';
+    }
+    // Easy mode: if you stand still for a while, the next moves light up for free.
+    const idle = (performance.now() - ctrl.lastActionAt) / 1000;
+    if (easy() && !ctrl.paused && !ctrl.finished && idle > 15 && !idleHintShown && !ctrl.hintActions?.length) {
+      idleHintShown = true;
+      const r = ctrl.showHint();
+      if (r.kind === 'path' && r.actions.length) showMsg('Stuck? Follow the glowing arrows.');
+    }
+    if (idle < 1) idleHintShown = false;
   }, 500);
 
   root.querySelectorAll<HTMLButtonElement>('[data-cmd]').forEach((b) =>
@@ -144,7 +213,8 @@ export function gameScreen(game: Game, root: HTMLElement, params: Record<string,
         { label: t('pause.settings'), onClick: () => (openSettings(), true) },
         { label: t('pause.quit'), onClick: () => void game.show(isDaily ? 'daily' : 'levels', { world: def.world }) },
         { label: t('pause.restart'), onClick: () => void ctrl.restart() },
-        { label: t('pause.resume'), kind: 'primary' },
+        ...(isDaily ? [] : [{ label: 'Skip level', onClick: () => void skipLevel() }]),
+        { label: t('pause.resume'), kind: 'primary' as const },
       ],
       onClose: () => {
         if (game.controller === ctrl && !document.querySelector('.modal-backdrop.settings-modal')) resume();
@@ -178,7 +248,7 @@ export function gameScreen(game: Game, root: HTMLElement, params: Record<string,
     const tokens = game.rewards.hints;
     const adOk = game.ads.isRewardedAdAvailable() && game.rewards.adHintsLeftToday(game.daily.today) > 0;
     let pathLabel: string;
-    if (already) pathLabel = 'Show the next moves';
+    if (already || easy()) pathLabel = easy() && !already ? 'Show the next moves (free in Easy mode)' : 'Show the next moves';
     else if (free) pathLabel = "Show the next moves (today's free hint)";
     else if (tokens > 0) pathLabel = `Show the next moves (1 of ${tokens} tokens)`;
     else pathLabel = '';
@@ -188,7 +258,7 @@ export function gameScreen(game: Game, root: HTMLElement, params: Record<string,
         label: pathLabel,
         kind: 'primary' as const,
         onClick: () => {
-          revealPath(already ? 'none' : free ? 'free' : 'token');
+          revealPath(already || easy() ? 'none' : free ? 'free' : 'token');
         },
       } as never);
     if (!pathLabel && adOk)
@@ -207,9 +277,19 @@ export function gameScreen(game: Game, root: HTMLElement, params: Record<string,
             ? '<p class="muted">Path hints light up your next moves on the board.</p>'
             : `<p class="muted">You have no hint tokens left. Earn them by clearing levels (one every five), finishing worlds, the daily challenge and achievements.${adOk ? '' : ' Rewarded videos are not available right now.'}</p>`
         }`,
-      actions,
+      actions: [...actions, { label: 'Skip level', kind: 'ghost' as const, onClick: () => void skipLevel() }],
       onClose: () => game.controller === ctrl && !ctrl.finished && resume(),
     });
+  }
+
+  /** Skipping opens the next level without rewards; you can come back any time. */
+  function skipLevel() {
+    if (isDaily) return void game.show('daily');
+    game.progress.skip(def);
+    const next = game.nextLevel(def);
+    toast('Level skipped. Come back any time to earn its stars.', 'info');
+    if (next) game.play(next);
+    else game.show(isRush ? 'levels' : 'map', { world: def.world });
   }
 
   function revealPath(cost: 'none' | 'free' | 'token') {
@@ -236,9 +316,7 @@ export function gameScreen(game: Game, root: HTMLElement, params: Record<string,
                 label: `Undo ${undoCount}`,
                 kind: 'primary',
                 onClick: () => {
-                  session.rewindTo(r.keep);
-                  ctrl.view.sync(session.state, [], false);
-                  updateHud();
+                  ctrl.rewindTo(r.keep);
                   setTimeout(() => revealPath('none'), 50);
                 },
               },
@@ -291,7 +369,7 @@ export function gameScreen(game: Game, root: HTMLElement, params: Record<string,
     const s = session.state;
     const seconds = session.elapsedSeconds();
     game.input.enabled = false;
-    const res = game.progress.complete(def, s.moves, seconds, session.usedPathHint);
+    const res = game.progress.complete(def, s.moves, seconds, session.usedPathHint, { boardCoins: isRush ? 0 : ctrl.coinsCollected });
     let dailyPaid = false;
     if (isDaily) dailyPaid = game.daily.completeChallenge(def.id);
     if (def.echo) {
@@ -303,15 +381,19 @@ export function gameScreen(game: Game, root: HTMLElement, params: Record<string,
     const finale = def.id === 'w5-20';
     const lines: string[] = [];
     if (res.firstClear && !isDaily) lines.push(`First clear`);
-    if (res.coins) lines.push(`${icons.coin} +${res.coins} coins`);
+    if (coinTotal && !isRush) lines.push(`Board coins: ${ctrl.coinsCollected}/${coinTotal}${res.boardCoins ? ` (+${res.boardCoins} new)` : ''}`);
+    if (ctrl.bestCombo >= 2) lines.push(`🔥 Best combo ×${ctrl.bestCombo}`);
+    if (res.speedBonus) lines.push(`⚡ Speed bonus +${res.speedBonus}`);
+    if (res.coins) lines.push(`${icons.coin} +${res.coins} coins in total`);
     if (res.hints) lines.push(`${icons.hint} +${res.hints} hint${res.hints > 1 ? 's' : ''}`);
     if (dailyPaid) lines.push(`Daily reward: ${icons.coin} +${DAILY_CHALLENGE_REWARD.coins} ${icons.hint} +${DAILY_CHALLENGE_REWARD.hints}`);
     if (!res.firstClear && !res.coins && !isDaily) lines.push('<span class="muted">Replay: rewards are only paid for new stars.</span>');
     if (isDaily && !dailyPaid) lines.push('<span class="muted">Today\'s daily reward was already collected.</span>');
     const cos = res.cosmetic ? cosmeticById(res.cosmetic) : null;
     const worldDone = res.worldCompleted ? WORLDS[res.worldCompleted - 1] : null;
+    void WORLDS;
     const actions = [] as { label: string; kind?: 'primary' | 'ghost'; onClick?: () => void }[];
-    actions.push({ label: t('complete.map'), onClick: () => game.show(isDaily ? 'daily' : 'map') });
+    actions.push({ label: t('complete.map'), onClick: () => game.show(isDaily ? 'daily' : isRush ? 'levels' : 'map', { world: def.world }) });
     actions.push({ label: t('complete.replay'), onClick: () => game.play(def) });
     if (finale) actions.push({ label: 'Continue', kind: 'primary', onClick: () => game.show('ending') });
     else if (next && !isDaily) actions.push({ label: t('complete.next'), kind: 'primary', onClick: () => game.play(next) });

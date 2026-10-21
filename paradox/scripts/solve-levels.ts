@@ -6,7 +6,7 @@ import { writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { compileLevel } from '../src/game/core/compile';
 import { solve } from '../src/game/core/solver';
 import { replay } from '../src/game/core/engine';
-import { ALL_LEVELS, DAILY_LEVELS } from '../src/data/levels/index';
+import { ALL_LEVELS, DAILY_LEVELS, RUSH_LEVELS } from '../src/data/levels/index';
 
 const args = process.argv.slice(2);
 const write = args.includes('--write');
@@ -20,7 +20,7 @@ for (const a of args.filter((x) => x.startsWith('--set='))) {
   stored[id] = moves;
 }
 let bad = 0;
-for (const def of [...ALL_LEVELS, ...DAILY_LEVELS]) {
+for (const def of [...ALL_LEVELS, ...DAILY_LEVELS, ...RUSH_LEVELS]) {
   if (filter && !def.id.startsWith(filter)) continue;
   const L = compileLevel(def);
   const prev = stored[def.id];

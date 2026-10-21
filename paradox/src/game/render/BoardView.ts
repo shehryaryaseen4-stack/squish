@@ -82,6 +82,11 @@ export class BoardView {
   private linkVis: { mat: THREE.MeshBasicMaterial; when?: import('../core/types').Cond }[] = [];
   private exitVis!: { ring: THREE.Mesh; disc: THREE.Mesh; mat: THREE.MeshStandardMaterial; discMat: THREE.MeshBasicMaterial; halo: THREE.Sprite; on: number };
   private hidden = false;
+  private droneMeshes: THREE.Group[] = [];
+  private bonusCoins = new Map<number, THREE.Group>();
+  private goalArrow!: THREE.Group;
+  private goalMat!: THREE.MeshStandardMaterial;
+  private squash = 0;
 
   constructor(
     private stage: Stage,
@@ -376,6 +381,16 @@ export class BoardView {
         grp.add(box, hole, hole2);
         this.place(grp, it.cell, g ? 0 : 0.47);
         this.shadows(box);
+        this.itemVis.push({ obj: grp, index, gone: 0 });
+      } else if (it.kind === 'shard' && L.def.style === 'rush') {
+        const grp = this.coinMesh(1.6);
+        this.place(grp, it.cell, g ? 0 : 0.45);
+        const base = grp.position.clone();
+        this.updaters.push((_dt, t) => {
+          grp.rotation.y = t * 2.4 + index;
+          grp.position.copy(base);
+          if (!g) grp.position.y = base.y + Math.sin(t * 3 + index) * 0.07;
+        });
         this.itemVis.push({ obj: grp, index, gone: 0 });
       } else if (it.kind === 'shard') {
         const mat = this.std(this.theme.accent, { emissive: this.theme.accent, emissiveIntensity: 1.4, metalness: 0.2, roughness: 0.2 });
@@ -675,7 +690,96 @@ export class BoardView {
     return { obj, queue: [], from: obj.position.clone(), seg: null, t: 0, baseScale: obj.scale.x };
   }
 
+  /** A spinning gold coin (shared look for Coin Rush coins and board bonus coins). */
+  private coinMesh(scale = 1) {
+    const grp = new THREE.Group();
+    const mat = this.std(0xffcf3a, { metalness: 0.9, roughness: 0.25, emissive: 0xb07000, emissiveIntensity: 0.6 });
+    const disc = new THREE.Mesh(this.track(new THREE.CylinderGeometry(0.2, 0.2, 0.06, 24)), mat);
+    disc.rotation.x = Math.PI / 2;
+    const rim = new THREE.Mesh(this.track(new THREE.TorusGeometry(0.2, 0.025, 8, 24)), mat);
+    grp.add(disc, rim, this.glowSprite(0xffd36a, 0.9, 0.55));
+    grp.scale.setScalar(scale);
+    return grp;
+  }
+
+  /** Optional bonus coins lying on the board. */
+  setBonusCoins(cells: number[]) {
+    const g = this.gravityMode;
+    cells.forEach((cell, k) => {
+      const c = this.coinMesh(1.3);
+      this.place(c, cell, g ? 0 : 0.42);
+      const base = c.position.clone();
+      this.updaters.push((_dt, t) => {
+        c.rotation.y = t * 3 + k;
+        if (!g) c.position.y = base.y + Math.sin(t * 3 + k) * 0.06;
+      });
+      this.bonusCoins.set(cell, c);
+    });
+  }
+
+  /** Show or hide bonus coins after pickups, undo or restart. */
+  syncBonusCoins(collected: Set<number>) {
+    for (const [cell, c] of this.bonusCoins) c.visible = !collected.has(cell);
+  }
+
+  coinBurst(cell: number) {
+    const at = this.toWorld(this.cellPos(cell, this.bodyLift()));
+    this.stage.bursts.emit(at, 0xffd36a, 26, { speed: 3, life: 0.7, up: 1.5, size: 0.25 });
+  }
+
+  /** World position of a cell, for screen-space popups. */
+  cellWorld(cell: number) {
+    return this.toWorld(this.cellPos(cell, this.bodyLift() + 0.6));
+  }
+
   private buildBodies() {
+    // Patrol drones.
+    const g = this.gravityMode;
+    this.L.drones.forEach((_d, i) => {
+      const grp = new THREE.Group();
+      const body = new THREE.Mesh(
+        this.track(new THREE.IcosahedronGeometry(0.28, 0)),
+        this.std(0x401018, { emissive: 0xff2a3a, emissiveIntensity: 1.4, metalness: 0.6, roughness: 0.3, flatShading: true }),
+      );
+      const ring = new THREE.Mesh(this.track(new THREE.TorusGeometry(0.38, 0.03, 8, 28)), this.std(0xff8090, { emissive: 0xff3040, emissiveIntensity: 1.2 }));
+      ring.rotation.x = Math.PI / 2;
+      const eye = new THREE.Mesh(this.track(new THREE.SphereGeometry(0.09, 10, 8)), this.track(new THREE.MeshBasicMaterial({ color: 0xffffff })));
+      eye.position.set(0, 0.05, 0.24);
+      grp.add(body, ring, eye, this.glowSprite(0xff3040, 1.5, 0.6));
+      body.castShadow = true;
+      this.pivot.add(grp);
+      this.droneMeshes.push(grp);
+      this.movers.set(`d${i}`, this.newMover(grp));
+      this.updaters.push((_dt, t) => {
+        body.rotation.y = t * 3;
+        ring.rotation.z = t * 4;
+        body.position.y = g ? 0 : Math.sin(t * 5 + i) * 0.06;
+        const dir = this.state.droneDir[i];
+        const dv = this.dirVec(dir);
+        eye.position.set(dv.x * 0.24, g ? dv.y * 0.24 : 0.05, g ? 0.1 : dv.z * 0.24);
+      });
+    });
+
+    // Goal marker: a bouncing arrow above the exit, bright once it is awake.
+    this.goalMat = this.std(0x888899, { emissive: 0x666677, emissiveIntensity: 1.2 });
+    this.goalArrow = new THREE.Group();
+    const cone = new THREE.Mesh(this.track(new THREE.ConeGeometry(0.3, 0.55, 4)), this.goalMat);
+    cone.rotation.x = Math.PI;
+    this.goalArrow.add(cone);
+    this.place(this.goalArrow, this.L.exit, g ? 0.9 : 1.35);
+    const goalBase = this.goalArrow.position.clone();
+    this.updaters.push((_dt, t) => {
+      if (g) {
+        this.goalArrow.visible = false;
+        return;
+      }
+      this.goalArrow.position.y = goalBase.y + Math.abs(Math.sin(t * 3)) * 0.25;
+      this.goalArrow.rotation.y = t * 1.5;
+      const open = this.state.exitOpen;
+      this.goalMat.color.setHex(open ? 0x7dff9a : 0x9a96b0);
+      this.goalMat.emissive.setHex(open ? 0x2aff6a : 0x444455);
+    });
+
     // Blocks.
     const blockGeo = this.track(new RoundedBoxGeometry(0.8, 0.8, 0.8, 3, 0.1));
     const blockMat = this.std(this.theme.wall, { map: stoneTexture(), roughness: 0.75 });
@@ -801,6 +905,17 @@ export class BoardView {
         if (!mesh.visible) this.snapMover(this.movers.get(`b${i}`)!, this.cellPos(cell, lift));
         mesh.visible = true;
         route(`b${i}`, 'b', i, cell);
+      }
+    });
+
+    // Drones
+    s.drones.forEach((cell, i) => {
+      const mv = this.movers.get(`d${i}`)!;
+      const to = this.cellPos(cell, lift);
+      if (!animate) this.snapMover(mv, to);
+      else {
+        this.finishMover(mv);
+        mv.queue.push({ to, kind: 'slide', dur: walkDur });
       }
     });
 
@@ -1010,6 +1125,12 @@ export class BoardView {
       }
       this.lastPlayerPos.copy(wp);
     }
+    // Squash and stretch when the cube lands.
+    if (this.squash > 0) {
+      this.squash = Math.max(0, this.squash - dt * 6);
+      const k = Math.sin(this.squash * Math.PI) * 0.18;
+      this.playerCube.scale.set(1 + k, 1 - k, 1 + k);
+    } else this.playerCube.scale.set(1, 1, 1);
     if (this.playerLight) this.playerLight.intensity = 2 + Math.sin(t * 3) * 0.3;
     void platformAt;
   }
@@ -1048,6 +1169,7 @@ export class BoardView {
     if (mv.t >= 1) {
       mv.obj.position.copy(seg.to);
       mv.obj.scale.setScalar(mv.baseScale);
+      if (isPlayer && (seg.kind === 'walk' || seg.kind === 'fall') && !this.stage.reducedMotion) this.squash = seg.kind === 'fall' ? 1 : 0.6;
       if (isPlayer) this.playerCube.rotation.set(0, 0, 0);
       mv.seg = null;
     }

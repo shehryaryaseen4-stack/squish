@@ -7,6 +7,7 @@ export function settingsBody(game: Game, inGame = false) {
   const s = game.saves.data.settings;
   return `
     <form class="settings" onsubmit="return false">
+      <label class="row check"><span>Easy mode <small>free hints, tips on screen, help when stuck</small></span><input type="checkbox" name="easyMode" ${s.easyMode ? 'checked' : ''}></label>
       <label class="row"><span>Music</span><input type="range" min="0" max="1" step="0.05" name="music" value="${s.music}"></label>
       <label class="row"><span>Sound effects</span><input type="range" min="0" max="1" step="0.05" name="sfx" value="${s.sfx}"></label>
       <label class="row"><span>Swipe sensitivity</span><input type="range" min="0.5" max="2" step="0.1" name="sensitivity" value="${s.sensitivity}"></label>

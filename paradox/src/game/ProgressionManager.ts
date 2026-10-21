@@ -1,4 +1,4 @@
-import { ALL_LEVELS, WORLDS_LEVELS } from '../data/levels/index';
+import { ALL_LEVELS, RUSH_LEVELS, WORLDS_LEVELS } from '../data/levels/index';
 import SOLUTIONS from '../data/solutions.json';
 import { COSMETICS } from '../data/cosmetics';
 import type { LevelDef } from './core/types';
@@ -39,10 +39,20 @@ export interface CompletionResult {
   worldCompleted: number | null;
   cosmetic: string | null;
   newBestMoves: boolean;
+  /** Bonus coins picked up on the board that were paid this time. */
+  boardCoins: number;
+  /** Time bonus paid this time (0 if not earned or already paid). */
+  speedBonus: number;
 }
 
-export const FIRST_CLEAR_COINS = (world: number) => 10 + 5 * world;
+export interface CompletionExtras {
+  /** Bonus coins collected on the board during this clear. */
+  boardCoins?: number;
+}
+
+export const FIRST_CLEAR_COINS = (world: number) => (world === 6 ? 25 : 10 + 5 * world);
 export const STAR_COINS = 5;
+export const SPEED_BONUS = 10;
 
 export class ProgressionManager {
   devUnlockAll = false;
@@ -60,12 +70,37 @@ export class ProgressionManager {
     return !!this.d.levels[id]?.done;
   }
 
-  /** Level n (1-based campaign number) unlocks when level n-1 is complete. */
+  /** Completed, or skipped: either way the next level opens. */
+  isPassed(id: string) {
+    const r = this.d.levels[id];
+    return !!r && (r.done || !!r.skipped);
+  }
+
+  /** Level n unlocks when level n-1 is complete or skipped. Coin Rush has its own chain. */
   isUnlocked(def: LevelDef): boolean {
     if (def.world === 0) return true;
     if (this.devUnlockAll || def.number === 1) return true;
-    const prev = ALL_LEVELS[def.number - 2];
-    return !!prev && this.isDone(prev.id);
+    const list = def.world === 6 ? RUSH_LEVELS : ALL_LEVELS;
+    const prev = list[def.number - 2];
+    return !!prev && this.isPassed(prev.id);
+  }
+
+  /** Skip a level you are stuck on. It earns nothing, but opens the next one. */
+  skip(def: LevelDef) {
+    const rec = this.d.levels[def.id] ?? { done: false, stars: 0, bestMoves: 0, bestTime: 0, hintFree: false };
+    if (!rec.done) rec.skipped = true;
+    this.d.levels[def.id] = rec;
+    this.saves.save();
+  }
+
+  rushProgress() {
+    const done = RUSH_LEVELS.filter((l) => this.isDone(l.id)).length;
+    const stars = RUSH_LEVELS.reduce((a, l) => a + (this.d.levels[l.id]?.stars ?? 0), 0);
+    return { done, total: RUSH_LEVELS.length, stars, maxStars: RUSH_LEVELS.length * 3 };
+  }
+
+  nextRush(): LevelDef {
+    return RUSH_LEVELS.find((l) => this.isUnlocked(l) && !this.isDone(l.id)) ?? RUSH_LEVELS[0];
   }
 
   isWorldUnlocked(world: number): boolean {
@@ -93,16 +128,16 @@ export class ProgressionManager {
     return w;
   }
 
-  /** First unlocked level that is not completed yet, or the last level. */
+  /** First unlocked level that is not passed yet, or the last level. */
   nextRecommended(): LevelDef {
-    return ALL_LEVELS.find((l) => this.isUnlocked(l) && !this.isDone(l.id)) ?? ALL_LEVELS[ALL_LEVELS.length - 1];
+    return ALL_LEVELS.find((l) => this.isUnlocked(l) && !this.isPassed(l.id)) ?? ALL_LEVELS[ALL_LEVELS.length - 1];
   }
 
   /**
    * Records a completion and pays rewards. Coins are paid once per first clear
    * and once per newly earned star, so replays cannot be farmed.
    */
-  complete(def: LevelDef, moves: number, seconds: number, usedPathHint: boolean): CompletionResult {
+  complete(def: LevelDef, moves: number, seconds: number, usedPathHint: boolean, extras: CompletionExtras = {}): CompletionResult {
     const prev = this.d.levels[def.id];
     const stars = starsFor(def, moves);
     const firstClear = !prev?.done;
@@ -116,9 +151,12 @@ export class ProgressionManager {
       worldCompleted: null,
       cosmetic: null,
       newBestMoves: !prev?.done || moves < prev.bestMoves,
+      boardCoins: 0,
+      speedBonus: 0,
     };
     const rec = prev ?? { done: false, stars: 0, bestMoves: 0, bestTime: 0, hintFree: false };
     rec.done = true;
+    rec.skipped = false;
     rec.stars = Math.max(rec.stars, stars);
     rec.bestMoves = rec.bestMoves ? Math.min(rec.bestMoves, moves) : moves;
     rec.bestTime = rec.bestTime ? Math.min(rec.bestTime, seconds) : seconds;
@@ -134,12 +172,23 @@ export class ProgressionManager {
     }
     if (firstClear) {
       res.coins += FIRST_CLEAR_COINS(def.world);
-      if (this.completedCount() % 5 === 0) res.hints += 1;
+      if (def.world <= 5 && this.completedCount() % 5 === 0) res.hints += 1;
     }
     const gained = Math.max(0, stars - previousStars);
     res.coins += gained * STAR_COINS;
+    // Board coins: only the ones beyond your previous best are paid.
+    const picked = Math.max(0, Math.floor(extras.boardCoins ?? 0));
+    res.boardCoins = Math.max(0, picked - (rec.coinBest ?? 0));
+    rec.coinBest = Math.max(rec.coinBest ?? 0, picked);
+    res.coins += res.boardCoins;
+    // Time race: finishing within the target time pays once per level.
+    if (seconds <= parTime(def) && !rec.speedBonus) {
+      rec.speedBonus = true;
+      res.speedBonus = SPEED_BONUS;
+      res.coins += SPEED_BONUS;
+    }
 
-    const wp = this.worldProgress(def.world);
+    const wp = def.world <= 5 ? this.worldProgress(def.world) : { done: 0, total: 1 };
     if (wp.done === wp.total && !this.d.worldRewards.includes(def.world)) {
       this.d.worldRewards.push(def.world);
       res.worldCompleted = def.world;

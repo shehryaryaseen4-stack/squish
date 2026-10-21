@@ -26,6 +26,7 @@ export function menuScreen(game: Game, root: HTMLElement) {
       </div>
       <nav class="menu-buttons">
         <button class="btn primary big" data-go="continue">${icons.play}<span>${done ? esc(t('menu.continue')) : esc(t('menu.play'))}</span></button>
+        <button class="btn rush" data-go="rush">⚡<span>Coin Rush</span><small>${game.progress.rushProgress().done}/${game.progress.rushProgress().total}</small></button>
         <button class="btn" data-go="map">${icons.map}<span>${esc(t('menu.map'))}</span></button>
         <button class="btn" data-go="daily">${icons.gift}<span>${esc(t('menu.daily'))}</span>${giftReady ? '<i class="dot" aria-label="Gift ready"></i>' : ''}</button>
         <button class="btn" data-go="rewards">${icons.sparkle}<span>${esc(t('menu.rewards'))}</span></button>
@@ -42,6 +43,7 @@ export function menuScreen(game: Game, root: HTMLElement) {
     b.addEventListener('click', () => {
       game.click();
       const go = b.dataset.go!;
+      if (go === 'rush') return game.show('levels', { world: 6 });
       if (go === 'continue') {
         if (!game.saves.data.seen.includes('world-intro-1')) return game.show('levels', { world: 1 });
         return game.play(next);

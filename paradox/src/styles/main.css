@@ -1446,3 +1446,164 @@ body.reduced-motion .ending-text p,
 body.reduced-motion .ending-final {
   animation-delay: 0s !important;
 }
+
+/* ---------- goals, tips, coins, speed race, popups ---------- */
+.goal-card {
+  align-self: center;
+  margin-top: 6px;
+  max-width: 520px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: rgba(10, 6, 24, 0.55);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+  text-align: left;
+}
+
+.goal-card .objective {
+  margin: 0 0 4px;
+  text-align: left;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.goals {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.goals li {
+  padding: 1px 0;
+}
+
+.goals li.done {
+  color: var(--good);
+  text-decoration: line-through;
+  text-decoration-color: rgba(125, 255, 154, 0.5);
+}
+
+.goals li.now {
+  color: #fff;
+  font-weight: 700;
+}
+
+.tip {
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+  color: #ffe9a8;
+}
+
+.chip.coins svg {
+  width: 16px;
+  height: 16px;
+  color: var(--gold);
+}
+
+.race {
+  position: relative;
+  align-self: center;
+  width: min(300px, 80%);
+  height: 18px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.race span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 100%;
+  background: linear-gradient(90deg, #ffb347, #ffd36a);
+  transition: width 0.5s linear;
+}
+
+.race.low span {
+  background: linear-gradient(90deg, #ff5a6a, #ff9a6a);
+}
+
+.race small {
+  position: relative;
+  display: block;
+  text-align: center;
+  font-size: 0.7rem;
+  line-height: 16px;
+  font-weight: 700;
+  color: #2a1400;
+  mix-blend-mode: normal;
+  text-shadow: 0 0 4px rgba(255, 255, 255, 0.6);
+}
+
+.popups {
+  position: absolute;
+  inset: 0;
+  pointer-events: none !important;
+  overflow: hidden;
+}
+
+.popup {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-weight: 900;
+  font-size: 1.3rem;
+  color: #ffd36a;
+  text-shadow: 0 2px 0 #7a4a00, 0 0 12px rgba(255, 211, 106, 0.8);
+  animation: popup 1s ease-out forwards;
+  white-space: nowrap;
+}
+
+.popup.big {
+  font-size: 1.8rem;
+  color: #ff8ae0;
+  text-shadow: 0 2px 0 #6a1050, 0 0 16px rgba(255, 138, 224, 0.9);
+}
+
+@keyframes popup {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -30%) scale(0.6);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -80%) scale(1.15);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -220%) scale(1);
+  }
+}
+
+.btn.rush {
+  background: linear-gradient(135deg, rgba(255, 179, 71, 0.35), rgba(255, 95, 90, 0.3));
+  border-color: rgba(255, 211, 106, 0.6);
+}
+
+.btn small {
+  opacity: 0.8;
+  font-size: 0.75rem;
+}
+
+.rush-card {
+  margin: 0 !important;
+}
+
+.level-tile.skipped {
+  border-style: dashed;
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .goal-card {
+    position: absolute;
+    left: 12px;
+    top: 120px;
+    max-width: 260px;
+  }
+}
+
+[hidden] {
+  display: none !important;
+}

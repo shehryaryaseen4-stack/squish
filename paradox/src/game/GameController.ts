@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { step } from './core/engine';
-import { A_ECHO, A_FLIP, A_WAIT, Action, GameEvent, LevelDef } from './core/types';
+import { initialState, step } from './core/engine';
+import { solutions } from './ProgressionManager';
+import { A_ECHO, A_FLIP, A_WAIT, ACTION_CHARS, Action, GameEvent, LevelDef, T_FLOOR } from './core/types';
 import { GameSession } from './GameSession';
 import { HintManager } from './HintManager';
 import { BoardView, SkinColors } from './render/BoardView';
@@ -17,6 +18,8 @@ export interface ControllerHooks {
   onHint(): void;
   onMessage(text: string): void;
   vibrate(ms: number | number[]): void;
+  /** A coin was picked up (board bonus coin or Coin Rush coin). */
+  onCoin(cell: number, combo: number): void;
 }
 
 /**
@@ -34,6 +37,15 @@ export class GameController {
   paused = false;
   finished = false;
   hintActions: Action[] | null = null;
+  /** performance.now() of the last player action, for automatic hints. */
+  lastActionAt = performance.now();
+  /** Bonus coins placed along the known route. */
+  readonly bonusCells: number[];
+  /** Pickups with the action count at which they happened (so undo can return them). */
+  private coinLog: { at: number; cell: number }[] = [];
+  private lastPickupAt = -99;
+  private combo = 0;
+  bestCombo = 0;
 
   constructor(
     readonly def: LevelDef,
@@ -47,6 +59,8 @@ export class GameController {
   ) {
     this.session = new GameSession(def);
     this.view = new BoardView(stage, this.session.L, this.session.state, theme, skin);
+    this.bonusCells = def.style === 'rush' ? [] : this.placeBonusCoins();
+    this.view.setBonusCoins(this.bonusCells);
     cam.frameBoard(this.session.L.w, this.session.L.h, this.view.gravityMode);
     this.frameGravity();
     this.removeUpdater = stage.addUpdater((dt, t) => this.tick(dt, t));
@@ -54,6 +68,65 @@ export class GameController {
 
   get state() {
     return this.session.state;
+  }
+
+  /** Bonus coins collected in the current attempt. */
+  get coinsCollected() {
+    return this.coinLog.length;
+  }
+
+  /**
+   * Scatter a few bonus coins along the stored solution route. They are
+   * optional, always reachable, and gently show the way.
+   */
+  private placeBonusCoins(): number[] {
+    const sol = solutions[this.def.id];
+    if (!sol) return [];
+    const L = this.session.L;
+    let s = initialState(L);
+    const route: number[] = [];
+    for (const ch of sol) {
+      const r = step(L, s, ACTION_CHARS.indexOf(ch));
+      if (!r) break;
+      s = r.state;
+      const c = s.p;
+      const plain =
+        L.terrain[c] === T_FLOOR && L.itemAt[c] < 0 && L.plateAt[c] < 0 && L.toggleAt[c] < 0 && L.timerAt[c] < 0 &&
+        L.portalPartner[c] < 0 && L.padAt[c] < 0 && L.doorAt[c] < 0 && L.bridgeAt[c] < 0 && c !== L.start;
+      if (plain && !route.includes(c)) route.push(c);
+    }
+    return route.filter((_c, i) => i % 3 === 1).slice(0, 6);
+  }
+
+  private collectedSet() {
+    return new Set(this.coinLog.map((c) => c.cell));
+  }
+
+  /** Drop pickups made after the current point in history (undo, rewind, restart). */
+  private trimCoins() {
+    const n = this.session.actions.length;
+    this.coinLog = this.coinLog.filter((c) => c.at <= n);
+    this.view.syncBonusCoins(this.collectedSet());
+  }
+
+  private pickups(events: GameEvent[]) {
+    const n = this.session.actions.length;
+    const got: number[] = [];
+    const p = this.state.p;
+    if (this.bonusCells.includes(p) && !this.coinLog.some((c) => c.cell === p)) {
+      this.coinLog.push({ at: n, cell: p });
+      got.push(p);
+    }
+    if (this.def.style === 'rush') for (const e of events) if (e.t === 'shard') got.push(e.cell);
+    for (const cell of got) {
+      this.combo = n - this.lastPickupAt <= 3 ? this.combo + 1 : 1;
+      this.lastPickupAt = n;
+      this.bestCombo = Math.max(this.bestCombo, this.combo);
+      this.view.coinBurst(cell);
+      this.audio.coin(this.combo);
+      this.hooks.onCoin(cell, this.combo);
+    }
+    if (got.length) this.view.syncBonusCoins(this.collectedSet());
   }
 
   private tick(dt: number, t: number) {
@@ -148,9 +221,13 @@ export class GameController {
       this.hooks.vibrate(12);
       return;
     }
+    this.lastActionAt = performance.now();
     const rewound = out.events.some((e) => e.t === 'rewind');
     this.view.sync(out.state, rewound ? [] : out.events, !rewound);
     this.frameGravity();
+    if (rewound) this.trimCoins();
+    else if (out.state.status !== 2) this.pickups(out.events);
+    if (out.events.some((e) => e.t === 'push')) this.cam.shake(0.07);
     if (rewound) this.view.rewindFlash();
     this.playSounds(out.events, a);
     this.busyUntil = performance.now() + (this.stage.reducedMotion ? 70 : 140) + this.extraDelay(out.events);
@@ -215,6 +292,7 @@ export class GameController {
       this.deathTimer = null;
       this.session.undo();
       this.view.sync(this.session.state, [], false);
+      this.trimCoins();
       this.frameGravity();
       this.view.reveal();
       this.hooks.onChange();
@@ -241,6 +319,8 @@ export class GameController {
       return false;
     }
     this.view.sync(s, [], false);
+    this.trimCoins();
+    this.lastActionAt = performance.now();
     this.frameGravity();
     this.audio.play('ui');
     this.refreshHint();
@@ -259,8 +339,21 @@ export class GameController {
     this.session.restart();
     this.view.reveal();
     this.view.sync(this.session.state, [], false);
+    this.trimCoins();
+    this.combo = 0;
+    this.lastPickupAt = -99;
+    this.lastActionAt = performance.now();
     this.frameGravity();
     this.hintActions = null;
+    this.hooks.onChange();
+  }
+
+  /** Undo back to `n` actions (used by the hint system). */
+  rewindTo(n: number) {
+    this.session.rewindTo(n);
+    this.view.sync(this.session.state, [], false);
+    this.trimCoins();
+    this.frameGravity();
     this.hooks.onChange();
   }
 

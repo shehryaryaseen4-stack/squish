@@ -24,7 +24,7 @@ await page.evaluate(() => {
 for (const id of ids) {
   await page.evaluate((id) => {
     const g = window.__paradox;
-    const all = [1, 2, 3, 4, 5].flatMap((w) => g.worldLevels(w));
+    const all = [1, 2, 3, 4, 5, 6].flatMap((w) => g.worldLevels(w));
     const def = id === 'daily' ? g.daily.challenge() : all.find((l) => l.id === id);
     if (def) g.play(def);
   }, id);

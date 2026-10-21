@@ -199,6 +199,15 @@ export class AudioManager {
     }
   }
 
+  /** Coin pickup; the pitch climbs with each coin in a combo. */
+  coin(combo: number) {
+    if (!this.ctx || this.ctx.state !== 'running' || this.sfxVolume <= 0) return;
+    const base = 988 * Math.pow(2, Math.min(combo - 1, 8) / 12);
+    this.tone(base, 0.07, 'square', 0.07);
+    this.tone(base * 1.5, 0.16, 'square', 0.07, 0.06);
+    if (combo >= 3) this.tone(base * 2, 0.2, 'triangle', 0.08, 0.12);
+  }
+
   /** Slow generative pad for a world (0 = menu). */
   startMusic(world: number) {
     this.musicWorld = Math.max(1, Math.min(5, world || 1));

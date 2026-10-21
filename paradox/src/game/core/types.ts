@@ -49,7 +49,9 @@ export type LegendEntry =
   | { kind: 'portal'; pair: number }
   | { kind: 'pad'; dir: Dir }
   | { kind: 'rail' }
-  | { kind: 'platform'; when?: Cond };
+  | { kind: 'platform'; when?: Cond }
+  /** Patrolling drone: moves one tile per action, bounces off obstacles, deadly on contact. */
+  | { kind: 'drone'; dir: Dir };
 
 /** A non-Euclidean connection: leaving cell `a` through side a[2] arrives in `b`
  *  through side b[2] (and vice versa). */
@@ -80,6 +82,8 @@ export interface LevelDef {
   /** Time echo: maximum recorded actions. Omit when echoes are not available. */
   echo?: number;
   links?: LinkDef[];
+  /** 'rush' levels belong to the Coin Rush arcade mode. */
+  style?: 'rush';
   /** Short story beat shown on completion. */
   story?: string;
 }
@@ -124,6 +128,7 @@ export interface Compiled {
   portalPartner: Int16Array;
   padAt: Int8Array;
   platforms: { path: number[]; start: number; when?: Cond }[];
+  drones: { cell: number; dir: Dir }[];
   railAt: Int16Array;
   blocks: number[];
   links: Map<number, { cell: number; dir: Dir; when?: Cond }>;
@@ -152,6 +157,8 @@ export interface State {
   mirrors: number[];
   plat: number[];
   platDir: number[];
+  drones: number[];
+  droneDir: number[];
   grav: number;
   flips: number;
   tick: number;
@@ -190,5 +197,6 @@ export type GameEvent =
   | { t: 'rewind' }
   | { t: 'wait' }
   | { t: 'lost'; who: 'g' | 'b'; block?: number }
-  | { t: 'dead'; reason: 'hazard' | 'fall' | 'loop' }
+  | { t: 'drone'; index: number; from: number; to: number }
+  | { t: 'dead'; reason: 'hazard' | 'fall' | 'loop' | 'drone' }
   | { t: 'win' };

@@ -30,6 +30,12 @@ export function mapScreen(game: Game, root: HTMLElement) {
             <small class="mech">${esc(w.mechanics)}</small>
           </button>`;
         }).join('')}
+        <button class="world-card rush-card" data-world="6" style="--world-bg:linear-gradient(160deg,#3a1d00 0%,#c2620e 50%,#ffd36a 100%)">
+          <div class="world-num">Bonus mode</div>
+          <h2>⚡ Coin Rush</h2>
+          <p>Short arcade boards: grab coins, dodge drones, beat the clock.</p>
+          <div class="world-meta"><span>${game.progress.rushProgress().done}/${game.progress.rushProgress().total} boards</span><span>★ ${game.progress.rushProgress().stars}/${game.progress.rushProgress().maxStars}</span></div>
+        </button>
         <p class="map-foot">${stars(3)} <span>${game.progress.totalStars()} / 300 stars collected</span></p>
       </div>
     </section>`;
@@ -37,7 +43,7 @@ export function mapScreen(game: Game, root: HTMLElement) {
   root.querySelectorAll<HTMLButtonElement>('[data-world]').forEach((b) =>
     b.addEventListener('click', () => {
       const w = Number(b.dataset.world);
-      if (!game.progress.isWorldUnlocked(w)) {
+      if (w !== 6 && !game.progress.isWorldUnlocked(w)) {
         game.audio.play('error');
         toast(t('map.locked'), 'warn');
         return;

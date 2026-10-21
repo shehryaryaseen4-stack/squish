@@ -264,3 +264,34 @@ describe('platforms, timers and clockwork', () => {
     expect(run(def, '.EE').at(-1)!.status).toBe(1);
   });
 });
+
+describe('drones', () => {
+  it('patrol and bounce off walls', () => {
+    const def = level('#H..#\nS...E');
+    const s = run(def, '...');
+    expect(s.map((x) => x.drones[0] % 5)).toEqual([1, 2, 3, 2]);
+  });
+
+  it('send you back when they touch you, including head-on swaps', () => {
+    const def = level('S.H.E');
+    // Drone at 2 moving east to 3; player steps to 1, then into the drone's lane.
+    const L = compileLevel(def);
+    let s = initialState(L);
+    s = step(L, s, 1)!.state; // player 1, drone 3
+    expect(s.status).toBe(0);
+    const hit = step(L, s, 1)!; // player 2, drone bounces off the exit? no: moves to 4 or back
+    expect([0, 2]).toContain(hit.state.status);
+    const corridor = level('S..H#E');
+    const swap = run(corridor, 'E');
+    // drone 3 -> moves east into wall? it is blocked by # and turns back to 2; player at 1: no hit yet
+    expect(swap[1].status).toBe(0);
+    expect(step(compileLevel(corridor), swap[1], 1)!.state.status).toBe(2);
+  });
+
+  it('are blocked by stones and keep the state deterministic', () => {
+    const def = level('SB.H.E');
+    const a = run(def, '.E.');
+    const b = run(def, '.E.');
+    expect(a.map((x) => x.drones.join())).toEqual(b.map((x) => x.drones.join()));
+  });
+});

@@ -54,6 +54,8 @@ export const DEFAULT_LEGEND: Record<string, LegendEntry> = {
   w: { kind: 'pad', dir: 3 },
   '-': { kind: 'rail' },
   '=': { kind: 'platform' },
+  H: { kind: 'drone', dir: 1 },
+  I: { kind: 'drone', dir: 2 },
   b: { kind: 'bridge', when: { ch: 0 } },
   d: { kind: 'bridge', when: { ch: 1 } },
 };
@@ -116,6 +118,7 @@ export function compileLevel(def: LevelDef): Compiled {
     portalPartner: neg(),
     padAt: new Int8Array(n).fill(-1),
     platforms: [],
+    drones: [],
     railAt: neg(),
     blocks: [],
     links: new Map(),
@@ -233,6 +236,9 @@ export function compileLevel(def: LevelDef): Compiled {
           if (e.when) conds.push(e.when);
           platformStarts.push({ cell: i, when: e.when });
           break;
+        case 'drone':
+          c.drones.push({ cell: i, dir: e.dir });
+          break;
       }
       c.terrain[i] = t;
     }
@@ -304,6 +310,8 @@ export function compileLevel(def: LevelDef): Compiled {
     if (cd.period) c.clockPeriod = lcm(c.clockPeriod, cd.period);
   }
 
+  if (def.gravity !== undefined && c.drones.length)
+    throw new LevelError(`${def.id}: drones are not supported in gravity chambers`);
   if (def.gravity !== undefined && c.platforms.length)
     throw new LevelError(`${def.id}: moving platforms are not supported in gravity chambers`);
 
@@ -322,6 +330,7 @@ export function compileLevel(def: LevelDef): Compiled {
   if (c.mirrors.length) m.add('mirrors');
   if (c.portals.length) m.add('portals');
   if (c.platforms.length) m.add('platforms');
+  if (c.drones.length) m.add('drones');
   if (def.gravity !== undefined) m.add('gravity');
   if (def.flips) m.add('flip');
   if (def.echo) m.add('echo');
@@ -329,7 +338,7 @@ export function compileLevel(def: LevelDef): Compiled {
   if (c.clockPeriod > 1) m.add('clockwork');
   if (c.hazardWhen.size || c.terrain.includes(T_HAZARD)) m.add('hazards');
   c.mechanics = [...m];
-  c.allowWait = !!def.echo || c.platforms.length > 0 || c.timers.length > 0 || c.clockPeriod > 1;
+  c.allowWait = !!def.echo || c.platforms.length > 0 || c.drones.length > 0 || c.timers.length > 0 || c.clockPeriod > 1;
   return c;
 }
 

@@ -1,5 +1,5 @@
-import { ALL_LEVELS, DAILY_LEVELS, WORLDS_LEVELS } from '../data/levels/index';
-import { WORLDS } from '../data/worlds';
+import { ALL_LEVELS, DAILY_LEVELS, RUSH_LEVELS, WORLDS_LEVELS } from '../data/levels/index';
+import { WORLDS, themeFor } from '../data/worlds';
 import { cosmeticById } from '../data/cosmetics';
 import type { AchievementDef } from '../data/achievements';
 import type { LevelDef } from './core/types';
@@ -46,7 +46,7 @@ export class Game {
 
   constructor(canvas: HTMLCanvasElement, ui: HTMLElement) {
     this.ui = ui;
-    const known = new Set([...ALL_LEVELS, ...DAILY_LEVELS].map((l) => l.id));
+    const known = new Set([...ALL_LEVELS, ...DAILY_LEVELS, ...RUSH_LEVELS].map((l) => l.id));
     this.saves = new SaveManager(undefined, known);
     this.rewards = new RewardManager(this.saves);
     this.progress = new ProgressionManager(this.saves, this.rewards);
@@ -112,6 +112,7 @@ export class Game {
     this.input.sensitivity = s.sensitivity;
     document.body.classList.toggle('reduced-motion', s.reducedMotion);
     document.body.classList.toggle('hide-pad', !s.showPad);
+    document.querySelectorAll<HTMLElement>('[data-tip]').forEach((e) => (e.hidden = !s.easyMode));
     setLanguage(s.language);
   }
 
@@ -166,7 +167,7 @@ export class Game {
       return;
     }
     this.endLevel();
-    const theme = WORLDS[(def.world || (this.daily.challenge().number % 5) + 1) - 1];
+    const theme = themeFor(def);
     this.stage.setTheme(theme);
     this.audio.startMusic(theme.id);
     this.show('game', { def });
@@ -175,7 +176,7 @@ export class Game {
   /** Create the controller for the game screen. */
   createController(def: LevelDef, hooks: ConstructorParameters<typeof GameController>[7]) {
     this.endLevel();
-    const theme = WORLDS[(def.world || (this.daily.challenge().number % 5) + 1) - 1];
+    const theme = themeFor(def);
     this.menuScene.show(false);
     this.controller = new GameController(def, this.stage, this.camera, this.audio, this.input, theme, this.skinColors(), hooks);
     this.input.enabled = true;
@@ -192,11 +193,12 @@ export class Game {
 
   nextLevel(def: LevelDef): LevelDef | null {
     if (def.world === 0) return null;
+    if (def.world === 6) return RUSH_LEVELS[def.number] ?? null;
     return ALL_LEVELS[def.number] ?? null;
   }
 
   worldLevels(world: number) {
-    return WORLDS_LEVELS[world - 1];
+    return world === 6 ? RUSH_LEVELS : WORLDS_LEVELS[world - 1];
   }
 
   /** Show unlocked achievements as toasts. */
