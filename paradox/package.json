@@ -1,0 +1,28 @@
+{
+  "name": "paradox-impossible-worlds",
+  "private": true,
+  "version": "1.0.0",
+  "description": "PARADOX: The Impossible Worlds - a 3D logic puzzle game (Three.js + TypeScript + Vite, installable PWA).",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "solve": "tsx scripts/solve-levels.ts",
+    "icons": "node scripts/make-icons.mjs",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.186.0",
+    "playwright-core": "1.56.1",
+    "tsx": "^4.20.0",
+    "typescript": "~5.9.3",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.5"
+  }
+}
