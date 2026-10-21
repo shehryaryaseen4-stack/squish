@@ -21,7 +21,7 @@ export interface Cond {
   ch?: number;
   /** Active on these phases of `tick % period` (clockwork mechanisms). */
   period?: number;
-  phases?: number[];
+  phases?: readonly number[];
   /** Flip the result. */
   invert?: boolean;
 }
@@ -176,7 +176,7 @@ export type GameEvent =
   | { t: 'move'; who: 'p' | 'g'; from: number; to: number }
   | { t: 'push'; block: number; from: number; to: number }
   | { t: 'teleport'; who: 'p' | 'g' | 'b'; from: number; to: number; block?: number }
-  | { t: 'link'; who: 'p' | 'g' | 'b'; from: number; to: number }
+  | { t: 'link'; who: 'p' | 'g' | 'b'; from: number; to: number; block?: number }
   | { t: 'fall'; who: 'p' | 'g' | 'b'; from: number; to: number; block?: number }
   | { t: 'fill'; block: number; cell: number }
   | { t: 'key'; cell: number }

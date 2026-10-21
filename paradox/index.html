@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#160a2a" />
+    <meta name="description" content="PARADOX: The Impossible Worlds. A 3D logic puzzle adventure across five impossible worlds and 100 levels." />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+    <title>PARADOX: The Impossible Worlds</title>
+  </head>
+  <body data-screen="splash">
+    <canvas id="scene" aria-hidden="true"></canvas>
+    <main id="ui">
+      <section class="screen splash" id="splash">
+        <div class="logo">
+          <div class="logo-mark" aria-hidden="true"><span></span></div>
+          <h1>PARADOX</h1>
+          <p>The Impossible Worlds</p>
+        </div>
+        <div class="loader" role="progressbar" aria-label="Loading"><span></span></div>
+        <noscript><p>PARADOX needs JavaScript to run.</p></noscript>
+      </section>
+    </main>
+    <div id="modals"></div>
+    <div id="toasts" aria-live="polite"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

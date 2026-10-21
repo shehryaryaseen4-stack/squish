@@ -128,12 +128,6 @@ export function platformAt(L: Compiled, s: State, cell: number): number {
   return L.platforms[r].path[s.plat[r]] === cell ? r : -1;
 }
 
-function itemConsumed(L: Compiled, s: State, cell: number, kind: string): boolean {
-  const i = L.itemAt[cell];
-  if (i < 0 || L.items[i].kind !== kind) return true;
-  return s.items[i] === 1;
-}
-
 /** Open = passable. Doors stay open while something stands in them. */
 export function doorOpen(L: Compiled, s: State, cell: number): boolean {
   const d = L.doorAt[cell];
