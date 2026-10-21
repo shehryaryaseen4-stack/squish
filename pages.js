@@ -273,7 +273,7 @@ function pickerPanel(groups, { current, extraClass = '', dataFmt = false, heads 
 
 function picker(label, groups, { current, align = '', role = '', dataFmt = false, placeholder = false } = {}) {
   const chipIcon = current && !placeholder ? fsvgFor(current) : fsvg('none');
-  return `<details class="chip-menu" data-menu${role ? ` data-role="${role}"` : ''}>`
+  return `<details class="chip-menu" name="ff-menu" data-menu${role ? ` data-role="${role}"` : ''}>`
     + `<summary class="chip${placeholder ? ' chip-empty' : ''}" aria-label="Choose format${placeholder ? '' : ` (currently ${label})`}">${chipIcon}<span class="chip-label">${label}</span><span class="caret" aria-hidden="true"></span></summary>`
     + pickerPanel(groups, { current, extraClass: align, dataFmt }) + '</details>';
 }
@@ -312,8 +312,8 @@ function topbar(full = false) {
   if (topbarCache[key]) return topbarCache[key];
   const mega = megaMenu();
   const toolsMenu = full
-    ? `<details class="nav-menu" data-menu><summary class="nav-item">Tools<span class="caret" aria-hidden="true"></span></summary>${mega}</details>`
-    : `<details class="nav-menu" data-menu data-lazy="/menu.html?v=${megaVersion}"><summary class="nav-item">Tools<span class="caret" aria-hidden="true"></span></summary><div class="dropdown mega-wait"><ul><li><a href="/converters">All formats and converters</a></li></ul></div></details>`;
+    ? `<details class="nav-menu" name="ff-menu" data-menu><summary class="nav-item">Tools<span class="caret" aria-hidden="true"></span></summary>${mega}</details>`
+    : `<details class="nav-menu" name="ff-menu" data-menu data-lazy="/menu.html?v=${megaVersion}"><summary class="nav-item">Tools<span class="caret" aria-hidden="true"></span></summary><div class="dropdown mega-wait"><ul><li><a href="/converters">All formats and converters</a></li></ul></div></details>`;
   const compress = ALL_COMPRESSORS.map((c) =>
     `<li><a href="${c.route}">${icon('compress')}Compress ${F(c.from).label}${c.status === 'live' ? '' : ' <span class="soon-tag">soon</span>'}</a></li>`).join('');
   const convertList = CATS.map((c) =>
@@ -323,9 +323,9 @@ function topbar(full = false) {
     ${BRAND_LINK}
     <nav class="main-nav" aria-label="Main">
       ${toolsMenu}
-      <details class="nav-menu nav-simple" data-menu><summary class="nav-item">Convert<span class="caret" aria-hidden="true"></span></summary><div class="dropdown"><ul>${convertList}</ul></div></details>
-      <details class="nav-menu nav-simple" data-menu><summary class="nav-item">Compress<span class="caret" aria-hidden="true"></span></summary><div class="dropdown"><ul>${compress}</ul></div></details>
-      <details class="nav-menu nav-simple nav-pdf" data-menu><summary class="nav-item">PDF Tools<span class="caret" aria-hidden="true"></span></summary>${pdfMenu()}</details>
+      <details class="nav-menu nav-simple" name="ff-menu" data-menu><summary class="nav-item">Convert<span class="caret" aria-hidden="true"></span></summary><div class="dropdown"><ul>${convertList}</ul></div></details>
+      <details class="nav-menu nav-simple" name="ff-menu" data-menu><summary class="nav-item">Compress<span class="caret" aria-hidden="true"></span></summary><div class="dropdown"><ul>${compress}</ul></div></details>
+      <details class="nav-menu nav-simple nav-pdf" name="ff-menu" data-menu><summary class="nav-item">PDF Tools<span class="caret" aria-hidden="true"></span></summary>${pdfMenu()}</details>
       ${PDF_EDITOR ? '<a class="nav-item nav-link nav-resume" href="/resume-maker">Resume<span class="nav-long">&nbsp;Builder</span></a>' : ''}
     </nav>
     <div class="top-actions">${PDF_EDITOR ? `
@@ -408,7 +408,7 @@ function anyInputPicker(ids, current) {
 }
 
 const emptyToPicker = () =>
-  `<details class="chip-menu" data-menu data-role="to"><summary class="chip chip-empty" aria-label="Choose output format">${fsvg('none')}<span class="chip-label">...</span><span class="caret" aria-hidden="true"></span></summary>`
+  `<details class="chip-menu" name="ff-menu" data-menu data-role="to"><summary class="chip chip-empty" aria-label="Choose output format">${fsvg('none')}<span class="chip-label">...</span><span class="caret" aria-hidden="true"></span></summary>`
   + `<div class="fmt-panel fmt-right"><label class="fmt-search">${SEARCH_ICON}<input type="search" class="fmt-q" placeholder="Search Format" autocomplete="off" aria-label="Search format"></label>`
   + '<div class="fmt-body"><ul class="fmt-cats"></ul><div class="fmt-grids"><p class="fmt-hint">Choose the input format first.</p><p class="fmt-none">No format found</p></div></div></div></details>';
 

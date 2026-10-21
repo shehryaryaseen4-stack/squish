@@ -49,7 +49,9 @@
   window.addEventListener("ff:converted", thanks);
 
   // Ad slots: present only when ADSENSE_CLIENT and slot IDs are set on the server.
-  document.querySelectorAll("ins.adsbygoogle").forEach(() => { (window.adsbygoogle = window.adsbygoogle || []).push({}); });
+  // adsbygoogle.push() throws when a slot is already filled or the ad script is blocked; that must
+  // never stop the rest of this file (menus, search, the converter), so each push is guarded.
+  document.querySelectorAll("ins.adsbygoogle").forEach(() => { try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch (_) { /* ads are optional */ } });
 
   // Every dropdown (header menus and format pickers) is a <details data-menu>.
   // Only one stays open at a time; clicking outside or pressing Escape closes it.
