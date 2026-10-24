@@ -18,7 +18,7 @@ const RASTER = { jpg: 'jpeg', png: 'png', webp: 'png', tiff: 'png', gif: 'png', 
 const PDF_LEVELS = { low: ['printer', 300], recommended: ['ebook', 150], strong: ['ebook', 100], extreme: ['ebook', 72] };
 
 async function pdfOut({ buffer, to, level, ocr, lang }) {
-  // HTML rebuilt from the PDF's text, fonts, pictures, drawings and tables (a ZIP package)
+  // HTML rebuilt from the PDF's text, fonts, pictures, drawings and tables (one self-contained file)
   const rebuilt = require('./pdfword');
   if (to.id === 'html' && rebuilt.available()) return rebuilt.convertPdfWord({ buffer, to, ocr, lang });
   return job(async (dir) => {

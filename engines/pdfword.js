@@ -5,7 +5,8 @@
 // fonts, pictures are separate images, drawings become shapes, ruled tables become tables.
 //   No OCR  the PDF's own text only; scanned pages are reported (and keep their pictures)
 //   OCR     scanned pages are read with Tesseract (real recognition, with orientation detection)
-// HTML comes back as a ZIP: index.html, style.css, images/, fonts/.
+// HTML comes back as one self-contained file (styles, pictures and fonts inside it), so it shows
+// correctly wherever it is opened.
 
 const fs = require('fs/promises');
 const path = require('path');
@@ -22,6 +23,7 @@ const EXIT = {
   3: ['This PDF is password-protected. Remove the password with Unlock PDF, then try again.', 422],
   5: ['This PDF has no pages.', 422],
   6: ['This PDF is a scan: its pages are pictures with no text in them. Choose OCR to turn the scanned text into editable text.', 422],
+  7: ['The Word file made from this PDF did not pass the validity check, so it was not offered for download. Please try again, or contact us with the PDF.', 500],
 };
 
 async function convertPdfWord({ buffer, to, ocr: wantOcr = false, lang = '' }) {
@@ -48,7 +50,7 @@ async function convertPdfWord({ buffer, to, ocr: wantOcr = false, lang = '' }) {
       L = 'eng';
     }
     const html = to.id === 'html';
-    const out = path.join(dir, html ? 'output.zip' : 'output.docx');
+    const out = path.join(dir, html ? 'output.html' : 'output.docx');
     let report = {};
     try {
       const { stdout } = await run(PYTHON, [RUNNER, input, out, wantOcr ? 'ocr' : 'text', L], {
@@ -59,6 +61,7 @@ async function convertPdfWord({ buffer, to, ocr: wantOcr = false, lang = '' }) {
     } catch (e) {
       if (e.userMessage) throw e;
       const code = Number((/exited with code (\d+)/.exec(e.message) || [])[1]);
+      if (code === 7) console.error('PDF to Word produced an invalid DOCX:', (e.stderr || '').slice(-2000));
       if (EXIT[code]) throw new UserError(EXIT[code][0], EXIT[code][1]);
       if (/password|encrypt/i.test(e.stderr || '')) throw new UserError(EXIT[3][0]);
       console.error('PDF conversion failed:', (e.stderr || e.message || '').slice(-1500));
@@ -70,7 +73,7 @@ async function convertPdfWord({ buffer, to, ocr: wantOcr = false, lang = '' }) {
       notes.push(`Font${report.fonts_substituted.length > 1 ? 's' : ''} ${report.fonts_substituted.slice(0, 4).join(', ')} could not be embedded and ${report.fonts_substituted.length > 1 ? 'were' : 'was'} replaced by a similar common font.`);
     }
     const result = await fs.readFile(out);
-    if (html) return { buffer: result, ext: 'zip', mime: 'application/zip', notes };
+    if (html) return { buffer: result, ext: 'html', mime: 'text/html; charset=utf-8', notes };
     if (to.id === 'docx') return { buffer: result, ext: 'docx', notes };
     // other Word formats from the DOCX
     const filter = { doc: 'doc:MS Word 97', odt: 'odt', rtf: 'rtf:Rich Text Format' }[to.id];

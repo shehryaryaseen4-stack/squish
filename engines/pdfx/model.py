@@ -464,8 +464,18 @@ def images(page, clean_page):
     """Each picture on the page, cut out of the picture layer so clipping (round photos) and
     transparency stay as they look, at about its own resolution (96-300 dpi)."""
     out, seen = [], set()
+    # the drawing order: a picture's place in the page's list of painting operations, so shapes
+    # drawn over a picture (frames, tints) stay over it
+    log = [(i, fitz.Rect(b)) for i, (kind, b) in enumerate(page.get_bboxlog()) if kind == 'fill-image']
+    taken = set()
     for info in page.get_image_info(xrefs=True):
-        r = fitz.Rect(info['bbox']) & page.rect
+        full = fitz.Rect(info['bbox'])
+        seq = next((i for i, b in log if i not in taken and abs(b.x0 - full.x0) < 1 and abs(b.y0 - full.y0) < 1
+                    and abs(b.x1 - full.x1) < 1 and abs(b.y1 - full.y1) < 1), None)
+        if seq is None:
+            seq = next((i for i, b in log if i not in taken and b.intersects(full)), 10 ** 6)
+        taken.add(seq)
+        r = full & page.rect
         if r.is_empty or r.width < 1 or r.height < 1:
             continue
         key = (round(r.x0), round(r.y0), round(r.x1), round(r.y1))
@@ -478,7 +488,7 @@ def images(page, clean_page):
         data, ext = encode(pix)
         if data is None:
             continue
-        out.append({'bbox': r, 'data': data, 'ext': ext, 'px': (pix.width, pix.height), 'xref': info.get('xref', 0)})
+        out.append({'bbox': r, 'data': data, 'ext': ext, 'px': (pix.width, pix.height), 'xref': info.get('xref', 0), 'seq': seq})
     return out
 
 
@@ -779,6 +789,7 @@ def analyze(pdf, mode, lang, work, report):
         work_doc, images_only, clean, rest = layer_pages(pdf, n, text_rects)
         vecs = vectors(page)
         tables, free = find_tables(page, lines, vecs)
+        pg['all_vectors'] = list(vecs)  # HTML draws table colours and rules in the drawing layer
         vecs = table_styles(tables, vecs)
         for t in tables:
             body = median_size([l for c in t['cells'] for l in c['lines']]) or 10

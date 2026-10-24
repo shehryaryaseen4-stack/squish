@@ -13,6 +13,9 @@
   rotated.pdf    a landscape (rotated) page and a line of vertical text
   unicode.pdf    accented Latin, Greek and Cyrillic text
   locked.pdf     simple.pdf with a password
+  resume.pdf     a designed page like a Canva resume: dark sidebar with white text, a round
+                 (clipped) photo with a ring drawn over it, a band drawn over a picture, and a
+                 crop box that is not at the page origin
 """
 import os
 import sys
@@ -156,6 +159,53 @@ def unicode():
                      '<p>Ελληνικά: Καλημέρα κόσμε.</p><p>Русский: Привет, мир.</p>')
 
 
+def circle(cx, cy, r):
+    k = 0.5523 * r
+    return (f'{cx + r} {cy} m {cx + r} {cy + k} {cx + k} {cy + r} {cx} {cy + r} c {cx - k} {cy + r} {cx - r} {cy + k} {cx - r} {cy} c '
+            f'{cx - r} {cy - k} {cx - k} {cy - r} {cx} {cy - r} c {cx + k} {cy - r} {cx + r} {cy - k} {cx + r} {cy} c')
+
+
+def resume():
+    doc = fitz.open()
+    W, H = 612, 860  # media box; the crop box below shows 595 x 842 of it, offset from the origin
+    page = doc.new_page(width=W, height=H)
+    page.insert_image(fitz.Rect(0, 0, 10, 10), pixmap=photo(300, 300))
+    page.insert_image(fitz.Rect(0, 0, 10, 10), pixmap=photo(400, 200))
+    names = [img[7] for img in page.get_images(full=True)]
+    page.clean_contents()
+    ox, oy = 9, 8  # crop box origin (PDF units, from the bottom-left)
+    content = (
+        # sidebar panel and main background band
+        f'q 0.118 0.165 0.267 rg {ox} {oy} 200 842 re f Q '
+        # round photo: clip to a circle, then paint the picture
+        f'q {circle(ox + 100, oy + 842 - 110, 60)} W n 120 0 0 120 {ox + 40} {oy + 842 - 170} cm /{names[0]} Do Q '
+        # a ring drawn over the photo (must stay above it)
+        f'q 1 1 1 RG 4 w {circle(ox + 100, oy + 842 - 110, 60)} S Q '
+        # a picture in the main area with a coloured band painted over its lower part
+        f'q 300 0 0 150 {ox + 250} {oy + 842 - 420} cm /{names[1]} Do Q '
+        f'q 0.9 0.2 0.18 rg {ox + 250} {oy + 842 - 420} 300 40 re f Q '
+    )
+    doc.update_stream(page.get_contents()[0], content.encode())
+    page.set_cropbox(fitz.Rect(ox, H - oy - 842, ox + 595, H - oy))
+    white, dark = (1, 1, 1), (0.12, 0.16, 0.27)
+    page.insert_text((30, 230), 'CONTACT', fontsize=12, fontname='hebo', color=white)
+    for i, t in enumerate(['0300-1234567', 'name@example.com', 'Lahore, Pakistan']):
+        page.insert_text((30, 255 + i * 16), t, fontsize=10, color=white)
+    page.insert_text((30, 330), 'SKILLS', fontsize=12, fontname='hebo', color=white)
+    for i, t in enumerate(['Architectural design', '3D visualization', 'Space planning']):
+        page.insert_text((30, 355 + i * 16), '\u2022  ' + t, fontsize=10, color=white)
+    page.insert_text((240, 100), 'MUNEEB MIRZA', fontsize=30, fontname='hebo', color=dark)
+    page.insert_text((240, 128), 'Architect | Architectural Designer', fontsize=14, color=dark)
+    page.insert_text((240, 190), 'PROFILE', fontsize=13, fontname='hebo', color=dark)
+    page.insert_text((262, 405), 'Text over the red band', fontsize=12, fontname='hebo', color=white)
+    for i, t in enumerate(['Motivated and creative designer with a bachelor of architecture',
+                           'and three years of freelance work for clients worldwide.']):
+        page.insert_text((240, 212 + i * 15), t, fontsize=10, color=(0.2, 0.2, 0.2))
+    path = os.path.join(OUT, 'resume.pdf')
+    doc.save(path)
+    return path
+
+
 simple_path = simple()
 styles_path = styles()
 images()
@@ -166,5 +216,6 @@ mixed()
 columns()
 rotated()
 unicode()
+resume()
 fitz.open(simple_path).save(os.path.join(OUT, 'locked.pdf'), encryption=fitz.PDF_ENCRYPT_AES_256, user_pw='secret', owner_pw='owner')
 print('ok')

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The two attributes of the XML namespace that WordprocessingML uses (xml:space, xml:lang). -->
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="http://www.w3.org/XML/1998/namespace" xml:lang="en">
+  <xsd:attribute name="lang" type="xsd:language"/>
+  <xsd:attribute name="space">
+    <xsd:simpleType>
+      <xsd:restriction base="xsd:NCName">
+        <xsd:enumeration value="default"/>
+        <xsd:enumeration value="preserve"/>
+      </xsd:restriction>
+    </xsd:simpleType>
+  </xsd:attribute>
+</xsd:schema>

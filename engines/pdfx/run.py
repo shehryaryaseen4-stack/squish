@@ -1,12 +1,13 @@
-"""PDF -> HTML package (ZIP) or Word (DOCX) that keeps the PDF's design and stays editable.
+"""PDF -> HTML (one self-contained file) or Word (DOCX) that keeps the PDF's design and stays editable.
 
-    pdf2docx-python engines/pdfx/run.py <in.pdf> <out.zip|out.docx> <text|ocr> [lang]
+    pdf2docx-python engines/pdfx/run.py <in.pdf> <out.html|out.docx> <text|ocr> [lang]
 
   text  never runs OCR; scanned pages are reported (they keep their pictures)
   ocr   pages that are scans are read with Tesseract (OCR); pages with text use their own text
 
 Prints one JSON line with what was done: pages, OCR pages, warnings.
-Exit codes: 3 password-protected, 5 no pages, 6 nothing readable (no text and no OCR).
+Exit codes: 3 password-protected, 5 no pages, 6 nothing readable (no text and no OCR),
+7 the Word file failed validation (engines/pdfx/validate_docx.py; nothing is written).
 """
 import json
 import os
@@ -47,18 +48,25 @@ def main():
         print(json.dumps(report))
         sys.exit(6)
     title = (pdf.metadata or {}).get('title') or os.path.splitext(os.path.basename(src))[0]
-    if dst.endswith('.zip'):
+    if dst.endswith('.html'):
         import html_out
         files = html_out.write(pages, fonts, title, dst)
-        # check the package: a page per PDF page, and the text really is in the HTML
+        # check the page: a section per PDF page, and nothing it needs lives outside the file
         index = files['index.html'].decode('utf-8')
         assert index.count('<section class="page"') == len(pages), 'page count'
+        assert 'src="images/' not in index and 'href="style.css"' not in index, 'self-contained'
     else:
         import docx_out
         docx_out.write(pages, fonts, pdf.metadata or {}, dst)
-        # check the document opens and holds the text
+        # never hand out a file Word would refuse: package, relationships and schema checks
+        import validate_docx
+        problems = validate_docx.validate(dst)
+        if problems:
+            sys.stderr.write('invalid DOCX:\n' + '\n'.join(problems[:20]) + '\n')
+            os.remove(dst)
+            sys.exit(7)
         from docx import Document
-        Document(dst)
+        Document(dst)  # and an independent reader can load it
     print(json.dumps(report))
 
 

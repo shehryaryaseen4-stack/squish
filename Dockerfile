@@ -41,7 +41,7 @@ RUN python3 -m venv /opt/pdf2docx \
   && /opt/pdf2docx/bin/pip install --no-cache-dir pdf2docx==0.5.13 \
   && printf '#!/bin/sh\nexec /opt/pdf2docx/bin/python "$@"\n' > /usr/local/bin/pdf2docx-python \
   && chmod +x /usr/local/bin/pdf2docx-python \
-  && pdf2docx-python -c "import cv2, docx, pymupdf, fontTools.ttLib; print('pdf tools ok')"
+  && pdf2docx-python -c "import cv2, docx, lxml, pymupdf, fontTools.ttLib; print('pdf tools ok')"
 
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules

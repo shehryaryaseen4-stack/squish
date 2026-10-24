@@ -77,6 +77,7 @@ class FontInfo:
         self.truetype = False                # glyf outlines: can be embedded in Word
         self.metrics = None                  # fitz.Font for measuring text in this font
         self.embed_name = None               # family name inside the repaired file
+        self.asc, self.desc = 0.9, 0.22      # the repaired file's ascent / descent (of the font size)
 
     @property
     def office(self):
@@ -191,12 +192,28 @@ def _repair(buf, uni2gid, name, bold, italic):
     for t in ('kern', 'GPOS', 'GSUB', 'GDEF', 'hdmx', 'LTSH', 'VDMX'):
         if t in ft and t in ('hdmx', 'LTSH', 'VDMX'):
             del ft[t]
+    # one set of vertical metrics everywhere (hhea = typo = win, no line gap), so every browser and
+    # Word puts the baseline at the same distance from the top of a line
+    os2 = ft['OS/2']
+    if os2.version < 4:
+        os2.version = 4
+        for a, v in (('sxHeight', int(hhea.ascent * 0.5)), ('sCapHeight', int(hhea.ascent * 0.7)), ('usDefaultChar', 0),
+                     ('usBreakChar', 32), ('usMaxContext', 0), ('ulCodePageRange1', 1), ('ulCodePageRange2', 0)):
+            if not hasattr(os2, a):
+                setattr(os2, a, v)
+    asc = max(hhea.ascent, os2.usWinAscent if hasattr(os2, 'usWinAscent') else 0, 1)
+    desc = max(-hhea.descent, os2.usWinDescent if hasattr(os2, 'usWinDescent') else 0, 0)
+    hhea.ascent, hhea.descent, hhea.lineGap = asc, -desc, 0
+    os2.sTypoAscender, os2.sTypoDescender, os2.sTypoLineGap = asc, -desc, 0
+    os2.usWinAscent, os2.usWinDescent = asc, desc
+    os2.fsSelection |= 1 << 7  # USE_TYPO_METRICS
     out = io.BytesIO()
     try:
         ft.save(out)
     except Exception:
         return None
-    return out.getvalue(), 'ttf' if truetype else 'otf', truetype
+    upem = head.unitsPerEm or 1000
+    return out.getvalue(), 'ttf' if truetype else 'otf', truetype, asc / upem, desc / upem
 
 
 def collect(pdf, used):
@@ -223,7 +240,7 @@ def collect(pdf, used):
             fixed = _repair(buf, uni2gid, name, fi.bold, fi.italic)
             if not fixed:
                 continue
-            data, fext, tt = fixed
+            data, fext, tt, fi.asc, fi.desc = fixed
             try:
                 met = fitz.Font(fontbuffer=data)
             except Exception:

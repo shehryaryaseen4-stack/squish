@@ -119,9 +119,19 @@ class Writer:
             st.insert(0, flag)
 
     # ----------------------------------------------------------------------------------- text --
+    def extra(self, run):
+        """The PDF's character spacing of a run (points per character), for embedded fonts."""
+        fi = self.fonts.get(run['font'])
+        t = run['text'].rstrip()
+        if fi is None or fi.metrics is None or len(t) < 2:
+            return 0
+        x = (run['bbox'].width - fi.metrics.text_length(t, fontsize=run['size'])) / len(t)
+        return x if abs(x) > 0.05 else 0
+
     def width(self, run, text=None):
         fi = self.fonts.get(run['font']) or FontInfo(run['font'])
-        return fi.width(run['text'] if text is None else text, run['size'], run.get('bold'))
+        text = run['text'] if text is None else text
+        return fi.width(text, run['size'], run.get('bold')) + self.extra(run) * len(text)
 
     def run_xml(self, run, text=None, scale=None):
         text = run['text'] if text is None else text
@@ -135,6 +145,8 @@ class Writer:
         props.append(f'<w:color w:val="{hexc(run.get("color"))}"/>')
         if scale and scale != 100:
             props.append(f'<w:w w:val="{scale}"/>')
+        elif exact and not scale and self.extra(run):  # the PDF's character spacing
+            props.append(f'<w:spacing w:val="{int(round(self.extra(run) * 20))}"/>')
         sz = max(2, int(round(run['size'] * 2)))
         props.append(f'<w:sz w:val="{sz}"/><w:szCs w:val="{sz}"/>')
         rpr = f'<w:rPr>{"".join(props)}</w:rPr>'
@@ -208,34 +220,42 @@ class Writer:
                     return False
         return True
 
-    def para_xml(self, p, box_x, box_w, before, numbering=None, jc_override=None):
+    def para_xml(self, p, box_x, box_w, before, numbering=None, jc_override=None, right=0.0):
         """One Word paragraph for a PDF paragraph, placed in a box starting at box_x."""
         ls = p['lines']
         L = self.line_height(p)
         first = ls[0]
         left = min(l['bbox'].x0 for l in ls[1:]) if len(ls) > 1 else first['bbox'].x0
-        ind = []
+        ind = {}  # one w:ind with all its attributes (Word rejects two)
         text_x = first['bbox'].x0
         strip = None
         if numbering:
             text_x, strip = numbering['text_x'], numbering['text']
-            ind.append(f'<w:ind w:left="{tw(text_x - box_x)}" w:hanging="{tw(text_x - numbering["bullet_x"])}"/>')
+            ind.update(left=tw(text_x - box_x), hanging=tw(max(0, text_x - numbering['bullet_x'])))
         else:
             first_ind = first['bbox'].x0 - left
             if abs(first_ind) > 0.8 and len(ls) > 1:
-                ind.append(f'<w:ind w:left="{tw(left - box_x)}" w:{"firstLine" if first_ind > 0 else "hanging"}="{tw(abs(first_ind))}"/>')
+                ind.update({'left': tw(left - box_x), 'firstLine' if first_ind > 0 else 'hanging': tw(abs(first_ind))})
             elif abs(left - box_x) > 0.3 and p['align'] in ('left', 'justify'):
-                ind.append(f'<w:ind w:left="{tw(left - box_x)}"/>')
+                ind['left'] = tw(left - box_x)
         align = jc_override or p['align']
         flow = self.can_flow(p, box_w - max(0, left - box_x)) and align in ('left', 'justify')
         self.flowed = self.flowed or (flow and len(ls) > 1)
         jc = {'left': 'left', 'justify': 'both', 'center': 'center', 'right': 'right'}[align]
         if not flow and jc == 'both':
             jc = 'left'
-        ppr = [f'<w:spacing w:before="{tw(max(0, before))}" w:after="0" w:line="{tw(L)}" w:lineRule="exact"/>'] + ind + [f'<w:jc w:val="{jc}"/>']
+        if right > 0:
+            ind['right'] = tw(right)
+        # paragraph properties in the order the WordprocessingML schema requires (Word refuses others)
+        ppr = ['<w:widowControl w:val="0"/>']
         if numbering:
-            ppr.insert(0, f'<w:numPr><w:ilvl w:val="0"/><w:numId w:val="{numbering["num"]}"/></w:numPr>')
-        ppr.insert(0, '<w:widowControl w:val="0"/><w:autoSpaceDE w:val="0"/><w:autoSpaceDN w:val="0"/>')
+            ppr.append(f'<w:numPr><w:ilvl w:val="0"/><w:numId w:val="{numbering["num"]}"/></w:numPr>')
+        ppr.append('<w:autoSpaceDE w:val="0"/><w:autoSpaceDN w:val="0"/>')
+        ppr.append(f'<w:spacing w:before="{tw(max(0, before))}" w:after="0" w:line="{max(1, tw(L))}" w:lineRule="exact"/>')
+        if ind:
+            order = ('left', 'right', 'hanging', 'firstLine')
+            ppr.append('<w:ind ' + ' '.join(f'w:{k}="{ind[k]}"' for k in order if k in ind) + '/>')
+        ppr.append(f'<w:jc w:val="{jc}"/>')
         body = []
         for i, l in enumerate(ls):
             if i:
@@ -561,9 +581,8 @@ class Writer:
             else:
                 jc = None
             if jc:
-                xml = self.para_xml(dict(p, align=jc), cb.x0, cb.width, before, jc_override=jc)
-                if jc == 'right':
-                    xml = xml.replace('<w:jc w:val="right"/>', f'<w:ind w:right="{tw(max(0, cb.x1 - p["bbox"].x1))}"/><w:jc w:val="right"/>', 1)
+                xml = self.para_xml(dict(p, align=jc), cb.x0, cb.width, before, jc_override=jc,
+                                    right=max(0, cb.x1 - p['bbox'].x1) if jc == 'right' else 0)
             else:
                 xml = self.para_xml(p, cb.x0, cb.width, before)
             out.append(xml)
@@ -598,16 +617,19 @@ class Writer:
             b = r['bbox']
             runs.append(self.picture(r['data'], b.x0, b.y0, b.width, b.height, True, z, 'Scan' if r['kind'] == 'scan' else 'Picture'))
             z += 1
-        vec = pg['vectors']
-        for d in vec[:3000]:
-            s = self.shape(d, z)
-            if s:
-                runs.append(s)
+        # shapes and pictures in the PDF's drawing order, so shapes painted over a picture (frames,
+        # bands, tints) stay over it
+        layers = [(d.get('seqno', 0), 0, d) for d in pg['vectors'][:3000]] + [(im.get('seq', 10 ** 6), 1, im) for im in pg['images']]
+        layers.sort(key=lambda t: (t[0], t[1]))
+        for _, kind, item in layers:
+            if kind == 0:
+                xml = self.shape(item, z)
+            else:
+                b = item['bbox']
+                xml = self.picture(item['data'], b.x0, b.y0, b.width, b.height, True, z)
+            if xml:
+                runs.append(xml)
                 z += 1
-        for im in pg['images']:
-            b = im['bbox']
-            runs.append(self.picture(im['data'], b.x0, b.y0, b.width, b.height, True, z))
-            z += 1
         runs.append(self.text_boxes(pg['blocks']))
         p = parse_xml(f'<w:p {NS}><w:pPr><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/><w:rPr><w:sz w:val="2"/></w:rPr></w:pPr>{"".join(runs)}</w:p>')
         sect_anchor.addprevious(p)
@@ -633,6 +655,10 @@ class Writer:
             el.append(parse_xml(f'<w:p {NS}><w:pPr><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/></w:pPr>{xml}</w:p>'))
 
     def build(self, dst):
+        # the template's <w:zoom> lacks the percentage the schema requires
+        zoom = self.doc.settings.element.find(qn('w:zoom'))
+        if zoom is not None and zoom.get(qn('w:percent')) is None:
+            zoom.set(qn('w:percent'), '100')
         for i, pg in enumerate(self.pages):
             self.page(pg, i)
         self.header_footer()
