@@ -25,7 +25,7 @@ module.exports = [
       ['Is this PDF to Word converter free?', 'Yes. It is completely free, with no sign-up, no email address, no watermark and no limit on how many files you convert in a day within fair use.'],
       ['Can I edit the Word file after converting?', 'Yes. The result is a normal DOCX file with editable text that opens in Microsoft Word, Google Docs, WPS Office and LibreOffice.'],
       ['Will the formatting stay the same?', 'Text, headings, bold, italic, lists and images come across. Complex layouts with columns, tables drawn as lines or text placed over pictures may be arranged differently, because Word flows text instead of fixing it to positions.'],
-      ['Can I convert a scanned PDF to Word?', 'Not into editable text: a scanned page is an image, and this converter does not do OCR. Use the PDF editor to type on top of a scan instead.'],
+      ['Can I convert a scanned PDF to Word?', 'Yes. Choose OCR when you convert: the text is read from the page and becomes editable in Word, in the same place, while the design, colours and pictures stay as they were. It is free.'],
       ['Can I convert PDF to Word on my phone?', 'Yes. The converter works in the browser on Android and iPhone; the Word file is saved to your downloads.'],
       ['Are my PDF files safe?', 'Files are converted on our server and deleted as soon as the conversion finishes. We never keep, read or share them.'],
     ],

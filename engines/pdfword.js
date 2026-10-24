@@ -3,15 +3,15 @@
 // tables, fonts, colours, images and the layout stay in place, unlike an ebook-style reflow.
 // DOC, ODT and RTF are made from that DOCX with LibreOffice.
 // Scanned PDFs (pages that are only pictures, with no text inside) would come out as pictures in
-// Word; for those the text is read with OCR (Tesseract, engines/ocr.js) and written as ordinary,
-// editable paragraphs instead.
+// Word; for those ocrdocx_run.py reads the text with OCR (Tesseract) and builds a Word file that
+// looks like the page: the design as a picture behind, the text editable at its place on top.
 
 const fs = require('fs/promises');
 const path = require('path');
 const { job, run, UserError } = require('./cli');
 
 const RUNNER = path.join(__dirname, 'pdf2docx_run.py');
-const TEXT_RUNNER = path.join(__dirname, 'textdocx_run.py');
+const OCR_RUNNER = path.join(__dirname, 'ocrdocx_run.py');
 const PYTHON = process.env.PDF2DOCX_PYTHON || 'pdf2docx-python';
 const MAX_PAGES = Math.max(1, Number(process.env.PDF2DOCX_MAX_PAGES || 150));
 
@@ -38,18 +38,15 @@ async function convertPdfWord({ buffer, to, ocr: wantOcr = false }) {
     // the visitor can also ask for OCR ("OCR" in the PDF to Word dialog), e.g. for a PDF that mixes scans and text
     const scanned = (wantOcr || fonts <= 0) && ocr.available();
     if (scanned) {
-      // read each page here, in this job's folder (calling ocr.ocr would wait for a second job slot)
+      // OCR runs inside this job (calling ocr.ocr would wait for a second job slot)
       if (pages > ocr.MAX_PAGES) throw new UserError(`This is a scanned PDF of ${pages} pages; up to ${ocr.MAX_PAGES} scanned pages can be turned into Word at once. Split it with Split PDF first.`, 413);
-      await run('pdftoppm', ['-r', '300', '-gray', '-png', input, path.join(dir, 'p')]);
-      const imgs = (await fs.readdir(dir)).filter((f) => /^p-\d+\.png$/.test(f)).sort((a, b) => Number(a.match(/\d+/)[0]) - Number(b.match(/\d+/)[0]));
-      const texts = [];
-      for (const img of imgs) {
-        const { stdout } = await run('tesseract', [path.join(dir, img), 'stdout', '-l', 'eng', '--psm', '3'], { env: { OMP_THREAD_LIMIT: '1' } });
-        texts.push(stdout.toString('utf8').replace(/\f/g, ''));
+      try {
+        await run(PYTHON, [OCR_RUNNER, input, docx, 'eng'], { timeoutMs: Math.max(120, pages * 40) * 1000, env: { OMP_THREAD_LIMIT: '1' } });
+      } catch (e) {
+        if (e.userMessage) throw e;
+        if (/exited with code 4/.test(e.message)) throw new UserError('No text was found in this PDF. If it is a photo or scan, try a clearer copy.', 422);
+        throw new UserError('This PDF could not be read with OCR. It may be damaged.', 415);
       }
-      const text = texts.join('\f');
-      if (!text.trim()) throw new UserError('No text was found in this PDF. If it is a photo or scan, try a clearer copy.', 422);
-      await run(PYTHON, [TEXT_RUNNER, docx], { input: Buffer.from(text, 'utf8') });
     } else try {
       await run(PYTHON, [RUNNER, input, docx], { timeoutMs: Math.max(120, pages * 6) * 1000 });
     } catch (e) {

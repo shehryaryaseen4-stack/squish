@@ -391,7 +391,7 @@ module.exports = {
       ['The layout looks different from the PDF.', 'PDF stores exact positions, while Word flows text. The text is all there; adjust spacing, columns and tables in Word.'],
     ],
     faq: [
-      ['Can I convert a scanned PDF to Word?', 'Not with editable text. Scanned PDFs contain images of pages, and this converter does not perform OCR.'],
+      ['Can I convert a scanned PDF to Word?', 'Yes. Choose OCR when you convert: the text is read from the page and becomes editable in Word, in the same place, while the design, colours and pictures stay as they were. It is free.'],
       ['Is my PDF kept after converting?', 'No. It is deleted from the server as soon as the Word file is ready.'],
     ],
   },

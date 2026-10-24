@@ -114,5 +114,6 @@ test('PDF to Word reads scanned pages as editable text (OCR)', { skip: (!has('pd
   const zip = await JSZip.loadAsync(out.buffer);
   const xml = await zip.file('word/document.xml').async('string');
   assert.match(xml, /Quarterly Sales Report/, 'the scanned text is real Word text');
-  assert.equal(Object.keys(zip.files).filter((f) => f.startsWith('word/media/')).length, 0, 'no page pictures');
+  assert.match(xml, /<w:framePr [^>]*w:hAnchor="page"/, 'the text sits where it was on the page');
+  assert.match(xml, /behindDoc="1"/, 'the design is a picture behind the text');
 });

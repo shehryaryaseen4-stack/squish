@@ -530,7 +530,7 @@
   }
 
   // PDF to Word: ask first whether the PDF has real text (No OCR) or is scanned (OCR), as other
-  // PDF sites do. OCR makes scanned pages editable text but does not keep tables or the layout.
+  // PDF sites do. OCR reads the text from the page picture and keeps the design behind it.
   const WORD_EXTS = ["docx", "doc", "odt", "rtf"];
   const isPdfToWord = r => !compressMode && isPdfRow(r) && WORD_EXTS.includes(r.target);
   let ocrDlg = null;
@@ -546,7 +546,7 @@
         <label class="ocr-opt"><input type="radio" name="ocr" value="0" checked><span><strong>No OCR</strong>
           Convert PDFs with selectable text into editable Word files. Tables, fonts and layout are kept.</span></label>
         <label class="ocr-opt"><input type="radio" name="ocr" value="1"><span><strong>OCR <em class="ocr-free">Free</em></strong>
-          Convert scanned PDFs with non-selectable text into editable Word files. The text is read from the page; tables and layout are not kept.</span></label>
+          Convert scanned PDFs with non-selectable text into editable Word files. The design stays as it is and the text is editable in its place.</span></label>
         <button class="btn btn-brand ocr-go" value="go">Convert to Word</button>
       </form>`;
       document.body.appendChild(ocrDlg);

@@ -186,7 +186,7 @@ module.exports = [
       ['When you are done', `<p>Edit the document in Word, then turn it back into a PDF with <a href="/docx-to-pdf">Word to PDF</a> so it looks the same for everyone.</p>`],
     ],
     faq: [
-      ['Can I convert a scanned PDF to editable Word?', 'Not with this converter: scanned PDFs contain pictures of pages, and it does not perform OCR. The Word file would contain no editable text.'],
+      ['Can I convert a scanned PDF to editable Word?', 'Yes. Choose OCR when you convert: the text is read from the page and becomes editable in Word, in the same place, while the design, colours and pictures stay as they were. It is free.'],
       ['Is PDF to Word conversion free?', 'Yes, free with no sign-up and no watermark.'],
       ['Why does my converted Word file look different?', 'PDFs fix every line on the page, while Word flows text. Paragraphs and text are kept, but tables, columns and spacing may need tidying.'],
     ],
