@@ -78,7 +78,7 @@ test('resume library: every job has six skills and short lines that fit the desi
   assert.equal(findJob('cashier').id, 'cashier');
 });
 
-test('PDF to Word keeps tables and colours (pdf2docx)', { skip: !has('pdf2docx-python') && 'pdf2docx missing', timeout: 120000 }, async () => {
+test('PDF to Word looks exactly like the PDF and can be edited', { skip: !has('pdf2docx-python') && 'pdf2docx missing', timeout: 120000 }, async () => {
   const fs2 = require('fs');
   const dir = fs2.mkdtempSync(path.join(DIR, 'w-'));
   fs2.writeFileSync(path.join(dir, 't.html'), '<table border="1"><tr><td>Region</td><td>Sales</td></tr><tr><td>North</td><td style="color:#c00">120</td></tr></table>');
@@ -88,12 +88,15 @@ test('PDF to Word keeps tables and colours (pdf2docx)', { skip: !has('pdf2docx-p
   const out = await convertPdfWord({ buffer: fs2.readFileSync(path.join(dir, 't.pdf')), to: registry.getFormat('docx') });
   const JSZip = require('jszip');
   const xml = await (await JSZip.loadAsync(out.buffer)).file('word/document.xml').async('string');
-  assert.match(xml, /<w:tbl>/, 'the table is a real Word table');
-  assert.match(xml, /North/);
+  assert.match(xml, />North</, 'the PDF\'s own text is editable Word text');
+  assert.match(xml, /<w:color w:val="CC0000"\/>[\s\S]*?>120</, 'colours are kept');
+  assert.match(xml, /<wp:positionH relativeFrom="page">/, 'text is placed where it was on the page');
+  assert.match(xml, /behindDoc="1"/, 'the design (table lines) is a picture behind the text');
+  assert.doesNotMatch(xml, /<w:framePr/);
   if (has('tesseract')) { // "OCR" chosen in the dialog: the text is read from the page image
     const o2 = await convertPdfWord({ buffer: fs2.readFileSync(path.join(dir, 't.pdf')), to: registry.getFormat('docx'), ocr: true });
     const x2 = await (await JSZip.loadAsync(o2.buffer)).file('word/document.xml').async('string');
-    assert.doesNotMatch(x2, /<w:tbl>/); assert.match(x2, /North/);
+    assert.match(x2, /North/);
   }
 });
 
@@ -114,6 +117,7 @@ test('PDF to Word reads scanned pages as editable text (OCR)', { skip: (!has('pd
   const zip = await JSZip.loadAsync(out.buffer);
   const xml = await zip.file('word/document.xml').async('string');
   assert.match(xml, /Quarterly Sales Report/, 'the scanned text is real Word text');
-  assert.match(xml, /<w:framePr [^>]*w:hAnchor="page"/, 'the text sits where it was on the page');
+  assert.match(xml, /<wps:txbx>/, 'the text sits in text boxes where it was on the page');
+  assert.match(xml, /<a:ln><a:noFill\/><\/a:ln>/, 'text boxes have no border');
   assert.match(xml, /behindDoc="1"/, 'the design is a picture behind the text');
 });

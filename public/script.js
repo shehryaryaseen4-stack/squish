@@ -544,7 +544,7 @@
         <h2 id="ocrChoiceTitle">PDF to Word</h2>
         <p class="pdf-choice-sub">Can you select the text in your PDF?</p>
         <label class="ocr-opt"><input type="radio" name="ocr" value="0" checked><span><strong>No OCR</strong>
-          Convert PDFs with selectable text into editable Word files. Tables, fonts and layout are kept.</span></label>
+          Convert PDFs with selectable text into editable Word files. The design and layout stay exactly as in the PDF.</span></label>
         <label class="ocr-opt"><input type="radio" name="ocr" value="1"><span><strong>OCR <em class="ocr-free">Free</em></strong>
           Convert scanned PDFs with non-selectable text into editable Word files. The design stays as it is and the text is editable in its place.</span></label>
         <button class="btn btn-brand ocr-go" value="go">Convert to Word</button>
