@@ -201,7 +201,8 @@
     render(`${topbar()}
       <div class="pad" style="margin-top:6px"><p class="muted" style="font-weight:600">${h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'}, ${esc(m.name.split(' ')[0])} 💪</p></div>
       <section class="member-card${dead ? ' expired' : ''}">
-        <div class="mc-top"><div style="display:flex;gap:12px;align-items:center"><a href="#/profile" aria-label="Your photo" class="mc-photo">${UI.avatarHtml(m, 'lg', '#ffffff')}</a><div><small>${esc(b.name)} member</small><h2>${esc(m.name)}</h2><div class="mc-no">No. ${m.memberNo}</div></div></div><span class="mc-pill">${esc(statusText(s))}</span></div>
+        <div class="mc-head"><a href="#/profile" aria-label="Your photo" class="mc-photo">${UI.avatarHtml(m, 'lg', '#ffffff')}</a><div class="mc-id"><small>${esc(b.name)} member</small><h2>${esc(m.name)}</h2><div class="mc-no">No. ${m.memberNo}</div></div></div>
+        <span class="mc-pill mc-status">${esc(statusText(s))}</span>
         <div class="mc-body"><div class="ring" style="--p:${pct}"><div><b>${s.daysLeft == null ? '—' : Math.max(0, s.daysLeft)}</b><span>days left</span></div></div>
           <div class="mc-info"><div><span>Plan</span><b>${esc(s.plan?.name || 'No plan yet')}</b></div><div><span>${s.status === 'expired' ? 'Expired on' : 'Valid till'}</span><b>${s.expiry ? dateLong(s.expiry) : '—'}</b></div></div></div>
       </section>
