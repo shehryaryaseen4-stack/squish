@@ -5,6 +5,7 @@
 // font, size and colour. Nothing is reflowed, so nothing moves.
 // Pages with no text of their own (scans) are read with OCR (Tesseract); "OCR" in the PDF to Word
 // dialog reads every page that way. DOC, ODT and RTF are made from the DOCX with LibreOffice.
+// PDF -> HTML is the same exact copy as a web page (engines/pdf.js hands it over).
 
 const fs = require('fs/promises');
 const path = require('path');
@@ -13,11 +14,13 @@ const { job, run, UserError } = require('./cli');
 const RUNNER = path.join(__dirname, 'exactdocx_run.py');
 const PYTHON = process.env.PDF2DOCX_PYTHON || 'pdf2docx-python';
 const MAX_PAGES = Math.max(1, Number(process.env.PDF2DOCX_MAX_PAGES || 150));
+let PY_OK = null;
+const available = () => (PY_OK === null ? (PY_OK = !!require('./detect').hasBin(PYTHON)) : PY_OK);
 
 async function convertPdfWord({ buffer, to, ocr: wantOcr = false }) {
   return job(async (dir) => {
     const input = path.join(dir, 'input.pdf');
-    const docx = path.join(dir, 'output.docx');
+    const docx = path.join(dir, to.id === 'html' ? 'output.html' : 'output.docx');
     await fs.writeFile(input, buffer);
     let pages = 0;
     try { pages = Number((/Pages:\s+(\d+)/.exec((await run('pdfinfo', [input])).stdout.toString()) || [])[1] || 0); } catch (e) {
@@ -36,7 +39,7 @@ async function convertPdfWord({ buffer, to, ocr: wantOcr = false }) {
       if (/password|encrypt/i.test(e.stderr || '')) throw new UserError('This PDF is password-protected. Remove the password with Unlock PDF, then try again.');
       throw new UserError('This PDF could not be converted to Word. It may be damaged.', 415);
     }
-    if (to.id === 'docx') return { buffer: await fs.readFile(docx), ext: 'docx' };
+    if (to.id === 'docx' || to.id === 'html') return { buffer: await fs.readFile(docx), ext: to.id };
     // other Word formats from the DOCX
     const filter = { doc: 'doc:MS Word 97', odt: 'odt', rtf: 'rtf:Rich Text Format' }[to.id];
     if (!filter) throw new UserError(`Converting PDF to ${to.label} is not supported yet.`);
@@ -50,4 +53,4 @@ async function convertPdfWord({ buffer, to, ocr: wantOcr = false }) {
   });
 }
 
-module.exports = { convertPdfWord };
+module.exports = { convertPdfWord, available };

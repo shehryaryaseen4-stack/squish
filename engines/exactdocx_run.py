@@ -1,6 +1,8 @@
 """PDF -> Word that looks exactly like the PDF and can be edited.
 
-    pdf2docx-python exactdocx_run.py <in.pdf> <out.docx> <auto|ocr|text> [lang]
+    pdf2docx-python exactdocx_run.py <in.pdf> <out.docx|out.html> <auto|ocr|text> [lang]
+
+  out.html: the same exact copy as a web page (each page an inline SVG: picture + selectable text)
 
   auto: OCR only the pages that have no text; ocr: OCR every page; text: never OCR (no Tesseract)
 
@@ -179,12 +181,18 @@ STAND_INS = {'sans': ('Arial', 'helv', 'hebo', 1.0), 'serif': ('Times New Roman'
 SCRIPT = re.compile(r'script|vibes|hand|brush|pacifico|dancing|signature|allura|sacramento|parisienne|satisfy|cursive|calligraph|tangerine|alex ?brush|kaushan|lobster', re.I)
 
 
+SERIF = re.compile(r'times|georgia|garamond|playfair|merriweather|lora|baskerville|bodoni|didot|(?<!sans )serif|roman|cormorant|crimson|'
+                   r'cinzel|abril|prata|spectral|cambria|minion|caslon|palatino|book ?antiqua|century schoolbook|charter|libre caslon', re.I)
+MONO = re.compile(r'mono|courier|consol|code|menlo', re.I)
+
+
 def stand_in(font, flags):
+    """The kind of a font by its name (the PDF's own serif flag is often wrong, e.g. on Montserrat)."""
     if SCRIPT.search(font):
         return STAND_INS['script']
-    if flags & 8:
+    if MONO.search(font):
         return STAND_INS['mono']
-    if flags & 4:
+    if SERIF.search(font):
         return STAND_INS['serif']
     return STAND_INS['sans']
 
@@ -228,7 +236,7 @@ def pdf_lines(page):
                 italic = bool(fl & 2) or bool(re.search(r'italic|oblique', nm, re.I))
                 c = sp['color']
                 spans.append((t, family(nm), sp['size'], bold, italic, ((c >> 16) & 255, (c >> 8) & 255, c & 255),
-                              fitz.Rect(sp['bbox']), sp['origin'], sp.get('ascender', 0.9), fl))
+                              fitz.Rect(sp['bbox']), sp['origin'], sp.get('ascender', 0.9), fl, nm))
             if spans:
                 while spans and not spans[-1][0].strip():
                     spans.pop()
@@ -243,12 +251,90 @@ def background(doc, n, w, h, rid):
     return drawing
 
 
-def jpeg(doc, rgb, w, h):
+def encode_jpeg(rgb, w, h):
     bw, bh = max(1, round(w * BG_DPI / 72)), max(1, round(h * BG_DPI / 72))
     if rgb.shape[1] != bw:
         rgb = cv2.resize(rgb, (bw, bh), interpolation=cv2.INTER_AREA)
     _, jpg = cv2.imencode('.jpg', cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 88])
-    return doc.part.get_or_add_image(io.BytesIO(jpg.tobytes()))[0]
+    return jpg.tobytes()
+
+
+def jpeg(doc, rgb, w, h):
+    return doc.part.get_or_add_image(io.BytesIO(encode_jpeg(rgb, w, h)))[0]
+
+
+def css_family(*names):
+    out = []
+    for nm in names:
+        if nm and nm not in out:
+            out.append(nm)
+    return ', '.join(f"'{nm}'" for nm in out)
+
+
+def page_fonts(pdf, fonts, pieces, faces):
+    """Embed the PDF's own fonts (TrueType/OpenType) in the web page when they can show every
+    character used with them; faces: raw font name -> (css name, @font-face rule) for the document."""
+    files = {}
+    for f in fonts:  # page.get_fonts(full=True), read before the text was removed
+        files.setdefault(f[3].split('+', 1)[-1], f[0])
+    for pc in pieces:
+        raw = pc[10]
+        if not raw or raw in faces:
+            continue
+        faces[raw] = None
+        xref = files.get(raw)
+        if not xref:
+            continue
+        try:
+            _, ext, _, buf = pdf.extract_font(xref)
+            if ext not in ('ttf', 'otf') or not buf:
+                continue
+            font = fitz.Font(fontbuffer=buf)
+            chars = {ch for q in pieces if q[10] == raw for ch in q[3] if not ch.isspace()}
+            if not all(font.has_glyph(ord(ch)) for ch in chars):
+                continue
+        except Exception:
+            continue
+        import base64
+        name = f'pdf-font-{len(faces)}'
+        mime = 'font/ttf' if ext == 'ttf' else 'font/otf'
+        faces[raw] = (name, f"@font-face{{font-family:'{name}';src:url(data:{mime};base64,{base64.b64encode(buf).decode()})}}")
+
+
+def svg_page(w, h, jpg, pieces, faces=None):
+    """One page as inline SVG: the design picture, and the text on top at its exact baseline and
+    width (textLength), so it lines up whatever font the browser uses. The text can be selected."""
+    import base64
+    parts = [f'<svg class="page" viewBox="0 0 {w:.2f} {h:.2f}" width="{w * 4 / 3:.0f}" height="{h * 4 / 3:.0f}" xmlns="http://www.w3.org/2000/svg">',
+             f'<image href="data:image/jpeg;base64,{base64.b64encode(jpg).decode()}" x="0" y="0" width="{w:.2f}" height="{h:.2f}" preserveAspectRatio="none"/>']
+    for x, base, width, text, fam, alt, size, bold, italic, colour, raw in pieces:
+        face = (faces or {}).get(raw)
+        if face:  # the PDF's own font: already bold or italic itself
+            fam, bold, italic = face[0], False, False
+        generic = 'serif' if alt in ('Times New Roman', 'Georgia', 'Garamond', 'Book Antiqua', 'Palatino Linotype', 'Cambria', 'Constantia') \
+            else 'monospace' if alt in ('Courier New', 'Consolas', 'Lucida Console') else 'cursive' if alt == 'Segoe Script' else 'sans-serif'
+        attrs = (f'x="{x:.2f}" y="{base:.2f}" font-size="{size:.2f}" fill="#{"%02x%02x%02x" % colour}" '
+                 f'font-family="{escape(css_family(fam, alt), {chr(34): "&quot;"})}, {generic}"')
+        if bold:
+            attrs += ' font-weight="bold"'
+        if italic:
+            attrs += ' font-style="italic"'
+        if width > 0 and len(text) > 1:
+            attrs += f' textLength="{width:.2f}" lengthAdjust="spacingAndGlyphs"'
+        parts.append(f'<text {attrs}>{escape(text)}</text>')
+    parts.append('</svg>')
+    return ''.join(parts)
+
+
+def write_html(dst, title, pages, faces=None):
+    html = ('<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'
+            '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+            f'<title>{escape(title)}</title>\n<style>\n'
+            'body{margin:0;background:#fff}\n'
+            '.page{display:block;margin:0 auto 8px;max-width:100%;height:auto}\n'
+            'text{white-space:pre}\n' + ''.join(f[1] + '\n' for f in (faces or {}).values() if f) + '</style>\n</head>\n<body>\n' + '\n'.join(pages) + '\n</body>\n</html>\n')
+    with open(dst, 'w', encoding='utf-8') as f:
+        f.write(html)
 
 
 def text_page(pdf, n, page):
@@ -276,7 +362,14 @@ def text_page(pdf, n, page):
     page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE, graphics=fitz.PDF_REDACT_LINE_ART_NONE, text=fitz.PDF_REDACT_TEXT_REMOVE)
     pix = page.get_pixmap(dpi=BG_DPI, alpha=False, colorspace=fitz.csRGB)
     rgb = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, 3)
-    boxes = []
+    boxes, pieces = [], []
+    for ln in lines:
+        for t, f, sz, bo, it, c, bbox, origin, _, fl, raw in ln:
+            lead, trail = len(t) - len(t.lstrip()), len(t) - len(t.rstrip())
+            if t.strip():
+                sp_w = sz * 0.28  # about one space
+                pieces.append((bbox.x0 + lead * sp_w, origin[1], max(0, bbox.width - (lead + trail) * sp_w), t.strip(),
+                               f, stand_in(f, fl)[0] if f not in OFFICE_FONTS else f, sz, bo, it, c, raw))
     for ln in lines:
         # split the line where spans are far apart (columns, tab stops), so each part keeps its place
         groups, cur = [], [ln[0]]
@@ -296,7 +389,7 @@ def text_page(pdf, n, page):
             if not g:
                 continue
             runs = []
-            for k, (t, f, sz, bo, it, c, bbox, _, _, fl) in enumerate(g):
+            for k, (t, f, sz, bo, it, c, bbox, _, _, fl, _) in enumerate(g):
                 if k == 0:
                     t = t.lstrip()
                 if f in OFFICE_FONTS:
@@ -309,7 +402,7 @@ def text_page(pdf, n, page):
             top = min(sp[7][1] - sp[2] * (min(1.05, max(0.75, sp[8])) if sp[1] in OFFICE_FONTS else 0.905) for sp in g)
             size = max(sp[2] for sp in g)
             boxes.append((x, top, (g[-1][6].x1 - x) * 1.1 + size, size * 1.3, runs))
-    return rgb, boxes
+    return rgb, boxes, pieces
 
 
 def ocr_page(page, lang, work, n):
@@ -330,7 +423,7 @@ def ocr_page(page, lang, work, n):
             mask[max(0, t[2] - pad):t[4] + pad, max(0, t[1] - pad):t[3] + pad] = 255
     clean = cv2.inpaint(img, mask, 5, cv2.INPAINT_TELEA) if segs else img
     k = page.rect.width / pix.width  # picture pixels -> points
-    boxes = []
+    boxes, pieces = [], []
     for s, (colour, bold) in zip(segs, styles):
         text = ' '.join(t[0] for t in s)
         x0, x1 = min(t[1] for t in s), max(t[3] for t in s)
@@ -341,7 +434,8 @@ def ocr_page(page, lang, work, n):
         base = max(t[4] - size_of(t)[1] * size_of(t)[0] for t in s) * k
         # Tesseract's box says how wide the text really is
         boxes.append((x0 * k, base - size * 0.905, width * 1.1 + size, size * 1.3, [(text, 'Arial', size, bold, False, colour, fit(text, size, bold, width))]))
-    return clean, boxes
+        pieces.append((x0 * k, base, width, text, 'Arial', 'Arial', size, bold, False, colour, None))
+    return clean, boxes, pieces
 
 
 def main():
@@ -349,6 +443,19 @@ def main():
     lang = sys.argv[4] if len(sys.argv) > 4 else 'eng'
     work = os.path.dirname(os.path.abspath(dst))
     pdf = fitz.open(src)
+    if dst.endswith('.html'):
+        svgs, faces = [], {}
+        for n, page in enumerate(pdf):
+            w, h = page.rect.width, page.rect.height
+            has_text = len(re.sub(r'\s+', '', page.get_text())) >= 10
+            use_ocr = mode == 'ocr' or (mode == 'auto' and not has_text)
+            fonts = page.get_fonts(full=True)
+            rgb, _, pieces = ocr_page(page, lang, work, n) if use_ocr else text_page(pdf, n, page)
+            if not use_ocr:
+                page_fonts(pdf, fonts, pieces, faces)
+            svgs.append(svg_page(w, h, encode_jpeg(rgb, w, h), pieces, faces))
+        write_html(dst, (pdf.metadata or {}).get('title') or 'Document', svgs, faces)
+        return
     doc = Document()
     body = doc.element.body
     for p in list(body.iterchildren(qn('w:p'))):  # the blank paragraph a new document starts with
@@ -363,7 +470,7 @@ def main():
         sec.header_distance = sec.footer_distance = Pt(0)
         has_text = len(re.sub(r'\s+', '', page.get_text())) >= 10
         use_ocr = mode == 'ocr' or (mode == 'auto' and not has_text)
-        rgb, boxes = ocr_page(page, lang, work, n) if use_ocr else text_page(pdf, n, page)
+        rgb, boxes, _ = ocr_page(page, lang, work, n) if use_ocr else text_page(pdf, n, page)
 
         # one paragraph per page holds the background picture and every text box, so nothing flows
         par = doc.add_paragraph()

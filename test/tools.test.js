@@ -121,3 +121,18 @@ test('PDF to Word reads scanned pages as editable text (OCR)', { skip: (!has('pd
   assert.match(xml, /<a:ln><a:noFill\/><\/a:ln>/, 'text boxes have no border');
   assert.match(xml, /behindDoc="1"/, 'the design is a picture behind the text');
 });
+
+test('PDF to HTML looks exactly like the PDF (picture + text + fonts)', { skip: !has('pdf2docx-python') && 'pdf2docx missing', timeout: 120000 }, async () => {
+  const fs2 = require('fs');
+  const dir = fs2.mkdtempSync(path.join(DIR, 'h-'));
+  fs2.writeFileSync(path.join(dir, 't.html'), '<body style="background:#123456"><h1 style="color:#ffcc00">Quarterly Report</h1><p style="color:#fff">North 120</p></body>');
+  execFileSync('soffice', ['--headless', `-env:UserInstallation=file://${dir}/p`, '--convert-to', 'pdf', '--outdir', dir, path.join(dir, 't.html')], { stdio: 'ignore' });
+  const { convertPdf } = require('../engines/pdf');
+  const registry = require('../registry');
+  const out = await convertPdf({ buffer: fs2.readFileSync(path.join(dir, 't.pdf')), from: registry.getFormat('pdf'), to: registry.getFormat('html') });
+  const html = out.buffer.toString('utf8');
+  assert.equal(out.ext, 'html');
+  assert.match(html, /<image href="data:image\/jpeg;base64,/, 'the page design is kept as a picture');
+  assert.match(html, /<text [^>]*fill="#ffcc00"[^>]*>Quarterly Report<\/text>/, 'text keeps its colour and is real text');
+  assert.match(html, /textLength="/, 'text keeps its exact width');
+});

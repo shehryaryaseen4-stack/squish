@@ -1,7 +1,7 @@
 'use strict';
 // PDF in and out:
 //   PDF -> JPG/PNG/WebP/TIFF   every page rendered (pdftoppm); several pages come back as a ZIP
-//   PDF -> TXT / HTML          pdftotext / pdftohtml
+//   PDF -> TXT / HTML          pdftotext / exact copy (pdfword.js; pdftohtml without it)
 //   PDF -> GIF / AVIF          pages rendered as PNG, then encoded with Sharp
 //   PDF -> SVG / EPS / PS      pdftocairo (SVG: one file per page)
 //   PDF -> XPS                 Ghostscript (xpswrite)
@@ -18,6 +18,9 @@ const RASTER = { jpg: 'jpeg', png: 'png', webp: 'png', tiff: 'png', gif: 'png', 
 const PDF_LEVELS = { low: ['printer', 300], recommended: ['ebook', 150], strong: ['ebook', 100], extreme: ['ebook', 72] };
 
 async function pdfOut({ buffer, to, level }) {
+  // HTML that looks exactly like the PDF: page design as a picture, text and fonts on top
+  const exact = require('./pdfword');
+  if (to.id === 'html' && exact.available()) return exact.convertPdfWord({ buffer, to });
   return job(async (dir) => {
     const input = path.join(dir, 'input.pdf');
     await fs.writeFile(input, buffer);
