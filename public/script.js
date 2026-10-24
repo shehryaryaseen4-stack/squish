@@ -12,7 +12,24 @@
   });
   document.querySelectorAll("details[data-menu]").forEach(d => d.addEventListener("toggle", () => {
     if (d.open) openMenus().forEach(o => { if (o !== d && !o.contains(d)) o.removeAttribute("open"); });
+    if (d.open) placePanel(d);
   }));
+  // A format picker opens downwards when it fits below, upwards when it fits above instead;
+  // when it fits on neither side, the page scrolls just enough to show it whole (never cut off).
+  function placePanel(d){
+    const panel = d.querySelector(":scope > .fmt-panel:not(.mega)");
+    if (!panel) return;
+    panel.classList.remove("fmt-up");
+    const top = (document.querySelector(".top") || { getBoundingClientRect: () => ({ bottom: 0 }) }).getBoundingClientRect().bottom + 8;
+    const room = window.innerHeight - 8;
+    const down = panel.getBoundingClientRect();
+    if (down.bottom <= room) return;
+    panel.classList.add("fmt-up");
+    if (panel.getBoundingClientRect().top >= top) return;
+    panel.classList.remove("fmt-up");
+    const by = Math.min(down.bottom - room, down.top - top);
+    if (by > 0) window.scrollBy({ top: by, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }
   // A click on a menu's button closes every other menu at once (before the browser toggles this
   // one), so two dropdowns are never open together, whatever the browser supports.
   document.addEventListener("click", e => {

@@ -113,6 +113,7 @@ a{color:inherit;}
 /* two-pane format picker: search + categories (left) + format buttons (right) */
 .fmt-panel{position:absolute; top:calc(100% + 8px); left:0; z-index:50; width:460px; max-width:calc(100vw - 32px); background:var(--menu-bg); color:var(--ink); border:1px solid var(--border); border-radius:8px; box-shadow:var(--shadow-lg); overflow:hidden; text-align:left;}
 .fmt-panel.fmt-right{left:auto; right:0;}
+.fmt-panel.fmt-up{top:auto; bottom:calc(100% + 8px);}
 .fmt-search{display:flex; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid var(--border); color:var(--dim); cursor:text;}
 .fmt-q{flex:1; min-width:0; border:0; outline:0; background:transparent; font:inherit; font-size:.98rem; color:var(--ink);}
 .fmt-q::placeholder{color:var(--dim);}
