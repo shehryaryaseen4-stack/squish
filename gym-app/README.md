@@ -27,7 +27,14 @@ A complete management app for a gym, plus an app for its members. It is built to
 - **Settings** (owner only): gym details, brand colour, admission fee, reminder days, blocking expired members at check-in, opening hours, plans, trainers and staff with salaries, PINs, and clearing the demo data.
 - **Two PINs:** the owner PIN opens everything. The front desk PIN can check members in, add members and collect fees, but cannot see money reports, expenses or settings.
 
-**Fingerprint machine:** ZKTeco and other attendance machines that support "Cloud server / ADMS" push send every thumb punch to `/iclock/cdata`. Enroll each member's thumb on the machine with User ID = member number, set the machine's server address to your domain, and approve it in **Settings → Fingerprint machine**. The first punch of the day checks the member in, the next one checks them out, and double taps within 2 minutes are ignored. Punches from IDs that aren't members are listed so you can fix the enrollment. Settings also has a "Punch" button to try it without a machine.
+**Fingerprint & face machines:** in **Settings → Fingerprint & face machines → Add machine** the owner picks the machine they have (ZKTeco fingerprint, ZKTeco face, eSSL/Identix, ZKTeco ZLink, Hikvision face terminal, or another brand). The app then asks only for what that machine needs (the serial number for ZKTeco-type machines, nothing for Hikvision), shows the exact settings to enter on the machine, and **Check connection** waits for the machine to call in. It shows ✅ *Connected* or ❌ *Not connected* with the reason and what to check. A mistyped serial number is detected and fixed with one tap.
+- ZKTeco, eSSL and other "ADMS / Cloud server / Push" machines send punches to `/iclock/cdata`.
+- Hikvision face terminals send events from **HTTP Listening** to a private address `/hik/<key>` (beta: built from Hikvision's event format, not yet tried on a real terminal).
+- On the machine, each member's User ID / Employee No. is their member number. A punch checks the member in, the next one checks them out, and double taps within 2 minutes are ignored. IDs that match no member are listed so the enrollment can be fixed. Settings also has a "Punch" button to try it without a machine.
+
+**Entry screen (`/display`):** open it on a TV or big monitor at the entrance and enter a PIN once. Every check-in from a machine, the kiosk or the front desk appears within 2 seconds, full size: the member's photo, name, member number, plan and days left, in green, amber (fee due soon or money pending) or red (expired). Check-outs show how long they trained. A side column lists the latest entries, how many are inside and today's total. It has an optional chime and a full-screen button.
+
+**Member photos:** members set or change their photo from the app (Profile → tap the picture), and the front desk can take one from the member's profile. Photos are cropped to a square on the phone before upload and show up in lists, the member profile, the desk, the kiosk and the entry screen. They are stored as files in a `photos/` folder next to the data file.
 
 **Check-in kiosk (`/kiosk`):** put a tablet at the entrance. Members type their number to check in or out, and the screen shows days left or a "please renew" warning.
 
@@ -56,6 +63,7 @@ npm test
 - Member app: `http://localhost:3100` (demo member **1001**, PIN **1111**)
 - Manager: `http://localhost:3100/admin` (owner PIN **1234**, front desk PIN **0000**)
 - Kiosk: `http://localhost:3100/kiosk`
+- Entry screen for a TV: `http://localhost:3100/display`
 
 The first start creates **demo data**: 100 members with 14 months of fees, visits and expenses. Clear it in **Settings → Data** before going live, or start with `SEED=empty`.
 

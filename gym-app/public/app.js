@@ -201,7 +201,7 @@
     render(`${topbar()}
       <div class="pad" style="margin-top:6px"><p class="muted" style="font-weight:600">${h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'}, ${esc(m.name.split(' ')[0])} 💪</p></div>
       <section class="member-card${dead ? ' expired' : ''}">
-        <div class="mc-top"><div><small>${esc(b.name)} member</small><h2>${esc(m.name)}</h2><div class="mc-no">No. ${m.memberNo}</div></div><span class="mc-pill">${esc(statusText(s))}</span></div>
+        <div class="mc-top"><div style="display:flex;gap:12px;align-items:center"><a href="#/profile" aria-label="Your photo" class="mc-photo">${UI.avatarHtml(m, 'lg', '#ffffff')}</a><div><small>${esc(b.name)} member</small><h2>${esc(m.name)}</h2><div class="mc-no">No. ${m.memberNo}</div></div></div><span class="mc-pill">${esc(statusText(s))}</span></div>
         <div class="mc-body"><div class="ring" style="--p:${pct}"><div><b>${s.daysLeft == null ? '—' : Math.max(0, s.daysLeft)}</b><span>days left</span></div></div>
           <div class="mc-info"><div><span>Plan</span><b>${esc(s.plan?.name || 'No plan yet')}</b></div><div><span>${s.status === 'expired' ? 'Expired on' : 'Valid till'}</span><b>${s.expiry ? dateLong(s.expiry) : '—'}</b></div></div></div>
       </section>
@@ -392,11 +392,38 @@
     const m = d.member;
     const trainer = state.gym.staff.find((x) => x.id === m.trainerId);
     render(`<div class="page-title"><h1>Profile</h1></div>
-      <div class="card box" style="margin-top:14px;display:flex;gap:14px;align-items:center"><span class="avatar lg">${esc(initials(m.name))}</span><div><b style="font-size:17px">${esc(m.name)}</b><p class="muted">Member no. ${m.memberNo} · ${esc(m.phone)}</p></div></div>
+      <div class="card box" style="margin-top:14px;display:flex;gap:16px;align-items:center"><button class="photo-edit" data-photo aria-label="Change your photo">${UI.avatarHtml(m, 'xl')}<span class="cam">${icon('camera')}</span></button><div><b style="font-size:17px">${esc(m.name)}</b><p class="muted">Member no. ${m.memberNo} · ${esc(m.phone)}</p><button class="link" data-photo2>${m.photo ? 'Change photo' : 'Add your photo'}</button></div></div>
       <div class="card recap"><div class="recap-row"><span>Joined</span><b>${dateLong(m.joinDate)}</b></div>${trainer ? `<div class="recap-row"><span>Trainer</span><b>${esc(trainer.name)}</b></div>` : ''}${m.goal ? `<div class="recap-row"><span>Goal</span><b>${esc(m.goal)}</b></div>` : ''}${m.emergencyName ? `<div class="recap-row"><span>Emergency contact</span><b>${esc(m.emergencyName)}</b></div>` : ''}</div>
       <div class="detail-actions" style="margin-top:16px"><a class="btn btn-ghost" href="#/fees">${icon('wallet')}Fees & receipts</a><button class="btn btn-ghost" data-pin>${icon('lock')}Change PIN</button><button class="btn btn-danger" data-out>${icon('logout')}Sign out</button></div>
       <section class="section"><div class="section-head"><h2>Gym</h2></div>${infoCard()}</section>`);
     view.querySelector('[data-out]').addEventListener('click', () => logout());
+    const changePhoto = () => sheet({
+      title: 'Your photo',
+      html: `<div style="display:grid;justify-items:center;gap:12px;padding:6px 0 4px">${UI.avatarHtml(m, 'xl')}<p class="muted" style="text-align:center">The gym sees this photo at the front desk and on the entry screen when you check in.</p></div>
+        <div class="sheet-actions">${m.photo ? `<button class="btn btn-danger" data-remove>${icon('trash')}Remove</button>` : ''}<button class="btn btn-primary" data-pick>${icon('camera')}${m.photo ? 'Change photo' : 'Choose a photo'}</button></div>`,
+      onMount: (el, close) => {
+        el.querySelector('[data-pick]').addEventListener('click', async (e) => {
+          const btn = e.currentTarget;
+          try {
+            const image = await UI.pickPhoto();
+            if (!image) return;
+            const r = await busy(btn, () => api('/api/member/photo', { method: 'PUT', body: { image } }));
+            state.me.member.photo = r.photo;
+            close();
+            toast('Photo updated');
+            profileView();
+          } catch (err) { toast(err.message, 'bad'); }
+        });
+        el.querySelector('[data-remove]')?.addEventListener('click', async () => {
+          await api('/api/member/photo', { method: 'DELETE' });
+          delete state.me.member.photo;
+          close();
+          profileView();
+        });
+      },
+    });
+    view.querySelector('[data-photo]').addEventListener('click', changePhoto);
+    view.querySelector('[data-photo2]').addEventListener('click', changePhoto);
     view.querySelector('[data-pin]').addEventListener('click', () => sheet({
       title: 'Change PIN',
       html: `<form class="form" style="padding:0" novalidate><label class="field"><span>Current PIN</span><input class="input" name="current" type="password" inputmode="numeric" maxlength="8"></label><label class="field"><span>New PIN (4–8 digits)</span><input class="input" name="next" type="password" inputmode="numeric" maxlength="8"></label></form>

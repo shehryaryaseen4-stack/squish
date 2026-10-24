@@ -77,7 +77,7 @@
     code = '';
     paint();
     try {
-      const r = await api('/api/admin/checkin', { method: 'POST', body: { memberNo: no } });
+      const r = await api('/api/admin/checkin', { method: 'POST', body: { memberNo: no, source: 'kiosk' } });
       show(r);
       loadInside();
     } catch (e) {
@@ -106,7 +106,7 @@
         const mins = toM(r.visit.out) - toM(r.visit.in);
         note = `Great session: ${mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins} min`}. See you soon!`;
       }
-      el.innerHTML = `<div class="k-result ${tone}"><span class="avatar" style="--c:var(--accent)">${esc(initials(r.member.name))}</span>
+      el.innerHTML = `<div class="k-result ${tone}">${UI.avatarHtml(r.member, '', 'var(--accent)')}
         <h2>${r.action === 'in' ? `Welcome, ${first}!` : `Bye, ${first}!`}</h2><p class="sub">#${r.member.memberNo} · ${r.action === 'in' ? 'Checked in' : 'Checked out'} at ${time12(r.action === 'in' ? r.visit.in : r.visit.out)}</p>${note ? `<p class="note">${note}</p>` : ''}</div>`;
     }
     resetTimer = setTimeout(entry, r.error ? 4000 : 4500);
@@ -119,7 +119,7 @@
       const el = document.getElementById('side');
       if (!el) return;
       el.innerHTML = `<section class="card panel"><div class="panel-head"><h2>In the gym now</h2><b style="font-size:22px">${inside.length}</b></div>
-        <div class="rows" style="max-height:52vh;overflow:auto">${inside.map((a) => `<div class="m-row" style="cursor:default"><span class="avatar sm">${esc(initials(a.member?.name))}</span><span class="tx"><b>${esc(a.member?.name || '')}</b><span>since ${time12(a.in)}</span></span></div>`).join('') || '<p class="muted">Nobody yet. Be the first! 💪</p>'}</div>
+        <div class="rows" style="max-height:52vh;overflow:auto">${inside.map((a) => `<div class="m-row" style="cursor:default">${UI.avatarHtml(a.member, 'sm')}<span class="tx"><b>${esc(a.member?.name || '')}</b><span>since ${time12(a.in)}</span></span></div>`).join('') || '<p class="muted">Nobody yet. Be the first! 💪</p>'}</div>
         <p class="muted" style="font-size:13px;margin-top:12px">${day.list.length} check-ins today</p></section>`;
     } catch { /* keep the last list */ }
   }

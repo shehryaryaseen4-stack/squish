@@ -18,7 +18,7 @@ const lib = (f) => fs.readFileSync(path.join(root, 'lib', f), 'utf8');
 
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
-for (const f of ['base.css', 'gym.css', 'app.css', 'admin.css', 'kiosk.css', 'icons.js', 'common.js', 'workout.js', 'app.js', 'admin.js', 'kiosk.js']) {
+for (const f of ['base.css', 'gym.css', 'app.css', 'admin.css', 'kiosk.css', 'display.css', 'icons.js', 'common.js', 'workout.js', 'app.js', 'admin.js', 'kiosk.js', 'display.js']) {
   fs.writeFileSync(path.join(out, f), pub(f));
 }
 fs.cpSync(path.join(root, 'public', 'exercises'), path.join(out, 'exercises'), { recursive: true });
@@ -67,7 +67,10 @@ function createStore({ seed = 'demo', ownerPin = '1234', staffPin = '0000', now 
     save();
   }
   save();
-  return { get db() { return db; }, save, clearData };
+  const savePhoto = (memberId, base64) => 'data:image/jpeg;base64,' + base64;
+  const deletePhoto = () => {};
+  const readPhoto = () => null;
+  return { get db() { return db; }, save, clearData, savePhoto, deletePhoto, readPhoto };
 }
 module.exports = { createStore, hashPin, checkPin };
 `;
@@ -162,6 +165,8 @@ const page = `<title>Iron Republic Gym App</title>
   .demo-strip button { border: 0; border-radius: 99px; padding: 6px 12px; background: transparent; color: inherit; font: inherit; cursor: pointer; opacity: .75; }
   .demo-strip button[aria-pressed="true"] { background: var(--accent, #f97316); color: #fff; opacity: 1; }
   .demo-strip .reset { margin-left: auto; text-decoration: underline; }
+  html[data-demo-mode="display"] .ds { height: calc(100dvh - 76px); }
+  .demo-punch { border: 0; border-radius: 99px; padding: 4px 12px; margin-left: 6px; background: var(--accent, #f97316); color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
   .demo-strip::-webkit-scrollbar { display: none; }
   .demo-pins { padding: 6px max(16px, env(safe-area-inset-right, 0px)) 6px max(16px, env(safe-area-inset-left, 0px)); background: var(--accent-soft, #fde7d6); color: var(--ink, #12121a); font: 600 12.5px/1.3 "Plus Jakarta Sans", system-ui, sans-serif; }
   .demo-loading { padding: 40px 16px; text-align: center; font: 500 14px system-ui, sans-serif; color: #888; }
@@ -171,6 +176,7 @@ const page = `<title>Iron Republic Gym App</title>
   <button data-mode="member">Member app</button>
   <button data-mode="manager">Gym manager</button>
   <button data-mode="kiosk">Kiosk</button>
+  <button data-mode="display">Entry screen</button>
   <button class="reset" data-reset>Reset</button>
 </div>
 <div class="demo-pins" data-pins></div>
@@ -181,6 +187,7 @@ const page = `<title>Iron Republic Gym App</title>
     member: { css: ['base.css', 'gym.css', 'app.css'], js: ['workout.js', 'app.js'], html: '<div class="app"><main id="view" tabindex="-1"></main><nav class="tabbar" id="tabbar" aria-label="Main" hidden></nav></div>', pins: 'Member 1001 · PIN 1111' },
     manager: { css: ['base.css', 'gym.css', 'admin.css'], js: ['workout.js', 'admin.js'], html: '<div id="root"></div>', pins: 'Owner PIN 1234 · Front desk 0000' },
     kiosk: { css: ['base.css', 'gym.css', 'admin.css', 'kiosk.css'], js: ['kiosk.js'], html: '<div id="root"></div>', pins: 'PIN 0000, then type 1001–1100' },
+    display: { css: ['base.css', 'display.css'], js: ['display.js'], html: '<div id="root"></div>', pins: 'PIN 0000 · <button class="demo-punch" data-punch>Simulate a thumb punch</button>' },
   };
   const read = (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } };
   const write = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* ignore */ } };
@@ -191,17 +198,26 @@ const page = `<title>Iron Republic Gym App</title>
     b.setAttribute('aria-pressed', b.dataset.mode === mode);
     b.addEventListener('click', () => switchTo(b.dataset.mode));
   });
-  document.querySelector('[data-pins]').textContent = m.pins;
+  document.querySelector('[data-pins]').innerHTML = m.pins;
+  // On the demo entry screen, pretend someone put their thumb on the machine.
+  document.querySelector('[data-punch]')?.addEventListener('click', async () => {
+    let token = null;
+    try { token = JSON.parse(localStorage.getItem('displayToken')); } catch (e) { /* not signed in */ }
+    if (!token) return window.UI?.toast('Enter PIN 0000 on the entry screen first.', 'bad');
+    const no = String(1001 + Math.floor(Math.random() * 100));
+    await fetch('/api/admin/devices/test-punch', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify({ memberNo: no }) });
+  });
   document.querySelector('[data-reset]').addEventListener('click', () => { window.resetGymDemo?.(); try { localStorage.removeItem('adminToken'); localStorage.removeItem('memberToken'); localStorage.removeItem('kioskToken'); } catch (e) { /* ignore */ } location.hash = ''; location.reload(); });
   function switchTo(next) { write('gymDemoMode', next); history.replaceState(null, '', location.pathname); location.reload(); }
   // Links between the apps switch the demo instead of leaving the page.
-  const LINKS = { '/index.html': 'member', '/': 'member', '/admin.html': 'manager', '/kiosk.html': 'kiosk' };
+  const LINKS = { '/index.html': 'member', '/': 'member', '/admin.html': 'manager', '/kiosk.html': 'kiosk', '/display.html': 'display' };
   document.addEventListener('click', (e) => {
     const a = e.target.closest && e.target.closest('a[href]');
     const target = a && LINKS[a.getAttribute('href')];
     if (target) { e.preventDefault(); switchTo(target); }
   }, true);
-  if (mode === 'kiosk') document.documentElement.dataset.theme = 'dark';
+  if (mode === 'kiosk' || mode === 'display') document.documentElement.dataset.theme = 'dark';
+  document.documentElement.dataset.demoMode = mode;
   for (const href of m.css) { const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href; document.head.append(l); }
   document.getElementById('demo-app').innerHTML = m.html;
   const scripts = ['config.js', 'demo-backend.js', 'icons.js', 'common.js', ...m.js];

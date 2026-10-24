@@ -184,8 +184,53 @@
 
   const waLink = (number, text) => `https://wa.me/${String(number || '').replace(/\D/g, '')}?text=${encodeURIComponent(text)}`;
 
+  // Member photos: stored paths come from the server, data URLs are used as is.
+  function photoSrc(p) {
+    if (!p) return null;
+    return p.startsWith('data:') ? p : `${apiBase()}${p}`;
+  }
+
+  // A round member picture, or their initials when there is no photo yet.
+  function avatarHtml(m, size = '', color) {
+    const c = color || (m?.gender === 'female' ? '#e5487f' : 'var(--accent)');
+    const src = photoSrc(m?.photo);
+    return src
+      ? `<span class="avatar has-photo ${size}" style="--c:${c}"><img src="${esc(src)}" alt="" loading="lazy" decoding="async"></span>`
+      : `<span class="avatar ${size}" style="--c:${c}">${esc(initials(m?.name || '?'))}</span>`;
+  }
+
+  // Lets the person take or choose a photo, then crops it to a centred square
+  // and shrinks it, so uploads stay small. Resolves with a JPEG data URL, or
+  // null if they cancel.
+  function pickPhoto({ size = 360 } = {}) {
+    return new Promise((resolve, reject) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.addEventListener('change', () => {
+        const file = input.files && input.files[0];
+        if (!file) return resolve(null);
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          const side = Math.min(img.naturalWidth, img.naturalHeight);
+          const canvas = document.createElement('canvas');
+          canvas.width = size;
+          canvas.height = size;
+          canvas.getContext('2d').drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, size, size);
+          URL.revokeObjectURL(url);
+          resolve(canvas.toDataURL('image/jpeg', 0.82));
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('That file is not a photo we can read. Try a JPG or PNG.')); };
+        img.src = url;
+      });
+      input.click();
+    });
+  }
+
   window.UI = {
     esc, api, apiBase, money, time12, dateLong, dateShort, dayName, dayNum, monthName, addDays, weekday, duration,
     initials, toast, sheet, confirmSheet, busy, setAccent, store, icsFor, waLink, setBusiness, DAYS, DAY_LABELS,
+    photoSrc, avatarHtml, pickPhoto,
   };
 })();

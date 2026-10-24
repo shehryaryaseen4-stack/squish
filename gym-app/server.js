@@ -17,14 +17,14 @@ const TYPES = {
   '.json': 'application/json',
   '.webmanifest': 'application/manifest+json',
 };
-const PAGES = { '/': 'index.html', '/admin': 'admin.html', '/admin/': 'admin.html', '/kiosk': 'kiosk.html' };
+const PAGES = { '/': 'index.html', '/admin': 'admin.html', '/admin/': 'admin.html', '/kiosk': 'kiosk.html', '/display': 'display.html' };
 
 const SECURITY_HEADERS = {
   'Content-Security-Policy': [
     "default-src 'self'",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data:",
+    "img-src 'self' data: blob:",
     "connect-src 'self'",
     "manifest-src 'self'",
     "frame-ancestors 'none'",
@@ -145,8 +145,21 @@ function createServer(options = {}) {
         res.writeHead(status, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
         return res.end(reply);
       }
+      // Hikvision face terminals post events (often with a photo) to HTTP Listening.
+      if (pathname.startsWith('/hik/') && req.method === 'POST') {
+        const text = await readText(req, 4 * 1024 * 1024);
+        const [status, reply] = api.handleHikvision(pathname.slice(5), text);
+        res.writeHead(status, { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
+        return res.end(reply);
+      }
+      // Member profile photos.
+      if (pathname.startsWith('/photos/') && (req.method === 'GET' || req.method === 'HEAD')) {
+        const data = store.readPhoto(pathname.slice(8));
+        if (!data) return send(res, 404, 'Not found', 'text/plain');
+        return send(res, 200, data, 'image/jpeg', { 'Cache-Control': 'private, max-age=86400' });
+      }
       if (pathname.startsWith('/api/')) {
-        const body = ['POST', 'PUT', 'PATCH'].includes(req.method) ? await readBody(req) : {};
+        const body = ['POST', 'PUT', 'PATCH'].includes(req.method) ? await readBody(req, pathname.endsWith('/photo') ? 1024 * 1024 : undefined) : {};
         const result = await api.handle(req, res, url, body);
         return send(res, 200, JSON.stringify(result), undefined, { 'Cache-Control': 'no-store' });
       }

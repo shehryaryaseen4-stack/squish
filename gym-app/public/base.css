@@ -242,3 +242,9 @@ img { max-width: 100%; display: block; }
 /* Keep a sheet's main buttons in reach when its content is long. */
 .sheet .sheet-actions { position: sticky; bottom: calc(-20px - env(safe-area-inset-bottom)); background: var(--surface); padding: 12px 0 calc(4px + env(safe-area-inset-bottom)); margin-bottom: calc(-4px - env(safe-area-inset-bottom)); z-index: 2; }
 @media (min-width: 720px) { .sheet .sheet-actions { bottom: -24px; padding-bottom: 4px; margin-bottom: -4px; } }
+.avatar.has-photo { overflow: hidden; background: var(--surface-2); padding: 0; }
+.avatar.has-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar.xl { width: 96px; height: 96px; font-size: 32px; }
+.photo-edit { position: relative; display: inline-grid; border: 0; padding: 0; background: none; cursor: pointer; border-radius: 50%; flex: none; }
+.photo-edit .cam { position: absolute; right: -2px; bottom: -2px; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); border: 3px solid var(--surface); }
+.photo-edit .cam .ico { width: 15px; height: 15px; }

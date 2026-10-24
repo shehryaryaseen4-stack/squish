@@ -56,7 +56,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
   function listItem({ member: m, s }) {
     return {
       id: m.id, memberNo: m.memberNo, name: m.name, phone: m.phone, gender: m.gender, joinDate: m.joinDate,
-      trainerId: m.trainerId, dob: m.dob, ...s,
+      trainerId: m.trainerId, dob: m.dob, photo: m.photo || null, ...s,
     };
   }
 
@@ -138,6 +138,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     const open = d.attendance.find((a) => a.memberId === member.id && a.date === n.date && !a.out);
     if (open) {
       open.out = fromMin(n.minutes);
+      open.outAt = stamp();
       store.save();
       return { action: 'out', visit: open, member: memberPublic(member), summary: summaryOf(member) };
     }
@@ -146,7 +147,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     if (blocked && d.business.blockExpiredCheckin && !(body.force && role === 'owner')) {
       fail(s.status === 'unpaid' ? `${member.name} has not paid a membership fee yet` : `${member.name}'s membership ${s.status === 'left' ? 'is closed' : `expired on ${s.expiry}`}. Please renew first.`, 409);
     }
-    const visit = { id: newId('att'), memberId: member.id, date: n.date, in: fromMin(n.minutes), out: null };
+    const visit = { id: newId('att'), memberId: member.id, date: n.date, in: fromMin(n.minutes), out: null, inAt: stamp(), source: body.source === 'kiosk' ? 'kiosk' : 'desk' };
     d.attendance.push(visit);
     store.save();
     return { action: 'in', visit, member: memberPublic(member), summary: { ...s, inside: true }, warning: blocked || s.balance > 0 || s.status === 'expiring' };
@@ -231,7 +232,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
   }
 
   function pick(m) {
-    return m ? { id: m.id, name: m.name, memberNo: m.memberNo, phone: m.phone, gender: m.gender } : null;
+    return m ? { id: m.id, name: m.name, memberNo: m.memberNo, phone: m.phone, gender: m.gender, photo: m.photo || null } : null;
   }
 
   function report(month) {
@@ -336,7 +337,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
         for (const p of pays) for (const i of p.installments) if (i.date >= from && i.date <= to) received.push({ amount: i.amount, method: i.method, date: i.date, planName: p.planName, receiptNo: p.receiptNo });
         const s = summarize(d, m, t, ix);
         return {
-          id: m.id, memberNo: m.memberNo, name: m.name, phone: m.phone, gender: m.gender,
+          id: m.id, memberNo: m.memberNo, name: m.name, phone: m.phone, gender: m.gender, photo: m.photo || null,
           plan: s.plan, status: s.status, expiry: s.expiry, balance: s.balance,
           visits: days.size, lastVisit: [...days].sort().pop() || null,
           paid: covering.length > 0, paidTill: covering[0]?.periodEnd || null, frozen: frozen && !covering.length,
@@ -385,10 +386,11 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
       if (mins - toMin(last.in) < DUPLICATE_MINUTES && mins >= toMin(last.in)) return 'duplicate';
       if (mins < toMin(last.in)) return 'duplicate';
       last.out = time;
+      last.outAt = stamp();
       return 'out';
     }
     if (last && last.out && Math.abs(mins - toMin(last.out)) < DUPLICATE_MINUTES) return 'duplicate';
-    d.attendance.push({ id: newId('att'), memberId: member.id, date, in: time, out: null, source });
+    d.attendance.push({ id: newId('att'), memberId: member.id, date, in: time, out: null, source, inAt: stamp() });
     return 'in';
   }
 
@@ -401,24 +403,82 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     ].join('\n');
   }
 
-  // Returns [status, text] for the machine. Unknown machines wait for approval
-  // and keep their punches until the owner approves them in Settings.
+  // Machines the gym can add from Settings, and what each one needs.
+  const DEVICE_TYPES = [
+    { id: 'zk-fingerprint', brand: 'ZKTeco', name: 'ZKTeco fingerprint machine', models: 'K40, K50, F18, F22, MB20, MB360, uFace', protocol: 'zk' },
+    { id: 'zk-face', brand: 'ZKTeco', name: 'ZKTeco face machine', models: 'SpeedFace V5L, ProFace X, MB560-VL, Horus, xFace', protocol: 'zk' },
+    { id: 'essl', brand: 'eSSL', name: 'eSSL / Identix / Realtime', models: 'eSSL X990, K21, iClock, Identix K90 (ZKTeco based)', protocol: 'zk' },
+    { id: 'zlink', brand: 'ZKTeco', name: 'ZKTeco ZLink machine', models: 'Machines set up with the ZKBio Zlink app', protocol: 'zk' },
+    { id: 'hik-face', brand: 'Hikvision', name: 'Hikvision face terminal', models: 'DS-K1T341, DS-K1T671, DS-K1T343 (MinMoe)', protocol: 'hik' },
+    { id: 'other', brand: 'Other', name: 'Other brand', models: 'Any machine with "ADMS", "Cloud server" or "Push" in its network menu', protocol: 'zk' },
+  ];
+  const ONLINE_MS = 3 * 60 * 1000;
+
+  const nowMs = () => new Date(clock()).getTime();
+
+  function publicDevice(dv) {
+    const seenAgo = dv.lastSeen ? nowMs() - Date.parse(dv.lastSeen) : null;
+    return { ...dv, online: seenAgo !== null && seenAgo < ONLINE_MS, seenAgo };
+  }
+
+  function addDevice(body) {
+    const d = db();
+    const type = DEVICE_TYPES.find((t) => t.id === body.type) || fail('Choose the type of machine');
+    const name = v.str(body.name, { max: 60 }) || type.name;
+    if (type.protocol === 'zk') {
+      const sn = v.str(body.sn, { max: 40, required: true, field: 'Serial number' }).toUpperCase().replace(/\s+/g, '');
+      if (!/^[A-Z0-9-]{4,40}$/.test(sn)) fail('The serial number has only letters and numbers. Find it under Menu → System Info → Device Info.');
+      // The machine may already have knocked on the door before it was added.
+      const existing = d.devices.find((x) => x.protocol === 'zk' && x.sn.toUpperCase() === sn);
+      if (existing && existing.approved) fail(`This machine (${sn}) is already added as "${existing.name}"`, 409);
+      const dv = existing || { id: newId('dev'), sn, firstSeen: null, lastSeen: null, punches: 0, unknownIds: [] };
+      Object.assign(dv, { type: type.id, protocol: 'zk', name, approved: true, addedAt: stamp() });
+      if (!existing) d.devices.push(dv);
+      store.save();
+      return publicDevice(dv);
+    }
+    const dv = { id: newId('dev'), type: type.id, protocol: 'hik', name, key: crypto.randomBytes(12).toString('hex'), approved: true, addedAt: stamp(), firstSeen: null, lastSeen: null, punches: 0, unknownIds: [] };
+    d.devices.push(dv);
+    store.save();
+    return publicDevice(dv);
+  }
+
+  // "Check connection": a push machine calls us, so connected means we heard from it recently.
+  function checkDevice(dv) {
+    const d = db();
+    const p = publicDevice(dv);
+    if (p.online) {
+      return { ok: true, message: `Connected. Last heard from the machine ${Math.max(1, Math.round(p.seenAgo / 1000))} seconds ago.`, device: p };
+    }
+    const others = d.devices.filter((x) => !x.approved && x.lastSeen && nowMs() - Date.parse(x.lastSeen) < 60 * 60 * 1000).map(publicDevice);
+    if (dv.lastSeen) {
+      return { ok: false, code: 'lost', message: `The machine was connected, but it has not been heard from since ${new Date(dv.lastSeen).toLocaleString('en-GB', { timeZone: d.business.timeZone, day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}.`, others, device: p };
+    }
+    if (dv.protocol === 'zk' && others.length) {
+      return { ok: false, code: 'wrong-serial', message: `A machine with serial number ${others.map((o) => o.sn).join(', ')} is calling the server, but you entered ${dv.sn}.`, others, device: p };
+    }
+    return { ok: false, code: 'never', message: 'The machine has not contacted the server yet.', others, device: p };
+  }
+
+  // ZKTeco & friends: returns [status, text] for the machine. Unknown machines
+  // are listed under "found" in Settings until the owner adds them.
   function handleDevice(method, url, text) {
     const d = db();
     const sn = String(url.searchParams.get('SN') || '').trim().slice(0, 40);
     if (!sn) return [400, 'ERROR: SN missing'];
-    let device = d.devices.find((x) => x.sn === sn);
+    let device = d.devices.find((x) => x.protocol === 'zk' && x.sn.toUpperCase() === sn.toUpperCase());
     if (!device) {
-      device = { sn, name: `Fingerprint machine ${d.devices.length + 1}`, approved: false, firstSeen: stamp(), lastSeen: null, punches: 0, unknownIds: [] };
+      device = { id: newId('dev'), sn, type: 'zk-fingerprint', protocol: 'zk', name: `Machine ${sn}`, approved: false, firstSeen: stamp(), lastSeen: null, punches: 0, unknownIds: [] };
       d.devices.push(device);
     }
+    device.firstSeen ||= stamp();
     device.lastSeen = stamp();
-    if (!device.approved) { store.save(); return [403, 'ERROR: waiting for approval in the gym app']; }
+    if (!device.approved) { store.save(); return [403, 'ERROR: add this machine in the gym app first']; }
     const path = url.pathname;
     if (method === 'GET' && path === '/iclock/cdata') { store.save(); return [200, deviceOptions(sn)]; }
     if (method === 'POST' && path === '/iclock/cdata') {
       const table = url.searchParams.get('table');
-      if (table !== 'ATTLOG') return [200, 'OK'];
+      if (table !== 'ATTLOG') { store.save(); return [200, 'OK']; }
       const lines = String(text || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
       const punches = lines.map((l) => l.split('\t')).filter((f) => f.length >= 2 && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(f[1]))
         .map(([pin, at, , verify]) => ({ pin: pin.trim(), date: at.slice(0, 10), time: at.slice(11, 16), verify }))
@@ -433,6 +493,85 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     }
     store.save();
     return [200, 'OK'];
+  }
+
+  // Hikvision face terminals post access events to "HTTP Listening" at /hik/<key>.
+  // The event JSON carries the person's employee number (= member number).
+  function handleHikvision(key, text) {
+    const d = db();
+    const device = d.devices.find((x) => x.protocol === 'hik' && x.key === key);
+    if (!device) return [404, 'Unknown machine'];
+    device.firstSeen ||= stamp();
+    device.lastSeen = stamp();
+    const events = [];
+    for (const chunk of String(text || '').split(/\r?\n--/)) {
+      const start = chunk.indexOf('{');
+      const end = chunk.lastIndexOf('}');
+      if (start < 0 || end <= start) continue;
+      try { events.push(JSON.parse(chunk.slice(start, end + 1))); } catch { /* not JSON */ }
+    }
+    for (const e of events) {
+      const ace = e.AccessControllerEvent || {};
+      const employee = String(ace.employeeNoString || ace.employeeNo || '').trim();
+      const at = String(e.dateTime || '');
+      if (!employee || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(at)) continue; // heartbeats and door events
+      const r = recordPunch(employee, at.slice(0, 10), at.slice(11, 16), ace.currentVerifyMode && /card/i.test(ace.currentVerifyMode) ? 'card' : 'face');
+      if (r === 'unknown' && !device.unknownIds.includes(employee)) device.unknownIds = [...device.unknownIds, employee].slice(-20);
+      if (r === 'in' || r === 'out') device.punches++;
+    }
+    store.save();
+    return [200, 'OK'];
+  }
+
+  // ---- entry screen ---------------------------------------------------------------
+
+  function displayFeed() {
+    const d = db();
+    const t = today();
+    const todays = d.attendance.filter((a) => a.date === t);
+    const events = [];
+    for (const a of todays) {
+      // Order by the gym's local time; the exact stamp only breaks ties within a minute.
+      events.push({ key: `${a.id}:in`, type: 'in', at: `${a.in}|${a.inAt || ''}`, time: a.in, visit: a });
+      if (a.out) events.push({ key: `${a.id}:out`, type: 'out', at: `${a.out}|${a.outAt || ''}`, time: a.out, visit: a });
+    }
+    events.sort((a, b) => b.at.localeCompare(a.at));
+    const latest = events.slice(0, 8);
+    const ix = indexDb(d);
+    return {
+      gym: { name: d.business.name, accent: d.business.accent },
+      insideNow: todays.filter((a) => !a.out).length,
+      checkinsToday: new Set(todays.map((a) => a.memberId)).size,
+      events: latest.map((e) => {
+        const m = d.members.find((x) => x.id === e.visit.memberId);
+        if (!m) return null;
+        const s = summarize(d, m, t, ix);
+        return {
+          key: e.key, type: e.type, time: e.time, source: e.visit.source || null,
+          minutes: e.type === 'out' ? toMin(e.visit.out) - toMin(e.visit.in) : null,
+          member: pick(m),
+          summary: { status: s.status, daysLeft: s.daysLeft, expiry: s.expiry, plan: s.plan, balance: s.balance, visitsThisMonth: s.visitsThisMonth },
+        };
+      }).filter(Boolean),
+    };
+  }
+
+  // ---- photos -----------------------------------------------------------------------
+
+  function setPhoto(member, image) {
+    const match = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(String(image || ''));
+    if (!match) fail('Choose a photo (JPG or PNG)');
+    if (match[2].length > 600 * 1024) fail('That photo is too large. Please choose a smaller one.');
+    member.photo = store.savePhoto(member.id, match[2]);
+    store.save();
+    return { photo: member.photo };
+  }
+
+  function clearPhoto(member) {
+    store.deletePhoto(member.id);
+    delete member.photo;
+    store.save();
+    return { photo: null };
   }
 
   // ---- routing ------------------------------------------------------------------
@@ -500,6 +639,8 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
         store.save();
         return { ok: true };
       }
+      if (m === 'PUT' && pathname === '/api/member/photo') return setPhoto(member, body.image);
+      if (m === 'DELETE' && pathname === '/api/member/photo') return clearPhoto(member);
       if (m === 'PUT' && pathname === '/api/member/plan') {
         member.workoutPlan = { ...v.workoutPlan(body), updatedAt: stamp(), updatedBy: 'member' };
         store.save();
@@ -610,6 +751,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
       }
       if (m === 'DELETE' && !action) {
         owner();
+        store.deletePhoto(id);
         d.members = d.members.filter((x) => x.id !== id);
         for (const key of ['payments', 'attendance', 'measurements', 'classBookings']) d[key] = d[key].filter((x) => x.memberId !== id);
         d.memberSessions = d.memberSessions.filter((s) => s.memberId !== id);
@@ -645,6 +787,8 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
         return memberDetail(member);
       }
       if (m === 'POST' && action === 'classes') return bookClass(member, body.classId, body.date, { asStaff: true });
+      if (m === 'PUT' && action === 'photo') return setPhoto(member, body.image);
+      if (m === 'DELETE' && action === 'photo') return clearPhoto(member);
       if (m === 'PUT' && action === 'plan') {
         member.workoutPlan = { ...v.workoutPlan(body), updatedAt: stamp(), updatedBy: 'trainer' };
         store.save();
@@ -737,8 +881,9 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
       return register(`${month}-01`, monthEnd(month) < t ? monthEnd(month) : t);
     }
 
-    // Fingerprint machines
-    if (m === 'GET' && pathname === '/api/admin/devices') return d.devices;
+    // Attendance machines (fingerprint / face)
+    if (m === 'GET' && pathname === '/api/admin/devices') return { types: DEVICE_TYPES, devices: d.devices.map(publicDevice) };
+    if (m === 'POST' && pathname === '/api/admin/devices') { owner(); return addDevice(body); }
     if (m === 'POST' && pathname === '/api/admin/devices/test-punch') {
       const n = now();
       const result = recordPunch(v.str(body.memberNo, { max: 10, required: true, field: 'Member number' }), n.date, fromMin(n.minutes), 'fingerprint');
@@ -747,21 +892,37 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
       const member = d.members.find((x) => x.memberNo === Number(body.memberNo));
       return { result, member: memberPublic(member), summary: summaryOf(member) };
     }
-    if ((match = pathname.match(/^\/api\/admin\/devices\/([\w.-]+)$/))) {
+    if ((match = pathname.match(/^\/api\/admin\/devices\/([\w.-]+)(\/check)?$/))) {
+      const device = d.devices.find((x) => x.id === match[1]) || fail('Machine not found', 404);
+      if (m === 'GET' && match[2]) return checkDevice(device);
       owner();
-      const device = d.devices.find((x) => x.sn === match[1]) || fail('Machine not found', 404);
-      if (m === 'PUT') {
+      if (m === 'PUT' && !match[2]) {
         if (body.approved !== undefined) device.approved = Boolean(body.approved);
         if (body.name !== undefined) device.name = v.str(body.name, { max: 60 }) || device.name;
+        // Fixing a mistyped serial number: take over the machine that is actually calling.
+        if (body.sn !== undefined && device.protocol === 'zk') {
+          const sn = v.str(body.sn, { max: 40, required: true, field: 'Serial number' }).toUpperCase().replace(/\s+/g, '');
+          if (!/^[A-Z0-9-]{4,40}$/.test(sn)) fail('The serial number has only letters and numbers');
+          const found = d.devices.find((x) => x.id !== device.id && x.protocol === 'zk' && x.sn.toUpperCase() === sn);
+          if (found && found.approved) fail(`Serial ${sn} is already added as "${found.name}"`, 409);
+          if (found) {
+            Object.assign(device, { firstSeen: found.firstSeen, lastSeen: found.lastSeen });
+            d.devices = d.devices.filter((x) => x.id !== found.id);
+          }
+          device.sn = sn;
+        }
         store.save();
-        return device;
+        return publicDevice(device);
       }
-      if (m === 'DELETE') {
-        d.devices = d.devices.filter((x) => x.sn !== device.sn);
+      if (m === 'DELETE' && !match[2]) {
+        d.devices = d.devices.filter((x) => x.id !== device.id);
         store.save();
         return { ok: true };
       }
     }
+
+    // Entry screen
+    if (m === 'GET' && pathname === '/api/admin/display') return displayFeed();
 
     // Reports and owner settings
     if (m === 'GET' && pathname === '/api/admin/report') {
@@ -836,7 +997,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     fail('Not found', 404);
   }
 
-  return { handle, handleDevice };
+  return { handle, handleDevice, handleHikvision };
 }
 
 module.exports = { createApi, HttpError, weekdayOf };

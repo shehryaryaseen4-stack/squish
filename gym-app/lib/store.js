@@ -40,6 +40,8 @@ function createStore({ file, seed = 'demo', ownerPin = '1234', staffPin = '0000'
     if (seed === 'demo') generateDemo(db, nowIn(db.business.timeZone, now()), { memberPin: hashPin('1111') });
   }
   for (const key of [...DATA, ...CONFIG, 'memberSessions', 'devices']) db[key] ||= [];
+  // Machines saved before devices had ids and types.
+  for (const dv of db.devices) { dv.id ||= `dev-${dv.sn}`; dv.type ||= 'zk-fingerprint'; dv.protocol ||= 'zk'; }
   db.expenseCategories ||= ['Rent', 'Salaries', 'Electricity', 'Equipment', 'Maintenance', 'Other'];
 
   function save() {
@@ -48,6 +50,23 @@ function createStore({ file, seed = 'demo', ownerPin = '1234', staffPin = '0000'
     const tmp = `${file}.${process.pid}.tmp`;
     fs.writeFileSync(tmp, JSON.stringify(db));
     fs.renameSync(tmp, file);
+  }
+
+  // Member photos live as files next to the data file; without a data file
+  // (tests) they stay inline as data URLs.
+  const photoDir = file ? path.join(path.dirname(file), 'photos') : null;
+  function savePhoto(memberId, base64) {
+    if (!photoDir) return `data:image/jpeg;base64,${base64}`;
+    fs.mkdirSync(photoDir, { recursive: true });
+    fs.writeFileSync(path.join(photoDir, `${memberId}.jpg`), Buffer.from(base64, 'base64'));
+    return `/photos/${memberId}.jpg?v=${Date.now().toString(36)}`;
+  }
+  function deletePhoto(memberId) {
+    if (photoDir) fs.rmSync(path.join(photoDir, `${memberId}.jpg`), { force: true });
+  }
+  function readPhoto(name) {
+    if (!photoDir || !/^[\w-]+\.jpg$/.test(name)) return null;
+    try { return fs.readFileSync(path.join(photoDir, name)); } catch { return null; }
   }
 
   // Wipes members, money and attendance but keeps the gym's own settings.
@@ -61,7 +80,7 @@ function createStore({ file, seed = 'demo', ownerPin = '1234', staffPin = '0000'
   }
 
   save();
-  return { get db() { return db; }, save, clearData };
+  return { get db() { return db; }, save, clearData, savePhoto, deletePhoto, readPhoto };
 }
 
 module.exports = { createStore, hashPin, checkPin };

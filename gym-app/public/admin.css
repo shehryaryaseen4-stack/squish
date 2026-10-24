@@ -283,3 +283,21 @@ button.kpi { text-align: left; font: inherit; color: inherit; cursor: pointer; }
 .fp-test p { font-size: 13px; }
 .src-ico { width: 15px; height: 15px; color: var(--accent); vertical-align: -3px; }
 .form-section h2 .ico { vertical-align: -4px; color: var(--accent); }
+/* Machine wizard */
+.type-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.type-card { display: grid; gap: 3px; padding: 14px; text-align: left; cursor: pointer; font: inherit; color: inherit; align-content: start; }
+.type-card:hover { border-color: var(--accent); }
+.type-card .brand { font-size: 11.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.type-card b { font-size: 15px; }
+.type-card small { font-size: 12.5px; color: var(--ink-3); line-height: 1.4; }
+.copyable { cursor: copy; }
+.conn { margin-top: 16px; }
+.conn-wait { display: flex; gap: 10px; align-items: center; padding: 14px; border-radius: 14px; background: var(--surface-2); font-size: 14px; color: var(--ink-2); }
+.conn-ok, .conn-bad { display: flex; gap: 12px; padding: 14px 16px; border-radius: 16px; font-size: 14px; }
+.conn-ok { background: var(--good-soft); }
+.conn-ok > .ico { color: var(--good); width: 26px; height: 26px; flex: none; }
+.conn-bad { background: var(--bad-soft); }
+.conn-bad > .ico { color: var(--bad); width: 26px; height: 26px; flex: none; }
+.conn-ok b, .conn-bad b { font-size: 15.5px; }
+.conn-bad ul { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 6px; color: var(--ink-2); font-size: 13.5px; }
+.profile-head .photo-edit .avatar { width: 84px; height: 84px; font-size: 28px; }

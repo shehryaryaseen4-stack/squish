@@ -29,7 +29,7 @@
   const monthOf = (d) => d.slice(0, 7);
   const monthLabel = (key, long = false) => new Intl.DateTimeFormat('en-GB', { month: long ? 'long' : 'short', year: long ? 'numeric' : '2-digit', timeZone: 'UTC' }).format(new Date(`${key}-15T12:00:00Z`));
   const shiftMonth = (key, n) => { const d = new Date(`${key}-15T12:00:00Z`); d.setUTCMonth(d.getUTCMonth() + n); return d.toISOString().slice(0, 7); };
-  const avatar = (m, size = '') => `<span class="avatar ${size}" style="--c:${m?.gender === 'female' ? '#e5487f' : 'var(--accent)'}">${esc(initials(m?.name || '?'))}</span>`;
+  const avatar = (m, size = '') => UI.avatarHtml(m, size);
   const staffById = (id) => S.data.staff.find((s) => s.id === id);
   const planById = (id) => S.data.plans.find((p) => p.id === id);
   const fmtMinutes = (m) => (m == null ? '—' : m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`);
@@ -149,6 +149,7 @@
       <aside class="side"><div class="side-brand"><div class="brand-mark">${esc(b.name.charAt(0))}</div><div><b>${esc(b.name)}</b><span>${isOwner() ? 'Owner' : 'Front desk'}</span></div></div>
         ${pages.map(([id, ic, label]) => `<a class="nav-item" href="#/${id}" ${id === page ? 'aria-current="page"' : ''}>${icon(ic)}${esc(label)}</a>`).join('')}
         <div class="spacer"></div>
+        <a class="nav-item" href="/display.html">${icon('tv')}Entry screen (TV)</a>
         <a class="nav-item" href="/kiosk.html">${icon('kiosk')}Check-in kiosk</a>
         <button class="nav-item" data-signout style="border:0;background:none;cursor:pointer;width:100%">${icon('logout')}Sign out</button>
       </aside>
@@ -166,7 +167,7 @@
     root.querySelector('[data-more]').addEventListener('click', () => sheet({
       title: 'More',
       html: `<div class="more-grid">${pages.filter(([id]) => !BOTTOM.includes(id)).map(([id, ic, label]) => `<a href="#/${id}" data-close>${icon(ic)}${esc(label)}</a>`).join('')}
-        <a href="/kiosk.html">${icon('kiosk')}Kiosk</a><a href="#" data-close data-out>${icon('logout')}Sign out</a></div>`,
+        <a href="/kiosk.html">${icon('kiosk')}Kiosk</a><a href="/display.html">${icon('tv')}Entry screen</a><a href="#" data-close data-out>${icon('logout')}Sign out</a></div>`,
       onMount: (el) => el.querySelector('[data-out]').addEventListener('click', (e) => { e.preventDefault(); signOut(); }),
     }));
     if (fab) root.querySelector('[data-fab]').addEventListener('click', fab.onClick);
@@ -626,7 +627,7 @@
 
     root.querySelector('.top h1').innerHTML = `<a class="icon-btn" href="#/members" aria-label="Back" style="display:inline-grid;vertical-align:middle;margin-right:10px">${icon('chevronLeft')}</a>${esc(m.name)}`;
     root.querySelector('.wrap').innerHTML = `
-      <section class="card profile-head">${avatar(m, 'lg')}
+      <section class="card profile-head"><button class="photo-edit" data-photo aria-label="Change photo">${avatar(m, 'xl')}<span class="cam">${icon('camera')}</span></button>
         <div class="tx"><h2>${esc(m.name)} <span class="no">#${m.memberNo}</span></h2><p>${esc(m.phone)} · ${m.gender}${age(m.dob) ? ` · ${age(m.dob)} yrs` : ''} · joined ${dateLong(m.joinDate)}</p>
           <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">${statusBadge(s)}${s.inside ? '<span class="badge badge-accent">In the gym now</span>' : ''}${s.balance > 0 ? `<span class="badge badge-bad">Due ${rs(s.balance)}</span>` : ''}</div></div>
         <div class="acts">
@@ -782,6 +783,7 @@
       location.hash = '#/members';
     });
     memberPageCalBind(id, d, m);
+    root.querySelector('[data-photo]').addEventListener('click', () => photoSheet(m, `/api/admin/members/${id}/photo`, reload));
     // Workout plan: trainers can see and set it; the member sees it in their app.
     const savePlan = async (plan) => { await api(`/api/admin/members/${id}/plan`, { method: 'PUT', body: plan }); reload(); };
     Workout.summary(m.workoutPlan).then((html) => {
@@ -1289,14 +1291,9 @@
       <section class="card form-section"><div class="panel-head"><div><h2>Trainers & staff</h2><p class="muted" style="font-size:13.5px">Coaches can be assigned to members and classes.</p></div><button class="btn btn-primary btn-sm" data-addstaff>${icon('plus')}Add</button></div>
         <div class="item-list">${S.data.staff.map((s) => `<div class="card item${s.active === false ? ' inactive' : ''}"><span class="avatar" style="--c:${esc(s.color)}">${esc(initials(s.name))}</span><div class="tx"><b>${esc(s.name)}</b><span>${esc(s.role || '')}${s.salary ? ` · salary ${rs(s.salary)}` : ''}${s.phone ? ` · ${esc(s.phone)}` : ''}</span></div><div class="acts"><button class="icon-btn" data-staff="${esc(s.id)}" aria-label="Edit ${esc(s.name)}">${icon('edit')}</button></div></div>`).join('')}</div></section>
 
-      <section class="card form-section" id="fp"><div class="panel-head"><div><h2>${icon('fingerprint')} Fingerprint machine</h2><p class="muted" style="font-size:13.5px">Members check in and out with their thumb. Works with ZKTeco and other machines that support "Cloud server / ADMS" push.</p></div></div>
-        <ol class="steps">
-          <li>On the machine open <b>Menu → Comm → Cloud Server Setting</b> (or <b>ADMS</b>).</li>
-          <li>Set <b>Server address</b> to <code>${esc(serverHost().host)}</code> and <b>port</b> to <code>${serverHost().port}</code>${serverHost().https ? ', and turn on <b>HTTPS</b>' : ''}.</li>
-          <li>Enroll each member's thumb on the machine with <b>User ID = their member number</b> (shown on every member's profile).</li>
-          <li>The machine appears below. Press <b>Approve</b>, and every thumb punch becomes a check-in, then a check-out.</li>
-        </ol>
-        <div id="devices" class="item-list" style="margin-top:14px"></div>
+      <section class="card form-section" id="fp"><div class="panel-head"><div><h2>${icon('fingerprint')} Fingerprint & face machines</h2><p class="muted" style="font-size:13.5px">Connect your attendance machine. Members check in and out with a thumb or face, and it shows on the entry screen.</p></div>
+        <button class="btn btn-primary btn-sm" data-addmachine>${icon('plus')}Add machine</button></div>
+        <div id="devices" class="item-list"><div class="skel" style="height:70px"></div></div>
         <div class="fp-test"><b>Try it without a machine</b><p class="muted">Enter a member number to record a thumb punch now.</p>
           <form class="toolbar" style="margin:8px 0 0" data-fptest><input class="input" name="memberNo" inputmode="numeric" placeholder="Member no., e.g. 1001" style="max-width:220px"><button class="btn btn-soft">${icon('fingerprint')}Punch</button></form></div>
       </section>
@@ -1369,6 +1366,7 @@
     root.querySelector('[data-addstaff]').addEventListener('click', () => editStaff({}));
     root.querySelectorAll('[data-staff]').forEach((x) => x.addEventListener('click', () => editStaff(S.data.staff.find((s) => s.id === x.dataset.staff))));
     drawDevices();
+    root.querySelector('[data-addmachine]').addEventListener('click', () => machineWizard());
     root.querySelector('[data-fptest]').addEventListener('submit', (e) => {
       e.preventDefault();
       const f = e.target;
@@ -1403,26 +1401,204 @@
     return { host: u.hostname, port: u.port || (https ? 443 : 80), https };
   }
 
+  // ---- attendance machines -------------------------------------------------------
+
+  let deviceTypes = [];
+
   async function drawDevices() {
     const box = document.getElementById('devices');
     if (!box) return;
-    const list = await api('/api/admin/devices');
-    box.innerHTML = list.length ? list.map((dv) => `<div class="card item"><div class="ic-tile">${icon('fingerprint')}</div>
-      <div class="tx"><b>${esc(dv.name)} ${dv.approved ? '<span class="badge badge-good"><i class="dot"></i>Connected</span>' : '<span class="badge badge-warn">Waiting for approval</span>'}</b>
-        <span>Serial ${esc(dv.sn)} · last seen ${dv.lastSeen ? new Date(dv.lastSeen).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : 'never'} · ${dv.punches} punches${dv.unknownIds?.length ? ` · unknown IDs: ${dv.unknownIds.map(esc).join(', ')}` : ''}</span></div>
-      <div class="acts">${dv.approved ? '' : `<button class="btn btn-primary btn-sm" data-approve="${esc(dv.sn)}">Approve</button>`}<button class="icon-btn" data-rename="${esc(dv.sn)}" aria-label="Rename">${icon('edit')}</button><button class="icon-btn" data-rmdev="${esc(dv.sn)}" aria-label="Remove">${icon('trash')}</button></div></div>`).join('')
-      : `<div class="note-box" style="margin:0;background:var(--surface-2)">${icon('info')}<span>No machine has connected yet. Once you enter the server address on the machine it shows up here within a minute.</span></div>`;
-    box.querySelectorAll('[data-approve]').forEach((b) => b.addEventListener('click', async () => { await api(`/api/admin/devices/${b.dataset.approve}`, { method: 'PUT', body: { approved: true } }); toast('Machine approved'); drawDevices(); }));
+    const { types, devices } = await api('/api/admin/devices');
+    deviceTypes = types;
+    const typeName = (id) => types.find((t) => t.id === id)?.name || 'Machine';
+    const added = devices.filter((dv) => dv.approved);
+    const found = devices.filter((dv) => !dv.approved && dv.lastSeen);
+    const badge = (dv) => (dv.online ? '<span class="badge badge-good"><i class="dot"></i>Connected</span>' : dv.lastSeen ? '<span class="badge badge-warn">Offline</span>' : '<span class="badge badge-muted">Not connected yet</span>');
+    box.innerHTML = `${added.map((dv) => `<div class="card item"><div class="ic-tile">${icon(dv.protocol === 'hik' || dv.type === 'zk-face' ? 'user' : 'fingerprint')}</div>
+      <div class="tx"><b>${esc(dv.name)} ${badge(dv)}</b><span>${esc(typeName(dv.type))}${dv.sn ? ` · serial ${esc(dv.sn)}` : ''} · ${dv.punches} punches${dv.lastSeen ? ` · last seen ${new Date(dv.lastSeen).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}` : ''}${dv.unknownIds?.length ? ` · <span class="money-neg">IDs not matching a member: ${dv.unknownIds.map(esc).join(', ')}</span>` : ''}</span></div>
+      <div class="acts"><button class="btn btn-ghost btn-sm" data-setup="${esc(dv.id)}">${icon('info')}Setup</button><button class="btn btn-soft btn-sm" data-check="${esc(dv.id)}">${icon('refresh')}Check</button><button class="icon-btn" data-rename="${esc(dv.id)}" aria-label="Rename">${icon('edit')}</button><button class="icon-btn" data-rmdev="${esc(dv.id)}" aria-label="Remove">${icon('trash')}</button></div></div>`).join('')}
+      ${found.map((dv) => `<div class="card item" style="border-style:dashed"><div class="ic-tile">${icon('alert')}</div><div class="tx"><b>New machine found · serial ${esc(dv.sn)}</b><span>It is calling the server but hasn't been added. Is it yours?</span></div>
+        <div class="acts"><button class="btn btn-primary btn-sm" data-addfound="${esc(dv.sn)}">Add it</button><button class="icon-btn" data-rmdev="${esc(dv.id)}" aria-label="Ignore">${icon('x')}</button></div></div>`).join('')}
+      ${!added.length && !found.length ? `<div class="note-box" style="margin:0;background:var(--surface-2)">${icon('info')}<span>No machine yet. Press <b>Add machine</b>, pick the one you have, and follow the steps.</span></div>` : ''}`;
+    const byId = (id) => devices.find((x) => x.id === id);
+    box.querySelectorAll('[data-setup]').forEach((b) => b.addEventListener('click', () => setupSheet(byId(b.dataset.setup))));
+    box.querySelectorAll('[data-check]').forEach((b) => b.addEventListener('click', () => setupSheet(byId(b.dataset.check), { checkNow: true })));
+    box.querySelectorAll('[data-addfound]').forEach((b) => b.addEventListener('click', () => machineWizard({ sn: b.dataset.addfound })));
     box.querySelectorAll('[data-rmdev]').forEach((b) => b.addEventListener('click', async () => {
-      if (!(await confirmSheet({ title: 'Remove this machine?', message: 'It stops sending punches until you approve it again.', confirm: 'Remove', danger: true }))) return;
+      if (!(await confirmSheet({ title: 'Remove this machine?', message: 'Punches from it will be refused until you add it again.', confirm: 'Remove', danger: true }))) return;
       await api(`/api/admin/devices/${b.dataset.rmdev}`, { method: 'DELETE' });
       drawDevices();
     }));
     box.querySelectorAll('[data-rename]').forEach((b) => b.addEventListener('click', () => sheet({
       title: 'Rename machine',
-      html: `<input class="input" data-name value="${esc(list.find((x) => x.sn === b.dataset.rename).name)}" maxlength="60"><div class="sheet-actions"><button class="btn btn-primary" data-ok>Save</button></div>`,
+      html: `<input class="input" data-name value="${esc(byId(b.dataset.rename).name)}" maxlength="60"><div class="sheet-actions"><button class="btn btn-primary" data-ok>Save</button></div>`,
       onMount: (el, close) => el.querySelector('[data-ok]').addEventListener('click', async () => { await api(`/api/admin/devices/${b.dataset.rename}`, { method: 'PUT', body: { name: el.querySelector('[data-name]').value } }); close(); drawDevices(); }),
     })));
+  }
+
+  function serverHost() {
+    const u = new URL(UI.apiBase() || location.origin);
+    const https = u.protocol === 'https:';
+    return { host: u.hostname, port: u.port || (https ? 443 : 80), https, origin: u.origin };
+  }
+
+  // Step 1: which machine do you have? Step 2: what it needs. Then setup steps and a connection check.
+  async function machineWizard(prefill = {}) {
+    if (!deviceTypes.length) deviceTypes = (await api('/api/admin/devices')).types;
+    sheet({
+      title: 'Add a machine',
+      wide: true,
+      html: `<p class="muted" style="margin-bottom:12px">Which machine do you have? It's written on the front or on the sticker at the back.</p>
+        <div class="type-list">${deviceTypes.map((t) => `<button class="card type-card" data-type="${t.id}"><span class="brand">${esc(t.brand)}</span><b>${esc(t.name)}</b><small>${esc(t.models)}</small></button>`).join('')}</div>`,
+      onMount: (el, close) => el.querySelectorAll('[data-type]').forEach((b) => b.addEventListener('click', () => {
+        close();
+        setTimeout(() => machineDetails(deviceTypes.find((t) => t.id === b.dataset.type), prefill), 240);
+      })),
+    });
+  }
+
+  function machineDetails(type, prefill = {}) {
+    const zk = type.protocol === 'zk';
+    sheet({
+      title: type.name,
+      wide: true,
+      html: `<form class="form-grid" novalidate>
+        <label class="field"><span>Name for this machine</span><input class="input" name="name" value="${esc(prefill.name || (type.protocol === 'hik' ? 'Face gate' : 'Front gate'))}" maxlength="60"><small>So you can tell machines apart, e.g. "Front gate" or "Ladies section".</small></label>
+        ${zk ? `<label class="field"><span>Serial number (S/N)</span><input class="input" name="sn" value="${esc(prefill.sn || '')}" placeholder="e.g. CQUJ223360123" autocapitalize="characters" style="text-transform:uppercase;letter-spacing:.04em"><small>On the machine: <b>Menu → System Info → Device Info → Serial Number</b>. It's also on the sticker at the back.</small></label>` : `<div class="note-box" style="margin:0;background:var(--surface-2)">${icon('info')}<span>Nothing to type here. After you press Next you get a private web address to enter in the terminal's <b>HTTP Listening</b> settings.</span></div>`}
+        ${type.id === 'zlink' ? `<div class="note-box" style="margin:0">${icon('alert')}<span>ZLink machines normally talk to ZKTeco's own cloud. Remove it from the <b>ZKBio Zlink</b> app first. If the machine's <b>Cloud Server Setting</b> doesn't let you change the server address, it can't connect to this app directly; ask your dealer for ADMS firmware.</span></div>` : ''}
+        ${type.id === 'other' ? `<div class="note-box" style="margin:0">${icon('info')}<span>Look in the machine's network menu for <b>ADMS</b>, <b>Cloud Server</b>, <b>Push</b> or <b>iClock</b>. If one of those exists, it will work. If not, this machine can't send attendance over the internet.</span></div>` : ''}
+        </form><div class="sheet-actions"><button class="btn btn-ghost" data-back>${icon('chevronLeft')}Back</button><button class="btn btn-primary" data-ok>Next: setup steps${icon('chevronRight')}</button></div>`,
+      onMount: (el, close) => {
+        el.querySelector('[data-back]').addEventListener('click', () => { close(); setTimeout(() => machineWizard(prefill), 240); });
+        const ok = el.querySelector('[data-ok]');
+        ok.addEventListener('click', () => busy(ok, async () => {
+          const f = el.querySelector('form');
+          try {
+            const device = await api('/api/admin/devices', { method: 'POST', body: { type: type.id, name: f.name.value, sn: f.sn?.value } });
+            close();
+            drawDevices();
+            setTimeout(() => setupSheet(device), 240);
+          } catch (e) { toast(e.message, 'bad'); }
+        }));
+      },
+    });
+  }
+
+  function setupSteps(device) {
+    const s = serverHost();
+    const code = (v) => `<code class="copyable" data-copy="${esc(v)}">${esc(v)}</code>`;
+    if (device.protocol === 'hik') {
+      const path = `/hik/${device.key}`;
+      return `<ol class="steps">
+        <li>Connect the terminal to the gym's internet (WiFi or LAN cable).</li>
+        <li>Open the terminal's settings: in <b>iVMS-4200</b> or by typing its IP address in a browser on the same WiFi, go to <b>Configuration → Network → Advanced → HTTP Listening</b> (on some firmware: <b>Event → Alarm Server</b>).</li>
+        <li>Fill in: <b>Destination IP or domain</b> ${code(s.host)} · <b>URL</b> ${code(path)} · <b>Port</b> ${code(String(s.port))} · <b>Protocol</b> ${s.https ? 'HTTPS' : 'HTTP'}. Save.</li>
+        <li>Under <b>Person management</b>, add every member with <b>Employee No. = their member number</b> (on each member's profile) and capture their face.</li>
+        <li>Do one face scan at the terminal, then press <b>Check connection</b> below.</li></ol>`;
+    }
+    return `<ol class="steps">
+      <li>Connect the machine to the gym's internet: <b>Menu → COMM → Ethernet</b> (or <b>Wireless/WiFi</b>). It should show an IP address.</li>
+      <li>Open <b>Menu → COMM → Cloud Server Setting</b> (on eSSL: <b>ADMS</b>; on some models: <b>Push</b>).</li>
+      <li>Set <b>Server mode</b> to ADMS, turn <b>Enable domain name</b> on, then fill in: <b>Server address</b> ${code(s.host)} · <b>Port</b> ${code(String(s.port))} · <b>HTTPS</b> ${s.https ? 'ON' : 'OFF'}. Save and <b>restart</b> the machine.</li>
+      <li>Add members on the machine: <b>Menu → User Mgt → New User</b>, with <b>User ID = their member number</b>, then enroll the ${device.type === 'zk-face' ? 'face' : 'thumb'}.</li>
+      <li>Wait one minute, then press <b>Check connection</b> below.</li></ol>`;
+  }
+
+  function hintsFor(device, result) {
+    if (result.code === 'lost') return ['Is the machine switched on and still on the internet (WiFi or cable)?', 'Was the router restarted or the WiFi password changed?', `Is the server address on the machine still ${serverHost().host}?`];
+    if (device.protocol === 'hik') return ['Check that HTTP Listening is saved and the URL is copied exactly, including the long code at the end.', 'Do one face scan: Hikvision only sends data when something happens.', 'Make sure the terminal shows an IP address and can reach the internet.', 'If your address starts with https, choose HTTPS in the terminal; otherwise HTTP.'];
+    return [
+      'On the machine, <b>COMM → Ethernet/WiFi</b> should show an IP address. If not, it isn’t on the internet.',
+      `Server address and port must be exactly <b>${esc(serverHost().host)}</b> and <b>${serverHost().port}</b>.`,
+      'Some older machines don’t support HTTPS or domain names. Try HTTPS off, or the server’s IP address instead of the name.',
+      'Restart the machine after saving the settings.',
+      `The serial number you entered (<b>${esc(device.sn || '')}</b>) must match <b>System Info → Device Info</b>.`,
+    ];
+  }
+
+  function setupSheet(device, { checkNow = false } = {}) {
+    sheet({
+      title: `Set up ${device.name}`,
+      wide: true,
+      html: `${setupSteps(device)}<div class="conn" data-conn></div>
+        <div class="sheet-actions"><button class="btn btn-ghost" data-close>Close</button><button class="btn btn-primary" data-check>${icon('refresh')}Check connection</button></div>`,
+      onMount: (el) => {
+        const box = el.querySelector('[data-conn]');
+        el.querySelectorAll('[data-copy]').forEach((c) => c.addEventListener('click', async () => {
+          try { await navigator.clipboard.writeText(c.dataset.copy); toast('Copied'); } catch { /* select instead */ }
+        }));
+        let polling = false;
+        const check = async () => {
+          if (polling) return;
+          polling = true;
+          const btn = el.querySelector('[data-check]');
+          btn.disabled = true;
+          // A machine calls in about once a minute, so keep listening for up to two minutes.
+          for (let i = 0; i < 24 && el.isConnected; i++) {
+            box.innerHTML = `<div class="conn-wait"><span class="spinner"></span><span>Waiting for the machine to call the server… ${i ? `(${i * 5}s)` : ''}</span></div>`;
+            let r;
+            try { r = await api(`/api/admin/devices/${device.id}/check`); } catch (e) { r = { ok: false, code: 'error', message: e.message }; }
+            if (r.ok) {
+              box.innerHTML = `<div class="conn-ok">${icon('check')}<div><b>Connected successfully</b><p>${esc(r.message)} Members can now use the machine; every punch shows up in Attendance and on the entry screen.</p></div></div>`;
+              drawDevices();
+              btn.disabled = false;
+              polling = false;
+              return;
+            }
+            if (r.code === 'wrong-serial' || r.code === 'lost' || i === 23) {
+              const others = (r.others || []).filter((o) => o.sn);
+              box.innerHTML = `<div class="conn-bad">${icon('alert')}<div><b>Not connected</b><p>${esc(r.message)}</p>
+                ${others.length && device.protocol === 'zk' ? `<p style="margin-top:8px">${others.map((o) => `<button class="btn btn-primary btn-sm" data-usesn="${esc(o.sn)}">Use serial ${esc(o.sn)}</button>`).join(' ')}</p>` : ''}
+                <ul>${hintsFor(device, r).map((h) => `<li>${h}</li>`).join('')}</ul></div></div>`;
+              box.querySelectorAll('[data-usesn]').forEach((b) => b.addEventListener('click', async () => {
+                try {
+                  device = await api(`/api/admin/devices/${device.id}`, { method: 'PUT', body: { sn: b.dataset.usesn } });
+                  polling = false;
+                  check();
+                } catch (e) { toast(e.message, 'bad'); }
+              }));
+              btn.disabled = false;
+              polling = false;
+              return;
+            }
+            await new Promise((res) => setTimeout(res, 5000));
+          }
+          btn.disabled = false;
+          polling = false;
+        };
+        el.querySelector('[data-check]').addEventListener('click', check);
+        if (checkNow) check();
+      },
+    });
+  }
+
+  // ---- member photo -------------------------------------------------------------
+
+  function photoSheet(m, url, after) {
+    sheet({
+      title: 'Profile photo',
+      html: `<div style="display:grid;justify-items:center;gap:12px;padding:6px 0 4px">${avatar(m, 'xl')}<p class="muted" style="text-align:center">The photo shows on the member's app, the front desk and the entry screen.</p></div>
+        <div class="sheet-actions">${m.photo ? `<button class="btn btn-danger" data-remove>${icon('trash')}Remove</button>` : ''}<button class="btn btn-primary" data-pick>${icon('camera')}${m.photo ? 'Change photo' : 'Add photo'}</button></div>`,
+      onMount: (el, close) => {
+        el.querySelector('[data-pick]').addEventListener('click', async (e) => {
+          const btn = e.currentTarget;
+          try {
+            const image = await UI.pickPhoto();
+            if (!image) return;
+            await busy(btn, () => api(url, { method: 'PUT', body: { image } }));
+            close();
+            toast('Photo saved');
+            after?.();
+          } catch (err) { toast(err.message, 'bad'); }
+        });
+        el.querySelector('[data-remove]')?.addEventListener('click', async () => {
+          await api(url, { method: 'DELETE' });
+          close();
+          toast('Photo removed');
+          after?.();
+        });
+      },
+    });
   }
 
   function editPlan(p) {
