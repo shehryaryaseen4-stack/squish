@@ -21,11 +21,11 @@ A complete management app for a gym, plus an app for its members. It is built to
 - **Fees:** monthly, quarterly, half-yearly, annual or any custom plan. Collect or renew with the right start date filled in, take part payments and keep the rest as dues, and see what was collected by day, week or month and by payment method (Cash, Bank transfer, JazzCash, EasyPaisa, Card). Lists of dues, expiring, expired and never-paid members come with one-tap WhatsApp reminders in Roman Urdu.
 - **Attendance:** daily log, check-ins by hour, average workout, and corrections for forgotten check-outs.
 - **Classes:** weekly timetable, daily bookings with capacity, and adding members to a class.
-- **Expenses** (owner only): rent, salaries, bills, equipment and your own categories.
-- **Reports** (owner only): fees collected, expenses, profit, new members, renewals, lapsed members, visits, admission fees, discounts, daily collection, and breakdowns by method, plan and expense category. Members, fees, attendance and daily totals export to CSV for Excel.
+- **Expenses:** rent, salaries, bills, equipment and your own categories.
+- **Reports:** fees collected, expenses, profit, new members, renewals, lapsed members, visits, admission fees, discounts, daily collection, and breakdowns by method, plan and expense category. Members, fees, attendance and daily totals export to CSV for Excel.
 - **Enquiries:** people who asked to join from the app, with WhatsApp follow-up and one-tap "make member".
-- **Settings** (owner only): gym details, brand colour, admission fee, reminder days, blocking expired members at check-in, opening hours, plans, trainers and staff with salaries, PINs, and clearing the demo data.
-- **Two PINs:** the owner PIN opens everything. The front desk PIN can check members in, add members and collect fees, but cannot see money reports, expenses or settings.
+- **Settings:** gym details, brand colour, admission fee, reminder days, blocking expired members at check-in, opening hours, plans, trainers and staff with salaries, staff logins, the owner PIN, and clearing the demo data.
+- **Staff logins & access** (owner only, in Settings): every staff member gets their own name and PIN, and the owner switches on exactly what each one may do: check-in, letting in expired members, seeing/adding/editing/deleting members, taking fees, seeing collections, deleting receipts, register and attendance, classes, enquiries, expenses, reports, machines and gym settings. Ready choices are *Check-in only*, *Front desk* and *Manager (everything)*. Changes apply at once, and switching a login off signs that person out. The server checks every action, so hidden buttons can't be worked around. Gyms that had the old shared front desk PIN get it as a "Front desk" login with the same rights as before.
 
 **Fingerprint & face machines:** in **Settings → Fingerprint & face machines → Add machine** the owner picks the machine they have (ZKTeco fingerprint, ZKTeco face, eSSL/Identix, ZKTeco ZLink, Hikvision face terminal, or another brand). The app then asks only for what that machine needs (the serial number for ZKTeco-type machines, nothing for Hikvision), shows the exact settings to enter on the machine, and **Check connection** waits for the machine to call in. It shows ✅ *Connected* or ❌ *Not connected* with the reason and what to check. A mistyped serial number is detected and fixed with one tap.
 - ZKTeco, eSSL and other "ADMS / Cloud server / Push" machines send punches to `/iclock/cdata`.
@@ -33,6 +33,10 @@ A complete management app for a gym, plus an app for its members. It is built to
 - On the machine, each member's User ID / Employee No. is their member number. A punch checks the member in, the next one checks them out, and double taps within 2 minutes are ignored. IDs that match no member are listed so the enrollment can be fixed. Settings also has a "Punch" button to try it without a machine.
 
 **Entry screen (`/display`):** open it on a TV or big monitor at the entrance and enter a PIN once. Every check-in from a machine, the kiosk or the front desk appears within 2 seconds, full size: the member's photo, name, member number, plan and days left, in green, amber (fee due soon or money pending) or red (expired). Check-outs show how long they trained. A side column lists the latest entries, how many are inside and today's total. It has an optional chime and a full-screen button.
+
+**Entry screen on a second monitor:** connect the wall TV or monitor to the front desk computer with HDMI and press **Windows + P → Extend**. Then:
+- In the **Windows app**, click **Entry screen (TV)** (or Ctrl+E). It opens full screen on the other monitor by itself and comes back there every time the app starts. Ctrl+Shift+E moves it to the next monitor, Esc leaves full screen.
+- In **Chrome or Edge**, click **Entry screen (TV)** and allow "window management" when asked. The screen opens on the other monitor; press *Full screen* there. Without that permission it opens as a new window to drag onto the TV.
 
 **Member photos:** members set or change their photo from the app (Profile → tap the picture), and the front desk can take one from the member's profile. Photos are cropped to a square on the phone before upload and show up in lists, the member profile, the desk, the kiosk and the entry screen. They are stored as files in a `photos/` folder next to the data file.
 
@@ -82,6 +86,17 @@ The first start creates **demo data**: 100 members with 14 months of fees, visit
 3. Open `/admin`, change both PINs, clear the demo data, and add your plans, staff and members.
 
 Back up `db.json` regularly. It is a single file holding the whole gym.
+
+## Windows app (front desk computer)
+
+`desktop/` holds an [Electron](https://www.electronjs.org) app. It runs the gym server on the front desk computer, so a gym needs no hosting: the dashboard opens in its own window, phones on the gym Wi-Fi use the computer's address, and the fingerprint machine sends punches to it. The **Gym** menu has the entry screen, the kiosk, **Phones and machines…** (the address to type into phones and machines), **Back up data…** and the data folder.
+
+Every push builds `gym-app-setup.exe` and puts it on the `app-latest` release. It is not code-signed, so Windows may say *"Windows protected your PC"*: click **More info → Run anyway**. Data is kept in `%APPDATA%\Iron Republic Gym\data`. Keep the computer on while the gym is open; members' phones only reach it on the same Wi-Fi unless the server is put online.
+
+```bash
+cd desktop && npm install && npm start      # try it
+npm run dist                                # build the Windows installer
+```
 
 ## Android and iPhone apps
 

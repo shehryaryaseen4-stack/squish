@@ -1,4 +1,4 @@
-name: Gym app · Android & iOS
+name: Gym app · Android, iOS & Windows
 
 on:
   push:
@@ -89,10 +89,45 @@ jobs:
             Test builds from the latest push (build ${{ github.run_number }}).
             - **gym-app-demo.apk**: works without a server. Install it to try everything on your phone.
             - **gym-app.apk**: the real app. It connects to your gym's server.
+            - **gym-app-setup.exe**: the Windows app for the front desk computer. It runs the gym server itself and shows the entry screen on a second monitor.
             On the phone: download, open the file, allow "Install unknown apps" for your browser, then Install.
+            On Windows: if "Windows protected your PC" shows, click "More info", then "Run anyway".
           files: |
             gym-app/apk/gym-app.apk
             gym-app/apk/gym-app-demo.apk
+
+  # Windows app for the gym's front desk computer.
+  # https://github.com/<owner>/<repo>/releases/download/app-latest/gym-app-setup.exe
+  windows:
+    needs: test
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: gym-app/desktop
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gym-app/desktop/package-lock.json
+      - run: npm ci
+      - run: npm version 1.0.${{ github.run_number }} --no-git-tag-version --allow-same-version
+      - run: npx electron-builder --win --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-app
+          path: gym-app/desktop/dist/gym-app-setup.exe
+          if-no-files-found: error
+      - name: Publish to the "app-latest" release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-latest
+          files: gym-app/desktop/dist/gym-app-setup.exe
 
   ios:
     needs: test

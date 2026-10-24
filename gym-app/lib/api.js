@@ -6,6 +6,7 @@ const { isDate, toMin, fromMin, addDays, addMonths, diffDays, monthKey, monthsBe
 const { classesOn } = require('./availability');
 const { summarize, indexDb, paidOf } = require('./members');
 const v = require('./validate');
+const { PERMISSIONS, PERM_IDS, PRESETS, migrateAccess } = require('./access');
 
 const { fail, HttpError } = v;
 const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -39,6 +40,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
   const memberLoginLimit = rateLimiter(10, 10 * 60 * 1000);
   const leadLimit = rateLimiter(5, 60 * 60 * 1000);
   const db = () => store.db;
+  if (migrateAccess(store.db)) store.save();
   const now = () => nowIn(db().business.timeZone, clock());
   const today = () => now().date;
   const stamp = () => new Date(clock()).toISOString();
@@ -62,11 +64,34 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
 
   // ---- sessions -----------------------------------------------------------
 
-  function adminRole(req) {
+  // Who is signed in to the dashboard, and what they may do.
+  function adminOf(req) {
     const token = bearer(req);
-    const s = token && (db().admin.sessions || []).find((x) => x.hash === sha(token) && x.expires > Date.now());
+    const d = db();
+    const s = token && (d.admin.sessions || []).find((x) => x.hash === sha(token) && x.expires > Date.now());
     if (!s) fail('Please sign in again', 401);
-    return s.role;
+    if (s.role === 'owner') return { role: 'owner', name: 'Owner', perms: PERM_IDS };
+    const user = d.admin.users.find((u) => u.id === s.userId && u.active !== false);
+    if (!user) fail('Please sign in again', 401);
+    return { role: 'staff', userId: user.id, name: user.name, perms: user.perms.filter((x) => PERM_IDS.includes(x)) };
+  }
+
+  function userPublic(u) {
+    const { pin, ...rest } = u;
+    return rest;
+  }
+
+  // Every PIN opens exactly one login, so no two may be the same.
+  function pinTaken(pin, exceptUserId) {
+    const d = db();
+    return checkPin(pin, d.admin.ownerPin) || d.admin.users.some((u) => u.id !== exceptUserId && checkPin(pin, u.pin));
+  }
+
+  function staffUser(body, existing = {}) {
+    const name = v.str(body.name ?? existing.name, { max: 40, required: true, field: 'Name' });
+    const perms = Array.isArray(body.perms) ? [...new Set(body.perms.filter((x) => PERM_IDS.includes(x)))] : existing.perms || [];
+    if (!perms.length) fail('Allow at least one thing');
+    return { name, perms, active: body.active === undefined ? existing.active !== false : Boolean(body.active) };
   }
 
   function memberOf(req) {
@@ -126,7 +151,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
 
   // ---- attendance -----------------------------------------------------------
 
-  function checkInOut(body, role) {
+  function checkInOut(body, canOverride) {
     const d = db();
     const n = now();
     let member;
@@ -144,7 +169,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     }
     const s = summaryOf(member);
     const blocked = ['expired', 'unpaid', 'left'].includes(s.status);
-    if (blocked && d.business.blockExpiredCheckin && !(body.force && role === 'owner')) {
+    if (blocked && d.business.blockExpiredCheckin && !(body.force && canOverride)) {
       fail(s.status === 'unpaid' ? `${member.name} has not paid a membership fee yet` : `${member.name}'s membership ${s.status === 'left' ? 'is closed' : `expired on ${s.expiry}`}. Please renew first.`, 409);
     }
     const visit = { id: newId('att'), memberId: member.id, date: n.date, in: fromMin(n.minutes), out: null, inAt: stamp(), source: body.source === 'kiosk' ? 'kiosk' : 'desk' };
@@ -162,7 +187,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
   }
   const spent = (from, to) => db().expenses.filter((e) => e.date >= from && e.date <= to);
 
-  function dashboard(role) {
+  function dashboard(showMoney) {
     const d = db();
     const n = now();
     const t = n.date;
@@ -217,7 +242,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
       birthdays: birthdays.map(listItem),
       peak,
     };
-    if (role === 'owner') {
+    if (showMoney) {
       const from = `${month}-01`;
       const months = monthsBetween(addMonths(from, -5), t).map((key) => ({
         month: key,
@@ -576,7 +601,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
 
   // ---- routing ------------------------------------------------------------------
 
-  const OWNER_ONLY = new Set(['plans', 'staff', 'classes', 'expenses']);
+  const COLLECTION_RIGHTS = { plans: ['settings'], staff: ['settings'], classes: ['settings'], expenses: ['expenses'], measurements: ['members.edit'], leads: ['leads'] };
 
   async function handle(req, res, url, body) {
     const { pathname } = url;
@@ -669,16 +694,20 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     if (m === 'POST' && pathname === '/api/admin/login') {
       loginLimit(ip);
       const pin = String(body.pin || '');
-      const role = checkPin(pin, d.admin.ownerPin) ? 'owner' : checkPin(pin, d.admin.staffPin) ? 'staff' : null;
-      if (!role) fail('Wrong PIN', 401);
-      const { token, kept } = openSession(d.admin.sessions || [], { role }, SESSION_MS);
+      const user = checkPin(pin, d.admin.ownerPin) ? null : d.admin.users.find((u) => u.active !== false && checkPin(pin, u.pin));
+      if (!user && !checkPin(pin, d.admin.ownerPin)) fail('Wrong PIN', 401);
+      const { token, kept } = openSession(d.admin.sessions || [], user ? { role: 'staff', userId: user.id } : { role: 'owner' }, SESSION_MS);
       d.admin.sessions = kept;
       store.save();
-      return { token, role };
+      return { token, role: user ? 'staff' : 'owner' };
     }
     if (!pathname.startsWith('/api/admin/')) fail('Not found', 404);
-    const role = adminRole(req);
+    const me = adminOf(req);
+    const { role } = me;
+    const can = (perm) => me.perms.includes(perm);
     const owner = () => { if (role !== 'owner') fail('Only the owner can do this', 403); };
+    // Any one of the given rights is enough.
+    const need = (...perms) => { if (!perms.some(can)) fail('You don’t have access to this. Ask the owner.', 403); };
 
     if (m === 'POST' && pathname === '/api/admin/logout') {
       d.admin.sessions = d.admin.sessions.filter((s) => s.hash !== sha(bearer(req)));
@@ -688,9 +717,11 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     if (m === 'GET' && pathname === '/api/admin/data') {
       return {
         role,
+        perms: me.perms,
+        userName: me.name,
         business: d.business,
         plans: d.plans,
-        staff: role === 'owner' ? d.staff : d.staff.map(({ salary, ...s }) => s),
+        staff: can('settings') || can('expenses') ? d.staff : d.staff.map(({ salary, ...s }) => s),
         classes: d.classes,
         expenseCategories: d.expenseCategories,
         methods: v.METHODS,
@@ -698,10 +729,12 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
         demo: Boolean(d.demo),
       };
     }
-    if (m === 'GET' && pathname === '/api/admin/dashboard') return dashboard(role);
+    if (m === 'GET' && pathname === '/api/admin/dashboard') return dashboard(can('reports'));
 
     // Members
     if (m === 'GET' && pathname === '/api/admin/members') {
+      // The front desk searches members to check them in.
+      need('members.view', 'checkin');
       const term = String(q.q || '').trim().toLowerCase();
       return summaries()
         .filter((x) => (q.status === 'left' ? x.member.left : !x.member.left || q.status === 'all'))
@@ -720,6 +753,8 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
         .sort((a, b) => (q.sort === 'expiry' ? String(a.expiry || '').localeCompare(String(b.expiry || '')) : q.sort === 'name' ? a.name.localeCompare(b.name) : b.memberNo - a.memberNo));
     }
     if (m === 'POST' && pathname === '/api/admin/members') {
+      need('members.add');
+      if (body.payment && body.payment.planId) need('fees.collect');
       const data = v.member(body);
       if (d.members.some((x) => !x.left && normalPhone(x.phone) === normalPhone(data.phone))) fail('A member with this phone number already exists', 409);
       const pin = randomPin();
@@ -741,7 +776,15 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     if ((match = pathname.match(/^\/api\/admin\/members\/([\w-]+)(?:\/(\w+))?(?:\/(\d+))?$/))) {
       const [, id, action, index] = match;
       const member = findMember(id);
-      if (m === 'GET' && !action) return memberDetail(member);
+      if (m === 'GET' && !action) {
+        need('members.view');
+        const detail = memberDetail(member);
+        if (!can('fees.view') && !can('fees.collect')) detail.payments = [];
+        return detail;
+      }
+      if (m === 'DELETE' && !action) need('members.delete');
+      else if (action === 'classes') need('classes', 'members.edit');
+      else need('members.edit');
       if (m === 'PUT' && !action) {
         const data = v.member(body);
         if (d.members.some((x) => x.id !== member.id && !x.left && normalPhone(x.phone) === normalPhone(data.phone))) fail('Another member already uses this phone number', 409);
@@ -750,7 +793,6 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
         return memberPublic(member);
       }
       if (m === 'DELETE' && !action) {
-        owner();
         store.deletePhoto(id);
         d.members = d.members.filter((x) => x.id !== id);
         for (const key of ['payments', 'attendance', 'measurements', 'classBookings']) d[key] = d[key].filter((x) => x.memberId !== id);
@@ -798,6 +840,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
 
     // Payments
     if (m === 'GET' && pathname === '/api/admin/payments') {
+      need('fees.view');
       const term = String(q.q || '').trim().toLowerCase();
       const names = new Map(d.members.map((x) => [x.id, x]));
       return d.payments
@@ -809,6 +852,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
         .slice(0, 1000);
     }
     if (m === 'POST' && pathname === '/api/admin/payments') {
+      need('fees.collect');
       const payment = createPayment(body);
       store.save();
       return payment;
@@ -816,6 +860,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     if ((match = pathname.match(/^\/api\/admin\/payments\/([\w-]+)(\/installments)?$/))) {
       const p = d.payments.find((x) => x.id === match[1]) || fail('Payment not found', 404);
       if (m === 'POST' && match[2]) {
+        need('fees.collect');
         const amount = v.num(body.amount, { min: 1, max: 100000000, field: 'Amount' });
         if (amount > p.total - paidOf(p)) fail(`Only ${p.total - paidOf(p)} is left to pay on this receipt`);
         p.installments.push({ amount, method: v.method(body.method), date: v.isoDate(body.date || today()) });
@@ -823,7 +868,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
         return p;
       }
       if (m === 'DELETE' && !match[2]) {
-        owner();
+        need('fees.delete');
         d.payments = d.payments.filter((x) => x.id !== p.id);
         store.save();
         return { ok: true };
@@ -831,8 +876,10 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     }
 
     // Attendance
-    if (m === 'POST' && pathname === '/api/admin/checkin') return checkInOut(body, role);
+    if (m === 'POST' && pathname === '/api/admin/checkin') { need('checkin'); return checkInOut(body, can('checkin.override')); }
     if (m === 'GET' && pathname === '/api/admin/attendance') {
+      // The front desk sees today's log next to the check-in box.
+      need('attendance', 'checkin');
       const date = isDate(q.date) ? q.date : today();
       const names = new Map(d.members.map((x) => [x.id, x]));
       const list = d.attendance.filter((a) => a.date === date).map((a) => ({ ...a, member: pick(names.get(a.memberId)) })).sort((a, b) => b.in.localeCompare(a.in));
@@ -840,6 +887,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
       return { date, list, hours };
     }
     if ((match = pathname.match(/^\/api\/admin\/attendance\/([\w-]+)$/))) {
+      need('attendance');
       const a = d.attendance.find((x) => x.id === match[1]) || fail('Visit not found', 404);
       if (m === 'PATCH') {
         const inT = body.in ?? a.in;
@@ -859,6 +907,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
 
     // Classes
     if (m === 'GET' && pathname === '/api/admin/class-day') {
+      need('classes');
       const date = isDate(q.date) ? q.date : today();
       const names = new Map(d.members.map((x) => [x.id, x]));
       return classesOn(d, date, now()).map((c) => ({
@@ -867,6 +916,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
       }));
     }
     if (m === 'POST' && (match = pathname.match(/^\/api\/admin\/class-bookings\/([\w-]+)\/cancel$/))) {
+      need('classes');
       const b = d.classBookings.find((x) => x.id === match[1]) || fail('Booking not found', 404);
       b.status = 'cancelled';
       store.save();
@@ -875,6 +925,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
 
     // Monthly register (a day or a month)
     if (m === 'GET' && pathname === '/api/admin/register') {
+      need('attendance');
       const t = today();
       if (isDate(q.day)) return register(q.day, q.day);
       const month = /^\d{4}-\d{2}$/.test(q.month || '') ? q.month : monthKey(t);
@@ -882,9 +933,11 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     }
 
     // Attendance machines (fingerprint / face)
+    if (pathname.startsWith('/api/admin/devices') && pathname !== '/api/admin/devices/test-punch') need('machines');
     if (m === 'GET' && pathname === '/api/admin/devices') return { types: DEVICE_TYPES, devices: d.devices.map(publicDevice) };
-    if (m === 'POST' && pathname === '/api/admin/devices') { owner(); return addDevice(body); }
+    if (m === 'POST' && pathname === '/api/admin/devices') return addDevice(body);
     if (m === 'POST' && pathname === '/api/admin/devices/test-punch') {
+      need('machines', 'checkin');
       const n = now();
       const result = recordPunch(v.str(body.memberNo, { max: 10, required: true, field: 'Member number' }), n.date, fromMin(n.minutes), 'fingerprint');
       if (result === 'unknown') fail(`No member with number ${body.memberNo}`, 404);
@@ -895,7 +948,6 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     if ((match = pathname.match(/^\/api\/admin\/devices\/([\w.-]+)(\/check)?$/))) {
       const device = d.devices.find((x) => x.id === match[1]) || fail('Machine not found', 404);
       if (m === 'GET' && match[2]) return checkDevice(device);
-      owner();
       if (m === 'PUT' && !match[2]) {
         if (body.approved !== undefined) device.approved = Boolean(body.approved);
         if (body.name !== undefined) device.name = v.str(body.name, { max: 60 }) || device.name;
@@ -922,26 +974,27 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     }
 
     // Entry screen
-    if (m === 'GET' && pathname === '/api/admin/display') return displayFeed();
+    if (m === 'GET' && pathname === '/api/admin/display') { need('checkin'); return displayFeed(); }
 
     // Reports and owner settings
     if (m === 'GET' && pathname === '/api/admin/report') {
-      owner();
+      need('reports');
       return report(/^\d{4}-\d{2}$/.test(q.month || '') ? q.month : monthKey(today()));
     }
     if (m === 'GET' && pathname === '/api/admin/expenses') {
-      owner();
+      need('expenses');
       return d.expenses.filter((e) => !q.month || monthKey(e.date) === q.month).sort((a, b) => b.date.localeCompare(a.date));
     }
+    if (m === 'GET' && pathname === '/api/admin/leads') need('leads');
     if (m === 'GET' && pathname === '/api/admin/leads') return [...d.leads].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     if (m === 'PUT' && pathname === '/api/admin/business') {
-      owner();
+      need('settings');
       d.business = v.business(body, d.business);
       store.save();
       return d.business;
     }
     if (m === 'PUT' && pathname === '/api/admin/expense-categories') {
-      owner();
+      need('settings', 'expenses');
       const list = (Array.isArray(body.categories) ? body.categories : []).map((c) => v.str(c, { max: 40 })).filter(Boolean);
       if (!list.length) fail('Keep at least one category');
       d.expenseCategories = [...new Set(list)].slice(0, 30);
@@ -951,15 +1004,50 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     if (m === 'POST' && pathname === '/api/admin/pins') {
       owner();
       if (!checkPin(String(body.current || ''), d.admin.ownerPin)) fail('Current owner PIN is wrong', 401);
-      for (const [key, field] of [['ownerPin', 'owner'], ['staffPin', 'staff']]) {
-        if (!body[field]) continue;
-        if (!/^\d{4,8}$/.test(String(body[field]))) fail('PINs must be 4 to 8 digits');
-        d.admin[key] = hashPin(body[field]);
-      }
-      if (body.owner && body.staff && body.owner === body.staff) fail('Owner and front desk PINs must be different');
-      if (body.staff) d.admin.sessions = d.admin.sessions.filter((s) => s.role === 'owner');
+      const pin = String(body.owner || '');
+      if (!/^\d{4,8}$/.test(pin)) fail('PINs must be 4 to 8 digits');
+      if (d.admin.users.some((u) => checkPin(pin, u.pin))) fail('A staff login already uses this PIN', 409);
+      d.admin.ownerPin = hashPin(pin);
       store.save();
       return { ok: true };
+    }
+
+    // Staff logins and what each may do (owner only)
+    if (pathname === '/api/admin/users' || pathname.startsWith('/api/admin/users/')) {
+      owner();
+      const id = pathname.split('/')[4];
+      if (m === 'GET' && !id) return { permissions: PERMISSIONS, presets: PRESETS, users: d.admin.users.map(userPublic) };
+      if (m === 'POST' && !id) {
+        const clean = staffUser(body);
+        const pin = String(body.pin || '');
+        if (!/^\d{4,8}$/.test(pin)) fail('The PIN must be 4 to 8 digits');
+        if (pinTaken(pin)) fail('This PIN is already used. Choose another.', 409);
+        const user = { id: newId('usr'), ...clean, pin: hashPin(pin), createdAt: stamp() };
+        d.admin.users.push(user);
+        store.save();
+        return userPublic(user);
+      }
+      const user = d.admin.users.find((u) => u.id === id) || fail('Staff login not found', 404);
+      const signOutUser = () => { d.admin.sessions = d.admin.sessions.filter((s) => s.userId !== user.id); };
+      if (m === 'PUT') {
+        Object.assign(user, staffUser(body, user));
+        if (body.pin) {
+          const pin = String(body.pin);
+          if (!/^\d{4,8}$/.test(pin)) fail('The PIN must be 4 to 8 digits');
+          if (pinTaken(pin, user.id)) fail('This PIN is already used. Choose another.', 409);
+          user.pin = hashPin(pin);
+          signOutUser();
+        }
+        if (!user.active) signOutUser();
+        store.save();
+        return userPublic(user);
+      }
+      if (m === 'DELETE') {
+        d.admin.users = d.admin.users.filter((u) => u.id !== user.id);
+        signOutUser();
+        store.save();
+        return { ok: true };
+      }
     }
     if (m === 'POST' && pathname === '/api/admin/clear-data') {
       owner();
@@ -971,7 +1059,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     // Simple collections
     if ((match = pathname.match(/^\/api\/admin\/(plans|staff|classes|expenses|measurements|leads)(?:\/([\w-]+))?$/))) {
       const [, collection, id] = match;
-      if (OWNER_ONLY.has(collection) && !(collection === 'staff' && m === 'GET')) owner();
+      if (!(collection === 'staff' && m === 'GET')) need(...COLLECTION_RIGHTS[collection]);
       const list = d[collection];
       if (m === 'POST' && !id) {
         const clean = v.collections[collection](body);

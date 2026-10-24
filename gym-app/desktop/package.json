@@ -1,0 +1,40 @@
+{
+  "name": "gym-app-desktop",
+  "productName": "Iron Republic Gym",
+  "version": "1.0.0",
+  "description": "Gym manager for Windows: runs the gym server on this computer and shows the entry screen on a second monitor.",
+  "main": "main.js",
+  "private": true,
+  "author": "Iron Republic",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --publish never"
+  },
+  "devDependencies": {
+    "electron": "44.5.1",
+    "electron-builder": "26.17.0"
+  },
+  "build": {
+    "appId": "pk.ironrepublic.gym.desktop",
+    "productName": "Iron Republic Gym",
+    "directories": { "output": "dist" },
+    "files": ["main.js", "preload.js", "package.json"],
+    "extraResources": [
+      { "from": "../server.js", "to": "server/server.js" },
+      { "from": "../lib", "to": "server/lib" },
+      { "from": "../seed", "to": "server/seed" },
+      { "from": "../public", "to": "server/public" }
+    ],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "icon.png",
+      "artifactName": "gym-app-setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Iron Republic Gym"
+    }
+  }
+}

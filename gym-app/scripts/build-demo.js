@@ -80,6 +80,7 @@ const modules = {
   './availability': lib('availability.js'),
   './members': lib('members.js'),
   './validate': lib('validate.js'),
+  './access': lib('access.js'),
   './demo': lib('demo.js'),
   './store': browserStore,
   './api': lib('api.js'),

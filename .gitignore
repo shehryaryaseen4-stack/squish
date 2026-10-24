@@ -2,3 +2,4 @@ node_modules/
 .env
 data/
 models/*.onnx
+gym-app/desktop/dist/

@@ -226,3 +226,40 @@ test('members save a weekly workout plan and tick off exercises; trainers can se
   assert.deepEqual(Object.keys(detail.body.member.workoutPlan.days), ['wed']);
   assert.equal(detail.body.member.workoutPlan.updatedBy, 'trainer');
 });
+
+test('the owner decides what each staff login may do', async (t) => {
+  const app = await start();
+  t.after(app.close);
+  const owner = await app.login('1234');
+  const desk = await app.login('0000');
+  // The old shared front desk PIN became a "Front desk" login.
+  const list = await app.call('/api/admin/users', { token: owner });
+  assert.equal(list.body.users.length, 1);
+  assert.equal(list.body.users[0].name, 'Front desk');
+  assert.equal(list.body.users[0].pin, undefined);
+  assert.equal((await app.call('/api/admin/users', { token: desk })).status, 403);
+
+  // A check-in-only login.
+  assert.equal((await app.call('/api/admin/users', { method: 'POST', token: owner, body: { name: 'Bilal', pin: '0000', perms: ['checkin'] } })).status, 409);
+  assert.equal((await app.call('/api/admin/users', { method: 'POST', token: owner, body: { name: 'Bilal', pin: '1234', perms: ['checkin'] } })).status, 409);
+  const made = await app.call('/api/admin/users', { method: 'POST', token: owner, body: { name: 'Bilal', pin: '5555', perms: ['checkin', 'nonsense'] } });
+  assert.deepEqual(made.body.perms, ['checkin']);
+  const bilal = await app.login('5555');
+  const data = await app.call('/api/admin/data', { token: bilal });
+  assert.deepEqual([data.body.role, data.body.userName, data.body.perms], ['staff', 'Bilal', ['checkin']]);
+  const { body } = await app.call('/api/admin/members', { method: 'POST', token: owner, body: newMember() });
+  assert.equal((await app.call('/api/admin/members', { method: 'POST', token: bilal, body: newMember({ phone: '0311 0000000' }) })).status, 403);
+  assert.equal((await app.call(`/api/admin/members/${body.member.id}`, { token: bilal })).status, 403);
+  assert.equal((await app.call('/api/admin/payments', { token: bilal })).status, 403);
+  assert.equal((await app.call('/api/admin/members?q=ahmed', { token: bilal })).body.length, 1);
+  assert.equal((await app.call('/api/admin/checkin', { method: 'POST', token: bilal, body: { memberNo: 1001 } })).body.action, 'in');
+
+  // More rights take effect at once; switching the login off signs it out.
+  await app.call(`/api/admin/users/${made.body.id}`, { method: 'PUT', token: owner, body: { perms: ['checkin', 'settings', 'reports'] } });
+  assert.equal((await app.call('/api/admin/report?month=2026-10', { token: bilal })).status, 200);
+  assert.equal((await app.call('/api/admin/business', { method: 'PUT', token: bilal, body: { ...data.body.business, name: 'Bilal Gym' } })).status, 200);
+  assert.equal((await app.call('/api/admin/expenses', { token: bilal })).status, 403);
+  await app.call(`/api/admin/users/${made.body.id}`, { method: 'PUT', token: owner, body: { active: false } });
+  assert.equal((await app.call('/api/admin/data', { token: bilal })).status, 401);
+  assert.equal((await app.call('/api/admin/login', { method: 'POST', body: { pin: '5555' } })).status, 401);
+});

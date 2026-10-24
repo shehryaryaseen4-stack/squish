@@ -5,6 +5,8 @@
   const root = document.getElementById('root');
   const S = { token: store.get('adminToken', null), data: null };
   const isOwner = () => S.data?.role === 'owner';
+  // What this login may do; the owner decides it per staff login.
+  const can = (perm) => isOwner() || (S.data?.perms || []).includes(perm);
   const toMin = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
   const ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   const PRESETS = ['#f97316', '#ef4444', '#eab308', '#22c55e', '#0ea5e9', '#6366f1', '#a855f7', '#111827'];
@@ -125,8 +127,68 @@
     loginView();
   }
 
+  // ---- entry screen on a second monitor -----------------------------------------
+
+  // The desktop app puts it full screen on the TV by itself. In Chrome or Edge
+  // the browser can place a window on the other monitor once allowed to.
+  async function openScreen(kind, e) {
+    if (e.defaultPrevented) return; // the demo handles these links itself
+    const desk = window.gymDesktop;
+    if (desk) {
+      e.preventDefault();
+      return kind === 'entry' ? desk.openEntryScreen() : desk.openKiosk();
+    }
+    if (kind !== 'entry') return;
+    e.preventDefault();
+    let spot = null;
+    try {
+      if ('getScreenDetails' in window) {
+        const d = await window.getScreenDetails();
+        spot = d.screens.find((s) => s !== d.currentScreen) || null;
+      }
+    } catch { /* permission refused: fall back to a normal window */ }
+    const size = spot
+      ? `left=${spot.availLeft},top=${spot.availTop},width=${spot.availWidth},height=${spot.availHeight}`
+      : 'width=1280,height=760';
+    const open = () => window.open('/display.html', 'gymEntryScreen', `popup,${size}`);
+    // Asking for the monitor list can use up the click, and then pop-ups are blocked.
+    const win = open();
+    if (!win) {
+      return sheet({
+        title: 'Open the entry screen',
+        html: '<p>The browser blocked the new window. Press the button below, or allow pop-ups for this site.</p><button class="btn btn-primary btn-block" data-go style="margin-top:14px">Open entry screen</button>',
+        onMount: (el, close) => el.querySelector('[data-go]').addEventListener('click', () => { if (open()) close(); }),
+      });
+    }
+    win.focus();
+    sheet({
+      title: 'Entry screen opened',
+      html: `<p>${spot ? 'It opened on your other monitor.' : 'It opened in a new window.'}</p>
+        <ol class="steps">${spot ? '' : '<li>Drag the new window onto the wall monitor or TV.</li>'}
+          <li>On that screen enter the PIN once and press <b>Full screen</b> (or F11).</li>
+          <li>Keep working here; check-ins appear there by themselves.</li></ol>
+        <p class="muted" style="margin-top:10px">No second monitor showing? Connect it with HDMI, press Windows + P and choose <b>Extend</b>.</p>`,
+    });
+  }
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest && e.target.closest('[data-screen]');
+    if (a) openScreen(a.dataset.screen, e);
+  });
+
   // ---- shell -------------------------------------------------------------------
 
+  const PAGE_RIGHTS = {
+    desk: ['checkin'], members: ['members.view'], register: ['attendance'], fees: ['fees.view'], attendance: ['attendance'],
+    classes: ['classes', 'settings'], leads: ['leads'], expenses: ['expenses'], reports: ['reports'], settings: ['settings', 'machines'], member: ['members.view'],
+  };
+  // Buttons marked data-need="right other-right" only show with one of those rights.
+  // The server checks every action too; this just keeps the screen tidy.
+  function applyRights() {
+    if (!S.data || isOwner()) return;
+    root.querySelectorAll('[data-need]').forEach((el) => { if (!el.dataset.need.split(' ').some(can)) el.style.display = 'none'; });
+  }
+  new MutationObserver(applyRights).observe(root, { childList: true, subtree: true });
+  const allowed = (page) => isOwner() || !PAGE_RIGHTS[page] || PAGE_RIGHTS[page].some(can);
   const PAGES = () => [
     ['home', 'chart', 'Dashboard'],
     ['desk', 'login', 'Front desk'],
@@ -135,22 +197,25 @@
     ['fees', 'wallet', 'Fees'],
     ['attendance', 'clock', 'Attendance'],
     ['classes', 'calendar', 'Classes'],
-    ...(isOwner() ? [['expenses', 'receipt', 'Expenses'], ['reports', 'trending', 'Reports']] : []),
+    ['expenses', 'receipt', 'Expenses'],
+    ['reports', 'trending', 'Reports'],
     ['leads', 'inbox', 'Enquiries'],
-    ...(isOwner() ? [['settings', 'settings', 'Settings']] : []),
-  ];
+    ['settings', 'settings', 'Settings'],
+  ].filter(([id]) => allowed(id));
   const BOTTOM = ['home', 'desk', 'register', 'members'];
 
   function shell(page, title, sub, body, { fab = null, actions = '' } = {}) {
     const b = S.data.business;
     const pages = PAGES();
-    const inBottom = BOTTOM.includes(page);
+    const bottom = BOTTOM.filter((id) => pages.some((p) => p[0] === id));
+    const inBottom = bottom.includes(page);
+    const screens = can('checkin');
     root.innerHTML = `<div class="shell">
-      <aside class="side"><div class="side-brand"><div class="brand-mark">${esc(b.name.charAt(0))}</div><div><b>${esc(b.name)}</b><span>${isOwner() ? 'Owner' : 'Front desk'}</span></div></div>
+      <aside class="side"><div class="side-brand"><div class="brand-mark">${esc(b.name.charAt(0))}</div><div><b>${esc(b.name)}</b><span>${isOwner() ? 'Owner' : esc(S.data.userName || 'Staff')}</span></div></div>
         ${pages.map(([id, ic, label]) => `<a class="nav-item" href="#/${id}" ${id === page ? 'aria-current="page"' : ''}>${icon(ic)}${esc(label)}</a>`).join('')}
         <div class="spacer"></div>
-        <a class="nav-item" href="/display.html">${icon('tv')}Entry screen (TV)</a>
-        <a class="nav-item" href="/kiosk.html">${icon('kiosk')}Check-in kiosk</a>
+        ${screens ? `<a class="nav-item" href="/display.html" data-screen="entry">${icon('tv')}Entry screen (TV)</a>
+        <a class="nav-item" href="/kiosk.html" data-screen="kiosk">${icon('kiosk')}Check-in kiosk</a>` : ''}
         <button class="nav-item" data-signout style="border:0;background:none;cursor:pointer;width:100%">${icon('logout')}Sign out</button>
       </aside>
       <div class="content">
@@ -158,19 +223,19 @@
         <div class="wrap view">${body}</div>
       </div>
       <nav class="bottom-nav" aria-label="Main">
-        ${BOTTOM.map((id) => { const [, ic, label] = pages.find((p) => p[0] === id); return `<a class="nav-item" href="#/${id}" ${id === page ? 'aria-current="page"' : ''}>${icon(ic)}<span>${esc(label === 'Front desk' ? 'Desk' : label === 'Dashboard' ? 'Home' : label)}</span></a>`; }).join('')}
+        ${bottom.map((id) => { const [, ic, label] = pages.find((p) => p[0] === id); return `<a class="nav-item" href="#/${id}" ${id === page ? 'aria-current="page"' : ''}>${icon(ic)}<span>${esc(label === 'Front desk' ? 'Desk' : label === 'Dashboard' ? 'Home' : label)}</span></a>`; }).join('')}
         <button class="nav-item" data-more style="border:0;background:none;cursor:pointer" ${!inBottom ? 'aria-current="page"' : ''}>${icon('more')}<span>More</span></button>
       </nav>
-      ${fab ? `<button class="fab" data-fab aria-label="${esc(fab.label)}">${icon(fab.icon || 'plus')}</button>` : ''}
+      ${fab && (!fab.need || can(fab.need)) ? `<button class="fab" data-fab aria-label="${esc(fab.label)}">${icon(fab.icon || 'plus')}</button>` : ''}
     </div>`;
     root.querySelector('[data-signout]').addEventListener('click', signOut);
     root.querySelector('[data-more]').addEventListener('click', () => sheet({
       title: 'More',
-      html: `<div class="more-grid">${pages.filter(([id]) => !BOTTOM.includes(id)).map(([id, ic, label]) => `<a href="#/${id}" data-close>${icon(ic)}${esc(label)}</a>`).join('')}
-        <a href="/kiosk.html">${icon('kiosk')}Kiosk</a><a href="/display.html">${icon('tv')}Entry screen</a><a href="#" data-close data-out>${icon('logout')}Sign out</a></div>`,
+      html: `<div class="more-grid">${pages.filter(([id]) => !bottom.includes(id)).map(([id, ic, label]) => `<a href="#/${id}" data-close>${icon(ic)}${esc(label)}</a>`).join('')}
+        ${screens ? `<a href="/kiosk.html" data-screen="kiosk">${icon('kiosk')}Kiosk</a><a href="/display.html" data-screen="entry">${icon('tv')}Entry screen</a>` : ''}<a href="#" data-close data-out>${icon('logout')}Sign out</a></div>`,
       onMount: (el) => el.querySelector('[data-out]').addEventListener('click', (e) => { e.preventDefault(); signOut(); }),
     }));
-    if (fab) root.querySelector('[data-fab]').addEventListener('click', fab.onClick);
+    root.querySelector('[data-fab]')?.addEventListener('click', fab?.onClick);
   }
 
   const panel = (title, body, extra = '') => `<section class="card panel"><div class="panel-head"><h2>${title}</h2>${extra}</div>${body}</section>`;
@@ -182,7 +247,11 @@
 
   function bindMemberRows(scope = root) {
     scope.querySelectorAll('[data-member]').forEach((el) => {
-      const go = (e) => { if (e.target.closest('a,button')) return; location.hash = `#/member/${el.dataset.member}`; };
+      const go = (e) => {
+        if (e.target.closest('a,button')) return;
+        if (!can('members.view')) return toast('You don’t have access to member profiles. Ask the owner.', 'bad');
+        location.hash = `#/member/${el.dataset.member}`;
+      };
       el.addEventListener('click', go);
       el.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(e); });
     });
@@ -218,28 +287,29 @@
   }
 
   async function homePage() {
-    shell('home', greeting(), dateLong(today()), '<div class="kpis six">' + '<div class="skel" style="height:104px;border-radius:22px"></div>'.repeat(6) + '</div>', { fab: { label: 'Add member', icon: 'userPlus', onClick: () => addMemberSheet() } });
-    const [o, month] = await Promise.all([api('/api/admin/dashboard'), api(`/api/admin/register?month=${monthOf(today())}`)]);
-    const M = month.totals;
+    shell('home', greeting(), dateLong(today()), '<div class="kpis six">' + '<div class="skel" style="height:104px;border-radius:22px"></div>'.repeat(6) + '</div>', { fab: { label: 'Add member', icon: 'userPlus', need: 'members.add', onClick: () => addMemberSheet() } });
+    const [o, month] = await Promise.all([api('/api/admin/dashboard'), can('attendance') ? api(`/api/admin/register?month=${monthOf(today())}`) : null]);
+    const M = month?.totals;
+    const fees = can('fees.view');
     const c = o.counts;
     const kpi = (ic, label, val, sub, href, tone = '') => `<a class="card kpi link" href="${href}"><div class="k-head">${icon(ic)}${label}</div><div class="k-val tnum ${tone}">${val}</div><div class="k-sub">${sub}</div></a>`;
     const owner = o.money;
     const body = `
-      ${o.demo && isOwner() ? `<div class="demo-bar">${icon('info')}<span>This is demo data so you can try everything. Clear it from <b>Settings → Data</b> when you start for real.</span></div>` : ''}
-      <section class="card panel" style="margin-bottom:16px"><div class="panel-head"><h2>${monthLabel(monthOf(today()), true)} so far</h2><a class="link" href="#/register">Open register</a></div>
+      ${o.demo && can('settings') ? `<div class="demo-bar">${icon('info')}<span>This is demo data so you can try everything. Clear it from <b>Settings → Data</b> when you start for real.</span></div>` : ''}
+      ${M ? `<section class="card panel" style="margin-bottom:16px"><div class="panel-head"><h2>${monthLabel(monthOf(today()), true)} so far</h2><a class="link" href="#/register">Open register</a></div>
         <div class="month-glance">
           <a href="#/register?f=came"><b class="tnum">${M.came}<small>/${M.members}</small></b><span>members came</span></a>
           <a href="#/register?f=absent"><b class="tnum ${M.notCame ? 'warn' : ''}">${M.notCame}</b><span>didn't come yet</span></a>
           <a href="#/register?f=paid"><b class="tnum">${M.paid}</b><span>fee paid</span></a>
           <a href="#/register?f=unpaid"><b class="tnum ${M.notPaid ? 'bad' : ''}">${M.notPaid}</b><span>fee not paid</span></a>
-          <a href="#/register?f=collected"><b class="tnum">${rs(M.collected)}</b><span>collected from ${M.payers}</span></a>
-        </div></section>
+          ${fees ? `<a href="#/register?f=collected"><b class="tnum">${rs(M.collected)}</b><span>collected from ${M.payers}</span></a>` : ''}
+        </div></section>` : ''}
       <div class="kpis six">
         ${kpi('login', 'In the gym now', c.insideNow, `${c.checkinsToday} check-ins today`, '#/desk')}
         ${kpi('users', 'Active members', c.active, `${c.newThisMonth} joined this month`, '#/members?status=active')}
         ${kpi('clock', 'Expiring soon', c.expiring, `in the next ${S.data.business.expiringDays} days`, '#/fees?tab=expiring', c.expiring ? 'warn' : '')}
         ${kpi('alert', 'Expired', c.expired, `${c.unpaid} never paid`, '#/fees?tab=expired', c.expired ? 'bad' : '')}
-        ${kpi('wallet', 'Dues pending', rs(c.duesAmount), `${c.dues} members owe`, '#/fees?tab=dues', c.duesAmount ? 'bad' : '')}
+        ${fees ? kpi('wallet', 'Dues pending', rs(c.duesAmount), `${c.dues} members owe`, '#/fees?tab=dues', c.duesAmount ? 'bad' : '') : kpi('userPlus', 'New this month', c.newThisMonth, 'joined since the 1st', '#/members')}
         ${kpi('moon', 'Not coming', c.inactive, `${S.data.business.inactiveDays}+ days absent`, '#/members?status=inactive', c.inactive ? 'warn' : '')}
       </div>
       ${owner ? `<div class="kpis section-gap">
@@ -260,10 +330,10 @@
       <div class="grid-3">
         ${listPanel('Expiring soon', o.expiring, (x) => `${statusBadge(x)}${waBtn(x.phone, MSG.expiring(x, x))}`, 'All expiring', '#/fees?tab=expiring', 'Nobody expiring this week.')}
         ${listPanel('Expired · need renewal', o.expired, (x) => `${statusBadge(x)}${waBtn(x.phone, MSG.expired(x, x))}`, 'All expired', '#/fees?tab=expired', 'No recent expiries.')}
-        ${listPanel('Fee dues', o.dues, (x) => `<b class="tnum money-neg">${rs(x.balance)}</b>${waBtn(x.phone, MSG.dues(x, x))}`, 'All dues', '#/fees?tab=dues', 'No pending dues.')}
+        ${fees ? listPanel('Fee dues', o.dues, (x) => `<b class="tnum money-neg">${rs(x.balance)}</b>${waBtn(x.phone, MSG.dues(x, x))}`, 'All dues', '#/fees?tab=dues', 'No pending dues.') : ''}
         ${listPanel(`Not coming lately`, o.inactive, (x) => `<span class="badge badge-muted">${x.daysSinceVisit == null ? 'Never came' : `${x.daysSinceVisit}d`}</span>${waBtn(x.phone, MSG.inactive(x, x))}`, 'See all', '#/members?status=inactive', 'Everyone is showing up. 💪')}
         ${o.birthdays.length ? listPanel('Birthdays this week 🎂', o.birthdays, (x) => `<span class="badge badge-accent">${dateShort(`${today().slice(0, 4)}-${x.dob.slice(5)}`)}</span>${waBtn(x.phone, MSG.birthday(x))}`, '', '', '') : ''}
-        ${c.newLeads ? panel('New enquiries', `<p style="font-size:15px"><b>${c.newLeads}</b> people asked about joining.</p><a class="btn btn-soft btn-sm" style="margin-top:12px" href="#/leads">${icon('inbox')}Open enquiries</a>`) : ''}
+        ${c.newLeads && can('leads') ? panel('New enquiries', `<p style="font-size:15px"><b>${c.newLeads}</b> people asked about joining.</p><a class="btn btn-soft btn-sm" style="margin-top:12px" href="#/leads">${icon('inbox')}Open enquiries</a>`) : ''}
       </div>`;
     root.querySelector('.wrap').innerHTML = body;
     bindMemberRows();
@@ -289,7 +359,7 @@
       <div class="desk-search input-group">${icon('search')}<input class="input" id="desk-q" placeholder="Member no., name or phone" autocomplete="off" inputmode="search" aria-label="Find member" autofocus></div>
       <div id="desk-flash"></div>
       <div class="desk-results" id="desk-results"></div>
-      <div class="grid-2" id="desk-lists"></div>`, { fab: { label: 'Add member', icon: 'userPlus', onClick: () => addMemberSheet() } });
+      <div class="grid-2" id="desk-lists"></div>`, { fab: { label: 'Add member', icon: 'userPlus', need: 'members.add', onClick: () => addMemberSheet() } });
     const input = document.getElementById('desk-q');
     const results = document.getElementById('desk-results');
     let members = [];
@@ -313,7 +383,7 @@
         lists();
         input.focus();
       } catch (e) {
-        if (e.status === 409 && isOwner() && (await confirmSheet({ title: 'Membership not active', message: `${e.message} Let them in anyway?`, confirm: 'Check in anyway' }))) {
+        if (e.status === 409 && can('checkin.override') && (await confirmSheet({ title: 'Membership not active', message: `${e.message} Let them in anyway?`, confirm: 'Check in anyway' }))) {
           const r = await api('/api/admin/checkin', { method: 'POST', body: { ...body, force: true } });
           flash(r);
           lists();
@@ -328,7 +398,7 @@
       document.getElementById('desk-flash').innerHTML = `<div class="desk-flash ${r.action === 'out' ? 'out' : warn ? 'warn' : 'in'}">${avatar(m, 'lg')}<div class="tx">
         <h3>${r.action === 'in' ? `Welcome, ${esc(m.name.split(' ')[0])}!` : `Bye, ${esc(m.name.split(' ')[0])}!`} <span class="no">#${m.memberNo}</span></h3>
         <p>${r.action === 'in' ? `Checked in at ${time12(r.visit.in)}` : `Checked out · trained ${fmtMinutes(dur)}`} · ${statusBadge(s)}${s.balance > 0 ? ` <span class="badge badge-bad">Due ${rs(s.balance)}</span>` : ''}</p></div>
-        ${warn ? `<button class="btn btn-primary btn-sm" data-collect="${esc(m.id)}">${icon('wallet')}Collect fee</button>` : ''}</div>`;
+        ${warn && can('fees.collect') ? `<button class="btn btn-primary btn-sm" data-collect="${esc(m.id)}">${icon('wallet')}Collect fee</button>` : ''}</div>`;
       document.querySelector('[data-collect]')?.addEventListener('click', () => collectFeeSheet(m.id, deskPage));
     };
     const lists = async () => {
@@ -368,7 +438,7 @@
         <select class="select" data-sort style="width:auto" aria-label="Sort"><option value="new" ${sort === 'new' ? 'selected' : ''}>Newest first</option><option value="name" ${sort === 'name' ? 'selected' : ''}>Name A–Z</option><option value="expiry" ${sort === 'expiry' ? 'selected' : ''}>Expiry date</option></select>
         <button class="btn btn-ghost btn-sm" data-csv style="min-height:50px">${icon('download')}CSV</button>
       </div>
-      <div class="card panel" id="list"><div class="skel" style="height:300px"></div></div>`, { fab: { label: 'Add member', icon: 'userPlus', onClick: () => addMemberSheet() } });
+      <div class="card panel" id="list"><div class="skel" style="height:300px"></div></div>`, { fab: { label: 'Add member', icon: 'userPlus', need: 'members.add', onClick: () => addMemberSheet() } });
     const go = (over) => {
       const p = new URLSearchParams({ status, q: input.value, sort, ...over });
       location.hash = `#/members?${p}`;
@@ -627,12 +697,12 @@
 
     root.querySelector('.top h1').innerHTML = `<a class="icon-btn" href="#/members" aria-label="Back" style="display:inline-grid;vertical-align:middle;margin-right:10px">${icon('chevronLeft')}</a>${esc(m.name)}`;
     root.querySelector('.wrap').innerHTML = `
-      <section class="card profile-head"><button class="photo-edit" data-photo aria-label="Change photo">${avatar(m, 'xl')}<span class="cam">${icon('camera')}</span></button>
+      <section class="card profile-head"><button class="photo-edit" data-photo aria-label="Change photo">${avatar(m, 'xl')}<span class="cam" data-need="members.edit">${icon('camera')}</span></button>
         <div class="tx"><h2>${esc(m.name)} <span class="no">#${m.memberNo}</span></h2><p>${esc(m.phone)} · ${m.gender}${age(m.dob) ? ` · ${age(m.dob)} yrs` : ''} · joined ${dateLong(m.joinDate)}</p>
           <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">${statusBadge(s)}${s.inside ? '<span class="badge badge-accent">In the gym now</span>' : ''}${s.balance > 0 ? `<span class="badge badge-bad">Due ${rs(s.balance)}</span>` : ''}</div></div>
         <div class="acts">
-          <button class="btn btn-primary btn-sm" data-fee>${icon('wallet')}${s.status === 'unpaid' ? 'Collect fee' : 'Renew / collect'}</button>
-          <button class="btn btn-ghost btn-sm" data-check>${icon(s.inside ? 'logout' : 'login')}${s.inside ? 'Check out' : 'Check in'}</button>
+          <button class="btn btn-primary btn-sm" data-fee data-need="fees.collect">${icon('wallet')}${s.status === 'unpaid' ? 'Collect fee' : 'Renew / collect'}</button>
+          <button class="btn btn-ghost btn-sm" data-check data-need="checkin">${icon(s.inside ? 'logout' : 'login')}${s.inside ? 'Check out' : 'Check in'}</button>
           <a class="btn btn-ghost btn-sm" href="tel:${esc(m.phone)}">${icon('phone')}Call</a>
           ${waBtn(m.phone, reminderFor(m, s), 'WhatsApp')}
         </div>
@@ -647,11 +717,11 @@
           ${s.balance > 0 ? `<div class="note-box" style="margin:0">${icon('alert')}<span>${rs(s.balance)} pending on old receipts.</span></div>` : ''}
         </section>
         <section class="card panel">
-          <div class="panel-head"><h2>Details</h2><button class="link" data-edit>${icon('edit')} Edit</button></div>
+          <div class="panel-head"><h2>Details</h2><button class="link" data-edit data-need="members.edit">${icon('edit')} Edit</button></div>
           <div class="kv" style="margin:0">
             <div><span>Trainer</span><b>${esc(trainer?.name || 'None')}</b></div><div><span>Goal</span><b>${esc(m.goal || '—')}</b></div>
             <div><span>Date of birth</span><b>${m.dob ? dateShort(m.dob) : '—'}</b></div><div><span>Area</span><b>${esc(m.address || '—')}</b></div>
-            <div><span>Emergency</span><b>${esc(m.emergencyName || '—')}${m.emergencyPhone ? ` · ${esc(m.emergencyPhone)}` : ''}</b></div><div><span>Total paid</span><b class="tnum">${rs(s.totalPaid)}</b></div>
+            <div><span>Emergency</span><b>${esc(m.emergencyName || '—')}${m.emergencyPhone ? ` · ${esc(m.emergencyPhone)}` : ''}</b></div>${can('fees.view') ? `<div><span>Total paid</span><b class="tnum">${rs(s.totalPaid)}</b></div>` : ''}
             <div style="grid-column:1/-1"><span>Fingerprint machine ID</span><b>${icon('fingerprint')} ${m.memberNo}</b> <small class="muted">enroll the thumb on the machine under this user ID</small></div>
           </div>
           ${m.notes ? `<div class="note-box" style="margin:12px 0 0">${icon('info')}<span>${esc(m.notes)}</span></div>` : ''}
@@ -688,33 +758,33 @@
         </section>
       </div>
 
-      <section class="card panel section-gap"><div class="panel-head"><h2>Fee history</h2><button class="btn btn-soft btn-sm" data-fee>${icon('plus')}New payment</button></div>
+      <section class="card panel section-gap" data-need="fees.view fees.collect"><div class="panel-head"><h2>Fee history</h2><button class="btn btn-soft btn-sm" data-fee data-need="fees.collect">${icon('plus')}New payment</button></div>
         ${d.payments.length ? `<div class="item-list" data-receipts>${d.payments.map((p, idx) => {
           const paid = p.installments.reduce((a, i) => a + i.amount, 0);
           const due = p.total - paid;
           return `<div class="receipt"${idx >= 3 ? ' data-old hidden' : ''}><div class="r-top"><div><b>${esc(p.planName)} · ${dateShort(p.periodStart)} – ${dateShort(p.periodEnd)}</b><span>Receipt #${p.receiptNo} · ${p.installments.map((i) => `${rs(i.amount)} ${esc(i.method)} on ${dateShort(i.date)}`).join(' · ') || 'nothing paid yet'}</span></div>
             ${due > 0 ? `<span class="badge badge-bad">Due ${rs(due)}</span>` : '<span class="badge badge-good">Paid</span>'}</div>
             <div class="amounts"><span>Fee <b class="tnum">${rs(p.price)}</b></span>${p.discount ? `<span>Discount <b class="tnum">−${rs(p.discount)}</b></span>` : ''}${p.admissionFee ? `<span>Admission <b class="tnum">${rs(p.admissionFee)}</b></span>` : ''}<span>Total <b class="tnum">${rs(p.total)}</b></span><span>Paid <b class="tnum">${rs(paid)}</b></span></div>
-            <div class="acts">${due > 0 ? `<button class="btn btn-primary btn-sm" data-inst="${esc(p.id)}">${icon('wallet')}Collect ${rs(due)}</button>` : ''}${waBtn(m.phone, MSG.receipt(m, p), 'Receipt')}${isOwner() ? `<button class="btn btn-ghost btn-sm" data-delpay="${esc(p.id)}" aria-label="Delete receipt">${icon('trash')}</button>` : ''}</div></div>`;
+            <div class="acts">${due > 0 ? `<button class="btn btn-primary btn-sm" data-inst="${esc(p.id)}" data-need="fees.collect">${icon('wallet')}Collect ${rs(due)}</button>` : ''}${waBtn(m.phone, MSG.receipt(m, p), 'Receipt')}${can('fees.delete') ? `<button class="btn btn-ghost btn-sm" data-delpay="${esc(p.id)}" aria-label="Delete receipt">${icon('trash')}</button>` : ''}</div></div>`;
         }).join('')}</div>${d.payments.length > 3 ? `<button class="btn btn-ghost btn-sm" style="margin-top:12px" data-allreceipts>Show all ${d.payments.length} receipts</button>` : ''}` : emptyLine('No payments yet.')}
       </section>
 
-      <section class="card panel section-gap"><div class="panel-head"><h2>Workout plan</h2><div style="display:flex;gap:6px"><button class="btn btn-ghost btn-sm" data-wpreset>${icon('star')}Ready plans</button><button class="btn btn-soft btn-sm" data-wday>${icon('edit')}Edit a day</button></div></div>
+      <section class="card panel section-gap"><div class="panel-head"><h2>Workout plan</h2><div style="display:flex;gap:6px" data-need="members.edit"><button class="btn btn-ghost btn-sm" data-wpreset>${icon('star')}Ready plans</button><button class="btn btn-soft btn-sm" data-wday>${icon('edit')}Edit a day</button></div></div>
         <div data-plan><div class="skel" style="height:70px"></div></div></section>
 
       <div class="grid-2">
-        <section class="card panel"><div class="panel-head"><h2>Body measurements</h2><button class="btn btn-soft btn-sm" data-measure>${icon('plus')}Add</button></div>${measurementsView(d.measurements)}</section>
-        <section class="card panel"><div class="panel-head"><h2>Freeze membership</h2><button class="btn btn-soft btn-sm" data-freeze>${icon('snow')}Freeze</button></div>
+        <section class="card panel"><div class="panel-head"><h2>Body measurements</h2><button class="btn btn-soft btn-sm" data-measure data-need="members.edit">${icon('plus')}Add</button></div>${measurementsView(d.measurements)}</section>
+        <section class="card panel"><div class="panel-head"><h2>Freeze membership</h2><button class="btn btn-soft btn-sm" data-freeze data-need="members.edit">${icon('snow')}Freeze</button></div>
           <p class="muted" style="font-size:13.5px;margin-bottom:10px">Pausing adds the frozen days to the end of the membership.</p>
-          ${(m.freezes || []).length ? `<div class="rows">${m.freezes.map((f, i) => `<div class="m-row" style="cursor:default"><span class="ic-tile">${icon('snow')}</span><span class="tx"><b>${dateShort(f.from)} – ${dateShort(f.to)}</b><span>${(Date.parse(f.to) - Date.parse(f.from)) / 864e5 + 1} days${f.reason ? ` · ${esc(f.reason)}` : ''}</span></span><span class="end"><button class="icon-btn" data-unfreeze="${i}" aria-label="Remove freeze">${icon('x')}</button></span></div>`).join('')}</div>` : emptyLine('Never frozen.')}
+          ${(m.freezes || []).length ? `<div class="rows">${m.freezes.map((f, i) => `<div class="m-row" style="cursor:default"><span class="ic-tile">${icon('snow')}</span><span class="tx"><b>${dateShort(f.from)} – ${dateShort(f.to)}</b><span>${(Date.parse(f.to) - Date.parse(f.from)) / 864e5 + 1} days${f.reason ? ` · ${esc(f.reason)}` : ''}</span></span><span class="end"><button class="icon-btn" data-unfreeze="${i}" data-need="members.edit" aria-label="Remove freeze">${icon('x')}</button></span></div>`).join('')}</div>` : emptyLine('Never frozen.')}
         </section>
       </div>
 
-      <section class="card panel section-gap"><div class="panel-head"><h2>Account</h2></div>
+      <section class="card panel section-gap" data-need="members.edit members.delete"><div class="panel-head"><h2>Account</h2></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-ghost btn-sm" data-pin>${icon('lock')}Reset app PIN</button>
-          <button class="btn btn-ghost btn-sm" data-left>${icon(m.left ? 'refresh' : 'logout')}${m.left ? 'Rejoin (mark active)' : 'Mark as left'}</button>
-          ${isOwner() ? `<button class="btn btn-danger btn-sm" data-del>${icon('trash')}Delete member</button>` : ''}
+          <button class="btn btn-ghost btn-sm" data-pin data-need="members.edit">${icon('lock')}Reset app PIN</button>
+          <button class="btn btn-ghost btn-sm" data-left data-need="members.edit">${icon(m.left ? 'refresh' : 'logout')}${m.left ? 'Rejoin (mark active)' : 'Mark as left'}</button>
+          ${can('members.delete') ? `<button class="btn btn-danger btn-sm" data-del>${icon('trash')}Delete member</button>` : ''}
         </div></section>`;
 
     const $ = (sel) => root.querySelectorAll(sel);
@@ -783,7 +853,7 @@
       location.hash = '#/members';
     });
     memberPageCalBind(id, d, m);
-    root.querySelector('[data-photo]').addEventListener('click', () => photoSheet(m, `/api/admin/members/${id}/photo`, reload));
+    root.querySelector('[data-photo]').addEventListener('click', () => can('members.edit') && photoSheet(m, `/api/admin/members/${id}/photo`, reload));
     // Workout plan: trainers can see and set it; the member sees it in their app.
     const savePlan = async (plan) => { await api(`/api/admin/members/${id}/plan`, { method: 'PUT', body: plan }); reload(); };
     Workout.summary(m.workoutPlan).then((html) => {
@@ -973,7 +1043,7 @@
     const range = params.get('range') || 'month';
     const tabs = [['collected', 'Collected'], ['dues', 'Dues'], ['expiring', 'Expiring'], ['expired', 'Expired'], ['unpaid', 'Never paid']];
     shell('fees', 'Fees', '', `<div class="toolbar"><div class="seg" role="group">${tabs.map(([id, l]) => `<button data-t="${id}" aria-pressed="${tab === id}">${l}</button>`).join('')}</div></div><div id="fees"><div class="skel" style="height:300px;border-radius:22px"></div></div>`,
-      { fab: { label: 'Collect fee', icon: 'wallet', onClick: () => pickMember('Collect fee from…', (id) => collectFeeSheet(id, () => feesPage(params))) } });
+      { fab: { label: 'Collect fee', icon: 'wallet', need: 'fees.collect', onClick: () => pickMember('Collect fee from…', (id) => collectFeeSheet(id, () => feesPage(params))) } });
     root.querySelectorAll('[data-t]').forEach((b) => b.addEventListener('click', () => { location.hash = `#/fees?tab=${b.dataset.t}`; }));
     const el = document.getElementById('fees');
     if (tab === 'collected') {
@@ -1066,14 +1136,14 @@
     const tab = params.get('tab') || 'day';
     const date = /^\d{4}-\d{2}-\d{2}$/.test(params.get('date') || '') ? params.get('date') : today();
     shell('classes', 'Classes', tab === 'day' ? dateLong(date) : 'Weekly timetable', `<div class="toolbar"><div class="seg" role="group"><button data-t="day" aria-pressed="${tab === 'day'}">Bookings</button><button data-t="week" aria-pressed="${tab === 'week'}">Timetable</button></div><span class="grow"></span>
-      ${tab === 'week' && isOwner() ? `<button class="btn btn-primary btn-sm" data-addclass>${icon('plus')}Add class</button>` : ''}</div><div id="cls"></div>`);
+      ${tab === 'week' && can('settings') ? `<button class="btn btn-primary btn-sm" data-addclass>${icon('plus')}Add class</button>` : ''}</div><div id="cls"></div>`);
     root.querySelectorAll('[data-t]').forEach((b) => b.addEventListener('click', () => { location.hash = `#/classes?tab=${b.dataset.t}`; }));
     const el = document.getElementById('cls');
     if (tab === 'week') {
       el.innerHTML = [1, 2, 3, 4, 5, 6, 0].map((wd) => {
         const items = S.data.classes.filter((c) => c.weekday === wd).sort((a, b) => a.start.localeCompare(b.start));
         return items.length ? `<div class="day-head">${DAY_LABELS[DAYS[wd]]}</div><div class="item-list">${items.map((c) => `<div class="card item${c.active === false ? ' inactive' : ''}"><div class="ic-tile">${icon('flame')}</div><div class="tx"><b>${esc(c.name)}</b><span>${time12(c.start)} · ${c.duration} min · ${c.capacity} spots · ${esc(staffById(c.staffId)?.name || 'No coach')}</span></div>
-          ${isOwner() ? `<div class="acts"><button class="icon-btn" data-edit="${esc(c.id)}" aria-label="Edit">${icon('edit')}</button></div>` : ''}</div>`).join('')}</div>` : '';
+          ${can('settings') ? `<div class="acts"><button class="icon-btn" data-edit="${esc(c.id)}" aria-label="Edit">${icon('edit')}</button></div>` : ''}</div>`).join('')}</div>` : '';
       }).join('') || emptyLine('No classes yet.');
       root.querySelector('[data-addclass]')?.addEventListener('click', () => editClass());
       el.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () => editClass(S.data.classes.find((c) => c.id === b.dataset.edit))));
@@ -1255,7 +1325,7 @@
         <div class="ranges">${h.length ? h.map((r, i) => range(d, i, r)).join('') + (h.length < 3 ? '<button type="button" class="link" data-addrange style="justify-self:start">+ Add a break</button>' : '') : '<span class="closed">Closed</span>'}</div></div>`;
     };
     shell('settings', 'Settings', '', `
-      <form id="settings" novalidate>
+      ${can('settings') ? `<form id="settings" novalidate>
       <section class="card form-section"><h2>Gym</h2><p>Shown in the member app and on receipts.</p>
         <div class="form-grid two">
           <label class="field"><span>Gym name</span><input class="input" name="name" value="${esc(b.name)}" maxlength="60" required></label>
@@ -1291,24 +1361,35 @@
       <section class="card form-section"><div class="panel-head"><div><h2>Trainers & staff</h2><p class="muted" style="font-size:13.5px">Coaches can be assigned to members and classes.</p></div><button class="btn btn-primary btn-sm" data-addstaff>${icon('plus')}Add</button></div>
         <div class="item-list">${S.data.staff.map((s) => `<div class="card item${s.active === false ? ' inactive' : ''}"><span class="avatar" style="--c:${esc(s.color)}">${esc(initials(s.name))}</span><div class="tx"><b>${esc(s.name)}</b><span>${esc(s.role || '')}${s.salary ? ` · salary ${rs(s.salary)}` : ''}${s.phone ? ` · ${esc(s.phone)}` : ''}</span></div><div class="acts"><button class="icon-btn" data-staff="${esc(s.id)}" aria-label="Edit ${esc(s.name)}">${icon('edit')}</button></div></div>`).join('')}</div></section>
 
-      <section class="card form-section" id="fp"><div class="panel-head"><div><h2>${icon('fingerprint')} Fingerprint & face machines</h2><p class="muted" style="font-size:13.5px">Connect your attendance machine. Members check in and out with a thumb or face, and it shows on the entry screen.</p></div>
+      ` : ''}
+      ${can('machines') ? `<section class="card form-section" id="fp"><div class="panel-head"><div><h2>${icon('fingerprint')} Fingerprint & face machines</h2><p class="muted" style="font-size:13.5px">Connect your attendance machine. Members check in and out with a thumb or face, and it shows on the entry screen.</p></div>
         <button class="btn btn-primary btn-sm" data-addmachine>${icon('plus')}Add machine</button></div>
         <div id="devices" class="item-list"><div class="skel" style="height:70px"></div></div>
         <div class="fp-test"><b>Try it without a machine</b><p class="muted">Enter a member number to record a thumb punch now.</p>
           <form class="toolbar" style="margin:8px 0 0" data-fptest><input class="input" name="memberNo" inputmode="numeric" placeholder="Member no., e.g. 1001" style="max-width:220px"><button class="btn btn-soft">${icon('fingerprint')}Punch</button></form></div>
       </section>
 
-      <section class="card form-section"><h2>PINs</h2><p>The owner PIN opens everything. The front desk PIN can check members in, add members and collect fees, but can't see reports, expenses or settings.</p>
+      ` : ''}
+      ${isOwner() ? `<section class="card form-section" id="logins"><div class="panel-head"><div><h2>${icon('lock')} Staff logins & access</h2><p class="muted" style="font-size:13.5px">Give each person their own PIN and choose exactly what they can see and do. Changes work straight away.</p></div>
+        <button class="btn btn-primary btn-sm" data-adduser>${icon('plus')}Add login</button></div>
+        <div id="users" class="item-list"><div class="skel" style="height:70px"></div></div>
+        <h3 style="font-size:15px;margin:22px 0 4px">Owner PIN</h3><p class="muted" style="font-size:13.5px;margin-bottom:10px">Opens everything, including this section. Keep it to yourself.</p>
         <form class="form-grid two" id="pin-form" novalidate>
-          <label class="field span"><span>Current owner PIN</span><input class="input" name="current" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password"></label>
-          <label class="field"><span>New owner PIN</span><input class="input" name="owner" type="password" inputmode="numeric" maxlength="8" autocomplete="new-password" placeholder="Leave blank to keep"></label>
-          <label class="field"><span>New front desk PIN</span><input class="input" name="staff" type="password" inputmode="numeric" maxlength="8" autocomplete="new-password" placeholder="Leave blank to keep"></label>
-          <div class="span"><button class="btn btn-ghost" type="submit">${icon('lock')}Update PINs</button></div>
+          <label class="field"><span>Current owner PIN</span><input class="input" name="current" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password"></label>
+          <label class="field"><span>New owner PIN</span><input class="input" name="owner" type="password" inputmode="numeric" maxlength="8" autocomplete="new-password"></label>
+          <div class="span"><button class="btn btn-ghost" type="submit">${icon('lock')}Change owner PIN</button></div>
         </form></section>
 
       <section class="card form-section"><h2>Data</h2><p>${S.data.demo ? 'You are looking at <b>demo data</b>. Clear it to start with your real members.' : 'Remove every member, payment, visit and expense. Settings, plans, staff and classes stay.'}</p>
-        <button class="btn btn-danger" data-clear>${icon('trash')}${S.data.demo ? 'Clear demo data' : 'Delete all member data'}</button></section>`);
+        <button class="btn btn-danger" data-clear>${icon('trash')}${S.data.demo ? 'Clear demo data' : 'Delete all member data'}</button></section>` : ''}`);
 
+    if (can('settings')) bindSettings(hoursRow);
+    if (can('machines')) bindMachines();
+    if (isOwner()) bindOwner();
+  }
+
+  function bindSettings(hoursRow) {
+    const b = S.data.business;
     const form = document.getElementById('settings');
     const hoursEl = document.getElementById('hours');
     const readHours = () => {
@@ -1365,6 +1446,9 @@
     root.querySelectorAll('[data-plan]').forEach((x) => x.addEventListener('click', () => editPlan(S.data.plans.find((p) => p.id === x.dataset.plan))));
     root.querySelector('[data-addstaff]').addEventListener('click', () => editStaff({}));
     root.querySelectorAll('[data-staff]').forEach((x) => x.addEventListener('click', () => editStaff(S.data.staff.find((s) => s.id === x.dataset.staff))));
+  }
+
+  function bindMachines() {
     drawDevices();
     root.querySelector('[data-addmachine]').addEventListener('click', () => machineWizard());
     root.querySelector('[data-fptest]').addEventListener('submit', (e) => {
@@ -1378,11 +1462,16 @@
         } catch (err) { toast(err.message, 'bad'); }
       });
     });
+  }
+
+  function bindOwner() {
+    drawUsers();
+    root.querySelector('[data-adduser]').addEventListener('click', () => userSheet({}));
     document.getElementById('pin-form').addEventListener('submit', (e) => {
       e.preventDefault();
       const f = e.target;
       busy(f.querySelector('[type=submit]'), async () => {
-        try { await api('/api/admin/pins', { method: 'POST', body: formData(f) }); f.reset(); toast('PINs updated'); } catch (err) { toast(err.message, 'bad'); }
+        try { await api('/api/admin/pins', { method: 'POST', body: formData(f) }); f.reset(); toast('Owner PIN changed'); } catch (err) { toast(err.message, 'bad'); }
       });
     });
     root.querySelector('[data-clear]').addEventListener('click', () => sheet({
@@ -1393,6 +1482,81 @@
         try { await api('/api/admin/clear-data', { method: 'POST', body: { confirm: el.querySelector('[data-confirm]').value.trim() } }); await refreshData(); close(); toast('Data cleared'); location.hash = '#/home'; } catch (err) { toast(err.message, 'bad'); }
       }),
     }));
+  }
+
+  // ---- staff logins and what each may do -------------------------------------------
+
+  let access = { permissions: [], presets: [], users: [] };
+
+  function accessSummary(perms) {
+    const preset = access.presets.find((p) => p.perms.length === perms.length && p.perms.every((x) => perms.includes(x)));
+    if (preset) return preset.label;
+    const labels = access.permissions.filter((p) => perms.includes(p.id)).map((p) => p.label);
+    return `${labels.length} of ${access.permissions.length}: ${labels.slice(0, 3).join(', ')}${labels.length > 3 ? '…' : ''}`;
+  }
+
+  async function drawUsers() {
+    const box = document.getElementById('users');
+    if (!box) return;
+    access = await api('/api/admin/users');
+    box.innerHTML = access.users.map((u) => `<div class="card item${u.active === false ? ' inactive' : ''}"><span class="avatar">${esc(initials(u.name))}</span>
+      <div class="tx"><b>${esc(u.name)}${u.active === false ? ' <span class="badge badge-muted">Switched off</span>' : ''}</b><span>${esc(accessSummary(u.perms))}</span></div>
+      <div class="acts"><button class="btn btn-ghost btn-sm" data-user="${esc(u.id)}">${icon('edit')}Access</button></div></div>`).join('')
+      || `<div class="note-box" style="margin:0;background:var(--surface-2)">${icon('info')}<span>No staff logins yet. Press <b>Add login</b> to give your front desk their own PIN.</span></div>`;
+    box.querySelectorAll('[data-user]').forEach((x) => x.addEventListener('click', () => userSheet(access.users.find((u) => u.id === x.dataset.user))));
+  }
+
+  function userSheet(u) {
+    const editing = Boolean(u.id);
+    const groups = [...new Set(access.permissions.map((p) => p.group))];
+    const has = new Set(u.perms || access.presets.find((p) => p.id === 'desk')?.perms || []);
+    sheet({
+      title: editing ? `${u.name} · access` : 'New staff login',
+      wide: true,
+      html: `<form class="form-grid two" novalidate>
+        <label class="field"><span>Name</span><input class="input" name="name" value="${esc(u.name || '')}" maxlength="40" placeholder="e.g. Bilal" required></label>
+        <label class="field"><span>${editing ? 'New PIN' : 'PIN'} (4 to 8 digits)</span><input class="input" name="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="new-password" ${editing ? 'placeholder="Leave blank to keep"' : 'required'}></label>
+        <div class="field span"><span>Quick choice</span><div class="chips-row" style="margin:0">${access.presets.map((p) => `<button type="button" class="chip" data-preset="${esc(p.id)}">${esc(p.label)}</button>`).join('')}</div></div>
+        <div class="span perm-groups">${groups.map((g) => `<div class="perm-group"><h4>${esc(g)}</h4>${access.permissions.filter((p) => p.group === g).map((p) => `
+          <label class="toggle-row"><span><b>${esc(p.label)}</b>${p.hint ? `<small>${esc(p.hint)}</small>` : ''}</span><span class="switch"><input type="checkbox" data-perm="${esc(p.id)}" ${has.has(p.id) ? 'checked' : ''}><span></span></span></label>`).join('')}</div>`).join('')}</div>
+        ${editing ? `<label class="toggle-row span perm-active"><span><b>Login switched on</b><small>Switch off when someone leaves; they are signed out at once.</small></span><span class="switch"><input type="checkbox" name="active" ${u.active !== false ? 'checked' : ''}><span></span></span></label>` : ''}
+        <p class="muted span" style="font-size:13px">Only you, the owner, can manage logins and change the owner PIN.</p>
+      </form>
+      <div class="sheet-actions">${editing ? `<button class="btn btn-danger" data-del>${icon('trash')}Delete</button><span class="grow"></span>` : ''}<button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" data-ok>${icon('check')}${editing ? 'Save' : 'Add login'}</button></div>`,
+      onMount: (el, close) => {
+        const f = el.querySelector('form');
+        const boxes = [...el.querySelectorAll('[data-perm]')];
+        const markPreset = () => {
+          const on = boxes.filter((b) => b.checked).map((b) => b.dataset.perm);
+          el.querySelectorAll('[data-preset]').forEach((c) => {
+            const p = access.presets.find((x) => x.id === c.dataset.preset);
+            c.setAttribute('aria-pressed', p.perms.length === on.length && p.perms.every((x) => on.includes(x)));
+          });
+        };
+        el.querySelectorAll('[data-preset]').forEach((c) => c.addEventListener('click', () => {
+          const p = access.presets.find((x) => x.id === c.dataset.preset);
+          boxes.forEach((b) => { b.checked = p.perms.includes(b.dataset.perm); });
+          markPreset();
+        }));
+        boxes.forEach((b) => b.addEventListener('change', markPreset));
+        markPreset();
+        el.querySelector('[data-ok]').addEventListener('click', (e) => busy(e.currentTarget, async () => {
+          const body = { name: f.name.value, perms: boxes.filter((b) => b.checked).map((b) => b.dataset.perm) };
+          if (f.pin.value) body.pin = f.pin.value;
+          if (editing) body.active = f.active.checked;
+          try {
+            await api(editing ? `/api/admin/users/${u.id}` : '/api/admin/users', { method: editing ? 'PUT' : 'POST', body });
+            close();
+            toast(editing ? 'Access saved' : `${body.name} can now sign in with their PIN`);
+            drawUsers();
+          } catch (err) { toast(err.message, 'bad'); }
+        }));
+        el.querySelector('[data-del]')?.addEventListener('click', async () => {
+          if (!(await confirmSheet({ title: `Delete ${u.name}?`, message: 'Their PIN stops working straight away.', confirm: 'Delete login', danger: true }))) return;
+          try { await api(`/api/admin/users/${u.id}`, { method: 'DELETE' }); close(); toast('Login deleted'); drawUsers(); } catch (err) { toast(err.message, 'bad'); }
+        });
+      },
+    });
   }
 
   function serverHost() {
@@ -1629,6 +1793,10 @@
     UI.setAccent(S.data.business.accent);
   }
 
+  function noAccess(page) {
+    shell(page, 'No access', '', `<div class="card empty"><div class="empty-icon">${icon('lock')}</div><h3>You don’t have access to this</h3><p>The owner decides what each login can open. Ask them if you need it.</p><a class="btn btn-primary" href="#/home">Go to the dashboard</a></div>`);
+  }
+
   async function route() {
     document.querySelectorAll('.sheet-backdrop').forEach((x) => x.remove());
     document.body.style.overflow = '';
@@ -1638,6 +1806,7 @@
     const parts = path.split('/').filter(Boolean);
     const page = parts[0] || 'home';
     window.scrollTo(0, 0);
+    if (!allowed(page)) return noAccess(page);
     try {
       if (page === 'member' && parts[1]) return await memberPage(parts[1], params);
       if (page === 'desk') return await deskPage();
@@ -1647,9 +1816,9 @@
       if (page === 'attendance') return await attendancePage(params);
       if (page === 'classes') return await classesPage(params);
       if (page === 'leads') return await leadsPage();
-      if (isOwner() && page === 'expenses') return await expensesPage(params);
-      if (isOwner() && page === 'reports') return await reportsPage(params);
-      if (isOwner() && page === 'settings') return settingsPage();
+      if (page === 'expenses') return await expensesPage(params);
+      if (page === 'reports') return await reportsPage(params);
+      if (page === 'settings') return settingsPage();
       return await homePage();
     } catch (e) {
       if (S.token) toast(e.message, 'bad');

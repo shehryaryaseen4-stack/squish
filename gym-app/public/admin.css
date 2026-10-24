@@ -301,3 +301,13 @@ button.kpi { text-align: left; font: inherit; color: inherit; cursor: pointer; }
 .conn-ok b, .conn-bad b { font-size: 15.5px; }
 .conn-bad ul { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 6px; color: var(--ink-2); font-size: 13.5px; }
 .profile-head .photo-edit .avatar { width: 84px; height: 84px; font-size: 28px; }
+
+/* Staff logins: what each login may do */
+.perm-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.perm-group { background: var(--surface-2); border-radius: 16px; padding: 12px 14px; }
+.perm-group h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); margin-bottom: 4px; }
+.perm-group .toggle-row, .perm-active { padding: 8px 0; align-items: flex-start; }
+.perm-group .toggle-row + .toggle-row { border-top: 1px solid var(--line); }
+.perm-group .toggle-row b, .perm-active b { display: block; font-size: 14px; }
+.perm-group .toggle-row small, .perm-active small { display: block; font-size: 12.5px; font-weight: 500; color: var(--ink-3); margin-top: 2px; }
+.sheet-actions .grow { flex: 1; }
