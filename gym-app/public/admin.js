@@ -54,8 +54,18 @@
 
   const waNumber = (p) => String(p || '').replace(/\D/g, '').replace(/^0/, '92');
   const wa = (phone, text) => UI.waLink(waNumber(phone), text);
-  const appLink = () => `${UI.apiBase() || location.origin}/`;
-  const MSG = {
+  const appLink = () => { const b = UI.apiBase(); return `${/^https?:/.test(b) ? b : location.origin + b}/`; };
+  // Reminders in the language the gym chose in Settings.
+  const MSG_EN = {
+    expiring: (m, s) => `Hi ${m.name}! Your ${S.data.business.name} membership ends on ${dateLong(s.expiry)} (${s.daysLeft} day${s.daysLeft === 1 ? '' : 's'} left). Please renew in time so your training doesn't stop. Thank you!`,
+    expired: (m, s) => `Hi ${m.name}! Your ${S.data.business.name} membership ended on ${dateLong(s.expiry)}. Renew to get back to training, we'd love to see you again! 💪`,
+    dues: (m, s) => `Hi ${m.name}! You have ${rs(s.balance)} left to pay at ${S.data.business.name}. Please clear it on your next visit. Thank you!`,
+    inactive: (m, s) => `Hi ${m.name}! ${s.daysSinceVisit == null ? 'We haven\u2019t seen you at the gym yet' : `We haven\u2019t seen you for ${s.daysSinceVisit} days`}. All good? We miss you, come in today! 💪`,
+    birthday: (m) => `Happy Birthday ${m.name}! 🎉 Best wishes from everyone at ${S.data.business.name}. Stay strong!`,
+    welcome: (m, pin) => `Welcome to ${S.data.business.name}, ${m.name}! 🎉\nMember number: ${m.memberNo}\nApp PIN: ${pin}\nSee your attendance, fees and classes here: ${appLink()}`,
+  };
+  const MSG = new Proxy({}, { get: (_, k) => (S.data?.business?.messageLang === 'en' && MSG_EN[k]) || MSG_UR[k] });
+  const MSG_UR = {
     expiring: (m, s) => `Assalam o Alaikum ${m.name}! ${S.data.business.name} mein aap ki membership ${dateLong(s.expiry)} ko khatam ho rahi hai (${s.daysLeft} din baqi). Barah-e-karam fee time par jama karwa dein taa ke training na ruke. Shukriya!`,
     expired: (m, s) => `Assalam o Alaikum ${m.name}! Aap ki ${S.data.business.name} membership ${dateLong(s.expiry)} ko khatam ho chuki hai. Renew karwa kar dobara training shuru karein, hum aap ka intezar kar rahe hain! 💪`,
     dues: (m, s) => `Assalam o Alaikum ${m.name}! ${S.data.business.name} mein aap ki fee ka ${rs(s.balance)} baqaya hai. Agli dafa aate hue jama karwa dein. Shukriya!`,
@@ -64,7 +74,7 @@
     welcome: (m, pin) => `Welcome to ${S.data.business.name}, ${m.name}! 🎉\nMember number: ${m.memberNo}\nApp PIN: ${pin}\nApni attendance, fee aur classes yahan dekhein: ${appLink()}`,
     receipt: (m, p) => {
       const paid = (p.installments || []).reduce((a, i) => a + i.amount, 0);
-      return `${S.data.business.name} · Fee receipt #${p.receiptNo}\n${m.name} (Member ${m.memberNo})\nPlan: ${p.planName}\nPeriod: ${dateShort(p.periodStart)} to ${dateShort(p.periodEnd)}\nFee: ${rs(p.price)}${p.discount ? `\nDiscount: -${rs(p.discount)}` : ''}${p.admissionFee ? `\nAdmission: ${rs(p.admissionFee)}` : ''}\nTotal: ${rs(p.total)}\nPaid: ${rs(paid)}${p.total - paid > 0 ? `\nBalance: ${rs(p.total - paid)}` : ''}\nShukriya!`;
+      return `${S.data.business.name} · Fee receipt #${p.receiptNo}\n${m.name} (Member ${m.memberNo})\nPlan: ${p.planName}\nPeriod: ${dateShort(p.periodStart)} to ${dateShort(p.periodEnd)}\nFee: ${rs(p.price)}${p.discount ? `\nDiscount: -${rs(p.discount)}` : ''}${p.admissionFee ? `\nAdmission: ${rs(p.admissionFee)}` : ''}\nTotal: ${rs(p.total)}\nPaid: ${rs(paid)}${p.total - paid > 0 ? `\nBalance: ${rs(p.total - paid)}` : ''}${S.data.business.messageLang === 'en' ? '\nThank you!' : '\nShukriya!'}`;
     },
   };
   const reminderFor = (m, s) => (s.status === 'expired' ? MSG.expired : s.status === 'expiring' ? MSG.expiring : s.balance > 0 ? MSG.dues : MSG.inactive)(m, s);
@@ -73,7 +83,8 @@
 
   async function loginView() {
     let business = { name: 'Gym', accent: '#f97316' };
-    try { business = (await rawApi('/api/gym')).business; } catch { /* still allow sign-in */ }
+    let demo = false;
+    try { ({ business, demo } = await rawApi('/api/gym')); } catch { /* still allow sign-in */ }
     UI.setAccent(business.accent);
     let pin = '';
     root.innerHTML = `<div class="login"><div class="login-card">
@@ -82,8 +93,8 @@
       <div class="pin-dots" aria-live="polite" aria-label="PIN entered">${'<i></i>'.repeat(4)}</div>
       <div class="keypad">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `<button class="key" data-k="${n}">${n}</button>`).join('')}
         <button class="key ghost" data-k="ok" aria-label="Sign in">${icon('chevronRight')}</button><button class="key" data-k="0">0</button><button class="key ghost" data-k="del" aria-label="Delete">${icon('backspace')}</button></div>
-      <p class="hint muted">Demo PINs: owner 1234 · front desk 0000</p>
-      <p class="hint"><a class="link" href="/index.html">← Member app</a></p>
+      ${demo ? '<p class="hint muted">Demo PINs: owner 1234 · front desk 0000</p>' : ''}
+      <p class="hint"><a class="link" href="${UI.url('/index.html')}">← Member app</a></p>
     </div></div>`;
     const dots = root.querySelector('.pin-dots');
     const paint = () => { dots.innerHTML = Array.from({ length: Math.max(4, pin.length) }, (_, i) => `<i class="${i < pin.length ? 'on' : ''}"></i>`).join(''); };
@@ -150,7 +161,7 @@
     const size = spot
       ? `left=${spot.availLeft},top=${spot.availTop},width=${spot.availWidth},height=${spot.availHeight}`
       : 'width=1280,height=760';
-    const open = () => window.open('/display.html', 'gymEntryScreen', `popup,${size}`);
+    const open = () => window.open(UI.url('/display.html'), 'gymEntryScreen', `popup,${size}`);
     // Asking for the monitor list can use up the click, and then pop-ups are blocked.
     const win = open();
     if (!win) {
@@ -214,8 +225,8 @@
       <aside class="side"><div class="side-brand"><div class="brand-mark">${esc(b.name.charAt(0))}</div><div><b>${esc(b.name)}</b><span>${isOwner() ? 'Owner' : esc(S.data.userName || 'Staff')}</span></div></div>
         ${pages.map(([id, ic, label]) => `<a class="nav-item" href="#/${id}" ${id === page ? 'aria-current="page"' : ''}>${icon(ic)}${esc(label)}</a>`).join('')}
         <div class="spacer"></div>
-        ${screens ? `<a class="nav-item" href="/display.html" data-screen="entry">${icon('tv')}Entry screen (TV)</a>
-        <a class="nav-item" href="/kiosk.html" data-screen="kiosk">${icon('kiosk')}Check-in kiosk</a>` : ''}
+        ${screens ? `<a class="nav-item" href="${UI.url('/display.html')}" data-screen="entry">${icon('tv')}Entry screen (TV)</a>
+        <a class="nav-item" href="${UI.url('/kiosk.html')}" data-screen="kiosk">${icon('kiosk')}Check-in kiosk</a>` : ''}
         <button class="nav-item" data-signout style="border:0;background:none;cursor:pointer;width:100%">${icon('logout')}Sign out</button>
       </aside>
       <div class="content">
@@ -232,7 +243,7 @@
     root.querySelector('[data-more]').addEventListener('click', () => sheet({
       title: 'More',
       html: `<div class="more-grid">${pages.filter(([id]) => !bottom.includes(id)).map(([id, ic, label]) => `<a href="#/${id}" data-close>${icon(ic)}${esc(label)}</a>`).join('')}
-        ${screens ? `<a href="/kiosk.html" data-screen="kiosk">${icon('kiosk')}Kiosk</a><a href="/display.html" data-screen="entry">${icon('tv')}Entry screen</a>` : ''}<a href="#" data-close data-out>${icon('logout')}Sign out</a></div>`,
+        ${screens ? `<a href="${UI.url('/kiosk.html')}" data-screen="kiosk">${icon('kiosk')}Kiosk</a><a href="${UI.url('/display.html')}" data-screen="entry">${icon('tv')}Entry screen</a>` : ''}<a href="#" data-close data-out>${icon('logout')}Sign out</a></div>`,
       onMount: (el) => el.querySelector('[data-out]').addEventListener('click', (e) => { e.preventDefault(); signOut(); }),
     }));
     root.querySelector('[data-fab]')?.addEventListener('click', fab?.onClick);
@@ -288,13 +299,19 @@
 
   async function homePage() {
     shell('home', greeting(), dateLong(today()), '<div class="kpis six">' + '<div class="skel" style="height:104px;border-radius:22px"></div>'.repeat(6) + '</div>', { fab: { label: 'Add member', icon: 'userPlus', need: 'members.add', onClick: () => addMemberSheet() } });
-    const [o, month] = await Promise.all([api('/api/admin/dashboard'), can('attendance') ? api(`/api/admin/register?month=${monthOf(today())}`) : null]);
+    const onPlatform = Boolean(window.APP_CONFIG?.base) && isOwner();
+    const [o, month, plan] = await Promise.all([
+      api('/api/admin/dashboard'),
+      can('attendance') ? api(`/api/admin/register?month=${monthOf(today())}`) : null,
+      onPlatform ? rawApi('/api/platform/status').catch(() => null) : null,
+    ]);
     const M = month?.totals;
     const fees = can('fees.view');
     const c = o.counts;
     const kpi = (ic, label, val, sub, href, tone = '') => `<a class="card kpi link" href="${href}"><div class="k-head">${icon(ic)}${label}</div><div class="k-val tnum ${tone}">${val}</div><div class="k-sub">${sub}</div></a>`;
     const owner = o.money;
     const body = `
+      ${planBar(plan)}${!o.demo && isOwner() && o.counts.members < 3 && !store.get('hideStart', false) ? startPanel(o) : ''}
       ${o.demo && can('settings') ? `<div class="demo-bar">${icon('info')}<span>This is demo data so you can try everything. Clear it from <b>Settings → Data</b> when you start for real.</span></div>` : ''}
       ${M ? `<section class="card panel" style="margin-bottom:16px"><div class="panel-head"><h2>${monthLabel(monthOf(today()), true)} so far</h2><a class="link" href="#/register">Open register</a></div>
         <div class="month-glance">
@@ -336,12 +353,35 @@
         ${c.newLeads && can('leads') ? panel('New enquiries', `<p style="font-size:15px"><b>${c.newLeads}</b> people asked about joining.</p><a class="btn btn-soft btn-sm" style="margin-top:12px" href="#/leads">${icon('inbox')}Open enquiries</a>`) : ''}
       </div>`;
     root.querySelector('.wrap').innerHTML = body;
+    root.querySelector('[data-hidestart]')?.addEventListener('click', () => { store.set('hideStart', true); homePage(); });
+    root.querySelector('[data-startadd]')?.addEventListener('click', () => addMemberSheet());
     bindMemberRows();
     root.querySelectorAll('[data-out]').forEach((b) => b.addEventListener('click', () => busy(b, async () => {
       const r = await api('/api/admin/checkin', { method: 'POST', body: { memberId: b.dataset.out } });
       toast(`${r.member.name} checked out`);
       homePage();
     })));
+  }
+
+  // On the platform: how long the trial or subscription has left.
+  function planBar(p) {
+    if (!p || p.state === 'paid' || p.state === 'free') return '';
+    const text = p.state === 'trial' ? `Free trial: <b>${p.daysLeft} day${p.daysLeft === 1 ? '' : 's'} left</b>. Choose a plan to keep everything running.` : 'Your payment is due. Renew in the next few days to avoid a pause.';
+    return `<div class="demo-bar">${icon('star')}<span>${text}</span><a class="btn btn-primary btn-sm" href="${esc(p.billingUrl)}">See plans</a></div>`;
+  }
+
+  // A new gym's first steps.
+  function startPanel(o) {
+    const steps = [
+      [false, 'Check your plans and prices', '#/settings'],
+      [o.counts.members > 0, 'Add your first member', null, 'data-startadd'],
+      [S.data.staff.length > 0, 'Add your trainers', '#/settings'],
+      [false, 'Give your front desk their own login', '#/settings'],
+      [false, 'Connect your fingerprint machine', '#/settings'],
+    ];
+    return `<section class="card panel" style="margin-bottom:16px"><div class="panel-head"><h2>Get your gym ready</h2><button class="link" data-hidestart>Hide</button></div>
+      <div class="start-steps">${steps.map(([done, text, href, attr]) => `${href ? `<a href="${href}"` : `<button type="button" ${attr}`} class="${done ? 'done' : ''}">${icon(done ? 'check' : 'chevronRight')}<span>${esc(text)}</span>${href ? '</a>' : '</button>'}`).join('')}</div>
+      <p class="muted" style="font-size:13px;margin-top:12px">Member app link to share: <b>${esc(appLink())}</b></p></section>`;
   }
 
   function listPanel(title, list, end, linkLabel, href, empty) {
@@ -1347,6 +1387,8 @@
           <label class="field"><span>Class booking window (days)</span><input class="input" name="bookingWindowDays" type="number" min="1" max="60" value="${b.bookingWindowDays}"></label>
           <label class="field"><span>Currency symbol</span><input class="input" name="currencySymbol" value="${esc(b.currencySymbol)}" maxlength="4"></label>
           <label class="field"><span>Time zone</span><input class="input" name="timeZone" value="${esc(b.timeZone)}"></label>
+          <label class="field span"><span>Ways members pay (comma between)</span><input class="input" name="paymentMethods" value="${esc((b.paymentMethods || S.data.methods || []).join(', '))}" placeholder="Cash, Card, Bank transfer"></label>
+          <label class="field"><span>WhatsApp reminder language</span><select class="input" name="messageLang"><option value="en" ${b.messageLang === 'en' ? 'selected' : ''}>English</option><option value="ur" ${b.messageLang !== 'en' ? 'selected' : ''}>Roman Urdu</option></select></label>
           <label class="toggle-row span"><span>Stop expired or unpaid members at check-in</span><span class="switch"><input type="checkbox" name="blockExpiredCheckin" ${b.blockExpiredCheckin ? 'checked' : ''}><span></span></span></label>
         </div></section>
 
@@ -1559,12 +1601,6 @@
     });
   }
 
-  function serverHost() {
-    const u = new URL(UI.apiBase() || location.origin);
-    const https = u.protocol === 'https:';
-    return { host: u.hostname, port: u.port || (https ? 443 : 80), https };
-  }
-
   // ---- attendance machines -------------------------------------------------------
 
   let deviceTypes = [];
@@ -1601,7 +1637,10 @@
   }
 
   function serverHost() {
-    const u = new URL(UI.apiBase() || location.origin);
+    const u = new URL(UI.apiBase() || location.origin, location.origin);
+    // On the platform, machines use a plain-http port (most can't do https).
+    const mp = window.APP_CONFIG?.machinePort;
+    if (mp) return { host: u.hostname, port: mp, https: false, origin: `http://${u.hostname}:${mp}` };
     const https = u.protocol === 'https:';
     return { host: u.hostname, port: u.port || (https ? 443 : 80), https, origin: u.origin };
   }
@@ -1838,7 +1877,7 @@
     route();
   }
 
-  if (window.APP_CONFIG?.native && !UI.apiBase()) { location.replace('/index.html'); return; }
+  if (window.APP_CONFIG?.native && !UI.apiBase()) { location.replace(UI.url('/index.html')); return; }
   window.addEventListener('hashchange', route);
   if (S.token) start(); else loginView();
 })();

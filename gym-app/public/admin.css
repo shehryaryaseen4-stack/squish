@@ -311,3 +311,10 @@ button.kpi { text-align: left; font: inherit; color: inherit; cursor: pointer; }
 .perm-group .toggle-row b, .perm-active b { display: block; font-size: 14px; }
 .perm-group .toggle-row small, .perm-active small { display: block; font-size: 12.5px; font-weight: 500; color: var(--ink-3); margin-top: 2px; }
 .sheet-actions .grow { flex: 1; }
+
+/* A new gym's first steps */
+.start-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+.start-steps a, .start-steps button { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 14px; border: 0; background: var(--surface-2); color: var(--ink); font: inherit; font-weight: 650; font-size: 14px; text-align: left; cursor: pointer; }
+.start-steps .ico { width: 18px; height: 18px; flex: none; color: var(--accent); }
+.start-steps .done { color: var(--ink-3); text-decoration: line-through; }
+.start-steps .done .ico { color: var(--good); }

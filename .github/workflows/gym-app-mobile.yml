@@ -24,6 +24,9 @@ env:
   # Set a repository variable GYM_API_URL (Settings → Secrets and variables → Actions → Variables)
   # so every build talks to your live server without asking.
   API_URL: ${{ inputs.api_url || vars.GYM_API_URL }}
+  # Your sales website (e.g. https://gymdesk.com): the apps then accept a gym code,
+  # and the Windows app activates licences there.
+  PLATFORM_URL: ${{ vars.GYM_PLATFORM_URL }}
 
 jobs:
   test:
@@ -117,6 +120,20 @@ jobs:
           cache-dependency-path: gym-app/desktop/package-lock.json
       - run: npm ci
       - run: npm version 1.0.${{ github.run_number }} --no-git-tag-version --allow-same-version
+      - name: Point the app at your website
+        shell: bash
+        env:
+          PRODUCT_NAME: ${{ vars.PRODUCT_NAME }}
+          LICENSE_PUBLIC_KEY: ${{ vars.LICENSE_PUBLIC_KEY }}
+        run: |
+          node -e "
+            const fs = require('fs');
+            const c = JSON.parse(fs.readFileSync('config.json', 'utf8'));
+            c.platformUrl = process.env.PLATFORM_URL || c.platformUrl;
+            c.publicKey = process.env.LICENSE_PUBLIC_KEY || c.publicKey;
+            c.productName = process.env.PRODUCT_NAME || c.productName;
+            fs.writeFileSync('config.json', JSON.stringify(c, null, 2));
+          "
       - run: npx electron-builder --win --publish never
       - uses: actions/upload-artifact@v4
         with:

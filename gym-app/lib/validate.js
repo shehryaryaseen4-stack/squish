@@ -59,7 +59,8 @@ const isoDate = (v, field = 'Date', { required = true } = {}) => {
 };
 const optNum = (v, opts) => (v === '' || v == null ? null : num(v, { int: false, ...opts }));
 const METHODS = ['Cash', 'Bank transfer', 'JazzCash', 'EasyPaisa', 'Card', 'Other'];
-const method = (v) => (METHODS.includes(v) ? v : 'Cash');
+// Gyms in other countries add their own ways to pay (UPI, M-Pesa, Zelle…).
+const method = (v) => String(v || '').trim().slice(0, 24) || 'Cash';
 
 // Per-collection sanitisers used by the admin CRUD routes.
 const collections = {
@@ -192,7 +193,14 @@ function business(b, current) {
     bookingWindowDays: num(b.bookingWindowDays, { min: 1, max: 60, field: 'Class booking window' }),
     hours: hours(b.hours),
     closedDates: (Array.isArray(b.closedDates) ? b.closedDates : []).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).slice(0, 100),
+    paymentMethods: paymentMethods(b.paymentMethods ?? current.paymentMethods),
+    messageLang: ['en', 'ur'].includes(b.messageLang) ? b.messageLang : current.messageLang || 'ur',
   };
+}
+
+function paymentMethods(list) {
+  const clean = [...new Set((Array.isArray(list) ? list : String(list || '').split(',')).map((x) => String(x).trim().slice(0, 24)).filter(Boolean))].slice(0, 10);
+  return clean.length ? clean : METHODS;
 }
 
 function validTimeZone(tz) {

@@ -169,7 +169,7 @@
       <div class="mark" style="width:72px;height:72px;border-radius:22px;display:grid;place-items:center;margin:0 auto 16px;font-size:30px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--accent),#222)">${esc(gym.name.charAt(0))}</div>
       <h1 style="font-size:28px">Start the entry screen</h1><p style="color:#9a9ab0;margin-top:6px">Enter the owner or front desk PIN once on this screen.</p>
       <form style="margin-top:22px;display:grid;gap:12px"><input class="input" type="password" inputmode="numeric" maxlength="8" placeholder="PIN" autofocus style="text-align:center;font-size:22px;letter-spacing:.3em"><button class="btn btn-primary btn-block">Start</button></form>
-      <p style="margin-top:18px"><a class="link" href="/admin.html">← Dashboard</a></p></div></div>`;
+      <p style="margin-top:18px"><a class="link" href="${UI.url('/admin.html')}">← Dashboard</a></p></div></div>`;
     root.querySelector('form').addEventListener('submit', async (e) => {
       e.preventDefault();
       try {

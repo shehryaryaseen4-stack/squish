@@ -7,6 +7,7 @@ const { classesOn } = require('./availability');
 const { summarize, indexDb, paidOf } = require('./members');
 const v = require('./validate');
 const { PERMISSIONS, PERM_IDS, PRESETS, migrateAccess } = require('./access');
+const { clientIp } = require('./net');
 
 const { fail, HttpError } = v;
 const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -607,7 +608,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     const { pathname } = url;
     const q = Object.fromEntries(url.searchParams);
     const m = req.method;
-    const ip = req.socket.remoteAddress || 'local';
+    const ip = clientIp(req);
     const d = db();
     let match;
 
@@ -620,6 +621,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
         classes: d.classes.filter((c) => c.active !== false),
         staff: d.staff.filter((s) => s.active !== false).map(({ id, name, role, color }) => ({ id, name, role, color })),
         today: today(),
+        demo: Boolean(d.demo),
       };
     }
     if (m === 'GET' && pathname === '/api/classes') {
@@ -724,7 +726,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
         staff: can('settings') || can('expenses') ? d.staff : d.staff.map(({ salary, ...s }) => s),
         classes: d.classes,
         expenseCategories: d.expenseCategories,
-        methods: v.METHODS,
+        methods: d.business.paymentMethods || v.METHODS,
         now: now(),
         demo: Boolean(d.demo),
       };
@@ -1085,7 +1087,16 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     fail('Not found', 404);
   }
 
-  return { handle, handleDevice, handleHikvision };
+  // The platform owner opening a gym's dashboard to help them.
+  function ownerToken() {
+    const d = db();
+    const { token, kept } = openSession(d.admin.sessions || [], { role: 'owner', support: true }, 8 * 60 * 60 * 1000);
+    d.admin.sessions = kept;
+    store.save();
+    return token;
+  }
+
+  return { handle, handleDevice, handleHikvision, ownerToken };
 }
 
 module.exports = { createApi, HttpError, weekdayOf };

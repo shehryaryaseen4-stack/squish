@@ -25,14 +25,15 @@ const CONFIG = ['plans', 'staff', 'classes'];
  * One JSON file holds the whole gym. Every write goes to a temp file first and
  * is renamed into place, so a crash never leaves half a file.
  */
-function createStore({ file, seed = 'demo', ownerPin = '1234', staffPin = '0000', now = () => new Date() }) {
+function createStore({ file, seed = 'demo', ownerPin = '1234', staffPin = '0000', business = null, now = () => new Date() }) {
   let db;
   if (file && fs.existsSync(file)) {
     db = JSON.parse(fs.readFileSync(file, 'utf8'));
   } else {
     db = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'seed', 'gym.json'), 'utf8'));
     for (const key of DATA) db[key] = [];
-    db.admin = { ownerPin: hashPin(ownerPin), staffPin: hashPin(staffPin), sessions: [] };
+    db.admin = { ownerPin: hashPin(ownerPin), ...(staffPin ? { staffPin: hashPin(staffPin) } : {}), sessions: [] };
+    if (business) Object.assign(db.business, business);
     db.memberSessions = [];
     db.devices = [];
     db.receiptSeq = 1;

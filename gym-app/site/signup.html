@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Create your gym · {product}</title>
+  <meta name="description" content="Start your free trial: create your gym in a minute.">
+  <meta name="theme-color" content="#f97316">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="/base.css">
+  <link rel="stylesheet" href="/site.css">
+</head>
+<body data-page="signup">
+  <header data-site-header></header>
+
+  <main class="page"><div class="wrap-site">
+    <div class="panel-card" id="signup-card">
+      <h1>Create your gym</h1>
+      <p class="lead">Free for <span data-trial>14</span> days. No card needed. You can change everything later.</p>
+      <form class="form-site" id="signup" novalidate>
+        <label class="field"><span>Gym name</span><input class="input" name="gymName" maxlength="60" autocomplete="organization" placeholder="e.g. Fit Zone" required></label>
+        <div class="field"><span>Your gym's web address</span>
+          <div class="slug-field"><span data-host>/g/</span><input class="input" name="slug" maxlength="32" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="fit-zone" aria-label="Web address"></div>
+          <div class="hint-line" data-slug-hint>Members and staff open the app here.</div></div>
+        <div class="two">
+          <label class="field"><span>Country</span><select class="input" name="country" required></select></label>
+          <label class="field"><span>Monthly fee you charge members</span><input class="input" name="monthlyFee" type="number" min="0" step="any" inputmode="decimal" placeholder=""><small class="hint-line" data-fee-hint></small></label>
+        </div>
+        <div class="two">
+          <label class="field"><span>Your email</span><input class="input" name="email" type="email" autocomplete="email" required></label>
+          <label class="field"><span>Phone / WhatsApp</span><input class="input" name="phone" type="tel" autocomplete="tel"></label>
+        </div>
+        <div class="two">
+          <label class="field"><span>Owner PIN (4 to 8 digits)</span><input class="input" name="ownerPin" type="password" inputmode="numeric" maxlength="8" autocomplete="new-password" required></label>
+          <label class="field"><span>Type the PIN again</span><input class="input" name="pin2" type="password" inputmode="numeric" maxlength="8" autocomplete="new-password" required></label>
+        </div>
+        <label class="check-row"><input type="checkbox" name="sample"> <span>Fill my gym with sample members so I can look around first (you can clear them later).</span></label>
+        <label class="check-row"><input type="checkbox" name="terms" required> <span>I agree to the <a class="link" href="/terms" target="_blank">terms</a> and <a class="link" href="/privacy" target="_blank">privacy policy</a>.</span></label>
+        <button class="btn btn-primary btn-block" type="submit" style="height:52px">Create my gym</button>
+      </form>
+    </div>
+  </div></main>
+
+  <footer data-site-footer></footer>
+  <script src="/icons.js"></script>
+  <script src="/common.js"></script>
+  <script src="/site.js"></script>
+  <script src="/pages.js"></script>
+</body>
+</html>

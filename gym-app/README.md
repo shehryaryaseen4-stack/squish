@@ -1,6 +1,12 @@
-# Gym app: members, fees and attendance, with Android and iPhone apps
+# GymDesk: gym management you can sell, online and on Windows
 
-A complete management app for a gym, plus an app for its members. It is built to be sold to gyms: each gym gets its own server, name, colour and plans, and nothing in the code changes per client.
+A complete management app for a gym plus an app for its members, packaged as a product to sell worldwide:
+
+- **Online (SaaS):** gyms sign up on your website, get a free trial and pay a monthly or yearly subscription through Paddle. Every gym gets its own address (`yourdomain.com/g/their-gym`), currency, time zone and data. You control every gym from the owner panel.
+- **Windows licence:** a one-time purchase. The buyer gets a licence key, the Windows app activates it once and then runs the gym on their own computer.
+- **Apps:** web, Windows and Android (iPhone project included).
+
+"GymDesk" is a placeholder name: change it in the owner panel (website), `desktop/config.json` and `desktop/package.json` (Windows app).
 
 ## What's inside
 
@@ -56,7 +62,54 @@ Visitors who aren't members see plans, coaches, timings and a "Join" form.
 
 The exercise library (84 exercises in 11 muscle groups) comes from [free-exercise-db](https://github.com/yuhonas/free-exercise-db), which is public domain. `scripts/build-exercises.py` downloads it and shrinks the photos into `public/exercises/`. Edit the `GROUPS` list in that script to add or swap exercises.
 
-## Run it
+## Sell it: the platform
+
+```bash
+cd gym-app
+PLATFORM=1 OWNER_EMAIL=you@example.com OWNER_PASSWORD='a-long-password' npm start
+# website http://localhost:3100 · owner panel http://localhost:3100/owner
+```
+
+| Page | What it is |
+|---|---|
+| `/` | Sales website: features, screenshots, pricing, FAQ |
+| `/signup` | A gym creates its account: name, web address, country (sets currency, time zone, payment methods and plan prices), owner PIN |
+| `/billing?gym=…` | Subscribe monthly or yearly through Paddle |
+| `/thanks` | After payment; shows the licence key for Windows purchases |
+| `/download` | Windows and Android downloads |
+| `/terms`, `/privacy`, `/refund` | Legal pages (templates, have them checked) |
+| `/owner` | **Your owner panel** |
+| `/g/<gym>/`, `/g/<gym>/admin` | One gym's member app and dashboard |
+
+**Owner panel (`/owner`):** totals (gyms, paying, on trial, locked, monthly income, licences) and recent activity; every gym with its status, plan, paid-until date and member count; per gym: **open their dashboard** as owner, **add paid time** (for bank or wallet payments), **pause / switch back on**, **reset the owner PIN**, make free, private notes, delete. Also: create gyms and licence keys by hand, switch licences off, free up their computers, see fingerprint machines that call with unknown serials, and every setting (product name, prices, trial length, Paddle keys, download links). Without `OWNER_EMAIL`/`OWNER_PASSWORD`, the first visit asks for a setup code printed in the server log.
+
+**Trials and locking:** new gyms get a free trial (14 days by default). When the trial or the paid time ends, plus a few grace days, the gym's app shows *"Subscription ended · Renew now"* and its API answers 402; nothing is deleted. The dashboard shows a banner during the trial.
+
+**Paddle (card payments):** Paddle is the merchant of record, so it handles tax and VAT worldwide and pays you out.
+1. Create a Paddle account (start in **sandbox**), and three prices: online monthly, online yearly (both recurring) and the Windows licence (one-time).
+2. In the owner panel → Settings: paste the price IDs (`pri_…`), the **client-side token**, and choose sandbox or live.
+3. In Paddle → Notifications, add the webhook URL shown in Settings (`https://yourdomain.com/paddle/webhook`) for `subscription.*` and `transaction.completed`, and paste its **secret** into Settings.
+4. Paddle reviews your website before going live: the pricing, terms, privacy and refund pages are there for that.
+
+Until Paddle is set up, the pay buttons show your WhatsApp/email so buyers can pay you directly; then use **Add paid time** or **New licence** in the owner panel.
+
+**Windows licences:** keys look like `GYM-7K2M-9QXF-4HTP-WN3B`. Activation (once, online) ties the key to the computer and returns a token signed with the platform's Ed25519 key (`license-private.pem` in the data folder; **back it up**). The app checks the signature on every start and asks the server every few days whether the key was switched off. Each key allows 2 computers by default.
+
+### Put the platform online
+
+On any Linux server (a €5 VPS is enough to start) with Docker:
+
+```bash
+git clone <this repo> && cd <repo>/gym-app/deploy
+cp .env.example .env      # DOMAIN, OWNER_EMAIL, OWNER_PASSWORD
+docker compose up -d --build
+```
+
+Point the domain's DNS at the server first; Caddy gets the HTTPS certificate by itself. Fingerprint machines connect over plain HTTP on `MACHINE_PORT` (8081): open it in the firewall. Machines reach the right gym by their serial number, which the gym enters in **Settings → Fingerprint & face machines**. Run `deploy/backup.sh` daily (cron) to keep copies of every gym.
+
+Then in GitHub → Settings → Secrets and variables → Actions → **Variables**, add `GYM_PLATFORM_URL` (e.g. `https://gymdesk.com`), `PRODUCT_NAME`, and `LICENSE_PUBLIC_KEY` (shown in owner panel → Settings) so the next build of the apps knows your website: the Android app then accepts a gym code, and the Windows app activates licences there.
+
+## Run one gym (development)
 
 ```bash
 cd gym-app
@@ -89,9 +142,14 @@ Back up `db.json` regularly. It is a single file holding the whole gym.
 
 ## Windows app (front desk computer)
 
-`desktop/` holds an [Electron](https://www.electronjs.org) app. It runs the gym server on the front desk computer, so a gym needs no hosting: the dashboard opens in its own window, phones on the gym Wi-Fi use the computer's address, and the fingerprint machine sends punches to it. The **Gym** menu has the entry screen, the kiosk, **Phones and machines…** (the address to type into phones and machines), **Back up data…** and the data folder.
+`desktop/` holds an [Electron](https://www.electronjs.org) app. On first start it asks how the computer will be used:
+- **Online account:** the gym types its address (or code) and the app opens its online dashboard.
+- **Windows licence:** the buyer enters the licence key, then the gym's name, country and owner PIN. The gym server runs on this computer: phones on the gym Wi-Fi use the computer's address and the fingerprint machine sends punches to it.
+- **Demo:** sample data to look around.
 
-Every push builds `gym-app-setup.exe` and puts it on the `app-latest` release. It is not code-signed, so Windows may say *"Windows protected your PC"*: click **More info → Run anyway**. Data is kept in `%APPDATA%\Iron Republic Gym\data`. Keep the computer on while the gym is open; members' phones only reach it on the same Wi-Fi unless the server is put online.
+The **Gym** menu has the entry screen, the kiosk, **Phones and machines…** (the address to type into phones and machines), **Back up data…**, the data folder and switching mode.
+
+Every push builds `gym-app-setup.exe` and puts it on the `app-latest` release. It is not code-signed, so Windows may say *"Windows protected your PC"*: click **More info → Run anyway** (a code-signing certificate removes this). Data is kept in `%APPDATA%\GymDesk`. Keep the computer on while the gym is open.
 
 ```bash
 cd desktop && npm install && npm start      # try it
@@ -133,6 +191,12 @@ lib/availability.js    Class timetable with live spots
 lib/store.js           JSON file storage with atomic writes, scrypt-hashed PINs
 lib/demo.js            Demo gym generator
 lib/validate.js        Input checks for every write
+lib/access.js          Staff rights the owner can give each login
+lib/web.js             Serves one gym (pages, API, photos, machines), also under /g/<gym>
+lib/platform/          Multi-gym platform: sign-ups, trials, owner panel API, Paddle, licences, countries
+site/                  Sales website and owner panel
+desktop/               Windows app (Electron)
+deploy/                Docker Compose with Caddy (HTTPS) and a backup script
 public/                Member app (index), manager (admin), kiosk, shared styles
 scripts/build-mobile.js  Copies public/ to www/ for Capacitor and sets the server URL
 ```

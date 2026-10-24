@@ -10,6 +10,24 @@
     try { return localStorage.getItem('serverUrl') || ''; } catch { return ''; }
   }
 
+  // The gym's subscription has ended on the platform: cover the screen.
+  function showLocked(info) {
+    if (document.querySelector('.locked-screen')) return;
+    const staff = /admin|display|kiosk/.test(location.pathname);
+    const el = document.createElement('div');
+    el.className = 'locked-screen';
+    el.setAttribute('role', 'alertdialog');
+    el.style.cssText = 'position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:24px;background:var(--bg,#fff);color:var(--ink,#111);text-align:center';
+    el.innerHTML = `<div style="max-width:420px"><div style="font-size:44px">🔒</div>
+      <h2 style="font-size:24px;margin:12px 0 8px">${esc(staff ? info.title || 'Subscription ended' : 'The app is paused')}</h2>
+      <p style="color:var(--ink-3,#666)">${esc(staff ? info.error : 'Please ask the gym\u2019s front desk. Your membership and records are safe.')}</p>
+      ${staff && info.billingUrl ? `<a class="btn btn-primary" style="margin-top:20px;display:inline-flex" href="${esc(info.billingUrl)}">Renew now</a>` : ''}</div>`;
+    document.body.append(el);
+  }
+
+  // Pages of this gym. On the multi-gym platform a gym lives under /g/<gym>.
+  const url = (p) => `${(window.APP_CONFIG || {}).base || ''}${p}`;
+
   async function api(path, { method = 'GET', body, token } = {}) {
     const headers = {};
     if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -21,6 +39,7 @@
       throw Object.assign(new Error('You seem to be offline. Check your connection and try again.'), { status: 0 });
     }
     const data = await res.json().catch(() => ({}));
+    if (res.status === 402 && data.locked) showLocked(data);
     if (!res.ok) throw Object.assign(new Error(data.error || 'Something went wrong'), { status: res.status });
     return data;
   }
@@ -147,15 +166,17 @@
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', hex);
   }
 
+  // Gyms on the platform share one website, so each keeps its own sign-ins.
+  const scoped = (key) => ((window.APP_CONFIG || {}).base ? `${window.APP_CONFIG.base}|${key}` : key);
   const store = {
     get(key, fallback) {
-      try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
+      try { return JSON.parse(localStorage.getItem(scoped(key))) ?? fallback; } catch { return fallback; }
     },
     set(key, value) {
-      try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private mode */ }
+      try { localStorage.setItem(scoped(key), JSON.stringify(value)); } catch { /* private mode */ }
     },
     remove(key) {
-      try { localStorage.removeItem(key); } catch { /* private mode */ }
+      try { localStorage.removeItem(scoped(key)); } catch { /* private mode */ }
     },
   };
 
@@ -229,7 +250,7 @@
   }
 
   window.UI = {
-    esc, api, apiBase, money, time12, dateLong, dateShort, dayName, dayNum, monthName, addDays, weekday, duration,
+    esc, api, apiBase, url, money, time12, dateLong, dateShort, dayName, dayNum, monthName, addDays, weekday, duration,
     initials, toast, sheet, confirmSheet, busy, setAccent, store, icsFor, waLink, setBusiness, DAYS, DAY_LABELS,
     photoSrc, avatarHtml, pickPhoto,
   };

@@ -95,7 +95,7 @@
         <div class="card box"><p style="color:var(--ink-2);font-size:14.5px">Leave your number and we'll call you to book a free trial.</p><button class="btn btn-primary btn-block" style="margin-top:14px" data-join>${icon('userPlus')}I want to join</button></div></section>
       <section class="section"><div class="section-head"><h2>Coaches</h2></div><div class="scroller">${staff.map((m) => `<div class="card team-card"><span class="avatar lg" style="--c:${esc(m.color)}">${esc(initials(m.name))}</span><h3>${esc(m.name)}</h3><p>${esc(m.role)}</p></div>`).join('')}</div></section>
       <section class="section"><div class="section-head"><h2>Visit us</h2></div>${infoCard()}</section>
-      <div class="footer">© ${new Date().getFullYear()} ${esc(b.name)} · <a href="/admin.html">Gym staff</a></div>`);
+      <div class="footer">© ${new Date().getFullYear()} ${esc(b.name)} · <a href="${UI.url('/admin.html')}">Gym staff</a></div>`);
     view.querySelector('[data-join]').addEventListener('click', joinSheet);
   }
 
@@ -459,18 +459,22 @@
     }
   }
 
-  // Native builds made without API_URL ask once for the gym's server address.
+  // Native builds made without API_URL ask once for the gym's address: a gym code
+  // on the platform the app was built for, or any server address.
   function connectView(error) {
+    const platform = (window.APP_CONFIG?.platformUrl || '').replace(/\/+$/, '');
     view.innerHTML = `<div class="view" style="padding:calc(48px + env(safe-area-inset-top)) 24px 24px">
-      <div class="empty" style="padding:0 0 20px"><div class="empty-icon">${icon('store')}</div><h3>Connect your gym</h3><p>Enter your gym's server address, for example https://app.yourgym.com</p></div>
-      <form class="form" style="padding:0" novalidate><label class="field"><span>Server address</span><input class="input" name="url" type="url" inputmode="url" autocapitalize="off" autocorrect="off" placeholder="https://" value="${esc(store.get('serverUrlDraft', ''))}"></label>
+      <div class="empty" style="padding:0 0 20px"><div class="empty-icon">${icon('store')}</div><h3>Connect your gym</h3><p>${platform ? 'Enter your gym\u2019s code (ask the front desk), or its full web address.' : 'Enter your gym\u2019s address, for example https://yourdomain.com/g/your-gym'}</p></div>
+      <form class="form" style="padding:0" novalidate><label class="field"><span>${platform ? 'Gym code or address' : 'Gym address'}</span><input class="input" name="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="${platform ? 'e.g. fit-zone' : 'https://'}" value="${esc(store.get('serverUrlDraft', ''))}"></label>
       ${error ? `<p class="field-error">${esc(error)}</p>` : ''}<button class="btn btn-primary btn-block">Connect</button></form></div>`;
     const form = view.querySelector('form');
     form.addEventListener('submit', (e) => {
       e.preventDefault();
-      const url = form.url.value.trim().replace(/\/+$/, '');
+      let url = form.url.value.trim().replace(/\/(admin|index)(\.html)?$/, '').replace(/\/+$/, '');
       store.set('serverUrlDraft', url);
-      if (!/^https?:\/\/./.test(url)) return connectView('The address must start with https://');
+      if (platform && /^[a-z0-9-]+$/i.test(url)) url = `${platform}/g/${url.toLowerCase()}`;
+      else if (url && !/^https?:\/\//.test(url)) url = `https://${url}`;
+      if (!/^https?:\/\/./.test(url)) return connectView('Enter your gym\u2019s code or address');
       try { localStorage.setItem('serverUrl', url); } catch { /* ignore */ }
       boot();
     });
@@ -513,7 +517,7 @@
     }
     offlineBanner();
     route();
-    if (!window.APP_CONFIG?.demo && 'serviceWorker' in navigator && !window.Capacitor?.isNativePlatform?.()) navigator.serviceWorker.register('/sw.js').catch(() => {});
+    if (!window.APP_CONFIG?.demo && 'serviceWorker' in navigator && !window.Capacitor?.isNativePlatform?.()) navigator.serviceWorker.register(UI.url('/sw.js')).catch(() => {});
   }
 
   boot();

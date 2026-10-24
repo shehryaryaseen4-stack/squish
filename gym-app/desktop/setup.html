@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Welcome</title>
+  <link rel="stylesheet" href="setup.css">
+</head>
+<body>
+  <main id="app">
+    <section data-step="choose">
+      <div class="mark" data-letter>G</div>
+      <h1>Welcome to <span data-product>GymDesk</span></h1>
+      <p class="lead">How will you use this computer?</p>
+      <div class="choices">
+        <button class="choice" data-go="online"><span class="ic">☁️</span><b>I have an online account</b><span>Open your gym's account from the website. Members can use their app from anywhere.</span></button>
+        <button class="choice" data-go="licence"><span class="ic">🔑</span><b>I bought a Windows licence</b><span>Run your gym on this computer with your licence key. No internet needed after activation.</span></button>
+        <button class="choice" data-go="demo"><span class="ic">✨</span><b>Just let me look around</b><span>A demo gym with sample members. Owner PIN 1234.</span></button>
+      </div>
+    </section>
+
+    <section data-step="online" hidden>
+      <button class="back" data-go="choose">← Back</button>
+      <h1>Open your online gym</h1>
+      <p class="lead">Type your gym's address. You'll find it in the welcome email or on the page you saw after signing up.</p>
+      <form id="online" novalidate>
+        <label>Gym address<input name="address" autocomplete="off" spellcheck="false" placeholder="https://yourdomain.com/g/your-gym"></label>
+        <p class="error" data-error></p>
+        <button class="btn" type="submit">Open my gym</button>
+      </form>
+    </section>
+
+    <section data-step="licence" hidden>
+      <button class="back" data-go="choose">← Back</button>
+      <h1>Activate your licence</h1>
+      <p class="lead">Enter the key you received after buying. This computer needs the internet just for this step.</p>
+      <form id="licence" novalidate>
+        <label>Licence key<input name="key" autocomplete="off" spellcheck="false" placeholder="GYM-XXXX-XXXX-XXXX-XXXX" class="mono"></label>
+        <label data-server hidden>Website you bought it from<input name="server" autocomplete="off" spellcheck="false" placeholder="https://yourdomain.com"></label>
+        <p class="error" data-error></p>
+        <button class="btn" type="submit">Activate</button>
+      </form>
+    </section>
+
+    <section data-step="gym" hidden>
+      <h1>Set up your gym</h1>
+      <p class="lead">Licence activated ✓. A few details and you're ready.</p>
+      <form id="gym" novalidate>
+        <label>Gym name<input name="name" maxlength="60" required></label>
+        <div class="two">
+          <label>Country<select name="country"></select></label>
+          <label>Monthly fee you charge<input name="monthlyFee" type="number" min="0" step="any"></label>
+        </div>
+        <div class="two">
+          <label>Owner PIN (4 to 8 digits)<input name="ownerPin" type="password" inputmode="numeric" maxlength="8"></label>
+          <label>Type the PIN again<input name="pin2" type="password" inputmode="numeric" maxlength="8"></label>
+        </div>
+        <div class="two">
+          <label>Email (optional)<input name="email" type="email"></label>
+          <label>Phone (optional)<input name="phone" type="tel"></label>
+        </div>
+        <p class="error" data-error></p>
+        <button class="btn" type="submit">Start using my gym</button>
+      </form>
+    </section>
+  </main>
+  <script src="setup.js"></script>
+</body>
+</html>
