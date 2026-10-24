@@ -144,3 +144,14 @@ bash /opt/flipfree/deploy/update.sh
 ```
 
 Menu mein "Edit PDF" aa jayega. Band karne ke liye `.env` se `PDF_EDITOR=1` wali line hata kar dobara `update.sh` chalayein.
+
+## AI tools on karna (AI Summarizer, Translate PDF)
+
+AI PDF Summarizer (chat ke saath) aur Translate PDF, Anthropic ka Claude AI istemal karte hain. Inhein chalane ke liye Anthropic ki API key chahiye (PDF to Markdown baghair key ke chalta hai).
+
+1. https://platform.claude.com pe account banayein, **Billing** mein thore credits daalein, phir **API keys** se nayi key banayein.
+2. Server pe settings file kholein: `nano /opt/flipfree/.env`
+3. Akhir mein yeh line likhein (apni key ke saath): `ANTHROPIC_API_KEY=sk-ant-...`
+4. `Ctrl+O`, `Enter`, `Ctrl+X` se save karein, phir: `bash /opt/flipfree/deploy/update.sh`
+
+Key sirf `.env` mein rakhein: kisi ko na bhejein, chat ya GitHub mein bhi nahi. Kharche ki hadd ke liye `.env` mein `AI_DAILY_MAX` (poori site, roz ki requests) aur `AI_PER_HOUR` (ek visitor, ghante ki requests) badal sakte hain, aur Anthropic console mein bhi monthly limit lagayein. Sasta model chahiye ho to `AI_MODEL=claude-haiku-5-5`.

@@ -34,7 +34,7 @@ const APPS = require('./content/apps');
 const APP_BY_SLUG = new Map(APPS.map((t) => [t.slug, t]));
 // Variants of a tool (resize to 50 KB, compress video for Discord ...) have pages but stay out of menus.
 const MENU_APPS = APPS.filter((t) => t.menu !== false);
-const APP_ICON = { passport: 'jpg', ocr: 'txt', invoice: 'pdf', resize: 'jpg', imgedit: 'png', favicon: 'ico', bgremove: 'png', vcompress: 'mp4', trim: 'mp3', words: 'txt', signature: 'png', cover: 'docx', aires: 'docx' };
+const APP_ICON = { aisum: 'pdf', translate: 'pdf', markdown: 'md', passport: 'jpg', ocr: 'txt', invoice: 'pdf', resize: 'jpg', imgedit: 'png', favicon: 'ico', bgremove: 'png', vcompress: 'mp4', trim: 'mp3', words: 'txt', signature: 'png', cover: 'docx', aires: 'docx' };
 // Converters under the names people search for: /pdf-to-word, /word-to-pdf ... (friendlyPage)
 const FRIENDLY_ALL = require('./content/friendly-pages');
 // Only the file types this server can really convert (LibreOffice, Calibre ... may be missing):
@@ -200,6 +200,7 @@ const ICON_PATHS = {
   upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>',
   download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
   edit: '<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/><path d="m10 17 5.5-5.5 1.5 1.5L11.5 18.5H10z"/>',
+  send: '<path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/>',
   convert: '<path d="M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2"/><path d="M21 4v5h-5M3 20v-5h5"/>',
 };
 for (const [k, v] of Object.entries(PDFT.icons)) ICON_PATHS[`t-${k}`] = v;
@@ -926,6 +927,93 @@ function pdfToolsHub(base) {
 // Stand-alone tools (content/apps.js): passport photo maker, image to text / OCR PDF, invoice
 // generator. Same layout as the PDF tool pages; the tool box is driven by public/apps.js.
 const OCR_LANGS = () => require('./engines/ocr').langs();
+// PDF intelligence (content/apps.js, public/ai.js, engines/ai.js): AI summarizer + chat, Translate
+// PDF and PDF to Markdown. The AI ones say so in the box when the server has no API key.
+const AI_APPS = new Set(['aisum', 'translate', 'markdown']);
+function aiBox(t) {
+  const ai = require('./engines/ai');
+  const off = t.app !== 'markdown' && !ai.configured();
+  const langs = OCR_LANGS();
+  const ocrOpts = `<label class="pt-check ai-ocr"><input type="checkbox" data-ocr> Scanned PDF? Read it with OCR</label>
+      <label class="ai-ocr-lang" data-ocr-lang-wrap hidden>Text language (for OCR)<select data-ocr-lang>${(langs.length ? langs : [['eng', 'English']]).map(([id, n]) => `<option value="${id}">${n}</option>`).join('')}</select></label>`;
+  const langList = (first) => `${first}${ai.LANGS.map(([id, name]) => `<option value="${id}">${esc(name)}</option>`).join('')}`;
+  const drop = `<div class="pt-drop" data-drop>
+    <input type="file" accept="application/pdf,.pdf" data-input hidden>
+    ${icon('upload', 'pt-drop-ico')}
+    <button class="btn btn-brand btn-select" type="button" data-pick>${icon('upload')}Select PDF</button>
+    <p class="pt-drop-sub">or drop a PDF here &middot; up to ${MAX_MB} MB</p>
+    <p class="pt-private">${icon('shield')}Files are deleted as soon as they are read</p>
+  </div>`;
+  const filebar = `<div class="pt-filebar">${icon('file')}<span class="pt-fname" data-fname></span><span class="pt-fmeta" data-fmeta></span><button type="button" class="pt-link" data-again>Choose another file</button></div>`;
+  const offNote = off ? '<p class="ai-off" role="note">The AI tools are being set up on this server and will be available soon.</p>' : '';
+  const head = `<section class="app app-ai app-${t.app}" id="app" data-app="${t.app}" data-max-mb="${MAX_MB}"${off ? ' data-off="1"' : ''}>`;
+  const end = '<noscript><p class="pt-msg">This tool needs JavaScript. Please turn it on and reload the page.</p></noscript>\n</section>';
+  if (t.app === 'aisum') {
+    return `${head}${offNote}
+  ${drop}
+  <div class="pt-work" data-work hidden>
+    ${filebar}
+    <form class="pt-opts ai-opts" autocomplete="off" onsubmit="return false">
+      <label>Summary language<select data-sum-lang>${langList('<option value="">Same as the PDF</option>')}</select></label>
+      ${ocrOpts}
+    </form>
+    <div class="pt-bar"><p class="pt-msg" data-msg role="status" aria-live="polite"></p><button type="button" class="btn btn-brand pt-go" data-go${off ? ' disabled' : ''}>${icon('t-ai')}Summarize</button></div>
+  </div>
+  <div class="ai-pane" data-pane hidden>
+    <div class="ai-doc">
+      <div class="ai-doc-bar">${icon('file')}<span class="pt-fname" data-doc-name></span><span class="pt-fmeta" data-doc-meta></span><button type="button" class="pt-link" data-again>New PDF</button></div>
+      <div class="ai-pages" data-pages aria-label="PDF preview"></div>
+    </div>
+    <aside class="ai-side" aria-label="AI summary and chat">
+      <div class="ai-side-head"><span class="ai-badge">${icon('t-ai')}AI Summary</span><button type="button" class="pt-link" data-copy-sum hidden>Copy summary</button></div>
+      <div class="ai-scroll" data-scroll>
+        <div class="ai-md ai-summary" data-summary aria-live="polite"></div>
+        <div class="ai-suggest" data-suggest hidden><p class="ai-suggest-h">Suggested questions</p><div data-suggest-list></div></div>
+        <div class="ai-chat" data-chat></div>
+      </div>
+      <form class="ai-ask" data-ask autocomplete="off"><textarea data-q rows="1" maxlength="4000" placeholder="Ask anything about this PDF..." aria-label="Ask a question about this PDF" disabled></textarea><button type="submit" class="ai-send" data-send aria-label="Send" disabled>${icon('send')}</button></form>
+      <p class="ai-foot">AI can make mistakes. Check important facts in the document.</p>
+    </aside>
+  </div>
+  ${end}`;
+  }
+  if (t.app === 'translate') {
+    return `${head}${offNote}
+  ${drop}
+  <div class="pt-work" data-work hidden>
+    ${filebar}
+    <form class="pt-opts ai-opts" autocomplete="off" onsubmit="return false">
+      <label>Translate into<select data-to>${langList('')}</select></label>
+      ${ocrOpts}
+    </form>
+    <div class="ai-progress" data-progress hidden><div class="ai-progress-bar"><span></span></div><p data-progress-text>Translating...</p></div>
+    <div class="pt-bar"><p class="pt-msg" data-msg role="status" aria-live="polite"></p><button type="button" class="btn btn-brand pt-go" data-go${off ? ' disabled' : ''}>${icon('t-translate')}Translate PDF</button></div>
+  </div>
+  <div class="pt-done" data-done hidden>
+    <span class="pt-done-ico" aria-hidden="true">&#10003;</span>
+    <h2 class="pt-done-h">Your translated PDF is ready</h2>
+    <p class="pt-done-text" data-done-text></p>
+    <div class="pt-done-btns"><a class="btn btn-brand" data-dl href="#" download>${icon('download')}Download PDF</a><button type="button" class="btn btn-ghost" data-again>Translate another PDF</button></div>
+  </div>
+  ${end}`;
+  }
+  return `${head}
+  ${drop}
+  <div class="pt-work" data-work hidden>
+    ${filebar}
+    <form class="pt-opts ai-opts" autocomplete="off" onsubmit="return false">${ocrOpts}</form>
+    <div class="pt-bar"><p class="pt-msg" data-msg role="status" aria-live="polite"></p><button type="button" class="btn btn-brand pt-go" data-go>${icon('t-markdown')}Convert to Markdown</button></div>
+  </div>
+  <div class="ocr-out md-out" data-out hidden>
+    <div class="ocr-out-bar"><strong data-out-title>Markdown</strong>
+      <span class="md-tabs" role="tablist"><button type="button" role="tab" class="md-tab is-on" data-tab="md" aria-selected="true">Markdown</button><button type="button" role="tab" class="md-tab" data-tab="preview" aria-selected="false">Preview</button></span>
+      <span class="ocr-btns"><button type="button" class="btn btn-ghost btn-sm" data-copy>Copy Markdown</button><a class="btn btn-brand btn-sm" data-dl href="#" download>${icon('download')}Download .md</a><button type="button" class="pt-link" data-again>New file</button></span></div>
+    <p class="pt-msg" data-notes hidden></p>
+    <textarea class="ocr-text md-text" data-text rows="18" spellcheck="false" aria-label="Markdown"></textarea>
+    <div class="ai-md md-preview" data-preview hidden></div>
+  </div>
+  ${end}`;
+}
 const PASSPORT_SPECS = require('./content/passport-specs');
 // every size in the menu, as a table on the page (searches like "pakistan passport photo size")
 const passportTableHtml = () => `<table><thead><tr><th>Country</th><th>Document</th><th>Photo size</th><th>Head (chin to top)</th><th>Digital file</th></tr></thead><tbody>${PASSPORT_SPECS
@@ -1205,6 +1293,7 @@ function appBox(t) {
   <noscript><p class="pt-msg">This tool needs JavaScript. Please turn it on and reload the page.</p></noscript>
 </section>`;
   }
+  if (AI_APPS.has(t.app)) return aiBox(t);
   if (t.app === 'ocr') {
     const langs = OCR_LANGS();
     const pdfFirst = t.accept === 'pdf';
@@ -1287,6 +1376,9 @@ const APP_PRIVACY = {
   trim: '<strong>How this works:</strong> the file is uploaded over HTTPS and cut on this server with FFmpeg. The upload is deleted when the work is done and the result 15 minutes later.',
   passport: '<strong>How this works:</strong> your photo is cropped and sized in your browser. It is never uploaded to our server and nothing is stored.',
   ocr: '<strong>How this works:</strong> your file is uploaded over HTTPS and read on this server with Tesseract, the open-source OCR engine, in a private temporary folder that is deleted as soon as the text is ready. Nothing is kept or shared.',
+  aisum: '<strong>How this works:</strong> your PDF is uploaded over HTTPS and its text is read on this server; the file is then deleted. The text is sent to Claude (Anthropic\'s AI) to write the summary and answers, and kept in memory for up to an hour for your questions. It is not used to train AI.',
+  translate: '<strong>How this works:</strong> your PDF is uploaded over HTTPS, its text is translated by Claude (Anthropic\'s AI) and written back into the PDF on this server. The upload is deleted when the work is done and the result 15 minutes later. Nothing is used to train AI.',
+  markdown: '<strong>How this works:</strong> your PDF is uploaded over HTTPS and turned into Markdown on this server with open-source tools (PyMuPDF), in a private temporary folder that is deleted straight after. No AI is used.',
   invoice: '<strong>How this works:</strong> the invoice is built in your browser with open-source code (pdf-lib) and saved straight to your device. Your details are kept only in this browser so the next invoice is quicker; nothing is sent to our server.',
 };
 function appPage(slug, base) {
@@ -1307,7 +1399,7 @@ function appPage(slug, base) {
       + `<section class="related-tools"><h2>Related tools</h2>${chips([...see, ...other])}</section>`
       + readMore(p) + faqHtml(t.faq),
     PRIVACY: APP_PRIVACY[t.app],
-    SCRIPTS: `${t.app === 'invoice' || t.app === 'cover' ? `<script src="/vendor/pdf-lib.min.js?v=${seo.ASSET_V.pdfTools}" defer></script>\n` : ''}${TOOLS_JS.has(t.app)
+    SCRIPTS: AI_APPS.has(t.app) ? `<script type="module" src="/ai.js?v=${seo.ASSET_V.ai}"></script>\n` : `${t.app === 'invoice' || t.app === 'cover' ? `<script src="/vendor/pdf-lib.min.js?v=${seo.ASSET_V.pdfTools}" defer></script>\n` : ''}${TOOLS_JS.has(t.app)
       ? `<script type="module" src="/tools.js?v=${seo.ASSET_V.tools}"></script>` : `<script type="module" src="/apps.js?v=${seo.ASSET_V.apps}"></script>`}\n`,
   }));
 }

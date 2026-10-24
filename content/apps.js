@@ -2,7 +2,7 @@
 // Stand-alone tools with their own page and their own tool box (pages.js appPage, public/apps.js and
 // public/tools.js): passport photo maker, OCR, invoice generator, image resizer, crop/rotate/flip,
 // favicon generator, background remover, video compressor, trimmers, word counter, signature and
-// cover letter generators.
+// cover letter generators, and the PDF intelligence tools (AI summarizer, Translate PDF, PDF to Markdown).
 //
 //   slug, name (menus and links), app (which tool box), menu (false: a variant page kept out of the
 //   menus, e.g. resize to 50 KB), browser (true: the file never
@@ -91,6 +91,80 @@ module.exports = [
       ['Can I convert a scanned PDF to Word?', 'Yes. Make it searchable here first, then convert the searchable PDF with PDF to DOCX, or download the text and paste it into Word.'],
     ],
     see: ['/image-to-text', '/pdf-to-docx', '/compress-pdf', '/split-pdf', '/pdf-to-txt'],
+  },
+  {
+    slug: 'ai-pdf-summarizer', howto: 'How to summarize a PDF with AI', name: 'AI PDF Summarizer', app: 'aisum', accept: 'pdf',
+    keywords: ['ai pdf summarizer', 'summarize pdf', 'pdf summarizer', 'chat with pdf', 'ask pdf questions', 'ai pdf reader', 'pdf summary generator'],
+    title: 'AI PDF Summarizer - Summarize PDF, Ask Questions',
+    desc: 'Free AI PDF summarizer: upload a PDF and get a clear summary with key points, then chat with the PDF and ask questions. Works with scans too (OCR).',
+    h1: 'AI PDF Summarizer and Chat',
+    intro: 'Upload a PDF and get a clear summary in seconds: what the document is, its key points under each section, and the names, numbers and dates that matter. Then ask anything about it in the chat, and the AI answers from the document with the page it found the answer on. Reports, contracts, papers, resumes, invoices and scanned pages (with OCR) all work. Free, no sign-up.',
+    steps: [['Upload your PDF.', 'Click <em>Select PDF</em> or drop a PDF into the box. If it is a scan or a photo of a document, turn on <em>OCR</em> so the text can be read.'],
+      ['Get the summary.', 'Click <em>Summarize</em>. The PDF opens on the left and the summary is written on the right, with three questions you may want to ask.'],
+      ['Ask questions.', 'Click a suggested question or type your own, such as <em>"What is the deadline?"</em> or <em>"Explain section 4 simply"</em>. Answers name the page they come from, so you can check them.']],
+    sections: [
+      ['What the AI summarizer is good for', '<ul><li><strong>Long reports and papers:</strong> get the purpose, method, findings and conclusions in a minute before you read the whole thing.</li><li><strong>Contracts and agreements:</strong> see the parties, dates, payments, notice periods and obligations, then ask about any clause.</li><li><strong>Study notes:</strong> turn a chapter into key points and ask the AI to explain hard parts in simple words.</li><li><strong>Resumes and applications:</strong> see a candidate\'s experience and skills at a glance.</li><li><strong>Letters, bills and forms:</strong> find what you have to do and by when.</li></ul>'],
+      ['How it works', '<p>The text of your PDF is read on our server with the same engine as our <a href="/pdf-to-word">PDF to Word</a> converter, so headings, lists and tables keep their structure and columns are read in the right order. Scanned pages are read with OCR when you turn it on. The text is then sent to Claude, an AI model made by Anthropic, which writes the summary and answers your questions using only what the document says, and tells you when the answer is not in it.</p><p>AI can make mistakes. For anything important, such as legal, medical or money matters, check the answer against the page it names.</p>'],
+      ['Private by design', '<p>The PDF file is deleted as soon as its text is read. The text is kept in memory for up to an hour so you can keep asking questions, then it is removed. It is not used to train AI models and is never shared or sold. To keep a document only on your device, use a browser-based tool such as <a href="/edit-pdf">Edit PDF</a> instead.</p>'],
+    ],
+    faq: [
+      ['How do I summarize a PDF?', 'Upload the PDF here and click Summarize. The summary appears next to the PDF in a few seconds, with key points and suggested questions.'],
+      ['Can I ask questions about my PDF?', 'Yes. After the summary, type any question in the chat box. The AI answers from the document and adds the page number, like (p. 3), so you can check it.'],
+      ['Is the AI PDF summarizer free?', 'Yes, it is free with no sign-up. To keep it free for everyone there is a fair-use limit on how many PDFs and questions one connection can use per hour.'],
+      ['Does it work with scanned PDFs?', 'Yes. Turn on OCR before you click Summarize and the scanned pages are read with text recognition first.'],
+      ['Can it summarize in another language?', 'Yes. Choose the summary language, for example English, Urdu, Hindi, Arabic or Spanish, and you can ask questions in any language.'],
+      ['How long can the PDF be?', 'Up to 100 pages and the file size limit shown in the box. For very long documents the AI reads the first part and tells you how many pages it read.'],
+      ['Which AI does it use?', 'Claude, made by Anthropic. Your document is not used to train it.'],
+    ],
+    see: ['/translate-pdf', '/pdf-to-markdown', '/pdf-to-word', '/ocr-pdf', '/word-counter'],
+  },
+  {
+    slug: 'translate-pdf', howto: 'How to translate a PDF', name: 'Translate PDF', app: 'translate', accept: 'pdf',
+    keywords: ['translate pdf', 'pdf translator', 'translate pdf to english', 'translate pdf to urdu', 'translate document', 'pdf translation online free', 'translate pdf keep formatting'],
+    title: 'Translate PDF - Free Translator, Keeps Layout',
+    desc: 'Translate a PDF into English, Urdu, Arabic, Spanish and 25 more languages with AI. The translated PDF keeps the original layout, fonts, colours and pictures.',
+    h1: 'Translate PDF (Keep the Layout)',
+    intro: 'Translate a whole PDF into another language and get back a PDF that looks like the original: the same pages, pictures, colours, tables and text sizes, with every heading, paragraph and table cell in the new language. AI translation handles 30 languages, including English, Urdu, Arabic, Hindi, Spanish, French, German, Chinese and Japanese. Free, no sign-up.',
+    steps: [['Upload your PDF.', 'Click <em>Select PDF</em> or drop a PDF into the box. For a scanned document, turn on <em>OCR</em>.'],
+      ['Choose the language.', 'Pick the language to translate into. The language of the PDF is recognised by itself.'],
+      ['Translate and download.', 'Click <em>Translate PDF</em>. Each paragraph is translated and written back in its place, and the translated PDF downloads.']],
+    sections: [
+      ['Translation that keeps your design', '<p>Most translators give you plain text and leave you to rebuild the document. Here the text of each heading, paragraph, list item and table cell is translated and written back into the same place on the page, in the same size, colour and weight. Pictures, logos, backgrounds, lines and tables are not touched. When a translation is longer than the original it is set a little smaller so it still fits, and right-to-left languages such as Urdu, Arabic and Persian are written right to left.</p>'],
+      ['How it works', '<p>The PDF is read with the same engine as our <a href="/pdf-to-word">PDF to Word</a> converter, which finds paragraphs, columns and tables in reading order. The text is translated by Claude, an AI model made by Anthropic, which translates paragraph by paragraph with the whole sentence in view, keeps names, numbers, emails and web addresses as they are, and keeps each translation about as long as the original.</p><p>Machine translation is very good but not perfect. For contracts, certificates and official documents, have the result checked by a qualified translator.</p>'],
+      ['Private by design', '<p>Your PDF is uploaded over HTTPS, translated, and deleted. The translated PDF is kept for 15 minutes so you can download it, then deleted. Your document is not used to train AI models.</p>'],
+    ],
+    faq: [
+      ['How do I translate a PDF and keep the formatting?', 'Upload the PDF here, choose the language and click Translate PDF. You get a PDF with the same layout, pictures and styles, in the new language.'],
+      ['Can I translate a PDF from English to Urdu?', 'Yes. Choose Urdu and the text is translated and written right to left in the same places on the page. Urdu to English works the same way.'],
+      ['Is Translate PDF free?', 'Yes, it is free with no sign-up. There is a fair-use limit per hour and up to 30 pages per PDF.'],
+      ['Can I translate a scanned PDF?', 'Yes. Turn on OCR so the scanned text is read first; the translation is then written over the scan in place of the original words.'],
+      ['Which languages are supported?', 'English, Urdu, Arabic, Hindi, Bengali, Punjabi, Persian, Spanish, French, German, Italian, Portuguese, Dutch, Russian, Ukrainian, Polish, Turkish, Swedish, Greek, Hebrew, Chinese (Simplified and Traditional), Japanese, Korean, Indonesian, Malay, Vietnamese, Thai, Filipino and Swahili.'],
+      ['Can I edit the translation?', 'Yes. Open the translated PDF in Edit PDF, or convert it with PDF to Word and edit it in Word.'],
+    ],
+    see: ['/ai-pdf-summarizer', '/pdf-to-word', '/pdf-to-markdown', '/ocr-pdf', '/edit-pdf'],
+  },
+  {
+    slug: 'pdf-to-markdown', howto: 'How to convert a PDF to Markdown', name: 'PDF to Markdown', app: 'markdown', accept: 'pdf',
+    keywords: ['pdf to markdown', 'pdf to md', 'convert pdf to markdown', 'pdf to markdown converter', 'pdf to markdown for chatgpt', 'extract text from pdf as markdown'],
+    title: 'PDF to Markdown - Free, Keeps Headings and Tables',
+    desc: 'Convert PDF to Markdown free: headings, bold and italic text, lists, links and tables come out as clean Markdown (.md). Scanned PDFs with OCR. No sign-up.',
+    h1: 'PDF to Markdown Converter',
+    intro: 'Turn a PDF into clean Markdown: headings become #, ## and ###, bold and italic words keep their style, bullet and numbered lists stay lists, links keep their address and ruled tables become Markdown tables. Columns are read in the right order and repeated page headers and footers are left out. Copy the result or download a .md file. Free, no sign-up.',
+    steps: [['Upload your PDF.', 'Click <em>Select PDF</em> or drop a PDF into the box. For a scanned PDF, turn on <em>OCR</em>.'],
+      ['Convert.', 'Click <em>Convert to Markdown</em>. The Markdown appears with a preview of how it looks.'],
+      ['Copy or download.', 'Copy the Markdown with one click, or download it as a .md file for GitHub, Obsidian, Notion, a static site or an AI chat.']],
+    sections: [
+      ['Why convert a PDF to Markdown?', '<ul><li><strong>For AI tools:</strong> Markdown keeps the structure of a document in plain text, so ChatGPT, Claude and other assistants understand it better than text copied out of a PDF.</li><li><strong>For notes:</strong> put papers and handouts into Obsidian, Notion, Logseq or any notes app.</li><li><strong>For websites and docs:</strong> move old PDF manuals into a documentation site, a wiki or a GitHub README.</li><li><strong>For editing:</strong> Markdown is easy to edit in any text editor and to turn into HTML, Word or PDF again with our <a href="/md-to-docx">Markdown to Word</a> and <a href="/md-to-pdf">Markdown to PDF</a> converters.</li></ul>'],
+      ['What is kept', '<p>Headings by size, paragraphs joined into whole sentences (words broken at the end of a line are joined again), <strong>bold</strong> and <em>italic</em> text, links, bullet and numbered lists and ruled tables. Pictures, colours and the exact position of things are not part of Markdown; to keep the look of the page use <a href="/pdf-to-word">PDF to Word</a> or <a href="/pdf-to-html">PDF to HTML</a> instead.</p><p>This converter does not use AI: the text comes straight from the PDF, so nothing is changed or made up.</p>'],
+    ],
+    faq: [
+      ['How do I convert a PDF to Markdown?', 'Upload the PDF here and click Convert to Markdown. Copy the Markdown or download the .md file.'],
+      ['Does it keep tables?', 'Yes. Tables with lines between the cells become Markdown tables. Tables without any lines come out as lines of text.'],
+      ['Can it convert scanned PDFs?', 'Yes. Turn on OCR and the scanned pages are read with text recognition first.'],
+      ['Is it free?', 'Yes. It is free, with no sign-up and no watermark.'],
+      ['Are my files kept?', 'No. The PDF is deleted as soon as the Markdown is made.'],
+    ],
+    see: ['/ai-pdf-summarizer', '/translate-pdf', '/pdf-to-word', '/pdf-to-txt', '/ocr-pdf'],
   },
   {
     slug: 'invoice-generator', howto: 'How to create an invoice', name: 'Invoice Generator', app: 'invoice', browser: true,

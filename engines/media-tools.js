@@ -137,10 +137,10 @@ const pending = () => [...JOBS.values()].filter((j) => j.status === 'queued' || 
  * Start fn(dir) in the background on an uploaded file; the upload is deleted afterwards.
  * fn returns { file, ext, type, note? }. Returns the job id.
  */
-function startJob(uploadPath, baseName, fn) {
+function startJob(uploadPath, baseName, fn, opts) {
   if (pending() >= MAX_WAITING) {
     fs.rm(uploadPath, { force: true }).catch(() => {});
-    throw new UserError('The server is busy with other videos right now. Please try again in a few minutes.', 503);
+    throw new UserError('The server is busy with other files right now. Please try again in a few minutes.', 503);
   }
   const id = crypto.randomBytes(12).toString('hex');
   const j = { status: 'queued', at: Date.now() };
@@ -151,7 +151,7 @@ function startJob(uploadPath, baseName, fn) {
     const dest = path.join(OUT_DIR, `${id}.${r.ext}`);
     await fs.copyFile(r.file, dest);
     Object.assign(j, { status: 'done', file: dest, name: `${baseName}.${r.ext}`, type: r.type, size: (await fs.stat(dest)).size, note: r.note || null, at: Date.now() });
-  }).catch((e) => {
+  }, opts).catch((e) => {
     Object.assign(j, { status: 'error', at: Date.now(), error: e.userMessage || 'This file could not be processed.', code: e.statusCode || 500 });
     if (!e.userMessage) console.error('Media job error:', e);
   }).finally(() => fs.rm(uploadPath, { force: true }).catch(() => {}));

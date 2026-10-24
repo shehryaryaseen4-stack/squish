@@ -62,7 +62,7 @@ test('every tool page has its tool box and script', () => {
   for (const t of pages.APPS) {
     const html = pages.resolveApp(t.slug, 'https://example.test').html;
     assert.match(html, new RegExp(`data-app="${t.app}"`), t.slug);
-    assert.match(html, /<script type="module" src="\/(apps|tools)\.js\?v=/, t.slug);
+    assert.match(html, /<script type="module" src="\/(apps|tools|ai)\.js\?v=/, t.slug);
     assert.ok(!/onclick=/.test(html.split('id="app"')[1].split('</section>')[0]), `${t.slug}: inline handlers are blocked by the CSP`);
   }
 });

@@ -34,16 +34,23 @@ function release() {
   if (next) next();
 }
 
-/** Runs fn(dir) with a fresh temp directory and a job slot; cleans up whatever happens. */
-async function job(fn) {
-  await acquire();
+/** Runs fn(dir) with a fresh temp directory and a job slot; cleans up whatever happens.
+ * slot: false for work that mostly waits on something else (an API); it takes slots itself. */
+async function job(fn, { slot = true } = {}) {
+  if (slot) await acquire();
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'squish-'));
   try {
     return await fn(dir);
   } finally {
-    release();
+    if (slot) release();
     fs.rm(dir, { recursive: true, force: true }).catch(() => {});
   }
+}
+
+/** Runs fn() holding a job slot. */
+async function withSlot(fn) {
+  await acquire();
+  try { return await fn(); } finally { release(); }
 }
 
 /**
@@ -111,4 +118,4 @@ async function collect(files, ext, baseDir) {
   return { buffer: await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' }), ext: 'zip' };
 }
 
-module.exports = { job, run, listFiles, collect, readCapped, UserError, MAX_OUTPUT_BYTES };
+module.exports = { job, withSlot, run, listFiles, collect, readCapped, UserError, MAX_OUTPUT_BYTES };

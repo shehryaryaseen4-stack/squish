@@ -231,12 +231,16 @@ const groups = [
     ['/excel-to-pdf', 'Excel to PDF', 'excel'], ['/html-to-pdf', 'HTML to PDF', 'html'], ['/image-to-pdf', 'Image to PDF', 'image']]],
   ['Convert from PDF', [['/pdf-to-jpg', 'PDF to JPG', 'image'], ['/pdf-to-word', 'PDF to Word', 'word'], ['/pdf-to-docx', 'PDF to DOCX', 'word'], ['/pdf-to-image', 'PDF to Image', 'image'],
     ['/pdf-to-pdfa', 'PDF to PDF/A', 'archive'], ['/pdf-to-txt', 'PDF to Text', 'text'], ['/ocr-pdf', 'OCR PDF', 'text']]],
+  ['PDF intelligence', [['/ai-pdf-summarizer', 'AI Summarizer', 'ai'], ['/translate-pdf', 'Translate PDF', 'translate'], ['/pdf-to-markdown', 'PDF to Markdown', 'markdown']]],
   ['Optimize PDF', [['/compress-pdf', 'Compress PDF', 'compress'], ['/repair-pdf', 'Repair PDF', 'repair']]],
   ['PDF security', [['/unlock-pdf', 'Unlock PDF', 'unlock'], ['/protect-pdf', 'Protect PDF', 'lock'], ['/sign-pdf', 'Sign PDF', 'sign'], ['/whiteout-pdf', 'Whiteout PDF', 'whiteout']]],
 ];
 
 // One line under each tool on the /pdf-tools page.
 const blurbs = {
+  '/ai-pdf-summarizer': 'Get a summary of any PDF and ask the AI questions about it.',
+  '/translate-pdf': 'Translate a PDF into 30 languages and keep its design.',
+  '/pdf-to-markdown': 'Turn a PDF into clean Markdown with headings, lists and tables.',
   '/merge-pdf': 'Combine several PDFs into one, in the order you want.',
   '/split-pdf': 'Save every page, or each page range, as a separate PDF.',
   '/delete-pdf-pages': 'Remove the pages you do not need from a PDF.',
@@ -272,6 +276,9 @@ const blurbs = {
 
 // Line icons for the tool tiles (24x24, stroke).
 const icons = {
+  ai: '<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8zM5 15l.6 1.4L7 17l-1.4.6L5 19l-.6-1.4L3 17l1.4-.6z"/>',
+  translate: '<path d="M4 5h8M8 3v2M10 5c-.7 3.5-3 6.5-6 8M6 9c1 2 2.7 3.5 5 4.5"/><path d="M12 21l4.5-10L21 21M13.6 18h5.8"/>',
+  markdown: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 15V9l3 3 3-3v6M16 9v6M14 13l2 2 2-2"/>',
   merge: '<path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M12 3v8M8 7l4 4 4-4M5 14h14v7H5z"/>',
   split: '<rect x="3" y="4" width="7" height="16" rx="1"/><rect x="14" y="4" width="7" height="16" rx="1"/><path d="M12 2v20" stroke-dasharray="2 2"/>',
   remove: '<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M9 14h6"/>',

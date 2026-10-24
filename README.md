@@ -234,6 +234,10 @@ and earning links from other sites.
 | `INDEXNOW_KEY` | unset | Serves `/<key>.txt` for IndexNow. |
 | `TWITTER_SITE` | unset | `twitter:site` handle on share cards. |
 | `SITE_UPDATED` | content file dates | Sitemap `lastmod` override (YYYY-MM-DD). |
+| `ANTHROPIC_API_KEY` | unset | Turns on the AI tools (`/ai-pdf-summarizer` with chat, `/translate-pdf`), which use Claude through the Anthropic API. Without it their pages say the AI is not switched on yet. `/pdf-to-markdown` needs no key. |
+| `AI_MODEL` | `claude-opus-5-5` | Claude model for the AI tools. `claude-haiku-5-5` is far cheaper per request. |
+| `AI_PER_HOUR`, `AI_DAILY_MAX` | `40`, `2000` | AI requests allowed per connection per hour, and for the whole site per UTC day: caps on the API bill. |
+| `AI_MAX_PAGES`, `AI_TRANSLATE_MAX_PAGES`, `AI_MAX_CHARS` | `100`, `30`, `250000` | Largest PDF for the summarizer and for Translate PDF, and how much of a PDF's text (characters) is given to Claude. |
 | `RATE_LIMIT_MAX` | `120` | Compress requests allowed per IP per 15-minute window (applies to `/api/` only, so search-engine crawlers are never rate-limited). This is the main safety valve against a runaway hosting bill on a public "unlimited free" tool — tune it to what your hosting plan can actually absorb. |
 
 ## Deploying live
