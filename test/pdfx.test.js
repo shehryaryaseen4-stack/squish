@@ -253,10 +253,14 @@ for (const [name, ocr] of [['simple.pdf'], ['styles.pdf'], ['tables.pdf'], ['ima
     assert.ok(v.ok, `the DOCX passes the package and schema checks:\n${v.out}`);
     const zip = await JSZip.loadAsync(out.buffer);
     for (const part of ['[Content_Types].xml', '_rels/.rels', 'word/document.xml', 'word/_rels/document.xml.rels']) assert.ok(zip.file(part), `${part} is present`);
+    // text is body text, not text boxes (only rotated or vertical text may use one)
+    const body = await zip.file('word/document.xml').async('string');
+    if (name !== 'rotated.pdf') assert.doesNotMatch(body, /<wps:txbx>|<w:txbxContent>/, 'no text boxes');
+    assert.doesNotMatch(body, /<w:tblpPr/, 'no floating tables (they become frames)');
     if (has('soffice')) {
       const pages = Number(/Pages:\s+(\d+)/.exec(execFileSync('pdfinfo', [path.join(DIR, name)]).toString())[1]);
       assert.equal(openInLibreOffice(file), pages, 'LibreOffice shows as many pages as the PDF has');
-      if (['resume.pdf', 'styles.pdf', 'tables.pdf', 'images.pdf'].includes(name)) {
+      if (['resume.pdf', 'styles.pdf', 'tables.pdf', 'images.pdf', 'multipage.pdf', 'mixed.pdf'].includes(name)) {
         // the Word document's first page, as LibreOffice draws it, against the PDF's
         const shot = `${lastExport}-1`;
         execFileSync('pdftoppm', ['-r', '96', '-png', '-singlefile', '-f', '1', '-l', '1', lastExport, shot]);
@@ -290,4 +294,20 @@ test('the DOCX validator rejects what Word would refuse', { skip, timeout: 18000
   assert.ok(!v2.ok && /not a relationship of this part/.test(v2.out), `a missing picture relationship is caught:\n${v2.out}`);
   fs.writeFileSync(path.join(dir, 'html.docx'), '<html><body>not a docx</body></html>');
   assert.ok(!validateDocx(path.join(dir, 'html.docx')).ok, 'HTML renamed to .docx is caught');
+});
+
+test('PDF to Word: a two-column resume becomes flowing text in a borderless layout table', { skip, timeout: 240000 }, async () => {
+  const { xml, text } = await docx('resume.pdf');
+  const body = xml.slice(xml.indexOf('<w:body>'));
+  assert.doesNotMatch(body, /<wps:txbx>|<w:txbxContent>/, 'no text boxes');
+  const tbl = /<w:tbl>([\s\S]*?)<\/w:tbl>/.exec(body);
+  assert.ok(tbl, 'the sidebar and the main column sit in a layout table');
+  assert.equal((tbl[1].match(/<w:gridCol /g) || []).length, 2, 'two columns');
+  assert.match(tbl[1], /<w:insideV w:val="nil"\/>/, 'without borders');
+  assert.match(tbl[1], /<w:tblCellMar><w:top w:w="0"/, 'without cell padding');
+  const cells = tbl[1].split('<w:tc>').slice(1);
+  assert.match(cells[0], /CONTACT[\s\S]*SKILLS/, 'the sidebar text is in the first column');
+  assert.match(cells[1], /MUNEEB MIRZA[\s\S]*PROFILE/, 'the main text is in the second column');
+  assert.match(body, /behindDoc="1"/, 'the sidebar panel and the photo stay behind the text');
+  assert.match(text, /Architect \| Architectural Designer/);
 });

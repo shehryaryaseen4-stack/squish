@@ -1,13 +1,19 @@
 """Document model -> an editable Word document that looks like the PDF.
 
-Each PDF page is a Word section of the same size and orientation. On it, positioned as in the
-PDF:
-  - vector drawings as Word shapes (backgrounds, boxes, lines) and pictures as Word pictures
-  - tables as real Word tables (floating at their place) with cell colours and borders
-  - text in borderless text boxes holding real paragraphs: fonts, sizes, colours, bold,
-    italics, alignment, indents, line spacing, spacing between paragraphs, bullets/numbering
-    as Word lists, and links
+Each PDF page is a Word section of the same size and orientation:
+  - text is ordinary body text: real paragraphs with the PDF's fonts, sizes, colours, bold,
+    italics, links, alignment, indents, exact line heights and the space before each paragraph,
+    bullets/numbering as Word lists, and tab stops for text further along the same line (a
+    date at the right of a job title)
+  - the page's text is cut into bands and columns the way a reader sees it (an XY cut); columns
+    side by side (a sidebar next to the main text) become a layout table without borders or cell
+    padding, so each column flows on its own
+  - ruled tables are real Word tables in the flow, with cell colours and borders
+  - vector drawings (backgrounds, panels, lines) as Word shapes and pictures as Word pictures,
+    anchored to the page behind the text, in the PDF's drawing order
   - the repeated header/footer in Word's header/footer, page numbers as page-number fields
+  - only rotated or vertical text, which cannot flow, sits in a text box (no border, no fill,
+    no inner margins)
 The PDF's own fonts are embedded in the file when they are TrueType; other fonts are replaced
 by a common font stretched to the width the text has in the PDF.
 
@@ -80,6 +86,7 @@ class Writer:
         self.next_num = 100
         self.rels = {}
         self.flowed = False
+        self.hf = {}
 
     # ---------------------------------------------------------------------------------- fonts --
     def word_font(self, run):
@@ -220,36 +227,47 @@ class Writer:
                     return False
         return True
 
-    def para_xml(self, p, box_x, box_w, before, numbering=None, jc_override=None, right=0.0):
-        """One Word paragraph for a PDF paragraph, placed in a box starting at box_x."""
+    def para_xml(self, p, cx0, cx1, before, numbering=None, align=None, tabs=(), extra=()):
+        """One Word paragraph for a PDF paragraph, in a column running from cx0 to cx1 (points).
+        Its place in the column comes from the indents: lines keep the PDF's left edge, centred
+        and right-aligned text keep their own span, and text that flows wraps at the PDF's right
+        edge. tabs/extra: further pieces of the same line, each after a tab stop."""
         ls = p['lines']
         L = self.line_height(p)
         first = ls[0]
         left = min(l['bbox'].x0 for l in ls[1:]) if len(ls) > 1 else first['bbox'].x0
+        right_edge = max(l['bbox'].x1 for l in ls)
+        align = align or p['align']
         ind = {}  # one w:ind with all its attributes (Word rejects two)
-        text_x = first['bbox'].x0
         strip = None
         if numbering:
             text_x, strip = numbering['text_x'], numbering['text']
-            ind.update(left=tw(text_x - box_x), hanging=tw(max(0, text_x - numbering['bullet_x'])))
+            ind.update(left=tw(text_x - cx0), hanging=tw(max(0, text_x - numbering['bullet_x'])))
+            left = numbering['bullet_x']
+        elif align == 'center':
+            slack = 2 + (right_edge - left) * 0.03
+            ind.update(left=tw(p['bbox'].x0 - cx0 - slack), right=tw(cx1 - p['bbox'].x1 - slack))
+        elif align == 'right':
+            ind['right'] = tw(cx1 - p['bbox'].x1)
         else:
             first_ind = first['bbox'].x0 - left
             if abs(first_ind) > 0.8 and len(ls) > 1:
-                ind.update({'left': tw(left - box_x), 'firstLine' if first_ind > 0 else 'hanging': tw(abs(first_ind))})
-            elif abs(left - box_x) > 0.3 and p['align'] in ('left', 'justify'):
-                ind['left'] = tw(left - box_x)
-        align = jc_override or p['align']
-        flow = self.can_flow(p, box_w - max(0, left - box_x)) and align in ('left', 'justify')
-        self.flowed = self.flowed or (flow and len(ls) > 1)
+                ind.update({'left': tw(left - cx0), 'firstLine' if first_ind > 0 else 'hanging': tw(abs(first_ind))})
+            elif abs(left - cx0) > 0.05:
+                ind['left'] = tw(left - cx0)
+        flow = len(ls) > 1 and align in ('left', 'justify') and not extra and self.can_flow(p, right_edge + 0.5 - left)
+        if flow:
+            # wrap where the PDF wraps: the text column ends at the paragraph's right edge
+            ind['right'] = tw(cx1 - right_edge - 0.5)
         jc = {'left': 'left', 'justify': 'both', 'center': 'center', 'right': 'right'}[align]
         if not flow and jc == 'both':
             jc = 'left'
-        if right > 0:
-            ind['right'] = tw(right)
         # paragraph properties in the order the WordprocessingML schema requires (Word refuses others)
         ppr = ['<w:widowControl w:val="0"/>']
         if numbering:
             ppr.append(f'<w:numPr><w:ilvl w:val="0"/><w:numId w:val="{numbering["num"]}"/></w:numPr>')
+        if tabs:
+            ppr.append('<w:tabs>' + ''.join(f'<w:tab w:val="{kind}" w:pos="{tw(pos)}"/>' for kind, pos in sorted(tabs, key=lambda t: t[1])) + '</w:tabs>')
         ppr.append('<w:autoSpaceDE w:val="0"/><w:autoSpaceDN w:val="0"/>')
         ppr.append(f'<w:spacing w:before="{tw(max(0, before))}" w:after="0" w:line="{max(1, tw(L))}" w:lineRule="exact"/>')
         if ind:
@@ -261,6 +279,8 @@ class Writer:
             if i:
                 body.append('<w:r><w:t xml:space="preserve"> </w:t></w:r>' if flow else '<w:r><w:br/></w:r>')
             body.append(self.line_runs_xml(l, strip if i == 0 else None))
+        for ln in extra:
+            body.append('<w:r><w:tab/></w:r>' + self.line_runs_xml(ln))
         return f'<w:p><w:pPr>{"".join(ppr)}</w:pPr>{"".join(body)}</w:p>'
 
     def list_numbering(self, p):
@@ -316,25 +336,6 @@ class Writer:
         np_.append(parse_xml(f'<w:num {NS} w:numId="{num}"><w:abstractNumId w:val="{aid}"/></w:num>'))
         return {'num': num, 'bullet_x': bullet_x, 'text_x': text_x, 'text': rest}
 
-    def paras_box(self, paras, jc=None):
-        """Paragraphs that share a left edge -> XML of the paragraphs and the box (x, y, w, h)."""
-        x = min(min(l['bbox'].x0 for l in p['lines']) for p in paras)
-        x1 = max(max(l['bbox'].x1 for l in p['lines']) for p in paras)
-        w = x1 - x
-        xml, y_top, prev_bottom = [], None, None
-        self.flowed = False
-        for p in paras:
-            L = self.line_height(p)
-            top = p['lines'][0]['baseline'] - L * BASELINE_IN_LINE
-            before = 0 if prev_bottom is None else top - prev_bottom
-            if y_top is None:
-                y_top = top
-            numbering = self.list_numbering(p) if p['kind'] == 'li' else None
-            xml.append(self.para_xml(p, x, w + 1, before, numbering, jc))
-            prev_bottom = top + L * len(p['lines'])
-        h = (prev_bottom or y_top) - y_top
-        return ''.join(xml), (x, y_top, w + 1.5, max(h, 1))
-
     def regular(self, p):
         """A paragraph Word can show as one paragraph: lines share a left edge (first line may be
         indented), or are centred / right-aligned together."""
@@ -346,48 +347,213 @@ class Writer:
         lefts = [l['bbox'].x0 for l in ls[1:]]
         return max(lefts) - min(lefts) <= max(1.5, p['size'] * 0.2) and ls[0]['bbox'].x0 >= min(lefts) - p['size'] * 3
 
-    def text_boxes(self, blocks):
-        """XML of the anchored text boxes for these blocks."""
+    # ------------------------------------------------------------------------- flowing layout --
+    # Text is written as ordinary paragraphs in the page body. The page's text items (paragraphs
+    # and tables) are cut into bands and columns (an XY cut, the way a reader sees the layout):
+    # columns side by side become a borderless layout table, everything else is one paragraph
+    # after another, placed by exact line heights and the space before each paragraph.
+
+    def items(self, blocks, tables, rotated):
         out = []
         for b in blocks:
-            paras = b['paras']
-            group = []
-
-            def flush():
-                if not group:
-                    return
-                if len(group) == 1 and group[0]['align'] in ('center', 'right') and len(group[0]['lines']) == 1:
-                    p = group[0]
-                    xml, (x, y, w, h) = self.paras_box(group, 'left')
-                else:
-                    xml, (x, y, w, h) = self.paras_box(group)
-                out.append(self.textbox(x, y, w, h, xml, wrap=self.flowed))
-                group.clear()
-
-            for p in paras:
+            for p in b['paras']:
                 if not self.regular(p):
-                    flush()
                     for l in p['lines']:
                         if abs(l.get('angle', 0)) >= 1:
-                            out.append(self.rotated_line(l))
+                            rotated.append(l)
                         else:
-                            q = dict(p, lines=[l], align='left', kind='p')
-                            xml, (x, y, w, h) = self.paras_box([q])
-                            out.append(self.textbox(x, y, w, h, xml, wrap=False))
+                            q = dict(p, lines=[l], align='left', kind='p', step=None)
+                            q['bbox'] = fitz.Rect(l['bbox'])
+                            out.append(self.para_item(q))
                     continue
-                if group:
-                    gl = min(l['bbox'].x0 for l in group[-1]['lines'])
-                    pl = min(l['bbox'].x0 for l in p['lines'])
-                    if p['align'] in ('center', 'right') or group[-1]['align'] in ('center', 'right') or abs(gl - pl) > max(2, p['size'] * 0.3) and p['kind'] != 'li' and group[-1]['kind'] != 'li':
-                        flush()
-                group.append(p)
-            flush()
-        return ''.join(out)
+                out.append(self.para_item(p))
+        for t in tables:
+            bb = fitz.Rect(t['bbox'])
+            out.append({'kind': 'table', 't': t, 'x0': bb.x0, 'x1': bb.x1, 'top': bb.y0, 'bottom': bb.y1})
+        return out
+
+    def para_item(self, p):
+        L = self.line_height(p)
+        top = p['lines'][0]['baseline'] - L * BASELINE_IN_LINE
+        x0 = min(l['bbox'].x0 for l in p['lines'])
+        x1 = max(l['bbox'].x1 for l in p['lines'])
+        return {'kind': 'para', 'p': p, 'x0': x0, 'x1': x1, 'top': top, 'bottom': top + L * len(p['lines']),
+                'single': len(p['lines']) == 1, 'baseline': p['lines'][0]['baseline']}
+
+    @staticmethod
+    def gaps(spans, lo, hi, min_gap):
+        """Free stretches between the spans (start, end) inside lo..hi, at least min_gap wide."""
+        spans = sorted(spans)
+        out, end = [], None
+        for a, b in spans:
+            if end is not None and a - end >= min_gap:
+                out.append((end, a))
+            end = b if end is None else max(end, b)
+        return out
+
+    def columns(self, items, cx0, cx1, strong):
+        """Split items at vertical gutters (free strips at least 6 pt wide) into columns. strong:
+        only when every column runs down a good part of the area (a sidebar next to content)."""
+        gs = self.gaps([(i['x0'], i['x1']) for i in items], cx0, cx1, 6)
+        if not gs:
+            return None
+        bounds = [cx0] + [(a + b) / 2 for a, b in gs] + [cx1]
+        groups = []
+        for k in range(len(bounds) - 1):
+            g = [i for i in items if bounds[k] <= (i['x0'] + i['x1']) / 2 < bounds[k + 1]]
+            if g:
+                groups.append([bounds[k], bounds[k + 1], g])
+        if len(groups) < 2:
+            return None
+        groups[0][0], groups[-1][1] = cx0, cx1
+        for k in range(len(groups) - 1):  # neighbouring columns meet in the middle of their gutter
+            mid = (max(i['x1'] for i in groups[k][2]) + min(i['x0'] for i in groups[k + 1][2])) / 2
+            groups[k][1] = groups[k + 1][0] = mid
+        if strong:
+            height = max(i['bottom'] for i in items) - min(i['top'] for i in items)
+            if min(max(i['bottom'] for i in g) - min(i['top'] for i in g) for _, _, g in groups) < height * 0.4:
+                return None
+        return ('cols', [(a, b, self.cut(g, a, b)) for a, b, g in groups])
+
+    def cut(self, items, cx0, cx1):
+        """Layout tree for items in the column cx0..cx1: ('stack', entries) where an entry is an
+        item or ('cols', [(x0, x1, subtree), ...]) for columns side by side."""
+        if len(items) <= 1:
+            return ('stack', list(items))
+        node = self.columns(items, cx0, cx1, True)
+        if node:
+            return ('stack', [node])
+        # bands: horizontal strips with nothing across them, top to bottom
+        bands = []
+        for i in sorted(items, key=lambda i: i['top']):
+            if bands and i['top'] < bands[-1]['bottom'] - 0.5:
+                bands[-1]['items'].append(i)
+                bands[-1]['bottom'] = max(bands[-1]['bottom'], i['bottom'])
+            else:
+                bands.append({'items': [i], 'bottom': i['bottom']})
+        out = []
+        for band in bands:
+            its = band['items']
+            if len(its) > 1 and not self.one_line(its):
+                sub = self.columns(its, cx0, cx1, False)
+                if sub:
+                    out.append(sub)
+                    continue
+            out.extend(sorted(its, key=lambda i: (round(i['baseline'] if i['kind'] == 'para' else i['top'], 1), i['x0'])))
+        return ('stack', out)
+
+    @staticmethod
+    def one_line(band):
+        """Single lines that share a baseline (a title and a date at the right): one paragraph."""
+        return all(i['kind'] == 'para' and i['single'] for i in band) and \
+            max(i['baseline'] for i in band) - min(i['baseline'] for i in band) <= 1.5
+
+    def spacer(self, height):
+        """An empty paragraph exactly height points tall (moves what follows down)."""
+        h = max(1, tw(height))
+        return (f'<w:p><w:pPr><w:widowControl w:val="0"/><w:spacing w:before="0" w:after="0" w:line="{h}" w:lineRule="exact"/>'
+                f'<w:rPr><w:sz w:val="2"/></w:rPr></w:pPr></w:p>')
+
+    def emit(self, node, cx0, cx1, cursor):
+        """XML for a stack, starting at page height cursor; returns (xml list, cursor after)."""
+        out = []
+        entries = node[1]
+        k = 0
+        while k < len(entries):
+            it = entries[k]
+            if isinstance(it, tuple):  # columns side by side: a borderless layout table
+                xml, cursor = self.layout_table(it, cx0, cx1, cursor)
+                out.extend(xml)
+                k += 1
+                continue
+            if it['kind'] == 'table':
+                gap = it['top'] - cursor
+                if gap > 0.05:
+                    out.append(self.spacer(gap))
+                    cursor = it['top']
+                out.append(self.table_xml(it['t'], indent=it['x0'] - cx0))
+                cursor = max(cursor, it['bottom'])
+                k += 1
+                continue
+            # pieces of one line (same baseline) go into one paragraph, separated by tab stops
+            group = [it]
+            while k + len(group) < len(entries):
+                nxt = entries[k + len(group)]
+                if isinstance(nxt, tuple) or nxt['kind'] != 'para' or not nxt['single'] or not it['single'] \
+                        or abs(nxt['baseline'] - it['baseline']) > 1.5:
+                    break
+                group.append(nxt)
+            group.sort(key=lambda i: i['x0'])
+            first = group[0]
+            p = first['p']
+            L = max(self.line_height(g['p']) for g in group)
+            top = first['baseline'] - L * BASELINE_IN_LINE
+            before = top - cursor
+            numbering = self.list_numbering(p) if p['kind'] == 'li' and len(group) == 1 else None
+            tabs, extra = [], []
+            for g in group[1:]:
+                gp = g['p']
+                at_right = cx1 - g['x1'] <= 3 or (gp['align'] == 'right')
+                tabs.append(('right', g['x1'] - cx0) if at_right else ('left', g['x0'] - cx0))
+                extra.append(gp['lines'][0])
+            q = dict(p, step=None) if len(group) > 1 else p
+            if len(group) > 1:
+                q = dict(q, align='left')
+                q['size'] = max(g['p']['size'] for g in group)
+            out.append(self.para_xml(q, cx0, cx1, before, numbering, tabs=tabs, extra=extra))
+            cursor = max(cursor, top) + L * len(p['lines'])
+            k += len(group)
+        return out, cursor
+
+    def layout_table(self, node, cx0, cx1, cursor):
+        """Columns as a one-row table with no borders and no cell padding."""
+        cols = node[1]
+        tops = []
+        for a, b, sub in cols:
+            t = self.first_top(sub)
+            if t is not None:
+                tops.append(t)
+        row_top = min(tops) if tops else cursor
+        out = []
+        if row_top - cursor > 0.05:
+            out.append(self.spacer(row_top - cursor))
+        else:
+            row_top = cursor
+        bounds = [cx0] + [b for _, b, _ in cols[:-1]] + [cx1]
+        cells, bottom = [], row_top
+        for k, (a, b, sub) in enumerate(cols):
+            xml, end = self.emit(sub, bounds[k], bounds[k + 1], row_top)
+            bottom = max(bottom, end)
+            if not xml or not xml[-1].startswith('<w:p>') and not xml[-1].startswith('<w:p '):
+                xml.append(self.spacer(0.05))
+            cells.append(f'<w:tc><w:tcPr><w:tcW w:w="{tw(bounds[k + 1] - bounds[k])}" w:type="dxa"/>'
+                         f'<w:tcBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/></w:tcBorders>'
+                         f'<w:vAlign w:val="top"/></w:tcPr>{"".join(xml)}</w:tc>')
+        grid = ''.join(f'<w:gridCol w:w="{tw(bounds[k + 1] - bounds[k])}"/>' for k in range(len(cols)))
+        out.append(f'<w:tbl><w:tblPr><w:tblW w:w="{tw(cx1 - cx0)}" w:type="dxa"/>'
+                   f'<w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/>'
+                   f'<w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders><w:tblLayout w:type="fixed"/>'
+                   f'<w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tblCellMar>'
+                   f'<w:tblLook w:val="0000" w:firstRow="0" w:lastRow="0" w:firstColumn="0" w:lastColumn="0" w:noHBand="1" w:noVBand="1"/></w:tblPr>'
+                   f'<w:tblGrid>{grid}</w:tblGrid><w:tr><w:trPr><w:trHeight w:val="{max(1, tw(bottom - row_top))}" w:hRule="atLeast"/></w:trPr>'
+                   f'{"".join(cells)}</w:tr></w:tbl>')
+        return out, bottom
+
+    def first_top(self, node):
+        for it in node[1]:
+            if isinstance(it, tuple):
+                tops = [self.first_top(sub) for _, _, sub in it[1]]
+                tops = [t for t in tops if t is not None]
+                if tops:
+                    return min(tops)
+            else:
+                return it['top'] if it['kind'] == 'table' else it['baseline'] - self.line_height(it['p']) * BASELINE_IN_LINE
+        return None
 
     def rotated_line(self, l):
         q = {'lines': [l], 'align': 'left', 'kind': 'p', 'size': l['size'], 'step': None}
         L = l['size'] * 1.2
-        xml = self.para_xml(q, l['origin'][0], 2000, 0)
+        xml = self.para_xml(q, l['origin'][0], l['origin'][0] + 2000, 0)
         w = sum(self.width(r) for r in l['runs']) + 2
         import math
         ox, oy = l['origin']
@@ -512,7 +678,7 @@ class Writer:
                 f'{fill_xml}{ln}</wps:spPr><wps:bodyPr/></wps:wsp></a:graphicData></a:graphic></wp:anchor>' + WPS_CLOSE)
 
     # ---------------------------------------------------------------------------------- tables --
-    def table_xml(self, t):
+    def table_xml(self, t, indent=0.0):
         xs, ys = t['xs'], t['ys']
         by_start = {(c['row'], c['col']): c for c in t['cells']}
         cover = {}
@@ -556,14 +722,12 @@ class Writer:
                 cells.append(f'<w:tc><w:tcPr>{"".join(pr)}</w:tcPr>{content}</w:tc>')
                 k += span
             rows.append(f'<w:tr><w:trPr><w:cantSplit/><w:trHeight w:val="{tw(ys[r + 1] - ys[r])}" w:hRule="exact"/></w:trPr>{"".join(cells)}</w:tr>')
-        tblpr = (f'<w:tblPr><w:tblpPr w:leftFromText="0" w:rightFromText="0" w:topFromText="0" w:bottomFromText="0" '
-                 f'w:horzAnchor="page" w:vertAnchor="page" w:tblpX="{tw(xs[0])}" w:tblpY="{tw(ys[0])}"/>'
-                 f'<w:tblOverlap w:val="overlap"/><w:tblW w:w="{tw(xs[-1] - xs[0])}" w:type="dxa"/>'
+        tblpr = (f'<w:tblPr><w:tblW w:w="{tw(xs[-1] - xs[0])}" w:type="dxa"/><w:tblInd w:w="{tw(indent)}" w:type="dxa"/>'
                  f'<w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders>'
                  f'<w:tblLayout w:type="fixed"/>'
                  f'<w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tblCellMar>'
                  f'<w:tblLook w:val="0000" w:firstRow="0" w:lastRow="0" w:firstColumn="0" w:lastColumn="0" w:noHBand="1" w:noVBand="1"/></w:tblPr>')
-        return f'<w:tbl {NS}>{tblpr}<w:tblGrid>{grid}</w:tblGrid>{"".join(rows)}</w:tbl>'
+        return f'<w:tbl>{tblpr}<w:tblGrid>{grid}</w:tblGrid>{"".join(rows)}</w:tbl>'
 
     def cell_paras(self, c):
         cb = c['bbox']
@@ -580,45 +744,61 @@ class Writer:
                 jc = 'right'
             else:
                 jc = None
-            if jc:
-                xml = self.para_xml(dict(p, align=jc), cb.x0, cb.width, before, jc_override=jc,
-                                    right=max(0, cb.x1 - p['bbox'].x1) if jc == 'right' else 0)
-            else:
-                xml = self.para_xml(p, cb.x0, cb.width, before)
+            xml = self.para_xml(p, cb.x0, cb.x1, before, align=jc)
             out.append(xml)
             prev_bottom = top + L * len(p['lines'])
         return ''.join(out) or '<w:p/>'
 
     # ----------------------------------------------------------------------------- page/sections --
+    def body_xml(self, xml):
+        """Parse body-level XML written without namespace declarations."""
+        return list(parse_xml(f'<w:body {NS}>{xml}</w:body>'))
+
+    def margins(self, pg, items):
+        W, H = pg['w'], pg['h']
+        if items:
+            x0 = min(i['x0'] for i in items)
+            x1 = max(i['x1'] for i in items)
+            top = min(i['top'] for i in items)
+            bottom = max(i['bottom'] for i in items)
+        else:
+            x0, x1, top, bottom = 36, W - 36, 36, H - 36
+        left = max(0.0, min(36.0, x0 - 0.5))
+        right = max(0.0, min(36.0, W - x1 - 0.5))
+        hf = self.hf
+        if hf.get('hdr_bottom') is not None:
+            top_m = min(max(hf['hdr_bottom'] + 0.5, 0), max(0.0, top - 0.1))
+        else:
+            top_m = max(0.0, min(36.0, top - 0.1))
+        if hf.get('ftr_top') is not None:
+            bottom_m = max(0.0, min(H - hf['ftr_top'] + 0.5, H - bottom - 0.1))
+        else:
+            bottom_m = max(0.0, min(18.0, H - bottom - 1))
+        return left, right, top_m, bottom_m
+
     def page(self, pg, idx):
         doc = self.doc
+        W, H = pg['w'], pg['h']
         sec = doc.sections[0] if idx == 0 else doc.add_section(WD_SECTION.NEW_PAGE)
-        sec.orientation = WD_ORIENT.LANDSCAPE if pg['w'] > pg['h'] else WD_ORIENT.PORTRAIT
-        sec.page_width, sec.page_height = Pt(pg['w']), Pt(pg['h'])
-        boxes = [b['bbox'] for b in pg['blocks']] + [t['bbox'] for t in pg['tables']]
-        if boxes:
-            left = min(b.x0 for b in boxes)
-            top = min(b.y0 for b in boxes)
-            right = pg['w'] - max(b.x1 for b in boxes)
-            bottom = pg['h'] - max(b.y1 for b in boxes)
-        else:
-            left = top = right = bottom = 36
-        clamp = lambda v: Pt(max(18, min(72, v)))
-        sec.left_margin, sec.top_margin, sec.right_margin, sec.bottom_margin = clamp(left), clamp(top), clamp(right), clamp(bottom)
-        sec.header_distance = sec.footer_distance = Pt(12)
+        sec.orientation = WD_ORIENT.LANDSCAPE if W > H else WD_ORIENT.PORTRAIT
+        sec.page_width, sec.page_height = Pt(W), Pt(H)
+        rotated = []
+        items = self.items(pg['blocks'], pg['tables'], rotated)
+        left, right, top_m, bottom_m = self.margins(pg, items)
+        sec.left_margin, sec.right_margin, sec.top_margin, sec.bottom_margin = Pt(left), Pt(right), Pt(top_m), Pt(bottom_m)
+        sec.header_distance = Pt(self.hf.get('hdr_top', 12) or 0)
+        sec.footer_distance = Pt(max(0, H - self.hf['ftr_bottom']) if self.hf.get('ftr_bottom') is not None else 12)
         body = doc.element.body
         sect_anchor = body.find(qn('w:sectPr'))
-        for t in pg['tables']:
-            el = parse_xml(self.table_xml(t))
-            sect_anchor.addprevious(el)
+
+        # the page's pictures and shapes, anchored to the page behind the text, in the PDF's
+        # drawing order; a hair-thin first paragraph holds them (and any rotated text)
         z = 1000
         runs = []
         for r in pg['rasters']:
             b = r['bbox']
             runs.append(self.picture(r['data'], b.x0, b.y0, b.width, b.height, True, z, 'Scan' if r['kind'] == 'scan' else 'Picture'))
             z += 1
-        # shapes and pictures in the PDF's drawing order, so shapes painted over a picture (frames,
-        # bands, tints) stay over it
         layers = [(d.get('seqno', 0), 0, d) for d in pg['vectors'][:3000]] + [(im.get('seq', 10 ** 6), 1, im) for im in pg['images']]
         layers.sort(key=lambda t: (t[0], t[1]))
         for _, kind, item in layers:
@@ -630,35 +810,61 @@ class Writer:
             if xml:
                 runs.append(xml)
                 z += 1
-        runs.append(self.text_boxes(pg['blocks']))
-        p = parse_xml(f'<w:p {NS}><w:pPr><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/><w:rPr><w:sz w:val="2"/></w:rPr></w:pPr>{"".join(runs)}</w:p>')
-        sect_anchor.addprevious(p)
+        for l in rotated:  # rotated / vertical text: the one place a (borderless) text box is used
+            runs.append(self.rotated_line(l))
+        anchor = (f'<w:p><w:pPr><w:widowControl w:val="0"/><w:spacing w:before="0" w:after="0" w:line="1" w:lineRule="exact"/>'
+                  f'<w:rPr><w:sz w:val="2"/></w:rPr></w:pPr>{"".join(runs)}</w:p>')
+        cx0, cx1 = left, W - right
+        flow, _ = self.emit(self.cut(items, cx0, cx1), cx0, cx1, top_m + 0.05)
+        for el in self.body_xml(anchor + ''.join(flow)):
+            sect_anchor.addprevious(el)
 
     def header_footer(self):
-        """The first page's repeated header/footer becomes the document's header/footer."""
+        """The first page's repeated header/footer becomes the document's header/footer, written
+        as ordinary paragraphs (page numbers as page-number fields)."""
         pg = self.pages[0] if self.pages else None
         if not pg:
             return
+        sec = self.doc.sections[0]
+        cx0 = sec.left_margin.pt
+        cx1 = pg['w'] - sec.right_margin.pt
         for kind in ('header', 'footer'):
             blocks = pg[kind]
             if not blocks:
                 continue
-            part = self.doc.sections[0].header if kind == 'header' else self.doc.sections[0].footer
+            part = sec.header if kind == 'header' else sec.footer
             part.is_linked_to_previous = False
             el = part._element
             for p in list(el.iterchildren(qn('w:p'))):
                 el.remove(p)
             for b in blocks:
                 if b.get('page_number'):
-                    b = page_number_fields(b)
-            xml = self.text_boxes(blocks)
-            el.append(parse_xml(f'<w:p {NS}><w:pPr><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/></w:pPr>{xml}</w:p>'))
+                    page_number_fields(b)
+            rotated = []
+            items = self.items(blocks, [], rotated)
+            start = self.hf['hdr_top'] if kind == 'header' else self.hf['ftr_top']
+            xml, _ = self.emit(self.cut(items, cx0, cx1), cx0, cx1, start)
+            for child in list(parse_xml(f"<w:hdr {NS}>{''.join(xml) or self.spacer(0.05)}</w:hdr>")):
+                el.append(child)
+
+    def measure_hf(self):
+        """Where the header and footer sit (from the first page), so margins leave room for them."""
+        self.hf = {}
+        pg = self.pages[0] if self.pages else None
+        if not pg:
+            return
+        for kind, a, b in (('header', 'hdr_top', 'hdr_bottom'), ('footer', 'ftr_top', 'ftr_bottom')):
+            items = self.items(pg[kind], [], []) if pg[kind] else []
+            if items:
+                self.hf[a] = max(0.0, min(i['top'] for i in items))
+                self.hf[b] = max(i['bottom'] for i in items)
 
     def build(self, dst):
         # the template's <w:zoom> lacks the percentage the schema requires
         zoom = self.doc.settings.element.find(qn('w:zoom'))
         if zoom is not None and zoom.get(qn('w:percent')) is None:
             zoom.set(qn('w:percent'), '100')
+        self.measure_hf()
         for i, pg in enumerate(self.pages):
             self.page(pg, i)
         self.header_footer()
