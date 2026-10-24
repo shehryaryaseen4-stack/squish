@@ -448,6 +448,10 @@ input[type=range]{width:150px; accent-color:var(--brand);}
 .out-name{font-weight:500; word-break:break-word;}
 .muted{color:var(--dim);}
 .err-text{color:var(--down);}
+.warn-text{display:block;margin-top:4px;color:#92400e;font-size:.85rem;line-height:1.4;}
+.ocr-lang{display:flex;align-items:center;gap:8px;margin-top:8px;color:var(--ink);font-size:.9rem;}
+.ocr-lang select{padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:var(--panel);color:var(--ink);font:inherit;}
+.ocr-what{display:block;}
 .row-progress{flex:0 1 220px; height:6px; border-radius:999px; background:var(--bg-soft); overflow:hidden;}
 .row-progress span{display:block; height:100%; background:#2B6CDE; transition:width .2s;}
 .spinner{display:inline-block; width:14px; height:14px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:spin .8s linear infinite; color:#2B6CDE; vertical-align:middle;}

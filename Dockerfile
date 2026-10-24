@@ -19,12 +19,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # PDF passwords and repair (Protect / Unlock / Repair PDF)
     qpdf \
     # text recognition (Image to Text, OCR PDF): English plus the main European languages
-    tesseract-ocr tesseract-ocr-eng tesseract-ocr-spa tesseract-ocr-fra tesseract-ocr-deu tesseract-ocr-ita tesseract-ocr-por tesseract-ocr-nld \
+    tesseract-ocr tesseract-ocr-osd tesseract-ocr-eng tesseract-ocr-spa tesseract-ocr-fra tesseract-ocr-deu tesseract-ocr-ita tesseract-ocr-por tesseract-ocr-nld \
     # extra image formats (PSD, ICO, PPM, BMP/PSD/EPS output; HEIC/HEIF)
     imagemagick libheif-examples libheif-plugin-libde265 \
     # camera RAW photos (dcraw_emu), macOS icons (icns2png), XPS documents (mutool), EOT fonts (mkeot)
     libraw-bin icnsutils mupdf-tools eot-utils \
-    # PDF to Word with the layout kept (pdf2docx, installed below)
+    # PDF to Word / HTML (engines/pdfx: PyMuPDF, OpenCV, python-docx, fontTools; installed below)
     python3 python3-venv \
     # archives (unar opens old solid RAR files that bsdtar cannot)
     libarchive-tools p7zip-full gzip bzip2 xz-utils lzip lzop ncompress unar \
@@ -35,12 +35,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
-# pdf2docx in its own virtual environment; engines/pdfword.js calls it as pdf2docx-python
+# Python tools for PDF to Word / HTML (engines/pdfx) in their own virtual environment; engines/pdfword.js
+# calls it as pdf2docx-python. pdf2docx pins tested versions of PyMuPDF, OpenCV, python-docx and fontTools.
 RUN python3 -m venv /opt/pdf2docx \
   && /opt/pdf2docx/bin/pip install --no-cache-dir pdf2docx==0.5.13 \
   && printf '#!/bin/sh\nexec /opt/pdf2docx/bin/python "$@"\n' > /usr/local/bin/pdf2docx-python \
   && chmod +x /usr/local/bin/pdf2docx-python \
-  && pdf2docx-python -c "import pdf2docx, cv2, docx, pymupdf; print('pdf2docx ok')"
+  && pdf2docx-python -c "import cv2, docx, pymupdf, fontTools.ttLib; print('pdf tools ok')"
 
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules

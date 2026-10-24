@@ -1,7 +1,7 @@
 'use strict';
 // PDF in and out:
 //   PDF -> JPG/PNG/WebP/TIFF   every page rendered (pdftoppm); several pages come back as a ZIP
-//   PDF -> TXT / HTML          pdftotext / exact copy (pdfword.js; pdftohtml without it)
+//   PDF -> TXT / HTML          pdftotext / rebuilt HTML package (pdfword.js; pdftohtml without the Python tools)
 //   PDF -> GIF / AVIF          pages rendered as PNG, then encoded with Sharp
 //   PDF -> SVG / EPS / PS      pdftocairo (SVG: one file per page)
 //   PDF -> XPS                 Ghostscript (xpswrite)
@@ -17,10 +17,10 @@ const RASTER = { jpg: 'jpeg', png: 'png', webp: 'png', tiff: 'png', gif: 'png', 
 // Compression levels: Ghostscript preset and the resolution pictures are brought down to
 const PDF_LEVELS = { low: ['printer', 300], recommended: ['ebook', 150], strong: ['ebook', 100], extreme: ['ebook', 72] };
 
-async function pdfOut({ buffer, to, level }) {
-  // HTML that looks exactly like the PDF: page design as a picture, text and fonts on top
-  const exact = require('./pdfword');
-  if (to.id === 'html' && exact.available()) return exact.convertPdfWord({ buffer, to });
+async function pdfOut({ buffer, to, level, ocr, lang }) {
+  // HTML rebuilt from the PDF's text, fonts, pictures, drawings and tables (a ZIP package)
+  const rebuilt = require('./pdfword');
+  if (to.id === 'html' && rebuilt.available()) return rebuilt.convertPdfWord({ buffer, to, ocr, lang });
   return job(async (dir) => {
     const input = path.join(dir, 'input.pdf');
     await fs.writeFile(input, buffer);
@@ -48,7 +48,7 @@ async function pdfOut({ buffer, to, level }) {
         return collect(files, to.extension, out);
       }
       if (to.id === 'txt') { await run('pdftotext', ['-layout', '-enc', 'UTF-8', input, path.join(out, 'output.txt')]); }
-      else if (to.id === 'html') { await run('pdftohtml', ['-s', '-i', '-noframes', '-q', input, path.join(out, 'output.html')]); }
+      else if (to.id === 'html') { await run('pdftohtml', ['-s', '-noframes', '-q', input, path.join(out, 'output.html')]); }
       else if (to.id === 'svg') {
         const { stdout } = await run('pdfinfo', [input]);
         const pages = Number((/Pages:\s+(\d+)/.exec(stdout.toString()) || [])[1] || 1);

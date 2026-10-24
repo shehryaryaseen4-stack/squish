@@ -520,18 +520,18 @@ module.exports = {
 
   'pdf>html': {
     why: 'Turning a PDF into HTML puts its text into a web page that can be read in any browser, copied, searched and reused on a website, without a PDF reader.',
-    keep: 'Keep the PDF for printing and for sharing the exact original layout, which a web page does not try to copy.',
+    keep: 'Keep the PDF for printing and for sending a single file; the web page comes as a folder (HTML, stylesheet, pictures and fonts).',
     tips: [
-      'The text of every page goes into one HTML file, in reading order.',
-      'Images are not included: the converter extracts the text.',
-      'Works best with PDFs made from documents, where you can select the text.',
+      'You get a ZIP with index.html, its stylesheet and every picture and font as its own file. Unzip it and open index.html.',
+      'Each PDF page becomes a page of the same size, with the text as real headings, paragraphs, lists, tables and links in the PDF\'s own fonts.',
+      'Choose OCR for scanned PDFs: their text is then recognised and becomes real text too.',
     ],
     problems: [
-      ['The HTML is empty.', 'The PDF is a scan: its pages are pictures without real text. This needs OCR (text recognition) software.'],
-      ['The layout differs from the PDF.', 'HTML flows text instead of fixing every position, so columns and spacing change.'],
+      ['A page says it is a scanned picture.', 'Its text is a picture. Convert again and choose OCR to read it.'],
+      ['A font looks a little different.', 'Some fonts cannot be embedded in a web page; a similar common font is used, at the same size and width.'],
     ],
     faq: [
-      ['Does PDF to HTML keep images?', 'No. Only the text is converted. Use PDF to PNG or PDF to JPG to get the pages as images.'],
+      ['Does PDF to HTML keep images?', 'Yes. Every picture is saved as its own image file and placed where it was on the page; backgrounds, lines and shapes are drawn as vector graphics.'],
       ['Can I open the HTML in Word?', 'Yes. Word and Google Docs can open HTML files, which is a quick way to edit the text.'],
     ],
   },

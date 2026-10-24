@@ -196,7 +196,7 @@ app.post('/api/compress', upload.single('file'), async (req, res) => {
     pair = `${inFormat.label} \u2192 ${outFormat.label}`;
     const handler = getHandler(converter.handler);
     const job = (q, dim) => handler(
-      { buffer: req.file.buffer, inputExt, format: outFormat.apiFormat, quality: q, maxDim: dim, from: inFormat, to: outFormat, filename: originalName, level: String(req.body.level || ''), ocr: req.body.ocr === '1' },
+      { buffer: req.file.buffer, inputExt, format: outFormat.apiFormat, quality: q, maxDim: dim, from: inFormat, to: outFormat, filename: originalName, level: String(req.body.level || ''), ocr: req.body.ocr === '1', lang: String(req.body.lang || '').slice(0, 20) },
       converter
     );
     // Compressing an image with "Reduce size by N%": aim for that size instead of a fixed quality.
@@ -216,6 +216,8 @@ app.post('/api/compress', upload.single('file'), async (req, res) => {
       'X-Compressed-Size': String(out.buffer.length),
       'X-Output-Ext': ext,
     });
+    // things the visitor should know about the result (e.g. a scanned page that needs OCR)
+    if (out.notes && out.notes.length) res.set('X-Convert-Notes', encodeURIComponent(JSON.stringify(out.notes.slice(0, 8))));
     res.send(out.buffer);
     analytics.event(req, inFormat.id === outFormat.id ? 'compress' : 'convert', { pair, p: fromPage(req) });
   } catch (err) {

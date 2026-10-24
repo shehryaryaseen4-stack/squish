@@ -169,9 +169,9 @@ const CONVERSION_RULES = [
   { id: 'image-ps-input', status: 'live', engine: 'ghostscript', handler: 'imagex', from: ['eps', 'ps'], to: IMG_OUT, notes: 'The first page is rendered at 150 dpi.' },
   { id: 'image-im-output', status: 'live', engine: 'imagemagick', handler: 'imagex', from: ['jpg', 'jfif', 'png', 'webp', 'avif', 'tiff', 'gif', 'bmp', 'svg'], to: IMG_IM_OUT },
 
-  // ---- PDF to Word that looks exactly like the PDF (exactdocx_run.py); before the ebook rule, which reflows text
+  // ---- PDF to Word rebuilt from the PDF's content (engines/pdfx); before the ebook rule, which reflows text
   { id: 'pdf-to-word', status: 'live', engine: 'pdf2docx', requires: ['libreoffice'], handler: 'pdfword', from: ['pdf'], to: ['docx', 'doc', 'odt', 'rtf'], quality: 'good',
-    notes: 'Tables, fonts, colours and images stay in place. Scanned PDFs need OCR first.' },
+    notes: 'Text, fonts, colours, tables, pictures and shapes stay in place and can be edited. Choose OCR for scanned PDFs.' },
 
   // ---- ebooks (Calibre)
   { id: 'ebook-live', status: 'live', engine: 'calibre', handler: 'ebook', from: EBOOK_LIVE_IN, to: EBOOK_LIVE_OUT, quality: 'good',

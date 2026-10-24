@@ -56,7 +56,7 @@ const ENGINES = [
   { id: 'fonttools', name: 'fontTools (+ brotli)', status: 'planned', runtime: 'server', license: 'MIT',
     handles: ['font'], notes: 'TTF<->OTF outline conversion (not integrated yet).' },
   { id: 'pdf2docx', name: 'PyMuPDF + OpenCV + python-docx', status: 'system', bins: ['pdf2docx-python'], runtime: 'server', license: 'GPL-3.0 / AGPL-3.0',
-    handles: ['pdf', 'document'], notes: 'PDF to Word that looks exactly like the PDF (page picture + editable text boxes), with OCR for scans. AGPL (PyMuPDF): review obligations for a hosted service.' },
+    handles: ['pdf', 'document'], notes: 'PDF to Word / HTML rebuilt from the PDF (text, fonts, pictures, drawings, tables, links), with Tesseract OCR for scans. AGPL (PyMuPDF): review obligations for a hosted service.' },
   { id: 'eot-utils', name: 'eot-utils (mkeot)', status: 'system', bins: ['mkeot'], runtime: 'server', license: 'W3C',
     handles: ['font'], notes: 'Makes EOT web fonts from TrueType fonts.' },
   { id: 'woff', name: 'WOFF/WOFF2 (wawoff2 + zlib)', status: 'installed', npm: 'wawoff2', runtime: 'both', license: 'MIT',

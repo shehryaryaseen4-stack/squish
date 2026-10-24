@@ -479,7 +479,7 @@
       form.append("quality", String(row.quality));
       if (compressMode) form.append("reduce", String(row.reduce)); // "make it N% smaller"
       if (compressMode && isPdfRow(row)) form.append("level", row.level);
-      if (row.ocr) form.append("ocr", "1");
+      if (row.ocr) { form.append("ocr", "1"); form.append("lang", row.ocrLang || "eng"); }
       form.append("maxDim", String(row.maxDim));
       const xhr = new XMLHttpRequest();
       xhr.open("POST", "/api/compress");
@@ -501,7 +501,9 @@
         let name = row.name.replace(/\.[^.]+$/, "") + "." + ext;
         const star = /filename\*=UTF-8''([^;]+)/i.exec(cd), plain = /filename="([^"]+)"/.exec(cd);
         try { if (star) name = decodeURIComponent(star[1]); else if (plain) name = plain[1]; } catch (e) {}
-        resolve({ blob: xhr.response, ext, name });
+        let notes = [];
+        try { notes = JSON.parse(decodeURIComponent(xhr.getResponseHeader("X-Convert-Notes") || "")) || []; } catch (e) { notes = []; }
+        resolve({ blob: xhr.response, ext, name, notes });
       };
       xhr.send(form);
     });
@@ -519,7 +521,7 @@
         if (p >= 1) row.state = "converting";
         updateRow(row);
       }).then(res => {
-        row.state = "finished"; row.blob = res.blob; row.outExt = res.ext; row.outName = res.name; row.outSize = res.blob.size;
+        row.state = "finished"; row.blob = res.blob; row.outExt = res.ext; row.outName = res.name; row.outSize = res.blob.size; row.notes = res.notes || [];
         // Compressing must never hand back a bigger file: keep the original when re-encoding
         // did not help (unless the visitor asked for a resize, which changes the image).
         if (compressMode && !row.maxDim && row.outSize >= row.size) { row.blob = row.file; row.outSize = row.size; }
@@ -529,31 +531,39 @@
     }
   }
 
-  // PDF to Word: ask first whether the PDF has real text (No OCR) or is scanned (OCR), as other
-  // PDF sites do. OCR reads the text from the page picture and keeps the design behind it.
-  const WORD_EXTS = ["docx", "doc", "odt", "rtf"];
-  const isPdfToWord = r => !compressMode && isPdfRow(r) && WORD_EXTS.includes(r.target);
+  // PDF to Word / HTML: ask first whether to read the PDF's own text (No OCR) or to recognise
+  // scanned pages with OCR, as other PDF sites do, and in which language the scan is written.
+  const DOC_EXTS = ["docx", "doc", "odt", "rtf", "html"];
+  const isPdfToDoc = r => !compressMode && isPdfRow(r) && DOC_EXTS.includes(r.target);
+  const OCR_LANGS = [["eng", "English"], ["spa", "Spanish"], ["fra", "French"], ["deu", "German"], ["ita", "Italian"], ["por", "Portuguese"], ["nld", "Dutch"]];
   let ocrDlg = null;
-  function askOcr(){
+  function askOcr(toHtml){
     if (!ocrDlg) {
       ocrDlg = document.createElement("dialog");
       ocrDlg.className = "pdf-choice ocr-choice";
       ocrDlg.setAttribute("aria-labelledby", "ocrChoiceTitle");
       ocrDlg.innerHTML = `<form method="dialog">
         <button class="pdf-choice-x" value="cancel" aria-label="Close">&times;</button>
-        <h2 id="ocrChoiceTitle">PDF to Word</h2>
+        <h2 id="ocrChoiceTitle"></h2>
         <p class="pdf-choice-sub">Can you select the text in your PDF?</p>
         <label class="ocr-opt"><input type="radio" name="ocr" value="0" checked><span><strong>No OCR</strong>
-          Convert PDFs with selectable text into editable Word files. The design and layout stay exactly as in the PDF.</span></label>
+          <span class="ocr-what" data-no></span></span></label>
         <label class="ocr-opt"><input type="radio" name="ocr" value="1"><span><strong>OCR <em class="ocr-free">Free</em></strong>
-          Convert scanned PDFs with non-selectable text into editable Word files. The design stays as it is and the text is editable in its place.</span></label>
-        <button class="btn btn-brand ocr-go" value="go">Convert to Word</button>
+          <span class="ocr-what" data-yes></span>
+          <span class="ocr-lang">Language of the scan <select name="lang" aria-label="Language of the scanned text">${OCR_LANGS.map(([v, n]) => `<option value="${v}">${n}</option>`).join("")}</select></span></span></label>
+        <button class="btn btn-brand ocr-go" value="go"></button>
       </form>`;
       document.body.appendChild(ocrDlg);
     }
+    const what = toHtml ? "a web page (HTML)" : "an editable Word file";
+    ocrDlg.querySelector("h2").textContent = toHtml ? "PDF to HTML" : "PDF to Word";
+    ocrDlg.querySelector("[data-no]").textContent = `Uses the text inside the PDF: PDFs whose text you can select become ${what} with the same fonts, pictures, tables and layout. Scanned pages are not read.`;
+    ocrDlg.querySelector("[data-yes]").textContent = `Also reads scanned pages (pictures of text) with text recognition, so their text becomes editable. Pages that already have text keep it. Slower.`;
+    ocrDlg.querySelector(".ocr-go").textContent = toHtml ? "Convert to HTML" : "Convert to Word";
     ocrDlg.returnValue = "cancel";
     return new Promise(resolve => {
-      ocrDlg.addEventListener("close", () => resolve(ocrDlg.returnValue === "go" ? ocrDlg.querySelector('input[name="ocr"]:checked').value === "1" : null), { once: true });
+      ocrDlg.addEventListener("close", () => resolve(ocrDlg.returnValue === "go"
+        ? { ocr: ocrDlg.querySelector('input[name="ocr"]:checked').value === "1", lang: ocrDlg.querySelector('select[name="lang"]').value } : null), { once: true });
       ocrDlg.showModal();
       ocrDlg.querySelector(".ocr-go").focus();
     });
@@ -561,10 +571,11 @@
 
   convertAllBtn.addEventListener("click", async () => {
     const ready = rows.filter(r => r.state === "ready");
-    if (ready.some(isPdfToWord)) {
-      const ocr = await askOcr();
-      if (ocr === null) return;
-      ready.forEach(r => { r.ocr = ocr && isPdfToWord(r); });
+    const docs = ready.filter(isPdfToDoc);
+    if (docs.length) {
+      const choice = await askOcr(docs.every(r => r.target === "html"));
+      if (choice === null) return;
+      ready.forEach(r => { r.ocr = choice.ocr && isPdfToDoc(r); r.ocrLang = r.ocr ? choice.lang : ""; });
     }
     ready.filter(r => r.state === "ready").forEach(r => { r.state = "waiting"; r.optionsOpen = false; queue.push(r); });
     render(); pump();
@@ -682,6 +693,7 @@
       // Compressing: original and compressed size side by side, plus the saving.
       const pct = Math.round((1 - row.outSize / row.size) * 100);
       text = `<span class="out-name">${esc(row.outName)}</span>`
+        + (row.notes && row.notes.length ? `<span class="warn-text" role="note">${row.notes.map(esc).join("<br>")}</span>` : "")
         + (compressMode ? `<span class="muted"> · ${fmtBytes(row.size)} &rarr; ${fmtBytes(row.outSize)}</span>`
           + (pct > 0 ? `<span class="saved">${pct}% smaller</span>` : `<span class="muted"> · already well compressed</span>`) : "");
     }
