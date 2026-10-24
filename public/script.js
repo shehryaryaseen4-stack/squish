@@ -1,6 +1,28 @@
 (function(){
   "use strict";
 
+  // Every dropdown (header menus and format pickers) is a <details data-menu>.
+  // Only one stays open at a time; clicking outside or pressing Escape closes it.
+  const openMenus = () => document.querySelectorAll("details[data-menu][open]");
+  document.addEventListener("click", e => {
+    openMenus().forEach(d => { if (!d.contains(e.target)) d.removeAttribute("open"); });
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") openMenus().forEach(d => d.removeAttribute("open"));
+  });
+  document.querySelectorAll("details[data-menu]").forEach(d => d.addEventListener("toggle", () => {
+    if (d.open) openMenus().forEach(o => { if (o !== d && !o.contains(d)) o.removeAttribute("open"); });
+  }));
+  // A click on a menu's button closes every other menu at once (before the browser toggles this
+  // one), so two dropdowns are never open together, whatever the browser supports.
+  document.addEventListener("click", e => {
+    const sum = e.target.closest("details[data-menu] > summary");
+    if (!sum) return;
+    const mine = sum.parentElement;
+    openMenus().forEach(o => { if (o !== mine && !o.contains(mine)) o.removeAttribute("open"); });
+  }, true);
+
+
   // Count this page view for the owner's dashboard. No cookies and nothing personal: the
   // server keeps only the page, where the visit came from, country and device (accounts/analytics.js).
   const track = (o) => {
@@ -53,18 +75,6 @@
   // never stop the rest of this file (menus, search, the converter), so each push is guarded.
   document.querySelectorAll("ins.adsbygoogle").forEach(() => { try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch (_) { /* ads are optional */ } });
 
-  // Every dropdown (header menus and format pickers) is a <details data-menu>.
-  // Only one stays open at a time; clicking outside or pressing Escape closes it.
-  const openMenus = () => document.querySelectorAll("details[data-menu][open]");
-  document.addEventListener("click", e => {
-    openMenus().forEach(d => { if (!d.contains(e.target)) d.removeAttribute("open"); });
-  });
-  document.addEventListener("keydown", e => {
-    if (e.key === "Escape") openMenus().forEach(d => d.removeAttribute("open"));
-  });
-  document.querySelectorAll("details[data-menu]").forEach(d => d.addEventListener("toggle", () => {
-    if (d.open) openMenus().forEach(o => { if (o !== d && !o.contains(d)) o.removeAttribute("open"); });
-  }));
 
   // Format picker: category switching + search inside every .fmt-panel
   function wirePanel(panel){
