@@ -196,7 +196,7 @@ app.post('/api/compress', upload.single('file'), async (req, res) => {
     pair = `${inFormat.label} \u2192 ${outFormat.label}`;
     const handler = getHandler(converter.handler);
     const job = (q, dim) => handler(
-      { buffer: req.file.buffer, inputExt, format: outFormat.apiFormat, quality: q, maxDim: dim, from: inFormat, to: outFormat, filename: originalName, level: String(req.body.level || '') },
+      { buffer: req.file.buffer, inputExt, format: outFormat.apiFormat, quality: q, maxDim: dim, from: inFormat, to: outFormat, filename: originalName, level: String(req.body.level || ''), ocr: req.body.ocr === '1' },
       converter
     );
     // Compressing an image with "Reduce size by N%": aim for that size instead of a fixed quality.

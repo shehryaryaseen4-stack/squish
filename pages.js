@@ -445,6 +445,12 @@ function buildConversionMap(fromIds) {
 //   outputs  choices for the Output format select
 //   any      true on home/category/format pages: files of any accepted type can be dropped, and
 //            non-image files get their own "convert to" select in the results list
+// The file picker's filter: extensions plus MIME types (phones filter by MIME type only, so an
+// extension list alone shows every file there). Broad types would let other files through.
+const BROAD_MIME = /^(application\/(octet-stream|zip|xml|x-zip-compressed)|text\/(plain|xml))$/;
+const acceptFor = (inputs, exts) => [...new Set([...exts.map((e) => `.${e}`),
+  ...inputs.flatMap((id) => (registry.getFormat(id).mimeTypes || []).filter((m) => !BROAD_MIME.test(m) || /^(zip|txt|xml)$/.test(id)))])].join(',');
+
 function toolHtml({ inputs, outputs, dropTitle, dropSub, any = false, compress = false }) {
   const exts = [...new Set(inputs.flatMap((id) => registry.getFormat(id).extensions))];
   // extension -> category, so each file gets the right icon and "JPEG Image" / "MP4 Video" label
@@ -460,7 +466,7 @@ function toolHtml({ inputs, outputs, dropTitle, dropSub, any = false, compress =
     ${icon('upload', 'drop-ico')}
     <div class="cta">${dropTitle}</div>
     <div class="sub">${dropSub} &middot; up to ${MAX_MB}MB each</div>
-    <input type="file" id="fileInput" accept="${exts.map((e) => `.${e}`).join(',')}" multiple>
+    <input type="file" id="fileInput" accept="${acceptFor(inputs, exts)}" multiple>
   </div>
   <div class="file-list" id="fileList" aria-live="polite"></div>
   <div class="tool-bar" id="toolBar" hidden>

@@ -90,6 +90,11 @@ test('PDF to Word keeps tables and colours (pdf2docx)', { skip: !has('pdf2docx-p
   const xml = await (await JSZip.loadAsync(out.buffer)).file('word/document.xml').async('string');
   assert.match(xml, /<w:tbl>/, 'the table is a real Word table');
   assert.match(xml, /North/);
+  if (has('tesseract')) { // "OCR" chosen in the dialog: the text is read from the page image
+    const o2 = await convertPdfWord({ buffer: fs2.readFileSync(path.join(dir, 't.pdf')), to: registry.getFormat('docx'), ocr: true });
+    const x2 = await (await JSZip.loadAsync(o2.buffer)).file('word/document.xml').async('string');
+    assert.doesNotMatch(x2, /<w:tbl>/); assert.match(x2, /North/);
+  }
 });
 
 test('PDF to Word reads scanned pages as editable text (OCR)', { skip: (!has('pdf2docx-python') || !has('tesseract')) && 'pdf2docx or tesseract missing', timeout: 120000 }, async () => {

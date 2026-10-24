@@ -462,6 +462,7 @@
       form.append("quality", String(row.quality));
       if (compressMode) form.append("reduce", String(row.reduce)); // "make it N% smaller"
       if (compressMode && isPdfRow(row)) form.append("level", row.level);
+      if (row.ocr) form.append("ocr", "1");
       form.append("maxDim", String(row.maxDim));
       const xhr = new XMLHttpRequest();
       xhr.open("POST", "/api/compress");
@@ -511,8 +512,44 @@
     }
   }
 
-  convertAllBtn.addEventListener("click", () => {
-    rows.filter(r => r.state === "ready").forEach(r => { r.state = "waiting"; r.optionsOpen = false; queue.push(r); });
+  // PDF to Word: ask first whether the PDF has real text (No OCR) or is scanned (OCR), as other
+  // PDF sites do. OCR makes scanned pages editable text but does not keep tables or the layout.
+  const WORD_EXTS = ["docx", "doc", "odt", "rtf"];
+  const isPdfToWord = r => !compressMode && isPdfRow(r) && WORD_EXTS.includes(r.target);
+  let ocrDlg = null;
+  function askOcr(){
+    if (!ocrDlg) {
+      ocrDlg = document.createElement("dialog");
+      ocrDlg.className = "pdf-choice ocr-choice";
+      ocrDlg.setAttribute("aria-labelledby", "ocrChoiceTitle");
+      ocrDlg.innerHTML = `<form method="dialog">
+        <button class="pdf-choice-x" value="cancel" aria-label="Close">&times;</button>
+        <h2 id="ocrChoiceTitle">PDF to Word</h2>
+        <p class="pdf-choice-sub">Can you select the text in your PDF?</p>
+        <label class="ocr-opt"><input type="radio" name="ocr" value="0" checked><span><strong>No OCR</strong>
+          Convert PDFs with selectable text into editable Word files. Tables, fonts and layout are kept.</span></label>
+        <label class="ocr-opt"><input type="radio" name="ocr" value="1"><span><strong>OCR <em class="ocr-free">Free</em></strong>
+          Convert scanned PDFs with non-selectable text into editable Word files. The text is read from the page; tables and layout are not kept.</span></label>
+        <button class="btn btn-brand ocr-go" value="go">Convert to Word</button>
+      </form>`;
+      document.body.appendChild(ocrDlg);
+    }
+    ocrDlg.returnValue = "cancel";
+    return new Promise(resolve => {
+      ocrDlg.addEventListener("close", () => resolve(ocrDlg.returnValue === "go" ? ocrDlg.querySelector('input[name="ocr"]:checked').value === "1" : null), { once: true });
+      ocrDlg.showModal();
+      ocrDlg.querySelector(".ocr-go").focus();
+    });
+  }
+
+  convertAllBtn.addEventListener("click", async () => {
+    const ready = rows.filter(r => r.state === "ready");
+    if (ready.some(isPdfToWord)) {
+      const ocr = await askOcr();
+      if (ocr === null) return;
+      ready.forEach(r => { r.ocr = ocr && isPdfToWord(r); });
+    }
+    ready.filter(r => r.state === "ready").forEach(r => { r.state = "waiting"; r.optionsOpen = false; queue.push(r); });
     render(); pump();
   });
 

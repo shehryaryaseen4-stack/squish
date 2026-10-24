@@ -15,7 +15,7 @@ const TEXT_RUNNER = path.join(__dirname, 'textdocx_run.py');
 const PYTHON = process.env.PDF2DOCX_PYTHON || 'pdf2docx-python';
 const MAX_PAGES = Math.max(1, Number(process.env.PDF2DOCX_MAX_PAGES || 150));
 
-async function convertPdfWord({ buffer, to }) {
+async function convertPdfWord({ buffer, to, ocr: wantOcr = false }) {
   return job(async (dir) => {
     const input = path.join(dir, 'input.pdf');
     const docx = path.join(dir, 'output.docx');
@@ -35,7 +35,8 @@ async function convertPdfWord({ buffer, to }) {
       try { fonts = (await run('pdffonts', [input])).stdout.toString().trim().split('\n').length - 2; } catch { fonts = 1; }
     }
     const ocr = require('./ocr');
-    const scanned = fonts <= 0 && ocr.available();
+    // the visitor can also ask for OCR ("OCR" in the PDF to Word dialog), e.g. for a PDF that mixes scans and text
+    const scanned = (wantOcr || fonts <= 0) && ocr.available();
     if (scanned) {
       // read each page here, in this job's folder (calling ocr.ocr would wait for a second job slot)
       if (pages > ocr.MAX_PAGES) throw new UserError(`This is a scanned PDF of ${pages} pages; up to ${ocr.MAX_PAGES} scanned pages can be turned into Word at once. Split it with Split PDF first.`, 413);
