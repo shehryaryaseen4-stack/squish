@@ -24,6 +24,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     imagemagick libheif-examples libheif-plugin-libde265 \
     # camera RAW photos (dcraw_emu), macOS icons (icns2png), XPS documents (mutool), EOT fonts (mkeot)
     libraw-bin icnsutils mupdf-tools eot-utils \
+    # PDF to Word with the layout kept (pdf2docx, installed below)
+    python3 python3-venv \
     # archives (unar opens old solid RAR files that bsdtar cannot)
     libarchive-tools p7zip-full gzip bzip2 xz-utils lzip lzop ncompress unar \
     # DjVu
@@ -32,6 +34,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fontconfig fonts-dejavu-core fonts-liberation2 fonts-crosextra-carlito fonts-crosextra-caladea \
     ca-certificates \
   && rm -rf /var/lib/apt/lists/*
+
+# pdf2docx in its own virtual environment; engines/pdfword.js calls it as pdf2docx-python
+RUN python3 -m venv /opt/pdf2docx \
+  && /opt/pdf2docx/bin/pip install --no-cache-dir pdf2docx==0.5.13 \
+  && printf '#!/bin/sh\nexec /opt/pdf2docx/bin/python "$@"\n' > /usr/local/bin/pdf2docx-python \
+  && chmod +x /usr/local/bin/pdf2docx-python \
+  && pdf2docx-python -c "import pdf2docx; print('pdf2docx ok')"
 
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules

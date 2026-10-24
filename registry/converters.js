@@ -169,6 +169,10 @@ const CONVERSION_RULES = [
   { id: 'image-ps-input', status: 'live', engine: 'ghostscript', handler: 'imagex', from: ['eps', 'ps'], to: IMG_OUT, notes: 'The first page is rendered at 150 dpi.' },
   { id: 'image-im-output', status: 'live', engine: 'imagemagick', handler: 'imagex', from: ['jpg', 'jfif', 'png', 'webp', 'avif', 'tiff', 'gif', 'bmp', 'svg'], to: IMG_IM_OUT },
 
+  // ---- PDF to Word with the layout kept (pdf2docx); before the ebook rule, which reflows text
+  { id: 'pdf-to-word', status: 'live', engine: 'pdf2docx', requires: ['libreoffice'], handler: 'pdfword', from: ['pdf'], to: ['docx', 'doc', 'odt', 'rtf'], quality: 'good',
+    notes: 'Tables, fonts, colours and images stay in place. Scanned PDFs need OCR first.' },
+
   // ---- ebooks (Calibre)
   { id: 'ebook-live', status: 'live', engine: 'calibre', handler: 'ebook', from: EBOOK_LIVE_IN, to: EBOOK_LIVE_OUT, quality: 'good',
     notes: 'DRM-protected books cannot be converted. PDF input works best for text-based PDFs.' },

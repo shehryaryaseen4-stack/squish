@@ -21,6 +21,7 @@ const LOADERS = {
   ebook: () => require('./ebook').convertEbook,
   djvu: () => require('./djvu').convertDjvu,
   xps: () => require('./xps').convertXps,
+  pdfword: () => require('./pdfword').convertPdfWord,
 };
 const HANDLER_IDS = Object.keys(LOADERS);
 

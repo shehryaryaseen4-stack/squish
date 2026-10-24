@@ -77,3 +77,17 @@ test('resume library: every job has six skills and short lines that fit the desi
   assert.equal(findJob('rn nurse').id, 'registered-nurse');
   assert.equal(findJob('cashier').id, 'cashier');
 });
+
+test('PDF to Word keeps tables and colours (pdf2docx)', { skip: !has('pdf2docx-python') && 'pdf2docx missing', timeout: 120000 }, async () => {
+  const fs2 = require('fs');
+  const dir = fs2.mkdtempSync(path.join(DIR, 'w-'));
+  fs2.writeFileSync(path.join(dir, 't.html'), '<table border="1"><tr><td>Region</td><td>Sales</td></tr><tr><td>North</td><td style="color:#c00">120</td></tr></table>');
+  execFileSync('soffice', ['--headless', `-env:UserInstallation=file://${dir}/p`, '--convert-to', 'pdf', '--outdir', dir, path.join(dir, 't.html')], { stdio: 'ignore' });
+  const { convertPdfWord } = require('../engines/pdfword');
+  const registry = require('../registry');
+  const out = await convertPdfWord({ buffer: fs2.readFileSync(path.join(dir, 't.pdf')), to: registry.getFormat('docx') });
+  const JSZip = require('jszip');
+  const xml = await (await JSZip.loadAsync(out.buffer)).file('word/document.xml').async('string');
+  assert.match(xml, /<w:tbl>/, 'the table is a real Word table');
+  assert.match(xml, /North/);
+});
