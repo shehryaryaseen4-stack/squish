@@ -91,3 +91,23 @@ test('PDF to Word keeps tables and colours (pdf2docx)', { skip: !has('pdf2docx-p
   assert.match(xml, /<w:tbl>/, 'the table is a real Word table');
   assert.match(xml, /North/);
 });
+
+test('PDF to Word reads scanned pages as editable text (OCR)', { skip: (!has('pdf2docx-python') || !has('tesseract')) && 'pdf2docx or tesseract missing', timeout: 120000 }, async () => {
+  const fs2 = require('fs');
+  const dir = fs2.mkdtempSync(path.join(DIR, 's-'));
+  fs2.writeFileSync(path.join(dir, 't.html'), '<h1>Quarterly Sales Report</h1><p>Prepared for Acme Incorporated by the finance team.</p>');
+  execFileSync('soffice', ['--headless', `-env:UserInstallation=file://${dir}/p`, '--convert-to', 'pdf', '--outdir', dir, path.join(dir, 't.html')], { stdio: 'ignore' });
+  execFileSync('pdftoppm', ['-r', '150', '-png', '-singlefile', path.join(dir, 't.pdf'), path.join(dir, 'page')]);
+  const { PDFDocument } = require('pdf-lib');
+  const pdf = await PDFDocument.create();
+  const img = await pdf.embedPng(fs2.readFileSync(path.join(dir, 'page.png')));
+  pdf.addPage([img.width, img.height]).drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+  const { convertPdfWord } = require('../engines/pdfword');
+  const registry = require('../registry');
+  const out = await convertPdfWord({ buffer: Buffer.from(await pdf.save()), to: registry.getFormat('docx') });
+  const JSZip = require('jszip');
+  const zip = await JSZip.loadAsync(out.buffer);
+  const xml = await zip.file('word/document.xml').async('string');
+  assert.match(xml, /Quarterly Sales Report/, 'the scanned text is real Word text');
+  assert.equal(Object.keys(zip.files).filter((f) => f.startsWith('word/media/')).length, 0, 'no page pictures');
+});
