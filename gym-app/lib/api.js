@@ -689,6 +689,30 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
       }
       if (m === 'PUT' && pathname === '/api/member/photo') return setPhoto(member, body.image);
       if (m === 'DELETE' && pathname === '/api/member/photo') return clearPhoto(member);
+      // One exercise's sets today: [[kg, reps], …]. The coach raises the weight from these.
+      if (m === 'PUT' && pathname === '/api/member/lift') {
+        const date = v.isoDate(body.date || today());
+        const ex = String(body.exerciseId || '');
+        if (!/^[a-z0-9-]{2,80}$/.test(ex)) fail('Unknown exercise');
+        const sets = (Array.isArray(body.sets) ? body.sets : []).slice(0, 12).map((s) => [
+          Math.round(v.num(s[0] ?? 0, { min: 0, max: 500, field: 'Weight', int: false }) * 4) / 4,
+          v.num(s[1], { min: 0, max: 200, field: 'Reps' }),
+        ]);
+        member.lifts ||= {};
+        const list = (member.lifts[ex] || []).filter((x) => x.d !== date);
+        if (sets.length) list.push({ d: date, s: sets });
+        member.lifts[ex] = list.sort((a, b) => a.d.localeCompare(b.d)).slice(-30);
+        store.save();
+        return member.lifts[ex];
+      }
+      if (m === 'POST' && pathname === '/api/member/weigh-in') {
+        const date = v.isoDate(body.date || today());
+        const kg = Math.round(v.num(body.kg, { min: 25, max: 300, field: 'Weight', int: false }) * 10) / 10;
+        member.weighIns = [...(member.weighIns || []).filter((x) => x.d !== date), { d: date, kg }].sort((a, b) => a.d.localeCompare(b.d)).slice(-200);
+        if (member.body) member.body.weight = Math.round(kg);
+        store.save();
+        return { weighIns: member.weighIns, body: member.body || null };
+      }
       if (m === 'PUT' && pathname === '/api/member/body') {
         member.body = { ...v.body(body), updatedAt: stamp() };
         store.save();

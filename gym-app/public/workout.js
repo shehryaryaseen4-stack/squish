@@ -30,6 +30,40 @@
     if (v?.type === 'youtube') return `<div class="ex-video yt${v.short ? ' short' : ''}"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(v.id)}?playsinline=1&rel=0&modestbranding=1&loop=1&playlist=${encodeURIComponent(v.id)}" title="${UI.esc(e.name)} video" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`;
     return '';
   }
+  // Log one set: weight and reps, filled in with what the coach suggests.
+  function logSetSheet(e, x, ctx, done) {
+    const t = targetFor(e, x) || {};
+    const prev = todaySets(e.id);
+    const body = Coach.kindOf(e.id).kind === 'body';
+    const lastW = prev.length ? prev[prev.length - 1][0] : t.weight;
+    const [lo, hi] = String(x.reps).match(/\d+/g)?.map(Number) || [10, 12];
+    sheet({
+      title: `${e.name} · set ${prev.length + 1} of ${x.sets}`,
+      html: `<form class="log-set" novalidate>
+        ${body ? '' : `<label class="field"><span>Weight (kg${Coach.kindOf(e.id).kind === 'db' ? ', each hand' : ''})</span><div class="stepper"><button type="button" data-w="-1" aria-label="Less">−</button><input class="input" name="w" type="number" inputmode="decimal" step="0.5" min="0" value="${lastW ?? ''}"><button type="button" data-w="1" aria-label="More">+</button></div></label>`}
+        <label class="field"><span>Reps you did</span><div class="stepper"><button type="button" data-r="-1" aria-label="Fewer">−</button><input class="input" name="r" type="number" inputmode="numeric" min="0" value="${hi || lo}"><button type="button" data-r="1" aria-label="More">+</button></div></label>
+        <p class="muted" style="font-size:13px">Target: ${kgText(e, t.weight)} × ${esc(x.reps)}. Be honest: the next weight is worked out from this.</p>
+        <div class="sheet-actions"><button type="button" class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary">${icon('check')}Save set</button></div></form>`,
+      onMount: (el, close) => {
+        const f = el.querySelector('form');
+        const stepW = Coach.kindOf(e.id).kind === 'bar' ? 2.5 : Coach.kindOf(e.id).kind === 'db' ? 1 : 5;
+        el.querySelectorAll('[data-w]').forEach((b) => b.addEventListener('click', () => { f.w.value = Math.max(0, (Number(f.w.value) || 0) + Number(b.dataset.w) * stepW); }));
+        el.querySelectorAll('[data-r]').forEach((b) => b.addEventListener('click', () => { f.r.value = Math.max(0, (Number(f.r.value) || 0) + Number(b.dataset.r)); }));
+        f.addEventListener('submit', (ev) => {
+          ev.preventDefault();
+          busy(f.querySelector('.btn-primary'), async () => {
+            try {
+              const list = await ctx.saveLift(e.id, [...prev, [body ? 0 : Number(f.w.value) || 0, Number(f.r.value) || 0]]);
+              coach.lifts[e.id] = list;
+              close();
+              done();
+            } catch (err) { toast(err.message, 'bad'); }
+          });
+        });
+      },
+    });
+  }
+
   // ---- rest between sets ------------------------------------------------------------
 
   let goal = 'fit';
@@ -155,6 +189,12 @@
         ${videos[e.id] ? '' : `<a class="btn btn-soft btn-block yt-link" href="${shortsLink(e)}" target="_blank" rel="noopener">${icon('tv')}Watch short videos of the right form</a>`}
         <div class="ex-tags"><span class="badge badge-accent">${esc(groupName(e.group))}</span><span class="badge badge-muted">${esc(cap(e.equipment))}</span>${e.level ? `<span class="badge badge-muted">${esc(cap(e.level))}</span>` : ''}${sets ? `<span class="badge badge-good">${sets} × ${esc(reps)}</span>` : ''}${sets && kcalOf(e, { sets, reps }) ? `<span class="badge badge-warn">${icon('flame')}≈ ${kcalOf(e, { sets, reps }).total} kcal · ${kcalOf(e, { sets, reps }).perSet} per ${e.cardio ? 'session' : 'set'}</span>` : ''}</div>
         ${!e.cardio ? `<div class="rest-tip">${icon('clock')}<span><b>Rest ${restText(restFor(e, { sets, reps, rest: x0?.rest }))} between sets.</b> Breathe and let the muscle recover, then do the next set. Heavy lifts need longer rest than small muscles.</span></div>` : ''}
+        ${(() => {
+          if (!coach.profile || e.cardio) return '';
+          const t = targetFor(e, x0 || { sets: sets || 3, reps: reps || '10-12' });
+          const hist = (coach.lifts[e.id] || []).slice(-6).reverse();
+          return `<div class="coach-note"><b>${icon('star')}Your coach</b><p>${esc(t.note)}</p>${hist.length ? `<table class="lift-hist"><tbody>${hist.map((h) => `<tr><td>${esc(UI.dateShort(h.d))}</td><td>${h.s.map(([w, r]) => `${w ? `${w}×` : ''}${r}`).join(' · ')}</td></tr>`).join('')}</tbody></table>` : ''}</div>`;
+        })()}
         <p class="ex-muscles"><b>Works:</b> ${e.primary.map(cap).map(esc).join(', ')}${e.secondary.length ? ` <span class="muted">· also ${e.secondary.map(cap).map(esc).join(', ')}</span>` : ''}</p>
         <h4 class="ex-h">How to do it</h4>
         <ol class="ex-steps">${e.steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>
@@ -253,6 +293,7 @@
     return `<div class="card ex-card${done ? ' done' : ''}" data-open="${e.id}" role="button" tabindex="0">${anim(e.id)}
       <div class="ex-body"><b>${esc(e.name)}</b><span>${x.sets} ${x.sets === 1 ? 'set' : 'sets'} × ${esc(x.reps)}${/min|s$/.test(x.reps) ? '' : ' reps'}</span><small>${esc(groupName(e.group))} · ${esc(cap(e.equipment))}</small>
         ${k ? `<span class="kcal">${icon('flame')}≈ ${k.total} kcal${x.sets > 1 ? ` · ${k.perSet} per set` : ''}</span>` : ''}${videos[e.id] ? `<span class="has-video">${icon('tv')}Video</span>` : ''}
+        ${(() => { const t = targetFor(e, x); return t ? `<span class="target${t.up ? ' up' : t.down ? ' down' : ''}">${icon('star')}${t.up ? 'Go up: ' : 'Lift '}${kgText(e, t.weight)} × ${esc(t.reps)}</span>` : ''; })()}
         ${!e.cardio && x.sets > 1 ? `<span class="rest-line">${icon('clock')}Rest ${restText(restFor(e, x))} after each set</span>` : ''}
         ${tickable && !done && !e.cardio ? `<button class="set-btn" data-set="${e.id}">${icon('check')}<span>Set <b data-setno>${Math.min((setsDone[e.id] || 0) + 1, x.sets)}</b> of ${x.sets} done</span></button>` : ''}</div>
       ${tickable ? `<label class="tick" aria-label="Done"><input type="checkbox" data-tick="${e.id}" ${done ? 'checked' : ''}><span>${icon('check')}</span></label>` : ''}</div>`;
@@ -261,14 +302,30 @@
   /**
    * ctx: { plan, log (ids done today), todayKey, todayDate, save(plan), tick(date, ids), selected, onSelect(day) }
    */
-  // Sets finished today, kept on this phone.
+  // Sets finished today, kept on this phone (or from the logged lifts).
   let setsDone = {};
+  // What the coach knows: the member's answers and their logged lifts.
+  let coach = { profile: null, lifts: {}, today: null, deload: false };
+  const historyOf = (id) => (coach.lifts[id] || []).filter((x) => x.d < coach.today);
+  const todaySets = (id) => (coach.lifts[id] || []).find((x) => x.d === coach.today)?.s || [];
+  function targetFor(e, x) {
+    if (!window.Coach || !coach.profile || e.cardio) return null;
+    const t = Coach.nextTarget(e.id, x, historyOf(e.id), coach.profile);
+    if (coach.deload && t.weight) return { ...t, weight: Math.round(t.weight * 0.9 * 2) / 2, note: `Easy week: ${Math.round(t.weight * 0.9 * 2) / 2} kg and one set less. ${t.note}` };
+    return t;
+  }
+  const kgText = (e, w) => (w ? `${w} kg${Coach.kindOf(e.id).kind === 'db' ? ' each hand' : ''}` : 'body weight');
   async function planView(root, ctx) {
     await library();
     if (ctx.kg) kg = ctx.kg;
     if (ctx.goal) goal = ctx.goal;
     setsDone = UI.store.get(`setsDone|${ctx.todayDate}`, {});
+    coach = { profile: ctx.profile?.experience ? ctx.profile : null, lifts: ctx.lifts || {}, today: ctx.todayDate, deload: false };
+    // Logged sets count as done sets.
+    for (const id of Object.keys(coach.lifts)) if (todaySets(id).length) setsDone[id] = todaySets(id).length;
     const plan = ctx.plan || { days: {} };
+    const ph = window.Coach && plan.program?.by === 'coach' ? Coach.phase(plan.program.startedAt, ctx.todayDate) : null;
+    if (ph) coach.deload = ph.deload;
     const has = Object.keys(plan.days || {}).length > 0;
     const selected = ctx.selected || ctx.todayKey;
     if (!has) {
@@ -285,6 +342,7 @@
     const doneCount = list.filter((x) => done.has(x.id)).length;
     root.innerHTML = `${weekStrip(plan, selected, ctx.todayKey)}
       <div class="card day-card"><div class="day-top"><div><small>${isToday ? 'Today · ' : ''}${DAY_LABELS[selected]}</small><h2>${esc(dayLabel(day))}</h2></div><button class="btn btn-ghost btn-sm" data-edit>${icon('edit')}Edit</button></div>
+        ${ph ? `<div class="phase"><b>Week ${ph.week} · ${esc(ph.name)}</b><span>${esc(ph.tip)}</span></div>` : ''}
         ${day && isToday && list.length ? `<div class="day-progress"><div class="progress-track"><i style="width:${Math.round((doneCount / list.length) * 100)}%"></i></div><span>${doneCount}/${list.length} done</span></div>` : ''}
         ${day ? `<p class="muted" style="font-size:13px">${list.length} exercise${list.length === 1 ? '' : 's'} · about ${Math.max(20, list.reduce((a, x) => a + (lib.byId[x.id]?.cardio ? 15 : x.sets * 3), 0))} min</p>` : ''}
         ${day && list.length && window.Nutrition ? (() => {
@@ -315,6 +373,10 @@
       ev.stopPropagation();
       const x = list.find((y) => y.id === btn.dataset.set);
       const e = lib.byId[x.id];
+      if (coach.profile && ctx.saveLift) return logSetSheet(e, x, ctx, () => afterSet(btn, x, e));
+      afterSet(btn, x, e);
+    }));
+    const afterSet = (btn, x, e) => {
       const n = (setsDone[x.id] || 0) + 1;
       setsDone[x.id] = n;
       UI.store.set(`setsDone|${ctx.todayDate}`, setsDone);
@@ -331,7 +393,7 @@
       btn.querySelector('[data-setno]').textContent = n + 1;
       const rest = restFor(e, x);
       if (rest) startRest(rest, `Then set ${n + 1} of ${x.sets}`);
-    }));
+    };
     root.querySelectorAll('[data-tick]').forEach((cb) => cb.addEventListener('change', async () => {
       if (cb.checked) done.add(cb.dataset.tick); else done.delete(cb.dataset.tick);
       cb.closest('.ex-card').classList.toggle('done', cb.checked);

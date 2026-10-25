@@ -637,6 +637,22 @@
   // Finger numbers as the machine counts them (0 = left little … 9 = right little).
   const FINGERS = [[6, 'Right index'], [5, 'Right thumb'], [7, 'Right middle'], [3, 'Left index'], [4, 'Left thumb'], [2, 'Left middle'], [8, 'Right ring'], [1, 'Left ring'], [9, 'Right little'], [0, 'Left little']];
 
+  // What the in-app coach knows and how the member's lifts have moved.
+  function coachProgress(m) {
+    const b = m.body;
+    const rows = Object.entries(m.lifts || {}).filter(([, l]) => l.length).map(([id, l]) => {
+      const top = (x) => Math.max(...x.s.map(([w]) => w));
+      return { id, first: top(l[0]), last: top(l[l.length - 1]), sessions: l.length, lastDate: l[l.length - 1].d };
+    }).sort((a, z) => z.lastDate.localeCompare(a.lastDate)).slice(0, 8);
+    const w = m.weighIns || [];
+    const names = { lose: 'Lose fat', fit: 'Stay fit', gain: 'Build muscle' };
+    if (!b && !rows.length && !w.length) return '';
+    return `<div class="coach-progress">
+      ${b ? `<p><b>Coach profile:</b> ${esc(names[b.goal] || '')}${b.focus && b.focus !== 'balanced' && window.Coach ? ` · ${esc(Coach.FOCUS[b.focus].label)}` : ''} · ${b.days || 3} days a week · ${b.weight} kg${b.injuries?.length ? ` · avoid: ${esc(b.injuries.join(', '))}` : ''}${m.workoutPlan?.program?.by === 'coach' ? ' · plan made by the app coach' : ''}</p>` : ''}
+      ${w.length ? `<p><b>Weight:</b> ${w.slice(-5).map((x) => `${x.kg} kg <span class="muted">(${esc(dateShort(x.d))})</span>`).join(' → ')}</p>` : ''}
+      ${rows.length ? `<table class="tbl" style="margin-top:8px"><tr><th>Exercise</th><th class="num">Started</th><th class="num">Now</th><th class="num">Workouts</th></tr>${rows.map((r) => `<tr><td>${esc(r.id.replace(/-/g, ' '))}</td><td class="num">${r.first || 'body'}${r.first ? ' kg' : ''}</td><td class="num"><b>${r.last || 'body'}${r.last ? ' kg' : ''}</b>${r.last > r.first ? ` <span class="badge badge-good">+${Math.round((r.last - r.first) * 10) / 10}</span>` : ''}</td><td class="num">${r.sessions}</td></tr>`).join('')}</table>` : ''}</div>`;
+  }
+
   function credentialChips(c = {}) {
     const items = [
       ['fingerprint', 'Fingerprint', c.fingers?.length ? `${c.fingers.length} finger${c.fingers.length === 1 ? '' : 's'}` : ''],
@@ -1023,6 +1039,7 @@
       box.innerHTML = html
         ? `${html}<p class="muted" style="font-size:12.5px;margin-top:10px">${m.workoutPlan.updatedBy === 'trainer' ? 'Set by a trainer' : 'Set by the member'} on ${dateShort(m.workoutPlan.updatedAt.slice(0, 10))}${recent.length ? ` · last ticked a workout on ${dateShort(recent[recent.length - 1][0])}` : ''}</p>`
         : emptyLine('No plan yet. The member can make one in the app, or set one here.');
+      box.insertAdjacentHTML('beforeend', coachProgress(m));
     }).catch(() => {});
     root.querySelector('[data-wpreset]').addEventListener('click', async () => { await Workout.library(); Workout.presetSheet(Boolean(m.workoutPlan && Object.keys(m.workoutPlan.days || {}).length), savePlan); });
     root.querySelector('[data-wday]').addEventListener('click', async () => {

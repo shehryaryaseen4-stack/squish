@@ -85,11 +85,12 @@
    * body: { weight, height, age, gender, goal: lose|fit|gain, diet: nonveg|egg|veg }
    * trainingDays: workout days in the week plan
    */
-  function plan(body, trainingDays = 3) {
+  function plan(body, trainingDays = 3, adjust = 0) {
     const { weight: kg, height: cm, age, gender, goal = 'fit', diet = 'nonveg' } = body;
     const bmr = 10 * kg + 6.25 * cm - 5 * age + (gender === 'female' ? -161 : 5);
     const maintain = bmr * ACTIVITY(trainingDays);
-    const target = Math.max(gender === 'female' ? 1200 : 1500, maintain + (goal === 'lose' ? -450 : goal === 'gain' ? 300 : 0));
+    // adjust: the coach's change after weekly weigh-ins (e.g. -150 when weight isn't moving).
+    const target = Math.max(gender === 'female' ? 1200 : 1500, maintain + (goal === 'lose' ? -450 : goal === 'gain' ? 300 : 0) + (Number(adjust) || 0));
     const protein = round(Math.min(kg, 120) * PROTEIN_PER_KG[goal], 5);
     const fat = round((target * 0.25) / 9, 5);
     const carbs = round((target - protein * 4 - fat * 9) / 4, 5);

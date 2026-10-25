@@ -170,7 +170,10 @@ function workoutPlan(b) {
     });
     if (groups.length || exercises.length) out[day] = { groups, exercises };
   }
-  return { days: out };
+  // Plans made by the in-app coach remember their split and when they started.
+  const pr = b && b.program;
+  const program = pr && typeof pr === 'object' ? { by: pr.by === 'coach' ? 'coach' : 'trainer', split: str(pr.split, { max: 60 }), weeks: num(pr.weeks || 8, { min: 1, max: 52, field: 'Weeks' }), startedAt: /^\d{4}-\d{2}-\d{2}$/.test(pr.startedAt) ? pr.startedAt : null } : null;
+  return program ? { days: out, program } : { days: out };
 }
 
 function business(b, current) {
@@ -231,6 +234,12 @@ function body(b) {
     gender: ['male', 'female'].includes(b.gender) ? b.gender : 'male',
     goal: ['lose', 'fit', 'gain'].includes(b.goal) ? b.goal : 'fit',
     diet: ['nonveg', 'egg', 'veg'].includes(b.diet) ? b.diet : 'nonveg',
+    // For the coach's plan
+    experience: ['new', 'lt1', '1to3', '3plus'].includes(b.experience) ? b.experience : 'new',
+    days: Math.max(2, Math.min(6, Number(b.days) || 3)),
+    minutes: [45, 60, 90].includes(Number(b.minutes)) ? Number(b.minutes) : 60,
+    focus: ['balanced', 'chest', 'arms', 'back', 'legs', 'waist'].includes(b.focus) ? b.focus : 'balanced',
+    injuries: (Array.isArray(b.injuries) ? b.injuries : []).filter((x) => ['knee', 'back', 'shoulder'].includes(x)),
   };
 }
 

@@ -36,7 +36,7 @@
   }
 
   function renderTabs() {
-    const route = (location.hash.split('?')[0] || '#/').replace('#/workout/library', '#/workout').replace('#/diet', '#/workout');
+    const route = (location.hash.split('?')[0] || '#/').replace('#/workout/library', '#/workout').replace('#/diet', '#/workout').replace('#/coach', '#/workout');
     const tabs = state.token
       ? [['#/', 'home', 'Home'], ['#/workout', 'dumbbell', 'Workout'], ['#/classes', 'calendar', 'Classes'], ['#/progress', 'activity', 'Progress'], ['#/profile', 'user', 'Profile']]
       : [['#/', 'home', 'Home'], ['#/classes', 'calendar', 'Classes'], ['#/login', 'lock', 'Member login']];
@@ -298,11 +298,16 @@
   async function workoutView(params) {
     const d = await me();
     const w = bodyWeight(d);
-    render(`<div class="page-title"><h1>My workout</h1><p>Your weekly plan. Tap an exercise to see how it's done.</p></div>${fitTabs('workout')}<div id="wk" style="margin-top:14px"><div class="boot"><div class="skel" style="height:300px;border-radius:22px"></div></div></div>`);
+    const byCoach = d.member.workoutPlan?.program?.by === 'coach';
+    const cta = byCoach ? '' : `<a class="card coach-cta" href="#/coach">${icon('star')}<div><b>Let your coach make your plan</b><span>Answer a few questions. You get a plan for your body and goal, the weight to lift on every exercise, and it goes up as you get stronger.</span></div>${icon('chevronRight')}</a>`;
+    render(`<div class="page-title"><h1>My workout</h1><p>Your weekly plan. Tap an exercise to see how it's done.</p></div>${fitTabs('workout')}${cta}<div id="wk" style="margin-top:14px"><div class="boot"><div class="skel" style="height:300px;border-radius:22px"></div></div></div>`);
     await Workout.planView(document.getElementById('wk'), {
       kg: w.kg,
       kgKnown: w.known,
       goal: d.member.body?.goal,
+      profile: d.member.body,
+      lifts: d.member.lifts || {},
+      saveLift,
       plan: d.member.workoutPlan,
       log: d.member.workoutLog?.[today()] || [],
       todayKey: todayKey(),
@@ -330,7 +335,8 @@
     const b = m.body;
     const plan = m.workoutPlan;
     const trainingDays = Object.values(plan?.days || {}).filter((x) => x?.exercises?.length).length || 3;
-    const p = Nutrition.plan(b, trainingDays);
+    const trend = Coach.weightTrend(m.weighIns || [], b.goal);
+    const p = Nutrition.plan(b, trainingDays, trend.kcal || 0);
     const lib = await Workout.library();
     const todayDay = plan?.days?.[todayKey()];
     const burnToday = todayDay ? Nutrition.dayBurn(todayDay, lib.byId, b.weight) : null;
@@ -344,6 +350,11 @@
         <p class="dt-why">${b.weight} kg × ${perKg} g = <b>${p.protein} g protein</b> a day to ${b.goal === 'gain' ? 'build muscle' : b.goal === 'lose' ? 'lose fat and keep your muscle' : 'stay fit'}. Your body uses about ${p.maintain.toLocaleString()} kcal a day with ${trainingDays} workout${trainingDays === 1 ? '' : 's'} a week${b.goal === 'lose' ? ', so eating less makes you lose fat' : b.goal === 'gain' ? ', so eating a bit more builds muscle' : ''}.</p></div>
 
       <div class="card diet-burn">${icon('flame')}<div>${burnToday && burnToday.kcal ? `<b>Today's workout burns ≈ ${burnToday.kcal} kcal</b><span>${esc(Workout.dayLabel(todayDay))} · about ${burnToday.minutes} min. See each exercise in <a class="link" href="#/workout">Workout</a>.</span>` : `<b>Rest day today</b><span>${weekBurn ? `Your week of workouts burns ≈ ${weekBurn.toLocaleString()} kcal.` : 'Make a workout plan to see the calories you burn.'}</span>`}</div></div>
+
+      <div class="card weigh-in"><div class="wi-head">${icon('activity')}<div><b>Weekly check-in</b><span>Weigh yourself once a week: same day, in the morning before breakfast.</span></div></div>
+        <form class="wi-form" novalidate><input class="input" name="kg" type="number" inputmode="decimal" step="0.1" min="25" max="300" placeholder="Today's weight (kg)" aria-label="Today's weight in kg"><button class="btn btn-primary">Save</button></form>
+        ${(m.weighIns || []).length ? `<div class="wi-list">${(m.weighIns || []).slice(-6).map((x) => `<span><b>${x.kg}</b><small>${esc(dateShort(x.d))}</small></span>`).join('')}</div>` : ''}
+        <p class="wi-note ${trend.kcal ? 'warn' : ''}">${esc(trend.note)}${trend.kcal ? ` Your calories above already include this (${trend.kcal > 0 ? '+' : ''}${trend.kcal} kcal).` : ''}</p></div>
 
       <h2 class="diet-h">Your meals for today</h2>
       <div class="meals">${p.meals.map((meal) => {
@@ -364,35 +375,111 @@
       <p class="diet-note">Numbers are estimates for a healthy adult. If you have a medical condition, are pregnant, or take medicine, ask a doctor first. Your trainer can adjust this plan with you.</p>
       <button class="btn btn-ghost btn-block" data-edit style="margin-top:12px">${icon('edit')}Change weight, goal or diet</button>`;
     box.querySelector('[data-edit]').addEventListener('click', () => { location.hash = '#/diet?edit=1'; });
+    box.querySelector('.wi-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      busy(e.target.querySelector('button'), async () => {
+        try { await weighIn(Number(e.target.kg.value)); toast('Saved. See you next week!'); dietView(new URLSearchParams()); } catch (err) { toast(err.message, 'bad'); }
+      });
+    });
   }
 
-  function bodyForm(box, d) {
+  const EXPERIENCE = [['new', 'Never / just started'], ['lt1', 'Under 1 year'], ['1to3', '1-3 years'], ['3plus', '3+ years']];
+  const INJURIES = [['knee', 'Knee'], ['back', 'Lower back'], ['shoulder', 'Shoulder']];
+
+  // Everything the coach needs to know; the diet plan uses the same answers.
+  function bodyForm(box, d, { coach = false, onSaved } = {}) {
     const m = d.member;
     const b = m.body || {};
     const last = (k) => [...(d.measurements || [])].reverse().find((x) => x[k])?.[k];
     const age = b.age || (m.dob ? Math.floor((Date.parse(today()) - Date.parse(m.dob)) / (365.25 * 864e5)) : '');
-    const chips = (name, list, cur) => `<div class="choice-row" role="radiogroup">${list.map(([v, l]) => `<label class="choice-chip"><input type="radio" name="${name}" value="${v}" ${v === cur ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>`;
-    box.innerHTML = `<div class="card box"><h2 style="font-size:19px">About you</h2><p class="muted" style="margin:4px 0 16px">Used to work out your calories and protein. Only you and your gym can see it.</p>
+    const chips = (name, list, cur, multi) => `<div class="choice-row" role="${multi ? 'group' : 'radiogroup'}">${list.map(([v, l]) => `<label class="choice-chip"><input type="${multi ? 'checkbox' : 'radio'}" name="${name}" value="${v}" ${(multi ? (cur || []).includes(v) : v === cur) ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>`;
+    box.innerHTML = `<div class="card box"><h2 style="font-size:19px">${coach ? 'Tell your coach about you' : 'About you'}</h2><p class="muted" style="margin:4px 0 16px">${coach ? 'Your plan, starting weights and diet are made from these answers. You can change them any time.' : 'Used to work out your calories and protein. Only you and your gym can see it.'}</p>
       <form class="form" style="padding:0" novalidate>
         <div class="two-col"><label class="field"><span>Weight (kg)</span><input class="input" name="weight" type="number" inputmode="decimal" min="25" max="300" value="${esc(b.weight || last('weight') || '')}" required></label>
           <label class="field"><span>Height (cm)</span><input class="input" name="height" type="number" inputmode="numeric" min="100" max="250" value="${esc(b.height || last('height') || '')}" required></label></div>
         <div class="two-col"><label class="field"><span>Age</span><input class="input" name="age" type="number" inputmode="numeric" min="10" max="100" value="${esc(age)}" required></label>
           <label class="field"><span>Gender</span><select class="select" name="gender"><option value="male" ${(b.gender || m.gender) !== 'female' ? 'selected' : ''}>Male</option><option value="female" ${(b.gender || m.gender) === 'female' ? 'selected' : ''}>Female</option></select></label></div>
         <div class="field"><span>Your goal</span>${chips('goal', GOALS, b.goal || 'fit')}</div>
+        <div class="field"><span>What you want most</span>${chips('focus', Object.entries(Coach.FOCUS).map(([k, x]) => [k, x.label]), b.focus || 'balanced')}</div>
+        <div class="field"><span>How long have you been training?</span>${chips('experience', EXPERIENCE, b.experience || 'new')}</div>
+        <div class="two-col"><label class="field"><span>Days a week you can come</span><select class="select" name="days">${[2, 3, 4, 5, 6].map((n) => `<option value="${n}" ${Number(b.days || 3) === n ? 'selected' : ''}>${n} days</option>`).join('')}</select></label>
+          <label class="field"><span>Time per workout</span><select class="select" name="minutes">${[[45, '45 min'], [60, '1 hour'], [90, '1.5 hours']].map(([n, l]) => `<option value="${n}" ${Number(b.minutes || 60) === n ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
+        <div class="field"><span>Any pain or injury? (we'll avoid risky moves)</span>${chips('injuries', INJURIES, b.injuries, true)}</div>
         <div class="field"><span>What you eat</span>${chips('diet', DIETS, b.diet || 'nonveg')}</div>
-        <button class="btn btn-primary btn-block">Show my diet plan</button></form></div>`;
+        <button class="btn btn-primary btn-block">${coach ? 'Make my plan' : 'Show my diet plan'}</button></form></div>`;
     const f = box.querySelector('form');
     f.addEventListener('submit', (e) => {
       e.preventDefault();
       busy(f.querySelector('button'), async () => {
         try {
-          const body = Object.fromEntries(new FormData(f).entries());
-          for (const k of ['weight', 'height', 'age']) body[k] = Math.round(Number(body[k]));
+          const fd = new FormData(f);
+          const body = Object.fromEntries(fd.entries());
+          body.injuries = fd.getAll('injuries');
+          for (const k of ['weight', 'height', 'age', 'days', 'minutes']) body[k] = Math.round(Number(body[k]));
           state.me.member.body = await api('/api/member/body', { method: 'PUT', body });
+          if (onSaved) return onSaved();
           if (location.hash === '#/diet') dietView(new URLSearchParams()); else location.hash = '#/diet';
         } catch (err) { toast(err.message, 'bad'); }
       });
     });
+  }
+
+  // ---- the coach ------------------------------------------------------------------------
+
+  async function coachView(params) {
+    const d = await me();
+    const m = d.member;
+    render(`<header class="page-head"><a class="icon-btn" href="#/workout" aria-label="Back">${icon('chevronLeft')}</a><h1>Your coach</h1></header><div id="coach" class="pad"></div>`);
+    const box = document.getElementById('coach');
+    if (!m.body?.experience || params.get('edit')) return bodyForm(box, d, { coach: true, onSaved: () => coachView(new URLSearchParams()) });
+    const lib = await Workout.library();
+    const b = m.body;
+    const plan = Coach.plan(b, lib);
+    const focus = Coach.FOCUS[b.focus]?.label || 'Balanced';
+    const goalText = { lose: 'lose fat while keeping your muscle', fit: 'get fit and strong', gain: 'build muscle' }[b.goal];
+    const why = [
+      `${plan.program.split}: the best split for ${b.days} days a week${b.experience === 'new' ? ' when you are starting out' : ''}.`,
+      `${b.goal === 'gain' ? 'Heavier sets of 8-10 reps' : b.goal === 'lose' ? 'Sets of 10-15 reps with short rests, plus cardio' : 'Sets of 8-15 reps'} to ${goalText}.`,
+      b.focus !== 'balanced' ? `Extra work for: ${focus.toLowerCase()}.` : 'Every muscle trained evenly.',
+      b.injuries?.length ? `No moves that load your ${b.injuries.map((x) => INJURIES.find((i) => i[0] === x)[1].toLowerCase()).join(', ')}.` : null,
+      ['new', 'lt1'].includes(b.experience) ? 'Machines and dumbbells first; barbell squats and deadlifts come once your form is solid.' : null,
+      'Starting weights are on the light side. Log each set and the app raises the weight when you are ready.',
+    ].filter(Boolean);
+    const hasOther = Object.keys(m.workoutPlan?.days || {}).length && m.workoutPlan?.program?.by !== 'coach';
+    box.innerHTML = `<div class="card coach-hero"><small>Made for ${esc(m.name.split(' ')[0])}</small><h2>${esc(plan.program.split)} · ${b.days} days a week</h2><ul>${why.map((w) => `<li>${icon('check')}<span>${esc(w)}</span></li>`).join('')}</ul></div>
+      ${Workout.ORDER.filter((k) => plan.days[k]).map((k) => {
+        const day = plan.days[k];
+        return `<section class="card coach-day"><div class="cd-head"><b>${DAY_LABELS[k]}</b><span>${esc(Workout.dayLabel(day))}</span></div>
+          <ul>${day.exercises.map((x) => {
+            const e = lib.byId[x.id];
+            const w = Coach.startWeight(x.id, b);
+            const kind = Coach.kindOf(x.id).kind;
+            return `<li><span class="cd-name">${esc(e.name)}</span><span class="cd-sets">${x.sets} × ${esc(x.reps)}</span><span class="cd-w">${w ? `${w} kg${kind === 'db' ? ' each' : ''}` : e.cardio ? '' : 'body'}</span></li>`;
+          }).join('')}</ul></section>`;
+      }).join('')}
+      ${hasOther ? '<p class="note-line">This replaces the plan you have now.</p>' : ''}
+      <div style="display:grid;gap:10px;margin-top:14px"><button class="btn btn-primary btn-block" data-start>${icon('check')}Start this plan</button><a class="btn btn-ghost btn-block" href="#/coach?edit=1">${icon('edit')}Change my answers</a></div>`;
+    box.querySelector('[data-start]').addEventListener('click', (e) => busy(e.currentTarget, async () => {
+      try {
+        const saved = await api('/api/member/plan', { method: 'PUT', body: { ...plan, program: { ...plan.program, startedAt: today() } } });
+        state.me.member.workoutPlan = saved;
+        toast('Your plan is ready. Let’s go! 💪');
+        location.hash = '#/workout';
+      } catch (err) { toast(err.message, 'bad'); }
+    }));
+  }
+
+  // Logging a set: what was lifted, then the rest timer.
+  async function saveLift(exerciseId, sets) {
+    const list = await api('/api/member/lift', { method: 'PUT', body: { date: today(), exerciseId, sets } });
+    state.me.member.lifts = { ...(state.me.member.lifts || {}), [exerciseId]: list };
+    return list;
+  }
+
+  async function weighIn(kg) {
+    const r = await api('/api/member/weigh-in', { method: 'POST', body: { kg } });
+    state.me.member.weighIns = r.weighIns;
+    if (r.body) state.me.member.body = r.body;
   }
 
   async function libraryPage(params) {
@@ -544,6 +631,7 @@
       if (page === 'workout' && path.includes('library')) return await libraryPage(params);
       if (page === 'workout') return await workoutView(params);
       if (page === 'diet') return await dietView(params);
+      if (page === 'coach') return await coachView(params);
       if (page === 'progress') return await progressView(params);
       if (page === 'fees') return await feesView();
       if (page === 'profile') return await profileView();
