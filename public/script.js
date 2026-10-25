@@ -328,6 +328,31 @@
     }
   }
 
+  // After a file is chosen (picked or dropped) in any tool box (converter, PDF tools, the other
+  // tools), the box grows with the file, its options and the button to go on, often below the
+  // fold, so it looked as if nothing had happened. Scroll down just enough to show the whole box,
+  // never hiding its top under the sticky header and never scrolling up. Checked twice, because
+  // some tools draw their previews a moment later.
+  const TOOL_BOXES = "#convert, #pt, #app";
+  function revealBox(box){
+    const header = (document.querySelector(".top") || { getBoundingClientRect: () => ({ bottom: 0 }) }).getBoundingClientRect().bottom;
+    const r = box.getBoundingClientRect();
+    const by = Math.min(r.top - header - 12, r.bottom - window.innerHeight + 16);
+    if (by > 8) window.scrollBy({ top: by, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }
+  function afterPick(target){
+    const box = target && target.closest && target.closest(TOOL_BOXES);
+    if (!box) return;
+    setTimeout(() => revealBox(box), 80);
+    setTimeout(() => revealBox(box), 600);
+  }
+  document.addEventListener("change", e => {
+    if (e.target.matches && e.target.matches('input[type="file"]') && e.target.files && e.target.files.length) afterPick(e.target);
+  }, true);
+  document.addEventListener("drop", e => {
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) afterPick(e.target);
+  }, true);
+
   const dropzone = document.getElementById("dropzone");
   if (!dropzone) return; // hub / 404 pages have no upload tool
 
