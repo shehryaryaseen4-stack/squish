@@ -234,6 +234,7 @@ and earning links from other sites.
 | `INDEXNOW_KEY` | unset | Serves `/<key>.txt` for IndexNow. |
 | `TWITTER_SITE` | unset | `twitter:site` handle on share cards. |
 | `SITE_UPDATED` | content file dates | Sitemap `lastmod` override (YYYY-MM-DD). |
+| `PDF_AI` | unset | `1` switches on the PDF intelligence tools (`/ai-pdf-summarizer`, `/translate-pdf`, `/pdf-to-markdown`); without it they have no page, link or API route. |
 | `ANTHROPIC_API_KEY` | unset | Turns on the AI tools (`/ai-pdf-summarizer` with chat, `/translate-pdf`), which use Claude through the Anthropic API. Without it their pages say the AI is not switched on yet. `/pdf-to-markdown` needs no key. |
 | `AI_MODEL` | `claude-opus-5-5` | Claude model for the AI tools. `claude-haiku-5-5` is far cheaper per request. |
 | `AI_PER_HOUR`, `AI_DAILY_MAX` | `40`, `2000` | AI requests allowed per connection per hour, and for the whole site per UTC day: caps on the API bill. |

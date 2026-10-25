@@ -30,7 +30,10 @@ const GUIDES = { ...require('./content/guides'), ...require('./content/guides-mo
 const ARTICLES = [...require('./content/articles'), ...(process.env.PDF_EDITOR === '1' ? require('./content/resume-articles') : [])];
 const KEYWORDS = require('./content/keywords');
 const USES = require('./content/uses');
-const APPS = require('./content/apps');
+// The PDF intelligence tools (AI summarizer, Translate PDF, PDF to Markdown) are switched on with
+// PDF_AI=1; until then they have no page, link or sitemap entry.
+const PDF_AI = process.env.PDF_AI === '1';
+const APPS = require('./content/apps').filter((t) => PDF_AI || !['aisum', 'translate', 'markdown'].includes(t.app));
 const APP_BY_SLUG = new Map(APPS.map((t) => [t.slug, t]));
 // Variants of a tool (resize to 50 KB, compress video for Discord ...) have pages but stay out of menus.
 const MENU_APPS = APPS.filter((t) => t.menu !== false);
@@ -2045,4 +2048,4 @@ const robots = (base) => `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: $
 module.exports = {
   megaMenu, PDF_TOOLS, resolvePdfTool, APPS, resolveApp, searchIndex,
   ACCOUNTS, authPage, accountPage, authDonePage, resolveFriendly, friendlies,
-  editorPage, PDF_EDITOR, EDITOR_LANDINGS, homePage, resolveGuide, hubPage, notFoundPage, resolvePair, resolveCompress, resolveConverter, resolveInfo, ogSpec, sitemap, robots, allPaths, adsTxt, ADS_ENABLED: !!ADS_CLIENT };
+  editorPage, PDF_EDITOR, PDF_AI, EDITOR_LANDINGS, homePage, resolveGuide, hubPage, notFoundPage, resolvePair, resolveCompress, resolveConverter, resolveInfo, ogSpec, sitemap, robots, allPaths, adsTxt, ADS_ENABLED: !!ADS_CLIENT };

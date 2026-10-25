@@ -151,7 +151,7 @@ AI PDF Summarizer (chat ke saath) aur Translate PDF, Anthropic ka Claude AI iste
 
 1. https://platform.claude.com pe account banayein, **Billing** mein thore credits daalein, phir **API keys** se nayi key banayein.
 2. Server pe settings file kholein: `nano /opt/flipfree/.env`
-3. Akhir mein yeh line likhein (apni key ke saath): `ANTHROPIC_API_KEY=sk-ant-...`
+3. Akhir mein yeh do lines likhein (apni key ke saath): `PDF_AI=1` aur `ANTHROPIC_API_KEY=sk-ant-...` (`PDF_AI=1` ke baghair teeno tools site pe nazar hi nahi aate)
 4. `Ctrl+O`, `Enter`, `Ctrl+X` se save karein, phir: `bash /opt/flipfree/deploy/update.sh`
 
 Key sirf `.env` mein rakhein: kisi ko na bhejein, chat ya GitHub mein bhi nahi. Kharche ki hadd ke liye `.env` mein `AI_DAILY_MAX` (poori site, roz ki requests) aur `AI_PER_HOUR` (ek visitor, ghante ki requests) badal sakte hain, aur Anthropic console mein bhi monthly limit lagayein. Sasta model chahiye ho to `AI_MODEL=claude-haiku-5-5`.

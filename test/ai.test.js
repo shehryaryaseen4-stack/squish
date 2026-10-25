@@ -10,6 +10,8 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 const { fakeClaude } = require('./fixtures/fake-claude');
 
+process.env.PDF_AI = '1'; // the pages are off unless this is set
+
 const has = (bin) => { try { execFileSync('which', [bin], { stdio: 'ignore' }); return true; } catch { return false; } };
 const READY = has('pdf2docx-python') && has('pdftotext');
 const skip = !READY && 'the PDF reader (pdf2docx-python) is not installed';

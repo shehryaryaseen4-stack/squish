@@ -374,89 +374,91 @@ app.get('/api/jobs/:id/file', (req, res) => {
 
 // PDF intelligence (engines/ai.js): AI Summarizer + chat and Translate PDF use Claude (Anthropic
 // API, key in .env as ANTHROPIC_API_KEY); PDF to Markdown needs no AI. The AI routes have their
-// own, tighter limit per connection, on top of the site-wide one.
-const ai = require('./engines/ai');
-const AI_PER_HOUR = Math.max(1, Number(process.env.AI_PER_HOUR || 40));
-const aiLimit = rateLimit({
-  windowMs: 60 * 60 * 1000, max: AI_PER_HOUR, standardHeaders: true, legacyHeaders: false,
-  message: { error: 'You have used the AI tools a lot in the last hour. Please wait a while and try again.' },
-});
-const aiFail = (req, res, err, what) => {
-  const e = ai.friendly(err);
-  analytics.event(req, 'fail', { pair: what, p: fromPage(req) });
-  if (!res.headersSent) return res.status(e.statusCode || 422).json({ error: e.userMessage });
-  sse(res, 'error', { error: e.userMessage });
-  res.end();
-};
-// Answers stream to the page as server-sent events (text pieces, then done or error). Comments
-// every 15 seconds keep proxies (Cloudflare) from closing the connection while Claude thinks.
-const sse = (res, event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-async function streamTo(req, res, what, fn) {
-  const ctl = new AbortController();
-  res.on('close', () => { if (!res.writableFinished) ctl.abort(); });
-  let beat = null;
-  try {
-    res.set({ 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache, no-transform', 'X-Accel-Buffering': 'no' });
-    res.flushHeaders();
-    beat = setInterval(() => res.write(': working\n\n'), 15000);
-    const msg = await fn(ctl.signal, (t) => sse(res, 'text', { t }));
-    sse(res, 'done', { model: msg.model });
+// own, tighter limit per connection, on top of the site-wide one. Switched on with PDF_AI=1.
+if (pages.PDF_AI) {
+  const ai = require('./engines/ai');
+  const AI_PER_HOUR = Math.max(1, Number(process.env.AI_PER_HOUR || 40));
+  const aiLimit = rateLimit({
+    windowMs: 60 * 60 * 1000, max: AI_PER_HOUR, standardHeaders: true, legacyHeaders: false,
+    message: { error: 'You have used the AI tools a lot in the last hour. Please wait a while and try again.' },
+  });
+  const aiFail = (req, res, err, what) => {
+    const e = ai.friendly(err);
+    analytics.event(req, 'fail', { pair: what, p: fromPage(req) });
+    if (!res.headersSent) return res.status(e.statusCode || 422).json({ error: e.userMessage });
+    sse(res, 'error', { error: e.userMessage });
     res.end();
-    analytics.event(req, 'tool', { pair: what, p: fromPage(req) });
-  } catch (err) {
-    if (ctl.signal.aborted) return res.end();
-    aiFail(req, res, err, what);
-  } finally {
-    clearInterval(beat);
+  };
+  // Answers stream to the page as server-sent events (text pieces, then done or error). Comments
+  // every 15 seconds keep proxies (Cloudflare) from closing the connection while Claude thinks.
+  const sse = (res, event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  async function streamTo(req, res, what, fn) {
+    const ctl = new AbortController();
+    res.on('close', () => { if (!res.writableFinished) ctl.abort(); });
+    let beat = null;
+    try {
+      res.set({ 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache, no-transform', 'X-Accel-Buffering': 'no' });
+      res.flushHeaders();
+      beat = setInterval(() => res.write(': working\n\n'), 15000);
+      const msg = await fn(ctl.signal, (t) => sse(res, 'text', { t }));
+      sse(res, 'done', { model: msg.model });
+      res.end();
+      analytics.event(req, 'tool', { pair: what, p: fromPage(req) });
+    } catch (err) {
+      if (ctl.signal.aborted) return res.end();
+      aiFail(req, res, err, what);
+    } finally {
+      clearInterval(beat);
+    }
   }
+  app.post('/api/ai/open', aiLimit, upload.single('file'), async (req, res) => {
+    try {
+      if (!ai.configured()) return res.status(503).json({ error: 'The AI tools are not switched on on this server yet. Please try again later.' });
+      if (!req.file) return res.status(400).json({ error: 'No file received.' });
+      res.json(await ai.openDoc({ buffer: req.file.buffer, name: req.file.originalname, ocr: req.body.ocr === '1', lang: req.body.lang }));
+    } catch (err) { aiFail(req, res, err, 'AI open PDF'); }
+  });
+  app.post('/api/ai/summary', aiLimit, express.json({ limit: '4kb' }), (req, res) => streamTo(req, res, 'AI summary',
+    (signal, onText) => ai.summarize({ id: req.body.id, lang: req.body.lang, signal }, onText)));
+  app.post('/api/ai/chat', aiLimit, express.json({ limit: '200kb' }), (req, res) => streamTo(req, res, 'AI chat',
+    (signal, onText) => ai.chat({ id: req.body.id, history: req.body.messages, signal }, onText)));
+  app.post('/api/ai/translate', aiLimit, upload.single('file'), async (req, res) => {
+    const tmp = path.join(UP_DIR, `squish-tr-${require('crypto').randomBytes(8).toString('hex')}.pdf`);
+    try {
+      if (!ai.configured()) return res.status(503).json({ error: 'The AI tools are not switched on on this server yet. Please try again later.' });
+      if (!req.file) return res.status(400).json({ error: 'No file received.' });
+      const to = ai.LANG.get(String(req.body.to || ''));
+      if (!to) return res.status(400).json({ error: 'Please choose the language to translate into.' });
+      await fs.promises.writeFile(tmp, req.file.buffer);
+      const opts = { file: tmp, to: to.id, ocr: req.body.ocr === '1', lang: req.body.lang };
+      const id = mediaTools.startJob(tmp, `${mediaBase(req.file.originalname)}-${to.id}`, (dir) => ai.translatePdf(opts, dir).catch((e) => { throw ai.friendly(e); }), { slot: false });
+      res.json({ id });
+      analytics.event(req, 'tool', { pair: 'Translate PDF', p: fromPage(req) });
+    } catch (err) {
+      fs.promises.rm(tmp, { force: true }).catch(() => {});
+      aiFail(req, res, err, 'Translate PDF');
+    }
+  });
+  app.post('/api/pdf-markdown', upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ error: 'No file received.' });
+      const out = await ai.toMarkdown({ buffer: req.file.buffer, ocr: req.body.ocr === '1', lang: req.body.lang });
+      res.set({
+        'Content-Type': 'text/markdown; charset=utf-8',
+        'Content-Disposition': disposition(`${mediaBase(req.file.originalname)}.md`),
+        'X-Pages': String(out.pages),
+        ...(out.notes.length ? { 'X-Convert-Notes': encodeURIComponent(JSON.stringify(out.notes.slice(0, 8))) } : {}),
+      });
+      res.send(out.buffer);
+      analytics.event(req, 'tool', { pair: 'PDF to Markdown', p: fromPage(req) });
+    } catch (err) {
+      analytics.event(req, 'fail', { pair: 'PDF to Markdown', p: fromPage(req) });
+      if (err.userMessage) return res.status(err.statusCode || 422).json({ error: err.userMessage });
+      console.error('PDF to Markdown error:', err);
+      res.status(500).json({ error: 'This PDF could not be converted to Markdown.' });
+    }
+  });
 }
-app.post('/api/ai/open', aiLimit, upload.single('file'), async (req, res) => {
-  try {
-    if (!ai.configured()) return res.status(503).json({ error: 'The AI tools are not switched on on this server yet. Please try again later.' });
-    if (!req.file) return res.status(400).json({ error: 'No file received.' });
-    res.json(await ai.openDoc({ buffer: req.file.buffer, name: req.file.originalname, ocr: req.body.ocr === '1', lang: req.body.lang }));
-  } catch (err) { aiFail(req, res, err, 'AI open PDF'); }
-});
-app.post('/api/ai/summary', aiLimit, express.json({ limit: '4kb' }), (req, res) => streamTo(req, res, 'AI summary',
-  (signal, onText) => ai.summarize({ id: req.body.id, lang: req.body.lang, signal }, onText)));
-app.post('/api/ai/chat', aiLimit, express.json({ limit: '200kb' }), (req, res) => streamTo(req, res, 'AI chat',
-  (signal, onText) => ai.chat({ id: req.body.id, history: req.body.messages, signal }, onText)));
-app.post('/api/ai/translate', aiLimit, upload.single('file'), async (req, res) => {
-  const tmp = path.join(UP_DIR, `squish-tr-${require('crypto').randomBytes(8).toString('hex')}.pdf`);
-  try {
-    if (!ai.configured()) return res.status(503).json({ error: 'The AI tools are not switched on on this server yet. Please try again later.' });
-    if (!req.file) return res.status(400).json({ error: 'No file received.' });
-    const to = ai.LANG.get(String(req.body.to || ''));
-    if (!to) return res.status(400).json({ error: 'Please choose the language to translate into.' });
-    await fs.promises.writeFile(tmp, req.file.buffer);
-    const opts = { file: tmp, to: to.id, ocr: req.body.ocr === '1', lang: req.body.lang };
-    const id = mediaTools.startJob(tmp, `${mediaBase(req.file.originalname)}-${to.id}`, (dir) => ai.translatePdf(opts, dir).catch((e) => { throw ai.friendly(e); }), { slot: false });
-    res.json({ id });
-    analytics.event(req, 'tool', { pair: 'Translate PDF', p: fromPage(req) });
-  } catch (err) {
-    fs.promises.rm(tmp, { force: true }).catch(() => {});
-    aiFail(req, res, err, 'Translate PDF');
-  }
-});
-app.post('/api/pdf-markdown', upload.single('file'), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: 'No file received.' });
-    const out = await ai.toMarkdown({ buffer: req.file.buffer, ocr: req.body.ocr === '1', lang: req.body.lang });
-    res.set({
-      'Content-Type': 'text/markdown; charset=utf-8',
-      'Content-Disposition': disposition(`${mediaBase(req.file.originalname)}.md`),
-      'X-Pages': String(out.pages),
-      ...(out.notes.length ? { 'X-Convert-Notes': encodeURIComponent(JSON.stringify(out.notes.slice(0, 8))) } : {}),
-    });
-    res.send(out.buffer);
-    analytics.event(req, 'tool', { pair: 'PDF to Markdown', p: fromPage(req) });
-  } catch (err) {
-    analytics.event(req, 'fail', { pair: 'PDF to Markdown', p: fromPage(req) });
-    if (err.userMessage) return res.status(err.statusCode || 422).json({ error: err.userMessage });
-    console.error('PDF to Markdown error:', err);
-    res.status(500).json({ error: 'This PDF could not be converted to Markdown.' });
-  }
-});
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
