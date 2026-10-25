@@ -18,7 +18,7 @@ const lib = (f) => fs.readFileSync(path.join(root, 'lib', f), 'utf8');
 
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
-for (const f of ['base.css', 'gym.css', 'app.css', 'admin.css', 'kiosk.css', 'display.css', 'icons.js', 'common.js', 'workout.js', 'app.js', 'admin.js', 'kiosk.js', 'display.js']) {
+for (const f of ['base.css', 'gym.css', 'app.css', 'admin.css', 'kiosk.css', 'display.css', 'icons.js', 'common.js', 'nutrition.js', 'workout.js', 'app.js', 'admin.js', 'kiosk.js', 'display.js']) {
   fs.writeFileSync(path.join(out, f), pub(f));
 }
 fs.cpSync(path.join(root, 'public', 'exercises'), path.join(out, 'exercises'), { recursive: true });
@@ -188,8 +188,8 @@ const page = `<title>Iron Republic Gym App</title>
 <script>
 (function () {
   const MODES = {
-    member: { css: ['base.css', 'gym.css', 'app.css'], js: ['workout.js', 'app.js'], html: '<div class="app"><main id="view" tabindex="-1"></main><nav class="tabbar" id="tabbar" aria-label="Main" hidden></nav></div>', pins: 'Member 1001 · PIN 1111' },
-    manager: { css: ['base.css', 'gym.css', 'admin.css'], js: ['workout.js', 'admin.js'], html: '<div id="root"></div>', pins: 'Owner PIN 1234 · Front desk 0000' },
+    member: { css: ['base.css', 'gym.css', 'app.css'], js: ['nutrition.js', 'workout.js', 'app.js'], html: '<div class="app"><main id="view" tabindex="-1"></main><nav class="tabbar" id="tabbar" aria-label="Main" hidden></nav></div>', pins: 'Member 1001 · PIN 1111' },
+    manager: { css: ['base.css', 'gym.css', 'admin.css'], js: ['nutrition.js', 'workout.js', 'admin.js'], html: '<div id="root"></div>', pins: 'Owner PIN 1234 · Front desk 0000' },
     kiosk: { css: ['base.css', 'gym.css', 'admin.css', 'kiosk.css'], js: ['kiosk.js'], html: '<div id="root"></div>', pins: 'PIN 0000, then type 1001–1100' },
     display: { css: ['base.css', 'display.css'], js: ['display.js'], html: '<div id="root"></div>', pins: 'PIN 0000 · <button class="demo-punch" data-punch>Simulate a thumb punch</button>' },
   };

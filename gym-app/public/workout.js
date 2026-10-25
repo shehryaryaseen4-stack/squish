@@ -6,6 +6,9 @@
   const ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   const SHORT = { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
   let lib = null;
+  // Body weight for calorie estimates; the member app sets it.
+  let kg = 70;
+  const kcalOf = (e, x) => (window.Nutrition ? Nutrition.burn(e, x, kg) : null);
 
   async function library() {
     if (lib) return lib;
@@ -63,7 +66,7 @@
       wide: true,
       html: `<div class="sheet-head"><h3>${esc(e.name)}</h3><button class="icon-btn" data-close aria-label="Close">${icon('x')}</button></div>
         ${anim(e.id, 'big')}
-        <div class="ex-tags"><span class="badge badge-accent">${esc(groupName(e.group))}</span><span class="badge badge-muted">${esc(cap(e.equipment))}</span>${e.level ? `<span class="badge badge-muted">${esc(cap(e.level))}</span>` : ''}${sets ? `<span class="badge badge-good">${sets} × ${esc(reps)}</span>` : ''}</div>
+        <div class="ex-tags"><span class="badge badge-accent">${esc(groupName(e.group))}</span><span class="badge badge-muted">${esc(cap(e.equipment))}</span>${e.level ? `<span class="badge badge-muted">${esc(cap(e.level))}</span>` : ''}${sets ? `<span class="badge badge-good">${sets} × ${esc(reps)}</span>` : ''}${sets && kcalOf(e, { sets, reps }) ? `<span class="badge badge-warn">${icon('flame')}≈ ${kcalOf(e, { sets, reps }).total} kcal · ${kcalOf(e, { sets, reps }).perSet} per ${e.cardio ? 'session' : 'set'}</span>` : ''}</div>
         <p class="ex-muscles"><b>Works:</b> ${e.primary.map(cap).map(esc).join(', ')}${e.secondary.length ? ` <span class="muted">· also ${e.secondary.map(cap).map(esc).join(', ')}</span>` : ''}</p>
         <h4 class="ex-h">How to do it</h4>
         <ol class="ex-steps">${e.steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>
@@ -153,8 +156,10 @@
   function exerciseCard(x, { done, tickable } = {}) {
     const e = lib.byId[x.id];
     if (!e) return '';
+    const k = kcalOf(e, x);
     return `<div class="card ex-card${done ? ' done' : ''}" data-open="${e.id}" role="button" tabindex="0">${anim(e.id)}
-      <div class="ex-body"><b>${esc(e.name)}</b><span>${x.sets} ${x.sets === 1 ? 'set' : 'sets'} × ${esc(x.reps)}${/min|s$/.test(x.reps) ? '' : ' reps'}</span><small>${esc(groupName(e.group))} · ${esc(cap(e.equipment))}</small></div>
+      <div class="ex-body"><b>${esc(e.name)}</b><span>${x.sets} ${x.sets === 1 ? 'set' : 'sets'} × ${esc(x.reps)}${/min|s$/.test(x.reps) ? '' : ' reps'}</span><small>${esc(groupName(e.group))} · ${esc(cap(e.equipment))}</small>
+        ${k ? `<span class="kcal">${icon('flame')}≈ ${k.total} kcal${x.sets > 1 ? ` · ${k.perSet} per set` : ''}</span>` : ''}</div>
       ${tickable ? `<label class="tick" aria-label="Done"><input type="checkbox" data-tick="${e.id}" ${done ? 'checked' : ''}><span>${icon('check')}</span></label>` : ''}</div>`;
   }
 
@@ -163,6 +168,7 @@
    */
   async function planView(root, ctx) {
     await library();
+    if (ctx.kg) kg = ctx.kg;
     const plan = ctx.plan || { days: {} };
     const has = Object.keys(plan.days || {}).length > 0;
     const selected = ctx.selected || ctx.todayKey;
@@ -181,7 +187,12 @@
     root.innerHTML = `${weekStrip(plan, selected, ctx.todayKey)}
       <div class="card day-card"><div class="day-top"><div><small>${isToday ? 'Today · ' : ''}${DAY_LABELS[selected]}</small><h2>${esc(dayLabel(day))}</h2></div><button class="btn btn-ghost btn-sm" data-edit>${icon('edit')}Edit</button></div>
         ${day && isToday && list.length ? `<div class="day-progress"><div class="progress-track"><i style="width:${Math.round((doneCount / list.length) * 100)}%"></i></div><span>${doneCount}/${list.length} done</span></div>` : ''}
-        ${day ? `<p class="muted" style="font-size:13px">${list.length} exercise${list.length === 1 ? '' : 's'} · about ${Math.max(20, list.reduce((a, x) => a + (lib.byId[x.id]?.cardio ? 15 : x.sets * 3), 0))} min</p>` : ''}</div>
+        ${day ? `<p class="muted" style="font-size:13px">${list.length} exercise${list.length === 1 ? '' : 's'} · about ${Math.max(20, list.reduce((a, x) => a + (lib.byId[x.id]?.cardio ? 15 : x.sets * 3), 0))} min</p>` : ''}
+        ${day && list.length && window.Nutrition ? (() => {
+          const all = Nutrition.dayBurn(day, lib.byId, kg);
+          const doneKcal = isToday ? Nutrition.dayBurn({ exercises: list.filter((x) => done.has(x.id)) }, lib.byId, kg).kcal : null;
+          return `<div class="day-burn">${icon('flame')}<div><b>≈ ${all.kcal} kcal</b> if you do the whole workout${doneKcal != null ? ` · <span data-burned>${doneKcal}</span> kcal done so far` : ''}<small>Estimate for ${kg} kg body weight${ctx.kgKnown ? '' : ' · add your weight in Diet'}</small></div></div>`;
+        })() : ''}</div>
       ${day ? `<div class="ex-list">${list.map((x) => exerciseCard(x, { done: done.has(x.id), tickable: isToday })).join('')}</div>`
         : `<div class="rest-note big">${icon('moon')}<span><b>Rest day.</b> Sleep well, eat well, and come back stronger. <button class="link" data-edit>Add a workout</button></span></div>`}
       <div class="plan-foot"><button class="link" data-presets>${icon('star')} Change to a ready-made plan</button><a class="link" href="#/workout/library">${icon('search')} Browse all ${lib.exercises.length} exercises</a></div>
@@ -206,6 +217,8 @@
       const bar = root.querySelector('.day-progress');
       if (bar) { bar.querySelector('i').style.width = `${Math.round((n / list.length) * 100)}%`; bar.querySelector('span').textContent = `${n}/${list.length} done`; }
       if (n === list.length) toast('Workout complete! 💪');
+      const burned = root.querySelector('[data-burned]');
+      if (burned) burned.textContent = Nutrition.dayBurn({ exercises: list.filter((x) => done.has(x.id)) }, lib.byId, kg).kcal;
       try { await ctx.tick(ctx.todayDate, [...done]); } catch (e) { toast(e.message, 'bad'); }
     }));
   }

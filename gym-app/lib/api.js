@@ -681,6 +681,11 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
       }
       if (m === 'PUT' && pathname === '/api/member/photo') return setPhoto(member, body.image);
       if (m === 'DELETE' && pathname === '/api/member/photo') return clearPhoto(member);
+      if (m === 'PUT' && pathname === '/api/member/body') {
+        member.body = { ...v.body(body), updatedAt: stamp() };
+        store.save();
+        return member.body;
+      }
       if (m === 'PUT' && pathname === '/api/member/plan') {
         member.workoutPlan = { ...v.workoutPlan(body), updatedAt: stamp(), updatedBy: 'member' };
         store.save();

@@ -36,7 +36,7 @@
   }
 
   function renderTabs() {
-    const route = (location.hash.split('?')[0] || '#/').replace('#/workout/library', '#/workout');
+    const route = (location.hash.split('?')[0] || '#/').replace('#/workout/library', '#/workout').replace('#/diet', '#/workout');
     const tabs = state.token
       ? [['#/', 'home', 'Home'], ['#/workout', 'dumbbell', 'Workout'], ['#/classes', 'calendar', 'Classes'], ['#/progress', 'activity', 'Progress'], ['#/profile', 'user', 'Profile']]
       : [['#/', 'home', 'Home'], ['#/classes', 'calendar', 'Classes'], ['#/login', 'lock', 'Member login']];
@@ -286,10 +286,22 @@
     state.me.member.workoutLog = { ...(state.me.member.workoutLog || {}), [date]: done };
   };
 
+  // The member's weight: what they entered for their diet, else the trainer's last measurement.
+  function bodyWeight(d) {
+    const measured = [...(d.measurements || [])].reverse().find((x) => x.weight);
+    const kg = d.member.body?.weight || measured?.weight;
+    return { kg: kg || 70, known: Boolean(kg) };
+  }
+
+  const fitTabs = (on) => `<div class="fit-tabs" role="tablist"><a href="#/workout" role="tab" aria-selected="${on === 'workout'}">${icon('dumbbell')}Workout</a><a href="#/diet" role="tab" aria-selected="${on === 'diet'}">${icon('flame')}Diet & calories</a></div>`;
+
   async function workoutView(params) {
     const d = await me();
-    render(`<div class="page-title"><h1>My workout</h1><p>Your weekly plan. Tap an exercise to see how it's done.</p></div><div id="wk" style="margin-top:14px"><div class="boot"><div class="skel" style="height:300px;border-radius:22px"></div></div></div>`);
+    const w = bodyWeight(d);
+    render(`<div class="page-title"><h1>My workout</h1><p>Your weekly plan. Tap an exercise to see how it's done.</p></div>${fitTabs('workout')}<div id="wk" style="margin-top:14px"><div class="boot"><div class="skel" style="height:300px;border-radius:22px"></div></div></div>`);
     await Workout.planView(document.getElementById('wk'), {
+      kg: w.kg,
+      kgKnown: w.known,
       plan: d.member.workoutPlan,
       log: d.member.workoutLog?.[today()] || [],
       todayKey: todayKey(),
@@ -298,6 +310,87 @@
       onSelect: (day) => { history.replaceState(null, '', `#/workout?day=${day}`); workoutView(new URLSearchParams({ day })); },
       save: savePlan,
       tick,
+    });
+  }
+
+  // ---- diet ----------------------------------------------------------------------------
+
+  const GOALS = [['lose', 'Lose fat'], ['fit', 'Stay fit'], ['gain', 'Build muscle']];
+  const DIETS = [['nonveg', 'Chicken, meat & eggs'], ['egg', 'Eggs, no meat'], ['veg', 'Vegetarian']];
+  const MEAL_NAMES = { breakfast: ['sun', 'Breakfast'], lunch: ['sunset', 'Lunch'], snack: ['bolt', 'After workout'], dinner: ['moon', 'Dinner'] };
+
+  async function dietView(params) {
+    const d = await me();
+    const m = d.member;
+    render(`<div class="page-title"><h1>Diet & calories</h1><p>How much you burn, how much protein you need, and what to eat.</p></div>${fitTabs('diet')}<div id="diet" class="pad" style="margin-top:14px"></div>`);
+    const box = document.getElementById('diet');
+    if (!m.body || params.get('edit')) return bodyForm(box, d);
+
+    const b = m.body;
+    const plan = m.workoutPlan;
+    const trainingDays = Object.values(plan?.days || {}).filter((x) => x?.exercises?.length).length || 3;
+    const p = Nutrition.plan(b, trainingDays);
+    const lib = await Workout.library();
+    const todayDay = plan?.days?.[todayKey()];
+    const burnToday = todayDay ? Nutrition.dayBurn(todayDay, lib.byId, b.weight) : null;
+    const weekBurn = Object.values(plan?.days || {}).reduce((a, x) => a + Nutrition.dayBurn(x, lib.byId, b.weight).kcal, 0);
+    const perKg = { lose: 2, fit: 1.6, gain: 2 }[b.goal];
+    const short = p.protein - p.totals.protein;
+
+    box.innerHTML = `<div class="card diet-target">
+        <div class="dt-main"><div><small>Eat each day</small><b class="tnum">${p.target.toLocaleString()}</b><span>kcal</span></div><div><small>Protein</small><b class="tnum">${p.protein}</b><span>grams</span></div></div>
+        <div class="dt-macros"><span><b>${p.carbs} g</b> carbs</span><span><b>${p.fat} g</b> fat</span><span><b>${p.water} L</b> water</span></div>
+        <p class="dt-why">${b.weight} kg × ${perKg} g = <b>${p.protein} g protein</b> a day to ${b.goal === 'gain' ? 'build muscle' : b.goal === 'lose' ? 'lose fat and keep your muscle' : 'stay fit'}. Your body uses about ${p.maintain.toLocaleString()} kcal a day with ${trainingDays} workout${trainingDays === 1 ? '' : 's'} a week${b.goal === 'lose' ? ', so eating less makes you lose fat' : b.goal === 'gain' ? ', so eating a bit more builds muscle' : ''}.</p></div>
+
+      <div class="card diet-burn">${icon('flame')}<div>${burnToday && burnToday.kcal ? `<b>Today's workout burns ≈ ${burnToday.kcal} kcal</b><span>${esc(Workout.dayLabel(todayDay))} · about ${burnToday.minutes} min. See each exercise in <a class="link" href="#/workout">Workout</a>.</span>` : `<b>Rest day today</b><span>${weekBurn ? `Your week of workouts burns ≈ ${weekBurn.toLocaleString()} kcal.` : 'Make a workout plan to see the calories you burn.'}</span>`}</div></div>
+
+      <h2 class="diet-h">Your meals for today</h2>
+      <div class="meals">${p.meals.map((meal) => {
+        const [ic, name] = MEAL_NAMES[meal.id];
+        const prot = meal.items.reduce((a, x) => a + x.protein, 0);
+        const kc = meal.items.reduce((a, x) => a + x.kcal, 0);
+        return `<section class="card meal"><div class="meal-head">${icon(ic)}<h3>${name}</h3><span>${prot} g protein · ${kc} kcal</span></div>
+          <ul>${meal.items.map((x) => `<li><span class="qty">${esc(x.label)}</span><span class="food">${esc(x.food)}</span><span class="p">${x.protein ? `${x.protein} g` : ''}</span></li>`).join('')}</ul></section>`;
+      }).join('')}</div>
+      <div class="card diet-total"><div><small>Protein in this plan</small><b class="${short > 10 ? 'warn' : ''}">${p.totals.protein} g</b><span>of ${p.protein} g</span></div><div><small>Calories</small><b>${p.totals.kcal.toLocaleString()}</b><span>of ${p.target.toLocaleString()} kcal</span></div></div>
+      ${short > 10 ? `<p class="note-line">${short} g short: add a scoop of whey or ${Math.ceil(short / 6)} more eggs.</p>` : ''}
+
+      <h2 class="diet-h">Protein in common foods</h2>
+      <div class="card protein-table"><table><tbody>${['egg', 'chicken', 'fish', 'beef', 'daal', 'chana', 'paneer', 'soya', 'milk', 'dahi', 'whey', 'roti'].map((k) => {
+        const f = Nutrition.FOODS[k];
+        return `<tr><td>${esc(f.name)}</td><td class="muted">${f.per ? `${f.per} g` : `1 ${f.unit}`}</td><td class="num"><b>${f.p} g</b></td><td class="num muted">${f.kcal} kcal</td></tr>`;
+      }).join('')}</tbody></table></div>
+      <p class="diet-note">Numbers are estimates for a healthy adult. If you have a medical condition, are pregnant, or take medicine, ask a doctor first. Your trainer can adjust this plan with you.</p>
+      <button class="btn btn-ghost btn-block" data-edit style="margin-top:12px">${icon('edit')}Change weight, goal or diet</button>`;
+    box.querySelector('[data-edit]').addEventListener('click', () => { location.hash = '#/diet?edit=1'; });
+  }
+
+  function bodyForm(box, d) {
+    const m = d.member;
+    const b = m.body || {};
+    const last = (k) => [...(d.measurements || [])].reverse().find((x) => x[k])?.[k];
+    const age = b.age || (m.dob ? Math.floor((Date.parse(today()) - Date.parse(m.dob)) / (365.25 * 864e5)) : '');
+    const chips = (name, list, cur) => `<div class="choice-row" role="radiogroup">${list.map(([v, l]) => `<label class="choice-chip"><input type="radio" name="${name}" value="${v}" ${v === cur ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>`;
+    box.innerHTML = `<div class="card box"><h2 style="font-size:19px">About you</h2><p class="muted" style="margin:4px 0 16px">Used to work out your calories and protein. Only you and your gym can see it.</p>
+      <form class="form" style="padding:0" novalidate>
+        <div class="two-col"><label class="field"><span>Weight (kg)</span><input class="input" name="weight" type="number" inputmode="decimal" min="25" max="300" value="${esc(b.weight || last('weight') || '')}" required></label>
+          <label class="field"><span>Height (cm)</span><input class="input" name="height" type="number" inputmode="numeric" min="100" max="250" value="${esc(b.height || last('height') || '')}" required></label></div>
+        <div class="two-col"><label class="field"><span>Age</span><input class="input" name="age" type="number" inputmode="numeric" min="10" max="100" value="${esc(age)}" required></label>
+          <label class="field"><span>Gender</span><select class="select" name="gender"><option value="male" ${(b.gender || m.gender) !== 'female' ? 'selected' : ''}>Male</option><option value="female" ${(b.gender || m.gender) === 'female' ? 'selected' : ''}>Female</option></select></label></div>
+        <div class="field"><span>Your goal</span>${chips('goal', GOALS, b.goal || 'fit')}</div>
+        <div class="field"><span>What you eat</span>${chips('diet', DIETS, b.diet || 'nonveg')}</div>
+        <button class="btn btn-primary btn-block">Show my diet plan</button></form></div>`;
+    const f = box.querySelector('form');
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      busy(f.querySelector('button'), async () => {
+        try {
+          const body = Object.fromEntries(new FormData(f).entries());
+          for (const k of ['weight', 'height', 'age']) body[k] = Math.round(Number(body[k]));
+          state.me.member.body = await api('/api/member/body', { method: 'PUT', body });
+          if (location.hash === '#/diet') dietView(new URLSearchParams()); else location.hash = '#/diet';
+        } catch (err) { toast(err.message, 'bad'); }
+      });
     });
   }
 
@@ -449,6 +542,7 @@
       if (!state.token) return page === 'login' ? loginView() : publicHome();
       if (page === 'workout' && path.includes('library')) return await libraryPage(params);
       if (page === 'workout') return await workoutView(params);
+      if (page === 'diet') return await dietView(params);
       if (page === 'progress') return await progressView(params);
       if (page === 'fees') return await feesView();
       if (page === 'profile') return await profileView();

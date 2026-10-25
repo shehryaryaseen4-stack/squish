@@ -219,4 +219,16 @@ function safeUrl(v) {
   return s;
 }
 
-module.exports = { HttpError, fail, str, num, phone, color, isoDate, method, METHODS, collections, member, payment, business, workoutPlan };
+// What the member tells us for the diet plan.
+function body(b) {
+  return {
+    weight: num(b.weight, { min: 25, max: 300, field: 'Weight' }),
+    height: num(b.height, { min: 100, max: 250, field: 'Height' }),
+    age: num(b.age, { min: 10, max: 100, field: 'Age' }),
+    gender: ['male', 'female'].includes(b.gender) ? b.gender : 'male',
+    goal: ['lose', 'fit', 'gain'].includes(b.goal) ? b.goal : 'fit',
+    diet: ['nonveg', 'egg', 'veg'].includes(b.diet) ? b.diet : 'nonveg',
+  };
+}
+
+module.exports = { HttpError, body, fail, str, num, phone, color, isoDate, method, METHODS, collections, member, payment, business, workoutPlan };
