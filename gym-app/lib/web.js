@@ -29,14 +29,17 @@ const csp = (extra = {}) => [
   `img-src 'self' data: blob:${extra.img ? ` ${extra.img}` : ''}`,
   `connect-src 'self'${extra.connect ? ` ${extra.connect}` : ''}`,
   `frame-src ${extra.frame || "'none'"}`,
+  `media-src 'self' blob:${extra.media ? ` ${extra.media}` : ''}`,
   "manifest-src 'self'",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
 ].join('; ');
 
+// Gym pages may play exercise videos from YouTube.
+const VIDEO_FRAMES = 'https://www.youtube-nocookie.com https://www.youtube.com';
 const SECURITY_HEADERS = {
-  'Content-Security-Policy': csp(),
+  'Content-Security-Policy': csp({ frame: VIDEO_FRAMES }),
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
@@ -71,6 +74,40 @@ async function readBody(req, limit = 64 * 1024) {
   } catch {
     throw new HttpError(400, 'Invalid JSON');
   }
+}
+
+function readRaw(req, limit) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > limit) {
+        reject(new HttpError(413, `The video is too big. Keep it under ${Math.round(limit / 1048576)} MB (a short clip of 15-60 seconds).`));
+        req.destroy();
+      } else chunks.push(c);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
+// Videos are streamed in pieces (Range requests) so phones can start and seek.
+function sendVideo(req, res, file) {
+  const size = file.buffer ? file.buffer.length : file.size;
+  const range = /bytes=(\d*)-(\d*)/.exec(req.headers.range || '');
+  const head = { 'Content-Type': 'video/mp4', 'Accept-Ranges': 'bytes', 'Cache-Control': 'private, max-age=86400', ...SECURITY_HEADERS };
+  let start = 0;
+  let end = size - 1;
+  if (range) {
+    start = range[1] ? Number(range[1]) : Math.max(0, size - Number(range[2]));
+    end = range[1] && range[2] ? Math.min(Number(range[2]), size - 1) : size - 1;
+    if (start >= size || start > end) { res.writeHead(416, { 'Content-Range': `bytes */${size}` }); return res.end(); }
+    res.writeHead(206, { ...head, 'Content-Range': `bytes ${start}-${end}/${size}`, 'Content-Length': end - start + 1 });
+  } else res.writeHead(200, { ...head, 'Content-Length': size });
+  if (req.method === 'HEAD') return res.end();
+  if (file.buffer) return res.end(file.buffer.subarray(start, end + 1));
+  fs.createReadStream(file.path, { start, end }).pipe(res);
 }
 
 function sendError(res, err) {
@@ -133,8 +170,16 @@ function gymHandler({ store, api, prefix = '', machines = true, machinePort = nu
         if (!data) return send(res, 404, 'Not found', 'text/plain');
         return send(res, 200, data, 'image/jpeg', { 'Cache-Control': 'private, max-age=86400' });
       }
+      if (pathname.startsWith('/videos/') && (req.method === 'GET' || req.method === 'HEAD')) {
+        const file = store.videoFile(pathname.slice(8));
+        if (!file) return send(res, 404, 'Not found', 'text/plain');
+        return sendVideo(req, res, file);
+      }
       if (pathname.startsWith('/api/')) {
-        const body = ['POST', 'PUT', 'PATCH'].includes(req.method) ? await readBody(req, pathname.endsWith('/photo') ? 1024 * 1024 : undefined) : {};
+        // An uploaded exercise video comes as the raw file.
+        const rawVideo = req.method === 'PUT' && /^\/api\/admin\/exercise-videos\/[\w-]+\/file$/.test(pathname);
+        const body = rawVideo ? { file: await readRaw(req, 40 * 1024 * 1024), type: req.headers['content-type'] || '' }
+          : ['POST', 'PUT', 'PATCH'].includes(req.method) ? await readBody(req, pathname.endsWith('/photo') ? 1024 * 1024 : undefined) : {};
         const result = await api.handle(req, res, Object.assign(new URL(url), { pathname }), body);
         return send(res, 200, JSON.stringify(result), undefined, { 'Cache-Control': 'no-store' });
       }

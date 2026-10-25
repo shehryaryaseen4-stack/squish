@@ -1517,6 +1517,7 @@
       </form>
 
       <section class="card form-section" id="wa"><div class="skel" style="height:120px"></div></section>
+      <section class="card form-section" id="exvid"><div class="skel" style="height:120px"></div></section>
 
       <section class="card form-section"><div class="panel-head"><div><h2>Membership plans</h2><p class="muted" style="font-size:13.5px">Monthly, quarterly, half-yearly, annual or anything you like.</p></div><button class="btn btn-primary btn-sm" data-addplan>${icon('plus')}Add plan</button></div>
         <div class="item-list">${S.data.plans.map((p) => `<div class="card item${p.active === false ? ' inactive' : ''}"><div class="ic-tile">${icon('star')}</div><div class="tx"><b>${esc(p.name)}${p.highlight ? ' <span class="badge badge-accent">Highlighted</span>' : ''}${p.active === false ? ' <span class="badge badge-muted">Hidden</span>' : ''}</b><span>${p.months} month${p.months > 1 ? 's' : ''} · ${rs(p.price)} · ${rs(Math.round(p.price / p.months))}/month</span></div><div class="acts"><button class="icon-btn" data-plan="${esc(p.id)}" aria-label="Edit ${esc(p.name)}">${icon('edit')}</button></div></div>`).join('')}</div></section>
@@ -1610,6 +1611,72 @@
     root.querySelector('[data-addstaff]').addEventListener('click', () => editStaff({}));
     root.querySelectorAll('[data-staff]').forEach((x) => x.addEventListener('click', () => editStaff(S.data.staff.find((s) => s.id === x.dataset.staff))));
     drawWhatsApp();
+    drawExerciseVideos();
+  }
+
+  // ---- short how-to videos on exercises ------------------------------------------------
+
+  async function drawExerciseVideos(filter = { q: '', f: 'all' }) {
+    const box = document.getElementById('exvid');
+    if (!box) return;
+    const lib = await Workout.library();
+    const count = lib.exercises.filter((e) => Workout.videoOf(e.id)).length;
+    box.innerHTML = `<div class="panel-head"><div><h2>${icon('tv')} Exercise videos</h2><p class="muted" style="font-size:13.5px">Add a short clip (15-60 seconds) showing the right way to do each exercise. Members see it when they open the exercise. Without one, they get a button to short YouTube videos.</p></div></div>
+      <div class="toolbar" style="margin:0 0 12px"><input class="input" type="search" placeholder="Search exercises" data-q value="${esc(filter.q)}" style="max-width:260px">
+        <div class="chips-row" style="margin:0" role="group">${[['all', `All · ${lib.exercises.length}`], ['with', `With video · ${count}`], ['without', `No video · ${lib.exercises.length - count}`]].map(([id, l]) => `<button class="chip" data-f="${id}" aria-pressed="${filter.f === id}">${l}</button>`).join('')}</div></div>
+      <div class="item-list ex-videos" data-list></div>`;
+    const draw = () => {
+      const t = filter.q.trim().toLowerCase();
+      const list = lib.exercises.filter((e) => (!t || e.name.toLowerCase().includes(t)) && (filter.f === 'all' || (filter.f === 'with') === Boolean(Workout.videoOf(e.id))));
+      box.querySelector('[data-list]').innerHTML = list.map((e) => {
+        const v = Workout.videoOf(e.id);
+        return `<div class="card item">${Workout.anim(e.id, 'tiny')}<div class="tx"><b>${esc(e.name)} ${v ? `<span class="badge badge-good">${v.type === 'file' ? 'Your clip' : 'YouTube'}</span>` : ''}</b><span>${esc(Workout.groupName(e.group))}</span></div>
+          <div class="acts"><button class="btn btn-ghost btn-sm" data-preview="${e.id}">${icon('tv')}See</button><button class="btn btn-soft btn-sm" data-link="${e.id}">Link</button><button class="btn btn-soft btn-sm" data-upload="${e.id}">${icon('download')}Upload</button>${v ? `<button class="icon-btn" data-rmvid="${e.id}" aria-label="Remove video">${icon('trash')}</button>` : ''}</div></div>`;
+      }).join('') || emptyLine('No exercise found.');
+      const L = box.querySelector('[data-list]');
+      L.querySelectorAll('[data-preview]').forEach((b) => b.addEventListener('click', () => Workout.detailSheet(b.dataset.preview)));
+      L.querySelectorAll('[data-link]').forEach((b) => b.addEventListener('click', () => sheet({
+        title: 'Add a YouTube video',
+        html: `<form class="form-grid" novalidate><p class="muted">Paste a YouTube or YouTube Shorts link. Short videos (under a minute) that show the full set with good form work best.</p>
+          <label class="field"><span>Link</span><input class="input" name="url" inputmode="url" placeholder="https://youtube.com/shorts/…" autocomplete="off"></label>
+          <a class="link" href="https://www.youtube.com/results?search_query=${encodeURIComponent(`${lib.byId[b.dataset.link].name} proper form #shorts`)}" target="_blank" rel="noopener">Find one on YouTube ↗</a>
+          <div class="sheet-actions"><button type="button" class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary">Save</button></div></form>`,
+        onMount: (el, close) => el.querySelector('form').addEventListener('submit', (ev) => {
+          ev.preventDefault();
+          busy(ev.target.querySelector('.btn-primary'), async () => {
+            try { Workout.setVideo(b.dataset.link, await api(`/api/admin/exercise-videos/${b.dataset.link}`, { method: 'PUT', body: { url: ev.target.url.value } })); close(); toast('Video added'); drawExerciseVideos(filter); } catch (err) { toast(err.message, 'bad'); }
+          });
+        }),
+      })));
+      L.querySelectorAll('[data-upload]').forEach((b) => b.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'video/mp4,video/quicktime';
+        input.addEventListener('change', () => {
+          const file = input.files[0];
+          if (!file) return;
+          if (file.size > 40 * 1024 * 1024) return toast('The video is too big. Keep it under 40 MB (15-60 seconds).', 'bad');
+          busy(b, async () => {
+            try {
+              const res = await fetch(`${UI.apiBase()}/api/admin/exercise-videos/${b.dataset.upload}/file`, { method: 'PUT', headers: { Authorization: `Bearer ${S.token}`, 'Content-Type': file.type || 'video/mp4' }, body: file });
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok) throw new Error(data.error || 'Upload failed');
+              Workout.setVideo(b.dataset.upload, data);
+              toast('Video uploaded');
+              drawExerciseVideos(filter);
+            } catch (err) { toast(err.message, 'bad'); }
+          });
+        });
+        input.click();
+      }));
+      L.querySelectorAll('[data-rmvid]').forEach((b) => b.addEventListener('click', async () => {
+        if (!(await confirmSheet({ title: 'Remove this video?', message: 'Members will see the photos and the YouTube button again.', confirm: 'Remove', danger: true }))) return;
+        try { await api(`/api/admin/exercise-videos/${b.dataset.rmvid}`, { method: 'DELETE' }); Workout.setVideo(b.dataset.rmvid, null); drawExerciseVideos(filter); } catch (err) { toast(err.message, 'bad'); }
+      }));
+    };
+    box.querySelector('[data-q]').addEventListener('input', (e) => { filter.q = e.target.value; draw(); });
+    box.querySelectorAll('[data-f]').forEach((b) => b.addEventListener('click', () => { filter.f = b.dataset.f; box.querySelectorAll('[data-f]').forEach((x) => x.setAttribute('aria-pressed', x === b)); draw(); }));
+    draw();
   }
 
   // ---- automatic WhatsApp reminders ---------------------------------------------------

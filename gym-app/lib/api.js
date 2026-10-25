@@ -33,6 +33,12 @@ const sum = (list, f) => list.reduce((a, x) => a + (f(x) || 0), 0);
 const bearer = (req) => (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
 const normalPhone = (p) => String(p || '').replace(/\D/g, '').replace(/^92/, '0');
 
+// "https://youtube.com/shorts/abc123DEF45", "youtu.be/…", "watch?v=…" → the 11-character video id.
+function youtubeId(url) {
+  const m = String(url || '').trim().match(/(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:shorts\/|embed\/|live\/|watch\?(?:.*&)?v=|v\/))([\w-]{11})/);
+  return m ? m[1] : null;
+}
+
 function memberPublic(m) {
   const { pin, ...rest } = m;
   return rest;
@@ -626,6 +632,8 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     let match;
 
     // Public
+    // Short how-to videos the gym added to exercises.
+    if (m === 'GET' && pathname === '/api/exercise-videos') return d.exerciseVideos || {};
     if (m === 'GET' && pathname === '/api/gym') {
       const { closedDates, ...business } = d.business;
       return {
@@ -1091,6 +1099,34 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
         return { ok: true };
       }
     }
+    // Exercise videos: a YouTube / Shorts link or a short clip uploaded by the gym
+    if ((match = pathname.match(/^\/api\/admin\/exercise-videos\/([\w-]{1,80})(\/file)?$/))) {
+      need('settings', 'members.edit');
+      const exId = match[1];
+      d.exerciseVideos ||= {};
+      if (m === 'DELETE' && !match[2]) {
+        if (d.exerciseVideos[exId]?.type === 'file') store.deleteVideo(exId);
+        delete d.exerciseVideos[exId];
+        store.save();
+        return { ok: true };
+      }
+      if (m === 'PUT' && match[2]) {
+        const buf = body.file;
+        // MP4 and MOV files have "ftyp" right after the first 4 bytes.
+        if (!Buffer.isBuffer(buf) || buf.length < 1000 || buf.subarray(4, 8).toString('latin1') !== 'ftyp') fail('Upload an MP4 video (most phones record MP4; on iPhone choose "Most compatible" in Camera → Formats)');
+        d.exerciseVideos[exId] = { type: 'file', src: store.saveVideo(exId, buf), size: buf.length, addedAt: stamp() };
+        store.save();
+        return d.exerciseVideos[exId];
+      }
+      if (m === 'PUT') {
+        const id = youtubeId(body.url) || fail('Paste a YouTube or YouTube Shorts link');
+        if (d.exerciseVideos[exId]?.type === 'file') store.deleteVideo(exId);
+        d.exerciseVideos[exId] = { type: 'youtube', id, short: /\/shorts\//.test(String(body.url)), addedAt: stamp() };
+        store.save();
+        return d.exerciseVideos[exId];
+      }
+    }
+
     // Automatic WhatsApp reminders
     if (pathname === '/api/admin/whatsapp' || pathname === '/api/admin/whatsapp/test') {
       need('settings');
@@ -1183,4 +1219,4 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
   return { handle, handleDevice, handleHikvision, ownerToken, reminders };
 }
 
-module.exports = { createApi, HttpError, weekdayOf };
+module.exports = { createApi, HttpError, weekdayOf, youtubeId };

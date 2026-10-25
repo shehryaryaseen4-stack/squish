@@ -10,14 +10,27 @@
   let kg = 70;
   const kcalOf = (e, x) => (window.Nutrition ? Nutrition.burn(e, x, kg) : null);
 
+  let videos = {};
   async function library() {
     if (lib) return lib;
-    const res = await fetch(`${BASE}exercises/library.json`);
+    const [res, vids] = await Promise.all([fetch(`${BASE}exercises/library.json`), UI.api('/api/exercise-videos').catch(() => ({}))]);
     if (!res.ok) throw new Error('Could not load the exercise library');
     lib = await res.json();
     lib.byId = Object.fromEntries(lib.exercises.map((e) => [e.id, e]));
+    videos = vids || {};
     return lib;
   }
+  const setVideo = (id, v) => { if (v) videos[id] = v; else delete videos[id]; };
+  const videoOf = (id) => videos[id] || null;
+
+  // The gym's own clip or YouTube video; otherwise a link to short videos on YouTube.
+  function player(e) {
+    const v = videos[e.id];
+    if (v?.type === 'file') return `<div class="ex-video"><video src="${UI.esc(UI.photoSrc(v.src))}" controls playsinline loop autoplay muted preload="metadata"></video></div>`;
+    if (v?.type === 'youtube') return `<div class="ex-video yt${v.short ? ' short' : ''}"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(v.id)}?playsinline=1&rel=0&modestbranding=1&loop=1&playlist=${encodeURIComponent(v.id)}" title="${UI.esc(e.name)} video" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`;
+    return '';
+  }
+  const shortsLink = (e) => `https://www.youtube.com/results?search_query=${encodeURIComponent(`${e.name} proper form #shorts`)}`;
 
   const img = (id, n) => `${BASE}exercises/img/${id}-${n}.jpg`;
   const groupName = (g) => lib?.groups.find((x) => x.id === g)?.name || g;
@@ -65,7 +78,8 @@
       label: e.name,
       wide: true,
       html: `<div class="sheet-head"><h3>${esc(e.name)}</h3><button class="icon-btn" data-close aria-label="Close">${icon('x')}</button></div>
-        ${anim(e.id, 'big')}
+        ${player(e) || anim(e.id, 'big')}
+        ${videos[e.id] ? '' : `<a class="btn btn-soft btn-block yt-link" href="${shortsLink(e)}" target="_blank" rel="noopener">${icon('tv')}Watch short videos of the right form</a>`}
         <div class="ex-tags"><span class="badge badge-accent">${esc(groupName(e.group))}</span><span class="badge badge-muted">${esc(cap(e.equipment))}</span>${e.level ? `<span class="badge badge-muted">${esc(cap(e.level))}</span>` : ''}${sets ? `<span class="badge badge-good">${sets} × ${esc(reps)}</span>` : ''}${sets && kcalOf(e, { sets, reps }) ? `<span class="badge badge-warn">${icon('flame')}≈ ${kcalOf(e, { sets, reps }).total} kcal · ${kcalOf(e, { sets, reps }).perSet} per ${e.cardio ? 'session' : 'set'}</span>` : ''}</div>
         <p class="ex-muscles"><b>Works:</b> ${e.primary.map(cap).map(esc).join(', ')}${e.secondary.length ? ` <span class="muted">· also ${e.secondary.map(cap).map(esc).join(', ')}</span>` : ''}</p>
         <h4 class="ex-h">How to do it</h4>
@@ -159,7 +173,7 @@
     const k = kcalOf(e, x);
     return `<div class="card ex-card${done ? ' done' : ''}" data-open="${e.id}" role="button" tabindex="0">${anim(e.id)}
       <div class="ex-body"><b>${esc(e.name)}</b><span>${x.sets} ${x.sets === 1 ? 'set' : 'sets'} × ${esc(x.reps)}${/min|s$/.test(x.reps) ? '' : ' reps'}</span><small>${esc(groupName(e.group))} · ${esc(cap(e.equipment))}</small>
-        ${k ? `<span class="kcal">${icon('flame')}≈ ${k.total} kcal${x.sets > 1 ? ` · ${k.perSet} per set` : ''}</span>` : ''}</div>
+        ${k ? `<span class="kcal">${icon('flame')}≈ ${k.total} kcal${x.sets > 1 ? ` · ${k.perSet} per set` : ''}</span>` : ''}${videos[e.id] ? `<span class="has-video">${icon('tv')}Video</span>` : ''}</div>
       ${tickable ? `<label class="tick" aria-label="Done"><input type="checkbox" data-tick="${e.id}" ${done ? 'checked' : ''}><span>${icon('check')}</span></label>` : ''}</div>`;
   }
 
@@ -265,5 +279,5 @@
     return { days };
   }
 
-  window.Workout = { library, planView, libraryView, presetSheet, editDaySheet, summary, addToDay, dayLabel, ORDER };
+  window.Workout = { library, planView, libraryView, presetSheet, editDaySheet, summary, addToDay, dayLabel, ORDER, detailSheet, setVideo, videoOf, anim, groupName };
 })();

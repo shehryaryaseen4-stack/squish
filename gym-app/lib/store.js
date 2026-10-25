@@ -70,6 +70,32 @@ function createStore({ file, seed = 'demo', ownerPin = '1234', staffPin = '0000'
     try { return fs.readFileSync(path.join(photoDir, name)); } catch { return null; }
   }
 
+  // Short exercise videos the gym uploads. Without a data file (tests) they stay in memory.
+  const videoDir = file ? path.join(path.dirname(file), 'videos') : null;
+  const memVideos = new Map();
+  const videoName = (id) => `${String(id).replace(/[^\w-]/g, '')}.mp4`;
+  function saveVideo(exerciseId, buffer) {
+    const name = videoName(exerciseId);
+    if (!videoDir) memVideos.set(name, buffer);
+    else {
+      fs.mkdirSync(videoDir, { recursive: true });
+      fs.writeFileSync(path.join(videoDir, name), buffer);
+    }
+    return `/videos/${name}?v=${Date.now().toString(36)}`;
+  }
+  function deleteVideo(exerciseId) {
+    const name = videoName(exerciseId);
+    memVideos.delete(name);
+    if (videoDir) fs.rmSync(path.join(videoDir, name), { force: true });
+  }
+  // The file path (or the bytes in memory) for serving with range requests.
+  function videoFile(name) {
+    if (!/^[\w-]+\.mp4$/.test(name)) return null;
+    if (!videoDir) return memVideos.has(name) ? { buffer: memVideos.get(name) } : null;
+    const p = path.join(videoDir, name);
+    return fs.existsSync(p) ? { path: p, size: fs.statSync(p).size } : null;
+  }
+
   // Wipes members, money and attendance but keeps the gym's own settings.
   function clearData() {
     for (const key of DATA) db[key] = [];
@@ -82,7 +108,7 @@ function createStore({ file, seed = 'demo', ownerPin = '1234', staffPin = '0000'
   }
 
   save();
-  return { get db() { return db; }, save, clearData, savePhoto, deletePhoto, readPhoto };
+  return { get db() { return db; }, save, clearData, savePhoto, deletePhoto, readPhoto, saveVideo, deleteVideo, videoFile };
 }
 
 module.exports = { createStore, hashPin, checkPin };

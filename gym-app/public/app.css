@@ -381,3 +381,13 @@ main.no-tabs { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 .choice-chip span { display: inline-flex; align-items: center; height: 40px; padding: 0 14px; border-radius: 99px; border: 1.5px solid var(--line); background: var(--surface); font-weight: 650; font-size: 14px; color: var(--ink-2); }
 .choice-chip input:checked + span { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .choice-chip input:focus-visible + span { outline: 2.5px solid var(--accent); outline-offset: 2px; }
+
+/* Exercise videos */
+.ex-video { margin: 0 0 12px; border-radius: 18px; overflow: hidden; background: #000; }
+.ex-video video { display: block; width: 100%; max-height: 62vh; background: #000; }
+.ex-video.yt { aspect-ratio: 16 / 9; }
+.ex-video.yt.short { aspect-ratio: 9 / 16; max-height: 66vh; max-width: 100%; margin-inline: auto; width: min(100%, calc(66vh * 9 / 16)); }
+.ex-video iframe { display: block; width: 100%; height: 100%; border: 0; }
+.yt-link { margin: -2px 0 12px; }
+.ex-body .has-video { display: inline-flex; align-items: center; gap: 4px; margin: 4px 0 0 8px; font-size: 12.5px; font-weight: 700; color: var(--accent); }
+.ex-body .has-video .ico { width: 14px; height: 14px; }
