@@ -325,3 +325,36 @@ button.kpi { text-align: left; font: inherit; color: inherit; cursor: pointer; }
 .wa-template { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px dashed var(--line); font-size: 13.5px; color: var(--ink); }
 .wa-template span { flex: 1; }
 .wa-test { margin-top: 16px; padding: 14px 16px; border-radius: 16px; background: var(--surface-2); }
+
+/* Registering on the fingerprint / face machine */
+.cred-chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.cred { display: flex; gap: 10px; align-items: center; padding: 12px; border-radius: 14px; background: var(--surface-2); color: var(--ink-3); }
+.cred .ico { width: 22px; height: 22px; flex: none; }
+.cred b { display: block; font-size: 14px; color: var(--ink-2); }
+.cred small { font-size: 12.5px; }
+.cred.on { background: var(--good-soft); color: var(--good); }
+.cred.on b { color: var(--ink); }
+.method-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+@media (max-width: 520px) { .method-grid { grid-template-columns: repeat(2, 1fr); } }
+.method { position: relative; cursor: pointer; }
+.method input { position: absolute; opacity: 0; }
+.method span { display: grid; justify-items: center; gap: 8px; padding: 16px 8px; border-radius: 16px; border: 1.5px solid var(--line); text-align: center; font-size: 13.5px; transition: border-color .15s, background .15s; }
+.method .ico { width: 28px; height: 28px; color: var(--ink-3); }
+.method input:checked + span { border-color: var(--accent); background: var(--accent-soft); }
+.method input:checked + span .ico { color: var(--accent); }
+.method input:focus-visible + span { outline: 2.5px solid var(--accent); outline-offset: 2px; }
+.enroll-offer { margin-top: 18px; padding: 14px; border-radius: 16px; background: var(--surface-2); text-align: left; }
+.enroll-offer p { font-size: 13.5px; margin: 2px 0 10px; }
+.method-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.method-chip { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 12px; border-radius: 99px; border: 1.5px solid var(--line); background: var(--surface); font-weight: 650; font-size: 13.5px; cursor: pointer; }
+.method-chip .ico { width: 17px; height: 17px; color: var(--accent); }
+.method-chip:hover { border-color: var(--accent); }
+.enroll-wait { display: grid; justify-items: center; text-align: center; gap: 8px; padding: 16px 0 4px; }
+.enroll-wait h3 { font-size: 20px; }
+.enroll-wait p { max-width: 420px; line-height: 1.6; }
+.enroll-wait .pulse { width: 92px; height: 92px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); margin-bottom: 8px; }
+.enroll-wait .pulse .ico { width: 44px; height: 44px; }
+.enroll-wait.wait .pulse { animation: enroll-pulse 1.6s ease-in-out infinite; }
+.enroll-wait.ok .pulse { background: var(--good-soft); color: var(--good); }
+.enroll-wait.bad .pulse { background: var(--bad-soft); color: var(--bad); }
+@keyframes enroll-pulse { 0%, 100% { box-shadow: 0 0 0 0 var(--accent-soft); } 50% { box-shadow: 0 0 0 18px transparent; } }

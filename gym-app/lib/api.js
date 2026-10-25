@@ -9,6 +9,7 @@ const v = require('./validate');
 const { PERMISSIONS, PERM_IDS, PRESETS, migrateAccess } = require('./access');
 const { clientIp } = require('./net');
 const { createReminders, TEMPLATES } = require('./reminders');
+const { createEnroll } = require('./enroll');
 
 const { fail, HttpError } = v;
 const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -44,6 +45,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
   const db = () => store.db;
   if (migrateAccess(store.db)) store.save();
   const reminders = createReminders(store, { now: clock });
+  const enrollment = createEnroll({ db, store, stamp: () => new Date(clock()).toISOString(), now: () => new Date(clock()).getTime() });
   const now = () => nowIn(db().business.timeZone, clock());
   const today = () => now().date;
   const stamp = () => new Date(clock()).toISOString();
@@ -427,7 +429,8 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
       `GET OPTION FROM: ${sn}`,
       'ATTLOGStamp=None', 'OPERLOGStamp=9999', 'ATTPHOTOStamp=None',
       'ErrorDelay=30', 'Delay=10', 'TransTimes=00:00;14:05', 'TransInterval=1',
-      'TransFlag=TransData AttLog', 'Realtime=1', 'Encrypt=None',
+      // OpLog, EnrollFP and FACE make the machine tell us about new fingerprints, faces and cards.
+      'TransFlag=TransData AttLog OpLog EnrollUser ChgUser EnrollFP ChgFP FACE', 'Realtime=1', 'Encrypt=None',
     ].join('\n');
   }
 
@@ -446,7 +449,8 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
 
   function publicDevice(dv) {
     const seenAgo = dv.lastSeen ? nowMs() - Date.parse(dv.lastSeen) : null;
-    return { ...dv, online: seenAgo !== null && seenAgo < ONLINE_MS, seenAgo };
+    const { commands = [], ...rest } = dv;
+    return { ...rest, online: seenAgo !== null && seenAgo < ONLINE_MS, seenAgo, waiting: commands.filter((c) => c.status === 'pending' || c.status === 'sent').length };
   }
 
   function addDevice(body) {
@@ -504,9 +508,16 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     if (!device.approved) { store.save(); return [403, 'ERROR: add this machine in the gym app first']; }
     const path = url.pathname;
     if (method === 'GET' && path === '/iclock/cdata') { store.save(); return [200, deviceOptions(sn)]; }
+    // The machine asks for work (register a member, scan a finger) and reports back.
+    if (method === 'GET' && path === '/iclock/getrequest') { const reply = enrollment.nextCommands(device); store.save(); return [200, reply]; }
+    if (method === 'POST' && path === '/iclock/devicecmd') { enrollment.results(device, text); store.save(); return [200, 'OK']; }
     if (method === 'POST' && path === '/iclock/cdata') {
       const table = url.searchParams.get('table');
-      if (table !== 'ATTLOG') { store.save(); return [200, 'OK']; }
+      if (table !== 'ATTLOG') {
+        const n = enrollment.operlog(text);
+        store.save();
+        return [200, `OK: ${n}`];
+      }
       const lines = String(text || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
       const punches = lines.map((l) => l.split('\t')).filter((f) => f.length >= 2 && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(f[1]))
         .map(([pin, at, , verify]) => ({ pin: pin.trim(), date: at.slice(0, 10), time: at.slice(11, 16), verify }))
@@ -774,6 +785,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
           throw e;
         }
       }
+      enrollment.syncMember(member);
       store.save();
       return { member: memberPublic(member), pin, payment };
     }
@@ -792,11 +804,14 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
       if (m === 'PUT' && !action) {
         const data = v.member(body);
         if (d.members.some((x) => x.id !== member.id && !x.left && normalPhone(x.phone) === normalPhone(data.phone))) fail('Another member already uses this phone number', 409);
+        const renamed = member.name !== data.name;
         Object.assign(member, data);
+        if (renamed) enrollment.syncMember(member);
         store.save();
         return memberPublic(member);
       }
       if (m === 'DELETE' && !action) {
+        enrollment.removeMember(member);
         store.deletePhoto(id);
         d.members = d.members.filter((x) => x.id !== id);
         for (const key of ['payments', 'attendance', 'measurements', 'classBookings']) d[key] = d[key].filter((x) => x.memberId !== id);
@@ -835,6 +850,18 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
       if (m === 'POST' && action === 'classes') return bookClass(member, body.classId, body.date, { asStaff: true });
       if (m === 'PUT' && action === 'photo') return setPhoto(member, body.image);
       if (m === 'DELETE' && action === 'photo') return clearPhoto(member);
+      // Register a finger, face, palm, card or PIN on a machine.
+      if (action === 'enroll') {
+        if (m === 'GET') return enrollment.status(member);
+        if (m === 'POST') {
+          const device = d.devices.find((x) => x.id === body.deviceId && x.approved) || fail('Choose a machine', 404);
+          if (device.protocol !== 'zk') fail('Hikvision terminals register faces on the terminal itself: Person management → add the member with Employee No. ' + member.memberNo + ' → Face.');
+          let cmds;
+          try { cmds = enrollment.enroll(member, device, body); } catch (e) { fail(e.message); }
+          store.save();
+          return { commands: cmds.map((c) => c.id), online: publicDevice(device).online };
+        }
+      }
       if (m === 'PUT' && action === 'plan') {
         member.workoutPlan = { ...v.workoutPlan(body), updatedAt: stamp(), updatedBy: 'trainer' };
         store.save();
@@ -949,9 +976,15 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
       const member = d.members.find((x) => x.memberNo === Number(body.memberNo));
       return { result, member: memberPublic(member), summary: summaryOf(member) };
     }
-    if ((match = pathname.match(/^\/api\/admin\/devices\/([\w.-]+)(\/check)?$/))) {
+    if ((match = pathname.match(/^\/api\/admin\/devices\/([\w.-]+)(\/check|\/sync)?$/))) {
       const device = d.devices.find((x) => x.id === match[1]) || fail('Machine not found', 404);
-      if (m === 'GET' && match[2]) return checkDevice(device);
+      if (m === 'GET' && match[2] === '/check') return checkDevice(device);
+      if (m === 'POST' && match[2] === '/sync') {
+        if (device.protocol !== 'zk') fail('Only ZKTeco-type machines take members from the app');
+        enrollment.syncAll(device);
+        store.save();
+        return { queued: d.members.filter((x) => !x.left).length };
+      }
       if (m === 'PUT' && !match[2]) {
         if (body.approved !== undefined) device.approved = Boolean(body.approved);
         if (body.name !== undefined) device.name = v.str(body.name, { max: 60 }) || device.name;

@@ -141,3 +141,70 @@ test('member photos: set from the app or the desk, shown to staff and on the ent
   await call(`/api/admin/members/${body.member.id}/photo`, { method: 'DELETE', token });
   assert.equal((await call('/api/member/me', { token: mt })).body.member.photo, undefined);
 });
+
+test('registering a finger, face, card or PIN on the machine from the app', async (t) => {
+  const { createServer: make } = require('../server');
+  const server = make({ seed: 'empty', reminders: false });
+  await new Promise((r) => server.listen(0, r));
+  t.after(() => new Promise((r) => server.close(r)));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const call = async (p, { method = 'GET', body, token, raw } = {}) => {
+    const res = await fetch(base + p, { method, headers: { 'Content-Type': raw ? 'text/plain' : 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: raw ?? (body ? JSON.stringify(body) : undefined) });
+    const text = await res.text();
+    let json = null;
+    try { json = JSON.parse(text); } catch { /* text */ }
+    return { status: res.status, body: json, text };
+  };
+  const token = (await call('/api/admin/login', { method: 'POST', body: { pin: '1234' } })).body.token;
+  const dev = (await call('/api/admin/devices', { method: 'POST', token, body: { type: 'zk-face', sn: 'FACE0001', name: 'Door' } })).body;
+  const opts = await call('/iclock/cdata?SN=FACE0001&options=all');
+  assert.match(opts.text, /TransFlag=.*OpLog.*EnrollFP/);
+
+  // Adding a member puts them on the machine.
+  const { member } = (await call('/api/admin/members', { method: 'POST', token, body: { name: 'Sára Malik', phone: '03001234567', gender: 'female', joinDate: '2026-10-01' } })).body;
+  let work = await call('/iclock/getrequest?SN=FACE0001');
+  assert.match(work.text, /^C:\d+:DATA UPDATE USERINFO PIN=1001\tName=Sara Malik\tPri=0$/);
+  assert.equal((await call('/iclock/getrequest?SN=FACE0001')).text, 'OK', 'each command is handed out once');
+
+  // Face: the machine gets the user and an enrol command, then says it worked and uploads the face.
+  const r = await call(`/api/admin/members/${member.id}/enroll`, { method: 'POST', token, body: { deviceId: dev.id, method: 'face' } });
+  assert.equal(r.status, 200);
+  work = (await call('/iclock/getrequest?SN=FACE0001')).text.split('\n');
+  assert.equal(work.length, 2);
+  assert.match(work[1], /ENROLL_BIO TYPE=9\tPIN=1001\tRETRY=3\tOVERWRITE=1/);
+  const id = work[1].split(':')[1];
+  await call('/iclock/devicecmd?SN=FACE0001', { method: 'POST', raw: `ID=${id}&Return=0&CMD=ENROLL_BIO` });
+  await call('/iclock/cdata?SN=FACE0001&table=OPERLOG', { method: 'POST', raw: 'BIODATA Pin=1001\tNo=0\tIndex=0\tValid=1\tDuress=0\tType=9\tMajorVer=40\tTmp=abc' });
+  let st = (await call(`/api/admin/members/${member.id}/enroll`, { token })).body;
+  assert.equal(st.commands[0].status, 'ok');
+  assert.equal(st.credentials.face, true);
+
+  // Fingerprint the machine can't start remotely: a clear message.
+  await call(`/api/admin/members/${member.id}/enroll`, { method: 'POST', token, body: { deviceId: dev.id, method: 'fingerprint', finger: 6 } });
+  work = (await call('/iclock/getrequest?SN=FACE0001')).text.split('\n');
+  assert.match(work[1], /ENROLL_FP PIN=1001\tFID=6/);
+  await call('/iclock/devicecmd?SN=FACE0001', { method: 'POST', raw: `ID=${work[1].split(':')[1]}&Return=-1002&CMD=ENROLL_FP` });
+  st = (await call(`/api/admin/members/${member.id}/enroll`, { token })).body;
+  assert.equal(st.commands[0].status, 'failed');
+  assert.match(st.commands[0].error, /on the machine itself/);
+  // …but a finger added on the machine still shows up.
+  await call('/iclock/cdata?SN=FACE0001&table=OPERLOG', { method: 'POST', raw: 'FP PIN=1001\tFID=5\tSize=1000\tValid=1\tTMP=xyz' });
+
+  // Card and PIN go straight onto the user.
+  await call(`/api/admin/members/${member.id}/enroll`, { method: 'POST', token, body: { deviceId: dev.id, method: 'card', card: '0012 345678' } });
+  work = (await call('/iclock/getrequest?SN=FACE0001')).text;
+  assert.match(work, /Card=0012345678/);
+  await call('/iclock/devicecmd?SN=FACE0001', { method: 'POST', raw: `ID=${work.split(':')[1]}&Return=0&CMD=DATA` });
+  assert.equal((await call(`/api/admin/members/${member.id}/enroll`, { method: 'POST', token, body: { deviceId: dev.id, method: 'pin', pin: '12' } })).status, 400);
+
+  const detail = (await call(`/api/admin/members/${member.id}`, { token })).body;
+  assert.deepEqual(detail.member.credentials.fingers, [5]);
+  assert.equal(detail.member.credentials.face, true);
+  assert.equal(detail.member.credentials.card, '0012345678');
+  const list = (await call('/api/admin/devices', { token })).body.devices;
+  assert.equal(list[0].commands, undefined);
+
+  // Deleting the member removes them from the machine.
+  await call(`/api/admin/members/${member.id}`, { method: 'DELETE', token });
+  assert.match((await call('/iclock/getrequest?SN=FACE0001')).text, /DATA DELETE USERINFO PIN=1001/);
+});

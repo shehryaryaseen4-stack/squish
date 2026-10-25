@@ -621,9 +621,123 @@
       html: `<div class="pin-reveal">${avatar(m, 'lg')}<h3 style="margin-top:10px">${isNew ? `${esc(m.name)} is a member!` : 'New app PIN'}</h3>
         <p class="muted">Member number <b>#${m.memberNo}</b>. Their app PIN is shown only now:</p>
         <div class="code">${pin.split('').map((d) => `<b>${d}</b>`).join('')}</div></div>
+        ${isNew && can('members.edit') ? `<div class="enroll-offer"><b>Register on the fingerprint / face machine</b><p class="muted">Ask ${esc(m.name.split(' ')[0])} what's easiest for them:</p>
+          <div class="method-row">${ENROLL_METHODS.map(([id, ic, label]) => `<button type="button" class="method-chip" data-method="${id}">${icon(ic)}${label}</button>`).join('')}</div></div>` : ''}
         <div class="sheet-actions"><a class="btn btn-primary" href="${wa(m.phone, MSG.welcome(m, pin))}" target="_blank" rel="noopener">${icon('whatsapp')}Send on WhatsApp</a><button class="btn btn-ghost" data-open>Open profile</button></div>`,
-      onMount: (el, close) => el.querySelector('[data-open]').addEventListener('click', () => { close(); location.hash = `#/member/${m.id}`; if (location.hash === `#/member/${m.id}`) route(); }),
+      onMount: (el, close) => {
+        el.querySelector('[data-open]').addEventListener('click', () => { close(); location.hash = `#/member/${m.id}`; if (location.hash === `#/member/${m.id}`) route(); });
+        el.querySelectorAll('[data-method]').forEach((b) => b.addEventListener('click', () => { close(); setTimeout(() => enrollSheet(m, { method: b.dataset.method }), 240); }));
+      },
     });
+  }
+
+  // ---- registering on the fingerprint / face machine ----------------------------------
+
+  const ENROLL_METHODS = [['fingerprint', 'fingerprint', 'Fingerprint'], ['face', 'user', 'Face'], ['face-nir', 'user', 'Near-infrared face'], ['palm', 'hand', 'Palm'], ['card', 'ticket', 'Card'], ['pin', 'lock', 'PIN code']];
+  // Finger numbers as the machine counts them (0 = left little … 9 = right little).
+  const FINGERS = [[6, 'Right index'], [5, 'Right thumb'], [7, 'Right middle'], [3, 'Left index'], [4, 'Left thumb'], [2, 'Left middle'], [8, 'Right ring'], [1, 'Left ring'], [9, 'Right little'], [0, 'Left little']];
+
+  function credentialChips(c = {}) {
+    const items = [
+      ['fingerprint', 'Fingerprint', c.fingers?.length ? `${c.fingers.length} finger${c.fingers.length === 1 ? '' : 's'}` : ''],
+      ['user', 'Face', c.face ? 'Saved' : ''],
+      ['hand', 'Palm', c.palm ? 'Saved' : ''],
+      ['ticket', 'Card', c.card ? `No. ${c.card}` : ''],
+      ['lock', 'PIN code', c.pin ? 'Set' : ''],
+    ];
+    return `<div class="cred-chips">${items.map(([ic, label, val]) => `<div class="cred ${val ? 'on' : ''}">${icon(ic)}<span><b>${label}</b><small>${val || 'Not registered'}</small></span></div>`).join('')}</div>`;
+  }
+
+  async function enrollSheet(m, { method = 'fingerprint' } = {}, onDone) {
+    let devices = [];
+    try { devices = (await api('/api/admin/devices')).devices.filter((dv) => dv.approved); } catch { /* shown below */ }
+    const first = esc(m.name.split(' ')[0]);
+    if (!devices.length) {
+      return sheet({
+        title: 'Register on a machine',
+        html: `<div class="empty" style="padding:10px 0"><div class="empty-icon">${icon('fingerprint')}</div><h3>No machine added yet</h3><p>Add your fingerprint or face machine first, then register ${first} here.</p></div>
+          ${can('machines') ? '<div class="sheet-actions"><a class="btn btn-primary" href="#/settings" data-close>Add a machine</a></div>' : ''}`,
+      });
+    }
+    sheet({
+      title: `Register ${m.name}`,
+      wide: true,
+      html: `<form class="enroll" novalidate>
+        <p class="muted" style="margin-bottom:12px">Member <b>#${m.memberNo}</b> · ask ${first} which is easiest, then they scan on the machine.</p>
+        ${devices.length > 1 ? `<label class="field" style="margin-bottom:12px"><span>Machine</span><select class="select" name="deviceId">${devices.map((dv) => `<option value="${esc(dv.id)}">${esc(dv.name)}${dv.online ? '' : ' (offline)'}</option>`).join('')}</select></label>` : `<input type="hidden" name="deviceId" value="${esc(devices[0].id)}">`}
+        <div class="method-grid" role="radiogroup" aria-label="How they check in">${ENROLL_METHODS.map(([id, ic, label]) => `<label class="method"><input type="radio" name="method" value="${id}" ${id === method ? 'checked' : ''}><span>${icon(ic)}<b>${label}</b></span></label>`).join('')}</div>
+        <div data-extra></div>
+        <div class="sheet-actions"><button type="button" class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" type="submit">${icon('fingerprint')}Start on machine</button></div></form>`,
+      onMount: (el, close) => {
+        const f = el.querySelector('form');
+        const extra = el.querySelector('[data-extra]');
+        const drawExtra = () => {
+          const v = f.method.value;
+          extra.innerHTML = v === 'fingerprint' ? `<label class="field"><span>Which finger</span><select class="select" name="finger">${FINGERS.map(([n, l]) => `<option value="${n}">${l}</option>`).join('')}</select></label>`
+            : v === 'card' ? '<label class="field"><span>Card number</span><input class="input" name="card" inputmode="numeric" autocomplete="off" placeholder="Tap the card on the desk reader or type the number on it"></label>'
+              : v === 'pin' ? '<label class="field"><span>PIN for the machine (4 to 8 digits)</span><input class="input" name="pin" inputmode="numeric" maxlength="8" autocomplete="off"></label>'
+                : `<p class="muted" style="font-size:13.5px">${v === 'palm' ? 'For machines with a palm sensor.' : v === 'face-nir' ? 'For older face machines with an infrared camera (MB160, iFace).' : 'For SpeedFace, ProFace and other visible light face machines.'}</p>`;
+          extra.querySelector('input')?.focus();
+        };
+        f.querySelectorAll('[name=method]').forEach((r) => r.addEventListener('change', drawExtra));
+        drawExtra();
+        f.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const body = formData(f);
+          busy(f.querySelector('[type=submit]'), async () => {
+            try {
+              const r = await api(`/api/admin/members/${m.id}/enroll`, { method: 'POST', body });
+              const device = devices.find((dv) => dv.id === body.deviceId);
+              enrollWait(el, close, m, body.method, r.commands[r.commands.length - 1], device, onDone);
+            } catch (err) { toast(err.message, 'bad'); }
+          });
+        });
+      },
+    });
+  }
+
+  // Waits for the machine to pick up the command and for the member to scan.
+  function enrollWait(el, close, m, method, cmdId, device, onDone) {
+    const first = esc(m.name.split(' ')[0]);
+    const label = ENROLL_METHODS.find((x) => x[0] === method)[2];
+    const ask = {
+      fingerprint: `Ask ${first} to put the chosen finger on the machine when it asks, three times.`,
+      face: `Ask ${first} to stand in front of the machine and look at the screen until it beeps.`,
+      'face-nir': `Ask ${first} to stand in front of the machine and look at the screen until it beeps.`,
+      palm: `Ask ${first} to hold their open palm over the sensor until it beeps.`,
+      card: 'Saving the card on the machine.',
+      pin: 'Saving the PIN on the machine.',
+    }[method];
+    const manual = `On the machine: <b>Menu → User Mgt → All Users → ${m.memberNo} → Edit → ${method === 'pin' ? 'Password' : method === 'face-nir' ? 'Face' : label}</b>.`;
+    const ic = ENROLL_METHODS.find((x) => x[0] === method)[1];
+    const box = el.querySelector('.sheet-body');
+    const started = Date.now();
+    const draw = (state, text, sub = '') => {
+      box.innerHTML = `<div class="enroll-wait ${state}"><div class="pulse">${icon(state === 'ok' ? 'check' : state === 'bad' ? 'alert' : ic)}</div>
+        <h3>${text}</h3><p class="muted">${sub}</p></div>
+        <div class="sheet-actions">${state === 'ok' ? '<button class="btn btn-primary" data-close>Done</button>' : state === 'bad' ? `<button class="btn btn-ghost" data-close>Close</button><button class="btn btn-primary" data-retry>Try again</button>` : '<button class="btn btn-ghost" data-close>Close</button>'}</div>`;
+      box.querySelector('[data-retry]')?.addEventListener('click', () => { close(); setTimeout(() => enrollSheet(m, { method }, onDone), 240); });
+    };
+    draw('wait', 'Sending to the machine…', `${esc(device.name)} checks for work every few seconds.`);
+    const tick = async () => {
+      if (!el.isConnected) return;
+      let st;
+      try { st = await api(`/api/admin/members/${m.id}/enroll`); } catch { return setTimeout(tick, 3000); }
+      const c = st.commands.find((x) => x.id === cmdId);
+      if (c?.status === 'ok') {
+        draw('ok', `${label} saved`, `${first} can now check in at ${esc(device.name)}.`);
+        onDone?.();
+        return;
+      }
+      if (c?.status === 'failed') return draw('bad', 'It didn’t work', `${esc(c.error || 'The machine refused it.')}<br><br>${manual}`);
+      if (c?.status === 'sent') draw('wait', method === 'card' || method === 'pin' ? 'Saving…' : `${label}: scan now`, ask);
+      if (c?.status === 'pending' && Date.now() - started > 90000) {
+        return draw('bad', 'The machine didn’t answer', `Is ${esc(device.name)} switched on and connected? ${device.lastSeen ? '' : 'It has never connected yet.'}<br>The request stays waiting and runs when it connects.<br><br>Or register on the machine now: ${manual}`);
+      }
+      if (Date.now() - started > 4 * 60 * 1000) return draw('bad', 'No answer yet', `Check the machine's screen. ${manual}`);
+      setTimeout(tick, 2000);
+    };
+    setTimeout(tick, 1500);
   }
 
   // ---- collect fee ----------------------------------------------------------------
@@ -820,6 +934,10 @@
         </section>
       </div>
 
+      <section class="card panel section-gap"><div class="panel-head"><h2>${icon('fingerprint')} Machine access</h2><button class="btn btn-soft btn-sm" data-enroll data-need="members.edit">${icon('plus')}Register on machine</button></div>
+        ${credentialChips(m.credentials)}
+        <p class="muted" style="font-size:13px;margin-top:10px">Machine user ID: <b>${m.memberNo}</b></p></section>
+
       <section class="card panel section-gap" data-need="members.edit members.delete"><div class="panel-head"><h2>Account</h2></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-ghost btn-sm" data-pin data-need="members.edit">${icon('lock')}Reset app PIN</button>
@@ -829,6 +947,7 @@
 
     const $ = (sel) => root.querySelectorAll(sel);
     $('[data-fee]').forEach((b) => b.addEventListener('click', () => collectFeeSheet(id, reload)));
+    root.querySelector('[data-enroll]')?.addEventListener('click', () => enrollSheet(m, {}, reload));
     root.querySelector('[data-check]').addEventListener('click', (e) => busy(e.currentTarget, async () => {
       try {
         const r = await api('/api/admin/checkin', { method: 'POST', body: { memberId: id } });
@@ -1676,7 +1795,7 @@
     const badge = (dv) => (dv.online ? '<span class="badge badge-good"><i class="dot"></i>Connected</span>' : dv.lastSeen ? '<span class="badge badge-warn">Offline</span>' : '<span class="badge badge-muted">Not connected yet</span>');
     box.innerHTML = `${added.map((dv) => `<div class="card item"><div class="ic-tile">${icon(dv.protocol === 'hik' || dv.type === 'zk-face' ? 'user' : 'fingerprint')}</div>
       <div class="tx"><b>${esc(dv.name)} ${badge(dv)}</b><span>${esc(typeName(dv.type))}${dv.sn ? ` · serial ${esc(dv.sn)}` : ''} · ${dv.punches} punches${dv.lastSeen ? ` · last seen ${new Date(dv.lastSeen).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}` : ''}${dv.unknownIds?.length ? ` · <span class="money-neg">IDs not matching a member: ${dv.unknownIds.map(esc).join(', ')}</span>` : ''}</span></div>
-      <div class="acts"><button class="btn btn-ghost btn-sm" data-setup="${esc(dv.id)}">${icon('info')}Setup</button><button class="btn btn-soft btn-sm" data-check="${esc(dv.id)}">${icon('refresh')}Check</button><button class="icon-btn" data-rename="${esc(dv.id)}" aria-label="Rename">${icon('edit')}</button><button class="icon-btn" data-rmdev="${esc(dv.id)}" aria-label="Remove">${icon('trash')}</button></div></div>`).join('')}
+      <div class="acts"><button class="btn btn-ghost btn-sm" data-setup="${esc(dv.id)}">${icon('info')}Setup</button><button class="btn btn-soft btn-sm" data-check="${esc(dv.id)}">${icon('refresh')}Check</button>${dv.protocol === 'zk' ? `<button class="btn btn-ghost btn-sm" data-syncall="${esc(dv.id)}" title="Put every member's name and number on this machine">${icon('users')}Send members</button>` : ''}<button class="icon-btn" data-rename="${esc(dv.id)}" aria-label="Rename">${icon('edit')}</button><button class="icon-btn" data-rmdev="${esc(dv.id)}" aria-label="Remove">${icon('trash')}</button></div></div>`).join('')}
       ${found.map((dv) => `<div class="card item" style="border-style:dashed"><div class="ic-tile">${icon('alert')}</div><div class="tx"><b>New machine found · serial ${esc(dv.sn)}</b><span>It is calling the server but hasn't been added. Is it yours?</span></div>
         <div class="acts"><button class="btn btn-primary btn-sm" data-addfound="${esc(dv.sn)}">Add it</button><button class="icon-btn" data-rmdev="${esc(dv.id)}" aria-label="Ignore">${icon('x')}</button></div></div>`).join('')}
       ${!added.length && !found.length ? `<div class="note-box" style="margin:0;background:var(--surface-2)">${icon('info')}<span>No machine yet. Press <b>Add machine</b>, pick the one you have, and follow the steps.</span></div>` : ''}`;
@@ -1684,6 +1803,10 @@
     box.querySelectorAll('[data-setup]').forEach((b) => b.addEventListener('click', () => setupSheet(byId(b.dataset.setup))));
     box.querySelectorAll('[data-check]').forEach((b) => b.addEventListener('click', () => setupSheet(byId(b.dataset.check), { checkNow: true })));
     box.querySelectorAll('[data-addfound]').forEach((b) => b.addEventListener('click', () => machineWizard({ sn: b.dataset.addfound })));
+    box.querySelectorAll('[data-syncall]').forEach((b) => b.addEventListener('click', async () => {
+      if (!(await confirmSheet({ title: 'Send all members to this machine?', message: 'Every member\u2019s number and name is added to the machine, ready for a finger or face. Fingerprints already on the machine stay.', confirm: 'Send members' }))) return;
+      try { const r = await api(`/api/admin/devices/${b.dataset.syncall}/sync`, { method: 'POST' }); toast(`${r.queued} members will be on the machine within a few minutes`); } catch (err) { toast(err.message, 'bad'); }
+    }));
     box.querySelectorAll('[data-rmdev]').forEach((b) => b.addEventListener('click', async () => {
       if (!(await confirmSheet({ title: 'Remove this machine?', message: 'Punches from it will be refused until you add it again.', confirm: 'Remove', danger: true }))) return;
       await api(`/api/admin/devices/${b.dataset.rmdev}`, { method: 'DELETE' });
