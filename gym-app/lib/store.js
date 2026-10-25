@@ -74,6 +74,7 @@ function createStore({ file, seed = 'demo', ownerPin = '1234', staffPin = '0000'
   function clearData() {
     for (const key of DATA) db[key] = [];
     db.memberSessions = [];
+    db.reminders = [];
     db.receiptSeq = 1;
     db.memberSeq = 1001;
     db.demo = false;

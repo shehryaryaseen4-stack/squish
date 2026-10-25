@@ -28,6 +28,13 @@ function createServer(options = {}) {
     serve(req, res, url, url.pathname);
   });
   server.store = store;
+  server.api = api;
+  // WhatsApp reminders go out on their own, checked every 10 minutes.
+  if (options.reminders !== false) {
+    const run = () => api.reminders.tick().catch((err) => console.error('Reminders:', err.message));
+    setTimeout(run, 20000).unref();
+    setInterval(run, 10 * 60 * 1000).unref();
+  }
   return server;
 }
 

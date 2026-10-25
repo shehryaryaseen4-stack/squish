@@ -73,7 +73,7 @@ function rateLimiter(limit, windowMs) {
   };
 }
 
-function createPlatform({ dataDir, corsOrigins, machinePort = process.env.MACHINE_PORT, now = () => new Date(), ownerEmail = process.env.OWNER_EMAIL, ownerPassword = process.env.OWNER_PASSWORD, log = console.log } = {}) {
+function createPlatform({ dataDir, corsOrigins, machinePort = process.env.MACHINE_PORT, reminderTimer = true, now = () => new Date(), ownerEmail = process.env.OWNER_EMAIL, ownerPassword = process.env.OWNER_PASSWORD, log = console.log } = {}) {
   fs.mkdirSync(path.join(dataDir, 'gyms'), { recursive: true });
   const file = path.join(dataDir, 'platform.json');
   const P = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
@@ -645,6 +645,18 @@ function createPlatform({ dataDir, corsOrigins, machinePort = process.env.MACHIN
       sendError(res, err);
     }
   });
+
+  // WhatsApp reminders for every gym that is switched on.
+  if (reminderTimer) {
+    const run = async () => {
+      for (const g of P.gyms) {
+        if (!accessOf(g).ok) continue;
+        await runtime(g).api.reminders.tick().catch((err) => log(`Reminders for ${g.slug}: ${err.message}`));
+      }
+    };
+    setTimeout(run, 30000).unref();
+    setInterval(run, 10 * 60 * 1000).unref();
+  }
 
   // Gyms set up before machines were routed by serial number.
   for (const g of P.gyms) if (fs.existsSync(path.join(gymDir(g), 'db.json'))) reindexMachines(g);

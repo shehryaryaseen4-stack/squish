@@ -8,6 +8,7 @@ const { summarize, indexDb, paidOf } = require('./members');
 const v = require('./validate');
 const { PERMISSIONS, PERM_IDS, PRESETS, migrateAccess } = require('./access');
 const { clientIp } = require('./net');
+const { createReminders, TEMPLATES } = require('./reminders');
 
 const { fail, HttpError } = v;
 const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -42,6 +43,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
   const leadLimit = rateLimiter(5, 60 * 60 * 1000);
   const db = () => store.db;
   if (migrateAccess(store.db)) store.save();
+  const reminders = createReminders(store, { now: clock });
   const now = () => nowIn(db().business.timeZone, clock());
   const today = () => now().date;
   const stamp = () => new Date(clock()).toISOString();
@@ -1051,6 +1053,50 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
         return { ok: true };
       }
     }
+    // Automatic WhatsApp reminders
+    if (pathname === '/api/admin/whatsapp' || pathname === '/api/admin/whatsapp/test') {
+      need('settings');
+      if (m === 'GET') {
+        const { token, ...cfg } = reminders.cfgOf();
+        return { settings: { ...cfg, hasToken: Boolean(token) }, templates: TEMPLATES, dueToday: reminders.due().length };
+      }
+      if (m === 'PUT' && pathname === '/api/admin/whatsapp') {
+        const cur = d.whatsapp || {};
+        const days = Math.round(Number(body.daysBefore));
+        if (!(days >= 1 && days <= 30)) fail('Start reminders 1 to 30 days before');
+        if (!/^\d{2}:\d{2}$/.test(String(body.sendAt || ''))) fail('Choose the time to send, like 10:00');
+        d.whatsapp = {
+          ...cur,
+          enabled: Boolean(body.enabled),
+          phoneNumberId: v.str(body.phoneNumberId, { max: 40 }).replace(/\D/g, ''),
+          // Blank keeps the saved token, so it is never sent back to the browser.
+          token: body.token ? v.str(body.token, { max: 600 }) : cur.token || '',
+          templateName: v.str(body.templateName, { max: 60 }).toLowerCase().replace(/[^a-z0-9_]/g, '_') || 'membership_reminder',
+          templateLang: v.str(body.templateLang, { max: 10 }) || 'en',
+          countryCode: v.str(body.countryCode, { max: 4 }).replace(/\D/g, ''),
+          daysBefore: days,
+          every: body.every === 'some' ? 'some' : 'day',
+          sendAt: body.sendAt,
+        };
+        if (d.whatsapp.enabled && (!d.whatsapp.phoneNumberId || !d.whatsapp.token)) fail('Add the phone number ID and access token to switch reminders on');
+        if (!d.whatsapp.countryCode) fail('Enter your country calling code, e.g. 92');
+        store.save();
+        return { ok: true };
+      }
+      if (m === 'POST' && pathname === '/api/admin/whatsapp/test') {
+        try { return await reminders.test(v.str(body.phone, { max: 24, required: true, field: 'Phone' })); } catch (e) { fail(`WhatsApp: ${e.message}`); }
+      }
+    }
+    if (m === 'GET' && pathname === '/api/admin/reminders') {
+      need('members.view');
+      const names = new Map(d.members.map((x) => [x.id, x]));
+      return {
+        log: (d.reminders || []).slice(0, 100).map((r) => ({ ...r, member: pick(names.get(r.memberId)) })),
+        due: reminders.due().map((r) => ({ member: pick(r.member), expiry: r.expiry, day: r.day })),
+        enabled: Boolean(d.whatsapp?.enabled),
+        lastRun: d.whatsapp?.lastRun || null,
+      };
+    }
     if (m === 'POST' && pathname === '/api/admin/clear-data') {
       owner();
       if (body.confirm !== 'DELETE') fail('Type DELETE to confirm');
@@ -1096,7 +1142,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     return token;
   }
 
-  return { handle, handleDevice, handleHikvision, ownerToken };
+  return { handle, handleDevice, handleHikvision, ownerToken, reminders };
 }
 
 module.exports = { createApi, HttpError, weekdayOf };

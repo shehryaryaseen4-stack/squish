@@ -82,6 +82,7 @@ const modules = {
   './validate': lib('validate.js'),
   './access': lib('access.js'),
   './net': lib('net.js'),
+  './reminders': lib('reminders.js'),
   './demo': lib('demo.js'),
   './store': browserStore,
   './api': lib('api.js'),

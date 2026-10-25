@@ -318,3 +318,10 @@ button.kpi { text-align: left; font: inherit; color: inherit; cursor: pointer; }
 .start-steps .ico { width: 18px; height: 18px; flex: none; color: var(--accent); }
 .start-steps .done { color: var(--ink-3); text-decoration: line-through; }
 .start-steps .done .ico { color: var(--good); }
+
+/* Automatic WhatsApp reminders */
+.wa-setup { background: var(--surface-2); border-radius: 16px; padding: 12px 16px; }
+.wa-setup summary { cursor: pointer; display: flex; gap: 8px; align-items: center; }
+.wa-template { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px dashed var(--line); font-size: 13.5px; color: var(--ink); }
+.wa-template span { flex: 1; }
+.wa-test { margin-top: 16px; padding: 14px 16px; border-radius: 16px; background: var(--surface-2); }

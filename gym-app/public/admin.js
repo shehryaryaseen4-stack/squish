@@ -1397,6 +1397,8 @@
       <div class="save-bar"><button class="btn btn-primary" type="submit">${icon('check')}Save settings</button></div>
       </form>
 
+      <section class="card form-section" id="wa"><div class="skel" style="height:120px"></div></section>
+
       <section class="card form-section"><div class="panel-head"><div><h2>Membership plans</h2><p class="muted" style="font-size:13.5px">Monthly, quarterly, half-yearly, annual or anything you like.</p></div><button class="btn btn-primary btn-sm" data-addplan>${icon('plus')}Add plan</button></div>
         <div class="item-list">${S.data.plans.map((p) => `<div class="card item${p.active === false ? ' inactive' : ''}"><div class="ic-tile">${icon('star')}</div><div class="tx"><b>${esc(p.name)}${p.highlight ? ' <span class="badge badge-accent">Highlighted</span>' : ''}${p.active === false ? ' <span class="badge badge-muted">Hidden</span>' : ''}</b><span>${p.months} month${p.months > 1 ? 's' : ''} · ${rs(p.price)} · ${rs(Math.round(p.price / p.months))}/month</span></div><div class="acts"><button class="icon-btn" data-plan="${esc(p.id)}" aria-label="Edit ${esc(p.name)}">${icon('edit')}</button></div></div>`).join('')}</div></section>
 
@@ -1488,6 +1490,64 @@
     root.querySelectorAll('[data-plan]').forEach((x) => x.addEventListener('click', () => editPlan(S.data.plans.find((p) => p.id === x.dataset.plan))));
     root.querySelector('[data-addstaff]').addEventListener('click', () => editStaff({}));
     root.querySelectorAll('[data-staff]').forEach((x) => x.addEventListener('click', () => editStaff(S.data.staff.find((s) => s.id === x.dataset.staff))));
+    drawWhatsApp();
+  }
+
+  // ---- automatic WhatsApp reminders ---------------------------------------------------
+
+  async function drawWhatsApp() {
+    const box = document.getElementById('wa');
+    if (!box) return;
+    const [{ settings: w, templates, dueToday }, rem] = await Promise.all([api('/api/admin/whatsapp'), api('/api/admin/reminders')]);
+    const ready = w.phoneNumberId && w.hasToken;
+    const status = w.enabled
+      ? `<span class="badge badge-good"><i class="dot"></i>On</span>`
+      : `<span class="badge badge-muted">Off</span>`;
+    const log = rem.log.slice(0, 12);
+    box.innerHTML = `<div class="panel-head"><div><h2>${icon('whatsapp')} Automatic WhatsApp reminders ${status}</h2><p class="muted" style="font-size:13.5px">Members get a WhatsApp message before their membership ends, from your gym's number, without anyone pressing a button.</p></div></div>
+      <form class="form-grid two" id="wa-form" novalidate>
+        <label class="toggle-row span"><span><b>Send reminders automatically</b></span><span class="switch"><input type="checkbox" name="enabled" ${w.enabled ? 'checked' : ''}><span></span></span></label>
+        <label class="field"><span>Start this many days before the end</span><input class="input" name="daysBefore" type="number" min="1" max="30" value="${w.daysBefore}"></label>
+        <label class="field"><span>How often</span><select class="select" name="every"><option value="day" ${w.every === 'day' ? 'selected' : ''}>Every day until it ends</option><option value="some" ${w.every === 'some' ? 'selected' : ''}>On day ${w.daysBefore}, 3, 1 and the last day</option></select></label>
+        <label class="field"><span>Send at</span><input class="input" name="sendAt" type="time" value="${esc(w.sendAt)}"></label>
+        <label class="field"><span>Country calling code</span><input class="input" name="countryCode" inputmode="numeric" value="${esc(w.countryCode)}" placeholder="92"><small>Turns 0300… into +92 300…</small></label>
+        <details class="span wa-setup" ${ready ? '' : 'open'}><summary><b>Connect your WhatsApp number</b> ${ready ? '<span class="badge badge-good">connected</span>' : '<span class="badge badge-warn">needed once</span>'}</summary>
+          <ol class="steps" style="margin:12px 0 14px">
+            <li>Open <b>business.facebook.com</b> → WhatsApp Manager, and add your gym's number to the <b>WhatsApp Business Platform</b> (the number can't be in the normal WhatsApp app at the same time).</li>
+            <li>Create a message template: category <b>Utility</b>, name <code class="copyable" data-copy="${esc(w.templateName)}">${esc(w.templateName)}</code>, language as chosen below, and this text:
+              <div class="wa-template"><span data-tpl>${esc(templates[w.templateLang === 'ur' ? 'ur' : 'en'])}</span><button type="button" class="icon-btn" data-copytpl aria-label="Copy text">${icon('copy')}</button></div>
+              {{1}} name · {{2}} gym · {{3}} end date · {{4}} days left. Meta usually approves it within a day.</li>
+            <li>In <b>API Setup</b>, copy the <b>Phone number ID</b> and a <b>permanent access token</b> (System user token with <i>whatsapp_business_messaging</i>) here.</li></ol>
+          <div class="form-grid two">
+            <label class="field"><span>Phone number ID</span><input class="input" name="phoneNumberId" inputmode="numeric" value="${esc(w.phoneNumberId)}"></label>
+            <label class="field"><span>Access token ${w.hasToken ? '<span class="badge badge-good">saved</span>' : ''}</span><input class="input" name="token" type="password" autocomplete="off" placeholder="${w.hasToken ? 'Leave blank to keep' : 'EAA…'}"></label>
+            <label class="field"><span>Template name</span><input class="input" name="templateName" value="${esc(w.templateName)}"></label>
+            <label class="field"><span>Template language</span><select class="select" name="templateLang"><option value="en" ${w.templateLang !== 'ur' ? 'selected' : ''}>English (en)</option><option value="ur" ${w.templateLang === 'ur' ? 'selected' : ''}>Urdu (ur) · Roman Urdu text</option></select></label>
+          </div></details>
+        <div class="span" style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-primary" type="submit">${icon('check')}Save reminders</button></div>
+      </form>
+      <div class="wa-test"><b>Send a test message</b><form class="toolbar" style="margin:8px 0 0" data-watest><input class="input" name="phone" inputmode="tel" placeholder="Your WhatsApp number" style="max-width:240px"><button class="btn btn-soft" ${ready ? '' : 'disabled'}>${icon('whatsapp')}Send test</button></form></div>
+      <h3 style="font-size:15px;margin:20px 0 8px">Today ${dueToday ? `· ${dueToday} still to send` : ''}${rem.lastRun ? ` <span class="muted" style="font-weight:600;font-size:13px">· last checked ${new Date(rem.lastRun).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>` : ''}</h3>
+      ${log.length ? `<div class="rows">${log.map((r) => memberRow({ ...(r.member || { name: 'Deleted member' }), id: r.memberId }, { sub: `${r.day === 0 ? 'Last day' : `${r.day} day${r.day === 1 ? '' : 's'} before`} · ends ${dateShort(r.expiry)} · ${new Date(r.at).toLocaleString([], { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}${r.error ? ` · ${esc(r.error)}` : ''}`, end: r.status === 'sent' ? '<span class="badge badge-good">Sent</span>' : '<span class="badge badge-bad">Failed</span>' })).join('')}</div>`
+        : emptyLine(w.enabled ? 'No reminders sent yet. They go out at the time you chose.' : 'Switch reminders on to start sending.')}`;
+    const f = box.querySelector('#wa-form');
+    f.templateLang.addEventListener('change', () => { box.querySelector('[data-tpl]').textContent = templates[f.templateLang.value === 'ur' ? 'ur' : 'en']; });
+    box.querySelector('[data-copytpl]').addEventListener('click', () => navigator.clipboard?.writeText(box.querySelector('[data-tpl]').textContent).then(() => toast('Template text copied'), () => toast('Select the text and copy it', 'bad')));
+    box.querySelectorAll('[data-copy]').forEach((c) => c.addEventListener('click', () => navigator.clipboard?.writeText(c.dataset.copy).then(() => toast('Copied'))));
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      busy(f.querySelector('[type=submit]'), async () => {
+        const body = formData(f);
+        body.enabled = f.enabled.checked;
+        try { await api('/api/admin/whatsapp', { method: 'PUT', body }); toast(body.enabled ? 'Reminders are on' : 'Saved'); drawWhatsApp(); } catch (err) { toast(err.message, 'bad'); }
+      });
+    });
+    box.querySelector('[data-watest]').addEventListener('submit', (e) => {
+      e.preventDefault();
+      busy(e.target.querySelector('button'), async () => {
+        try { const r = await api('/api/admin/whatsapp/test', { method: 'POST', body: { phone: e.target.phone.value } }); toast(`Test sent to +${r.to}`); } catch (err) { toast(err.message, 'bad'); }
+      });
+    });
   }
 
   function bindMachines() {
