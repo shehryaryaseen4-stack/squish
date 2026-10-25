@@ -153,6 +153,113 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     return payment;
   }
 
+  // ---- importing members from a spreadsheet ---------------------------------------
+
+  const GENDERS = { m: 'male', male: 'male', man: 'male', boy: 'male', mard: 'male', f: 'female', female: 'female', woman: 'female', girl: 'female', aurat: 'female', larki: 'female' };
+
+  // "Monthly", "3 months", "Quarterly", "1 year"… → one of the gym's plans.
+  function planFor(text, months) {
+    const d = db();
+    const t = String(text || '').toLowerCase().trim();
+    const plans = d.plans.filter((p) => p.active !== false);
+    if (t) {
+      const byName = plans.find((p) => p.name.toLowerCase() === t) || plans.find((p) => t.includes(p.name.toLowerCase()) || p.name.toLowerCase().includes(t));
+      if (byName) return byName;
+      const n = /annual|year|12/.test(t) ? 12 : /half|6/.test(t) ? 6 : /quarter|3/.test(t) ? 3 : /month|1/.test(t) ? 1 : Number(t.match(/\d+/)?.[0]) || 0;
+      const byMonths = plans.find((p) => p.months === n);
+      if (byMonths) return byMonths;
+    }
+    if (months) return plans.find((p) => p.months === months) || plans.reduce((a, p) => (Math.abs(p.months - months) < Math.abs(a.months - months) ? p : a), plans[0]);
+    return plans.find((p) => p.months === 1) || plans[0];
+  }
+
+  /**
+   * rows: [{ memberNo, name, phone, gender, joinDate, dob, address, notes, emergencyPhone,
+   *          plan, amount, due, paidOn, validTill }] with ISO dates.
+   * Keeps old member numbers (the fingerprint machine knows members by them).
+   * A row with fee details gets a receipt covering paidOn → validTill.
+   */
+  function importMembers(rows, { dryRun = false, existing = 'skip' } = {}) {
+    const d = db();
+    const t = today();
+    const result = { created: 0, updated: 0, skipped: [], errors: [], fees: 0, pins: [] };
+    const byPhone = new Map(d.members.filter((x) => !x.left).map((x) => [normalPhone(x.phone), x]));
+    const usedNos = new Set(d.members.map((x) => x.memberNo));
+    const seenInFile = new Set();
+    const plan = [];
+    rows.slice(0, 5000).forEach((r, i) => {
+      const line = i + 2; // spreadsheet row, after the header
+      try {
+        for (const [k, label] of [['joinDate', 'joining date'], ['paidOn', 'fee date'], ['validTill', 'expiry date'], ['dob', 'date of birth']]) {
+          if (r[k] && !/^\d{4}-\d{2}-\d{2}$/.test(r[k])) throw new Error(`Can’t read the ${label} “${String(r[k]).slice(0, 20)}”`);
+        }
+        const gender = GENDERS[String(r.gender || '').trim().toLowerCase()] || 'male';
+        const fee = r.validTill || r.paidOn || r.amount;
+        const data = v.member({
+          name: r.name, phone: r.phone, gender, dob: r.dob || '', address: r.address, notes: r.notes, emergencyPhone: r.emergencyPhone,
+          joinDate: r.joinDate || r.paidOn || t,
+        });
+        const key = normalPhone(data.phone);
+        if (seenInFile.has(key)) { result.skipped.push({ line, name: data.name, reason: 'Same phone as an earlier row' }); return; }
+        seenInFile.add(key);
+        const found = byPhone.get(key);
+        if (found && existing !== 'update') { result.skipped.push({ line, name: data.name, reason: `Already a member (#${found.memberNo})` }); return; }
+        let no = Number(String(r.memberNo ?? '').replace(/\D/g, '')) || null;
+        if (no && (no > 9999999 || (usedNos.has(no) && found?.memberNo !== no))) no = null;
+        let feeRow = null;
+        if (fee) {
+          const months = r.paidOn && r.validTill ? Math.max(1, Math.round(diffDays(r.paidOn, r.validTill) / 30.4)) : 0;
+          const p = planFor(r.plan, months);
+          const end = r.validTill || addDays(addMonths(r.paidOn || data.joinDate, p.months), -1);
+          const start = r.validTill ? (r.paidOn && r.paidOn <= end ? r.paidOn : addMonths(addDays(end, 1), -p.months)) : (r.paidOn || data.joinDate);
+          const paid = Math.max(0, Number(r.amount) || 0);
+          const due = Math.max(0, Number(r.due) || 0);
+          feeRow = { plan: p, start, end, paid: r.amount === undefined || r.amount === '' ? p.price : paid, due, date: r.paidOn || start };
+        }
+        plan.push({ line, data, found, no, feeRow });
+        if (no) usedNos.add(no);
+      } catch (e) {
+        result.errors.push({ line, name: r.name || '', reason: e.message });
+      }
+    });
+    if (dryRun) {
+      result.created = plan.filter((x) => !x.found).length;
+      result.updated = plan.filter((x) => x.found).length;
+      result.fees = plan.filter((x) => x.feeRow).length;
+      return result;
+    }
+    for (const x of plan) {
+      let member = x.found;
+      if (member) {
+        Object.assign(member, { ...x.data, joinDate: member.joinDate < x.data.joinDate ? member.joinDate : x.data.joinDate });
+        result.updated++;
+      } else {
+        const pin = randomPin();
+        const memberNo = x.no || (() => { while (usedNos.has(d.memberSeq)) d.memberSeq++; usedNos.add(d.memberSeq); return d.memberSeq++; })();
+        member = { id: newId('mem'), memberNo, ...x.data, pin: hashPin(pin), freezes: [], left: false, createdAt: stamp(), imported: true };
+        d.members.push(member);
+        result.created++;
+        result.pins.push({ memberNo, name: member.name, phone: member.phone, pin });
+        enrollment.syncMember(member);
+      }
+      // Importing the same file again doesn't add the same fee twice.
+      if (x.feeRow && !d.payments.some((p) => p.memberId === member.id && p.periodEnd === x.feeRow.end)) {
+        const f = x.feeRow;
+        const total = f.paid + f.due;
+        d.payments.push({
+          id: newId('pay'), receiptNo: d.receiptSeq++, memberId: member.id, planId: f.plan.id, planName: f.plan.name, months: f.plan.months,
+          periodStart: f.start, periodEnd: f.end, price: total, discount: 0, admissionFee: 0, total,
+          installments: f.paid > 0 ? [{ amount: f.paid, method: 'Cash', date: f.date }] : [], date: f.date, note: 'Imported', createdAt: stamp(),
+        });
+        result.fees++;
+      }
+    }
+    const maxNo = Math.max(0, ...d.members.map((x) => x.memberNo));
+    if (d.memberSeq <= maxNo) d.memberSeq = maxNo + 1;
+    store.save();
+    return result;
+  }
+
   // Where a renewal should start: the day after the current period, or today if it lapsed.
   function suggestedStart(member) {
     const s = summaryOf(member);
@@ -803,6 +910,14 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
         .filter((x) => !term || [x.member.name, x.member.phone, String(x.member.memberNo)].some((f) => String(f).toLowerCase().includes(term)))
         .map(listItem)
         .sort((a, b) => (q.sort === 'expiry' ? String(a.expiry || '').localeCompare(String(b.expiry || '')) : q.sort === 'name' ? a.name.localeCompare(b.name) : b.memberNo - a.memberNo));
+    }
+    if (m === 'POST' && pathname === '/api/admin/members/import') {
+      need('members.add');
+      if (!Array.isArray(body.rows) || !body.rows.length) fail('The file has no members');
+      if (body.rows.length > 5000) fail('Import up to 5,000 members at a time');
+      if (body.rows.some((r) => r.amount || r.paidOn || r.validTill)) need('fees.collect');
+      if (body.existing === 'update') need('members.edit');
+      return importMembers(body.rows, { dryRun: Boolean(body.dryRun), existing: body.existing === 'update' ? 'update' : 'skip' });
     }
     if (m === 'POST' && pathname === '/api/admin/members') {
       need('members.add');

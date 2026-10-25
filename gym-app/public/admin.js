@@ -476,7 +476,8 @@
       <div class="toolbar">
         <div class="grow input-group">${icon('search')}<input class="input" type="search" placeholder="Search name, phone or member no." value="${esc(q)}" data-q aria-label="Search members"></div>
         <select class="select" data-sort style="width:auto" aria-label="Sort"><option value="new" ${sort === 'new' ? 'selected' : ''}>Newest first</option><option value="name" ${sort === 'name' ? 'selected' : ''}>Name A–Z</option><option value="expiry" ${sort === 'expiry' ? 'selected' : ''}>Expiry date</option></select>
-        <button class="btn btn-ghost btn-sm" data-csv style="min-height:50px">${icon('download')}CSV</button>
+        <button class="btn btn-ghost btn-sm" data-import data-need="members.add" style="min-height:50px">${icon('inbox')}Import</button>
+        <button class="btn btn-ghost btn-sm" data-csv style="min-height:50px">${icon('download')}Export</button>
       </div>
       <div class="card panel" id="list"><div class="skel" style="height:300px"></div></div>`, { fab: { label: 'Add member', icon: 'userPlus', need: 'members.add', onClick: () => addMemberSheet() } });
     const go = (over) => {
@@ -503,6 +504,7 @@
       })).join('')}</div>` : `<div class="empty"><div class="empty-icon">${icon('users')}</div><h3>No members here</h3><p>${term ? 'Nothing matches your search.' : 'Nobody in this group right now.'}</p></div>`;
       bindMemberRows(el);
     };
+    root.querySelector('[data-import]').addEventListener('click', () => importSheet());
     root.querySelector('[data-csv]').addEventListener('click', () => {
       downloadCsv(`members-${status}-${today()}.csv`, ['Member no', 'Name', 'Phone', 'Gender', 'Joined', 'Plan', 'Status', 'Expiry', 'Days left', 'Balance', 'Total paid', 'Visits', 'Visits this month', 'Last visit', 'Months member', 'Months attended', 'Months missed', 'Months unpaid'],
         list.map((m) => [m.memberNo, m.name, m.phone, m.gender, m.joinDate, m.plan?.name || '', m.status, m.expiry || '', m.daysLeft ?? '', m.balance, m.totalPaid, m.totalVisits, m.visitsThisMonth, m.lastVisit || '', m.monthsMember, m.monthsAttended, m.monthsMissed, m.monthsUnpaid]));
@@ -519,6 +521,135 @@
     a.download = name;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  // ---- import members from Excel / CSV ----------------------------------------------
+
+  const TEMPLATE_HEAD = ['Member no', 'Name', 'Phone', 'Gender', 'Join date', 'Plan', 'Fee paid', 'Paid on', 'Valid till', 'Balance', 'Date of birth', 'Address', 'Emergency phone', 'Notes'];
+  const DATE_FIELDS = ['joinDate', 'paidOn', 'validTill', 'dob'];
+
+  // A spreadsheet row → what the server takes (ISO dates, numbers for money).
+  function importRow(row, cols, dayFirst) {
+    const out = {};
+    for (const [key, col] of Object.entries(cols)) {
+      let v = row[col];
+      if (v == null || v === '') continue;
+      if (DATE_FIELDS.includes(key)) v = Sheet.toIsoDate(v, dayFirst) || String(v);
+      else if (key === 'amount' || key === 'due') v = Number(String(v).replace(/[^\d.]/g, '')) || 0;
+      else if (key === 'phone' || key === 'emergencyPhone') {
+        v = String(v).trim();
+        // Excel drops the leading 0 of numbers like 03001234567.
+        if (/^3\d{9}$/.test(v)) v = `0${v}`;
+      } else v = String(v).trim();
+      out[key] = v;
+    }
+    return out;
+  }
+
+  function importSheet() {
+    let rows = [];
+    let cols = {};
+    let dayFirst = true;
+    let checked = null;
+    sheet({
+      title: 'Import members',
+      wide: true,
+      html: `<div data-step="pick">
+          <p class="muted" style="margin:0 0 12px">Bring members from your old Excel sheet or software. Old member numbers are kept, so fingerprints on the machine keep working. Fees and expiry dates come in too.</p>
+          <label class="drop-zone"><input type="file" accept=".xlsx,.csv,.tsv,.txt" data-file hidden>${icon('inbox')}<b>Choose an Excel (.xlsx) or CSV file</b><span class="muted">The first row should have the column names</span></label>
+          <details style="margin-top:12px"><summary class="muted" style="cursor:pointer">Or paste rows copied from Excel</summary>
+            <textarea class="textarea" data-paste rows="5" placeholder="Copy the rows in Excel (with the heading row) and paste here" style="margin-top:8px"></textarea>
+            <button class="btn btn-ghost btn-sm" data-use-paste style="margin-top:8px">Use these rows</button></details>
+          <p style="margin:14px 0 0"><button class="btn btn-ghost btn-sm" data-template>${icon('download')}Download a blank template</button></p>
+        </div>
+        <div data-step="map" hidden></div>
+        <div data-step="done" hidden></div>`,
+      onMount: (el, close) => {
+        const step = (name) => el.querySelectorAll('[data-step]').forEach((x) => { x.hidden = x.dataset.step !== name; });
+        const mapEl = el.querySelector('[data-step="map"]');
+        const doneEl = el.querySelector('[data-step="done"]');
+
+        el.querySelector('[data-template]').addEventListener('click', () => downloadCsv('members-template.csv', TEMPLATE_HEAD,
+          [['101', 'Ali Khan', '03001234567', 'Male', today(), 'Monthly', '3000', today(), '', '0', '', '', '', '']]));
+
+        const load = (table) => {
+          table = table.filter((r) => r.some((x) => x !== '' && x != null));
+          if (table.length < 2) return toast('No members found. The first row should be the column names, then one member per row.', 'bad');
+          const head = table[0].map((h) => String(h ?? '').trim());
+          rows = table.slice(1);
+          cols = Sheet.guessColumns(head);
+          dayFirst = Sheet.guessDayFirst(rows, DATE_FIELDS.map((k) => cols[k]).filter((x) => x != null));
+          drawMap(head);
+          step('map');
+        };
+        el.querySelector('[data-file]').addEventListener('change', async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          try {
+            if (/\.xls$/i.test(file.name)) throw new Error('Old .xls files can’t be read. In Excel choose File → Save As → Excel Workbook (.xlsx) or CSV.');
+            if (/\.xlsx$/i.test(file.name)) load(await Sheet.readXlsx(await file.arrayBuffer()));
+            else load(Sheet.parseCsv(await file.text()));
+          } catch (err) { toast(err.message, 'bad'); }
+          e.target.value = '';
+        });
+        el.querySelector('[data-use-paste]').addEventListener('click', () => load(Sheet.parseCsv(el.querySelector('[data-paste]').value)));
+
+        function drawMap(head) {
+          const options = (key) => `<option value="">— not in file —</option>${head.map((h, i) => `<option value="${i}" ${cols[key] === i ? 'selected' : ''}>${esc(h || `Column ${i + 1}`)}</option>`).join('')}`;
+          const sample = rows.slice(0, 5).map((r) => importRow(r, cols, dayFirst));
+          const shown = Sheet.FIELDS.filter(([k]) => cols[k] != null).slice(0, 7);
+          mapEl.innerHTML = `<p style="margin:0 0 10px"><b>${rows.length} row${rows.length === 1 ? '' : 's'}</b> found. Check that each item comes from the right column.</p>
+            <div class="form-grid two">${Sheet.FIELDS.map(([k, label]) => `<label class="field"><span>${esc(label)}${k === 'name' || k === 'phone' ? ' *' : ''}</span><select class="select" data-col="${k}">${options(k)}</select></label>`).join('')}
+              <label class="field"><span>Dates are written</span><select class="select" data-dayfirst><option value="1" ${dayFirst ? 'selected' : ''}>Day first (31/12/2026)</option><option value="0" ${dayFirst ? '' : 'selected'}>Month first (12/31/2026)</option></select></label>
+              <label class="field"><span>A member already here (same phone)</span><select class="select" data-existing><option value="skip">Leave them as they are</option>${can('members.edit') ? '<option value="update">Update their details</option>' : ''}</select></label></div>
+            <h3 style="margin:16px 0 8px;font-size:15px">Preview</h3>
+            <div class="tbl-wrap"><table class="tbl"><tr>${shown.map(([, l]) => `<th>${esc(l)}</th>`).join('')}</tr>${sample.map((r) => `<tr>${shown.map(([k]) => `<td>${esc(r[k] ?? '')}</td>`).join('')}</tr>`).join('')}</table></div>
+            <div data-check style="margin-top:12px"></div>
+            <div class="sheet-actions"><button class="btn btn-ghost" data-back>Back</button><button class="btn btn-ghost" data-dry>${icon('check')}Check</button><button class="btn btn-primary" data-go disabled>${icon('inbox')}Import</button></div>`;
+          mapEl.querySelectorAll('[data-col]').forEach((sel) => sel.addEventListener('change', () => {
+            if (sel.value === '') delete cols[sel.dataset.col]; else cols[sel.dataset.col] = Number(sel.value);
+            checked = null;
+            drawMap(head);
+          }));
+          mapEl.querySelector('[data-dayfirst]').addEventListener('change', (e) => { dayFirst = e.target.value === '1'; checked = null; drawMap(head); });
+          const existing = mapEl.querySelector('[data-existing]');
+          existing.addEventListener('change', () => { checked = null; mapEl.querySelector('[data-go]').disabled = true; mapEl.querySelector('[data-check]').innerHTML = ''; });
+          mapEl.querySelector('[data-back]').addEventListener('click', () => step('pick'));
+          const body = (dryRun) => ({ rows: rows.map((r) => importRow(r, cols, dayFirst)), existing: existing.value, dryRun });
+          const dry = mapEl.querySelector('[data-dry]');
+          const go = mapEl.querySelector('[data-go]');
+          dry.addEventListener('click', () => busy(dry, async () => {
+            if (cols.name == null || cols.phone == null) return toast('Choose the Name and Phone columns', 'bad');
+            try {
+              checked = await api('/api/admin/members/import', { method: 'POST', body: body(true) });
+              const n = checked.created + checked.updated;
+              mapEl.querySelector('[data-check]').innerHTML = `<div class="notice ${checked.errors.length ? 'warn' : 'good'}"><b>${checked.created} new member${checked.created === 1 ? '' : 's'}</b>${checked.updated ? `, ${checked.updated} updated` : ''}${checked.fees ? ` · ${checked.fees} with fee and expiry` : ''}${checked.skipped.length ? ` · ${checked.skipped.length} skipped` : ''}${checked.errors.length ? ` · <b>${checked.errors.length} with problems</b> (they won’t be imported)` : ''}</div>${problemList([...checked.errors, ...checked.skipped])}`;
+              go.disabled = !n;
+              go.innerHTML = `${icon('inbox')}Import ${n} member${n === 1 ? '' : 's'}`;
+            } catch (e) { toast(e.message, 'bad'); }
+          }));
+          go.addEventListener('click', () => busy(go, async () => {
+            try {
+              const r = await api('/api/admin/members/import', { method: 'POST', body: body(false) });
+              drawDone(r);
+              step('done');
+            } catch (e) { toast(e.message, 'bad'); }
+          }));
+        }
+
+        const problemList = (list) => (list.length ? `<div class="tbl-wrap" style="max-height:200px;overflow:auto;margin-top:8px"><table class="tbl"><tr><th>Row</th><th>Name</th><th>Why</th></tr>${list.sort((a, b) => a.line - b.line).slice(0, 200).map((x) => `<tr><td>${x.line}</td><td>${esc(x.name || '')}</td><td>${esc(x.reason)}</td></tr>`).join('')}</table></div>` : '');
+
+        function drawDone(r) {
+          doneEl.innerHTML = `<div class="confirm-sheet"><div class="empty-icon">${icon('check')}</div>
+              <h3>${r.created} member${r.created === 1 ? '' : 's'} added${r.updated ? `, ${r.updated} updated` : ''}</h3>
+              <p class="muted">${r.fees ? `${r.fees} fee record${r.fees === 1 ? '' : 's'} with expiry dates imported. ` : ''}Each new member got a PIN for the member app. Download the list to share the PINs.</p></div>
+            ${problemList([...r.errors, ...r.skipped])}
+            <div class="sheet-actions">${r.pins.length ? `<button class="btn btn-ghost" data-pins>${icon('download')}Download app PINs</button>` : ''}<button class="btn btn-primary" data-finish>Done</button></div>`;
+          doneEl.querySelector('[data-pins]')?.addEventListener('click', () => downloadCsv(`member-pins-${today()}.csv`, ['Member no', 'Name', 'Phone', 'App PIN'], r.pins.map((p) => [p.memberNo, p.name, p.phone, p.pin])));
+          doneEl.querySelector('[data-finish]').addEventListener('click', () => { close(); route(); });
+        }
+      },
+    });
   }
 
   // ---- add / edit member ----------------------------------------------------------
