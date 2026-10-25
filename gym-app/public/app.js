@@ -302,6 +302,7 @@
     await Workout.planView(document.getElementById('wk'), {
       kg: w.kg,
       kgKnown: w.known,
+      goal: d.member.body?.goal,
       plan: d.member.workoutPlan,
       log: d.member.workoutLog?.[today()] || [],
       todayKey: todayKey(),

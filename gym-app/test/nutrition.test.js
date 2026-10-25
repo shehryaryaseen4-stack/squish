@@ -38,3 +38,11 @@ test('the diet plan meets the protein target with everyday foods', () => {
   const bulk = N.plan({ weight: 75, height: 175, age: 25, gender: 'male', goal: 'gain', diet: 'nonveg' }, 5);
   assert.ok(cut.target < cut.maintain && bulk.target > bulk.maintain);
 });
+
+test('a plan keeps the rest chosen for an exercise, or leaves it to the suggestion', () => {
+  const v = require('../lib/validate');
+  const plan = v.workoutPlan({ days: { mon: { groups: ['chest'], exercises: [{ id: 'barbell-bench-press-medium-grip', sets: 4, reps: '8-10', rest: 120 }, { id: 'dumbbell-flyes', sets: 3, reps: '12' }] } } });
+  assert.equal(plan.days.mon.exercises[0].rest, 120);
+  assert.equal('rest' in plan.days.mon.exercises[1], false);
+  assert.throws(() => v.workoutPlan({ days: { mon: { groups: ['chest'], exercises: [{ id: 'dumbbell-flyes', rest: 9999 }] } } }));
+});

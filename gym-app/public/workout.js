@@ -30,6 +30,79 @@
     if (v?.type === 'youtube') return `<div class="ex-video yt${v.short ? ' short' : ''}"><iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(v.id)}?playsinline=1&rel=0&modestbranding=1&loop=1&playlist=${encodeURIComponent(v.id)}" title="${UI.esc(e.name)} video" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`;
     return '';
   }
+  // ---- rest between sets ------------------------------------------------------------
+
+  let goal = 'fit';
+  const SMALL_GROUPS = new Set(['biceps', 'triceps', 'forearms', 'calves', 'traps']);
+  // Suggested rest in seconds: heavy compound lifts need longer to recover than small muscles.
+  function restFor(e, x = {}) {
+    if (x.rest != null && x.rest !== '') return Number(x.rest);
+    if (e.cardio) return 0;
+    const reps = Number(String(x.reps || '').match(/\d+/)?.[0]) || 10;
+    let s;
+    if (e.group === 'abs') s = 45;
+    else if (SMALL_GROUPS.has(e.group) || (e.secondary || []).length === 0) s = 60;
+    else if (['legs', 'back', 'chest'].includes(e.group) && /barbell/.test(e.equipment || '')) s = 120;
+    else s = 90;
+    if (reps <= 6 && !SMALL_GROUPS.has(e.group) && e.group !== 'abs') s = 180; // heavy, low-rep sets
+    if (goal === 'lose') s = Math.max(30, s - 30);
+    return s;
+  }
+  const restText = (s) => (s >= 60 ? `${Math.floor(s / 60)} min${s % 60 ? ` ${s % 60} sec` : ''}` : `${s} sec`);
+  const clock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
+  // A rest countdown at the bottom of the screen; buzzes and beeps when it's time for the next set.
+  let timer = null;
+  function startRest(seconds, nextLabel) {
+    stopRest();
+    let left = seconds;
+    const bar = document.createElement('div');
+    bar.className = 'rest-timer';
+    bar.setAttribute('role', 'timer');
+    bar.innerHTML = `<div class="rt-track"><i></i></div><div class="rt-row">${icon('clock')}<div class="rt-text"><small>Rest</small><b>${clock(left)}</b></div><span class="rt-next">${UI.esc(nextLabel)}</span><button class="btn btn-ghost btn-sm" data-more>+15s</button><button class="btn btn-primary btn-sm" data-skip>Skip</button></div>`;
+    document.body.append(bar);
+    let total = seconds;
+    const paint = () => {
+      bar.querySelector('b').textContent = clock(Math.max(0, left));
+      bar.querySelector('.rt-track i').style.width = `${Math.max(0, (left / total) * 100)}%`;
+    };
+    const finish = () => {
+      stopRest();
+      try { navigator.vibrate?.([250, 120, 250]); } catch { /* not on this device */ }
+      beep();
+      toast(`Time's up! ${nextLabel}`);
+    };
+    bar.querySelector('[data-more]').addEventListener('click', () => { left += 15; total += 15; paint(); });
+    bar.querySelector('[data-skip]').addEventListener('click', stopRest);
+    timer = { bar, id: setInterval(() => { left -= 1; paint(); if (left <= 0) finish(); }, 1000) };
+    paint();
+  }
+  function stopRest() {
+    if (!timer) return;
+    clearInterval(timer.id);
+    timer.bar.remove();
+    timer = null;
+  }
+  let audio = null;
+  function beep() {
+    try {
+      audio ||= new (window.AudioContext || window.webkitAudioContext)();
+      [0, 0.22].forEach((t) => {
+        const o = audio.createOscillator();
+        const g = audio.createGain();
+        o.frequency.value = 880;
+        o.connect(g);
+        g.connect(audio.destination);
+        const t0 = audio.currentTime + t;
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(0.3, t0 + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.18);
+        o.start(t0);
+        o.stop(t0 + 0.2);
+      });
+    } catch { /* no sound */ }
+  }
+
   const shortsLink = (e) => `https://www.youtube.com/results?search_query=${encodeURIComponent(`${e.name} proper form #shorts`)}`;
 
   const img = (id, n) => `${BASE}exercises/img/${id}-${n}.jpg`;
@@ -71,7 +144,7 @@
 
   // ---- sheets ------------------------------------------------------------------
 
-  function detailSheet(id, { sets, reps, onAdd } = {}) {
+  function detailSheet(id, { sets, reps, onAdd, item: x0 } = {}) {
     const e = lib.byId[id];
     if (!e) return;
     sheet({
@@ -81,6 +154,7 @@
         ${player(e) || anim(e.id, 'big')}
         ${videos[e.id] ? '' : `<a class="btn btn-soft btn-block yt-link" href="${shortsLink(e)}" target="_blank" rel="noopener">${icon('tv')}Watch short videos of the right form</a>`}
         <div class="ex-tags"><span class="badge badge-accent">${esc(groupName(e.group))}</span><span class="badge badge-muted">${esc(cap(e.equipment))}</span>${e.level ? `<span class="badge badge-muted">${esc(cap(e.level))}</span>` : ''}${sets ? `<span class="badge badge-good">${sets} × ${esc(reps)}</span>` : ''}${sets && kcalOf(e, { sets, reps }) ? `<span class="badge badge-warn">${icon('flame')}≈ ${kcalOf(e, { sets, reps }).total} kcal · ${kcalOf(e, { sets, reps }).perSet} per ${e.cardio ? 'session' : 'set'}</span>` : ''}</div>
+        ${!e.cardio ? `<div class="rest-tip">${icon('clock')}<span><b>Rest ${restText(restFor(e, { sets, reps, rest: x0?.rest }))} between sets.</b> Breathe and let the muscle recover, then do the next set. Heavy lifts need longer rest than small muscles.</span></div>` : ''}
         <p class="ex-muscles"><b>Works:</b> ${e.primary.map(cap).map(esc).join(', ')}${e.secondary.length ? ` <span class="muted">· also ${e.secondary.map(cap).map(esc).join(', ')}</span>` : ''}</p>
         <h4 class="ex-h">How to do it</h4>
         <ol class="ex-steps">${e.steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>
@@ -107,7 +181,8 @@
           list.innerHTML = groups.map((g) => `<h4 class="ex-h">${esc(groupName(g))}</h4><div class="pick-ex">${lib.exercises.filter((e) => e.group === g).map((e) => {
             const c = chosen.get(e.id);
             return `<div class="pick-row${c ? ' on' : ''}"><label class="pick-main"><input type="checkbox" data-ex="${e.id}" ${c ? 'checked' : ''}>${anim(e.id, 'tiny')}<span><b>${esc(e.name)}</b><small>${esc(cap(e.equipment))}</small></span></label>
-              ${c ? `<span class="setsreps"><input class="input" type="number" min="1" max="10" value="${c.sets}" data-sets="${e.id}" aria-label="Sets"><span>×</span><input class="input" value="${esc(c.reps)}" maxlength="12" data-reps="${e.id}" aria-label="Reps"></span>` : ''}</div>`;
+              ${c ? `<span class="setsreps"><input class="input" type="number" min="1" max="10" value="${c.sets}" data-sets="${e.id}" aria-label="Sets"><span>×</span><input class="input" value="${esc(c.reps)}" maxlength="12" data-reps="${e.id}" aria-label="Reps">
+                ${e.cardio ? '' : `<select class="select rest-pick" data-rest="${e.id}" aria-label="Rest between sets"><option value="">Rest: ${restText(restFor(e, { reps: c.reps }))} (suggested)</option>${[30, 45, 60, 90, 120, 180].map((r) => `<option value="${r}" ${Number(c.rest) === r && c.rest != null ? 'selected' : ''}>Rest: ${restText(r)}</option>`).join('')}</select>`}</span>` : ''}</div>`;
           }).join('')}</div>`).join('');
           list.querySelectorAll('[data-ex]').forEach((cb) => cb.addEventListener('change', () => {
             const e = lib.byId[cb.dataset.ex];
@@ -117,6 +192,10 @@
           }));
           list.querySelectorAll('[data-sets]').forEach((i) => i.addEventListener('input', () => { chosen.get(i.dataset.sets).sets = Number(i.value) || 1; }));
           list.querySelectorAll('[data-reps]').forEach((i) => i.addEventListener('input', () => { chosen.get(i.dataset.reps).reps = i.value; }));
+          list.querySelectorAll('[data-rest]').forEach((i) => i.addEventListener('change', () => {
+            const c = chosen.get(i.dataset.rest);
+            if (i.value === '') delete c.rest; else c.rest = Number(i.value);
+          }));
         };
         el.querySelectorAll('[data-g]').forEach((b) => b.addEventListener('click', () => {
           const g = b.dataset.g;
@@ -173,16 +252,22 @@
     const k = kcalOf(e, x);
     return `<div class="card ex-card${done ? ' done' : ''}" data-open="${e.id}" role="button" tabindex="0">${anim(e.id)}
       <div class="ex-body"><b>${esc(e.name)}</b><span>${x.sets} ${x.sets === 1 ? 'set' : 'sets'} × ${esc(x.reps)}${/min|s$/.test(x.reps) ? '' : ' reps'}</span><small>${esc(groupName(e.group))} · ${esc(cap(e.equipment))}</small>
-        ${k ? `<span class="kcal">${icon('flame')}≈ ${k.total} kcal${x.sets > 1 ? ` · ${k.perSet} per set` : ''}</span>` : ''}${videos[e.id] ? `<span class="has-video">${icon('tv')}Video</span>` : ''}</div>
+        ${k ? `<span class="kcal">${icon('flame')}≈ ${k.total} kcal${x.sets > 1 ? ` · ${k.perSet} per set` : ''}</span>` : ''}${videos[e.id] ? `<span class="has-video">${icon('tv')}Video</span>` : ''}
+        ${!e.cardio && x.sets > 1 ? `<span class="rest-line">${icon('clock')}Rest ${restText(restFor(e, x))} after each set</span>` : ''}
+        ${tickable && !done && !e.cardio ? `<button class="set-btn" data-set="${e.id}">${icon('check')}<span>Set <b data-setno>${Math.min((setsDone[e.id] || 0) + 1, x.sets)}</b> of ${x.sets} done</span></button>` : ''}</div>
       ${tickable ? `<label class="tick" aria-label="Done"><input type="checkbox" data-tick="${e.id}" ${done ? 'checked' : ''}><span>${icon('check')}</span></label>` : ''}</div>`;
   }
 
   /**
    * ctx: { plan, log (ids done today), todayKey, todayDate, save(plan), tick(date, ids), selected, onSelect(day) }
    */
+  // Sets finished today, kept on this phone.
+  let setsDone = {};
   async function planView(root, ctx) {
     await library();
     if (ctx.kg) kg = ctx.kg;
+    if (ctx.goal) goal = ctx.goal;
+    setsDone = UI.store.get(`setsDone|${ctx.todayDate}`, {});
     const plan = ctx.plan || { days: {} };
     const has = Object.keys(plan.days || {}).length > 0;
     const selected = ctx.selected || ctx.todayKey;
@@ -218,12 +303,35 @@
     root.querySelectorAll('[data-open]').forEach((c) => {
       const open = (ev) => {
         if (ev.target.closest('.tick')) return;
+        if (ev.target.closest('.set-btn')) return;
         const x = list.find((y) => y.id === c.dataset.open);
-        detailSheet(c.dataset.open, { sets: x?.sets, reps: x?.reps });
+        detailSheet(c.dataset.open, { sets: x?.sets, reps: x?.reps, item: x });
       };
       c.addEventListener('click', open);
       c.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') open(ev); });
     });
+    // "Set done": count it and start the rest timer; after the last set the exercise is ticked.
+    root.querySelectorAll('[data-set]').forEach((btn) => btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      const x = list.find((y) => y.id === btn.dataset.set);
+      const e = lib.byId[x.id];
+      const n = (setsDone[x.id] || 0) + 1;
+      setsDone[x.id] = n;
+      UI.store.set(`setsDone|${ctx.todayDate}`, setsDone);
+      if (n >= x.sets) {
+        stopRest();
+        const cb = root.querySelector(`[data-tick="${x.id}"]`);
+        if (cb && !cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change')); }
+        btn.remove();
+        const next = list.find((y) => !done.has(y.id) && y.id !== x.id);
+        const rest = restFor(e, x);
+        if (next && rest) startRest(rest, `Next: ${lib.byId[next.id]?.name || 'next exercise'}`);
+        return;
+      }
+      btn.querySelector('[data-setno]').textContent = n + 1;
+      const rest = restFor(e, x);
+      if (rest) startRest(rest, `Then set ${n + 1} of ${x.sets}`);
+    }));
     root.querySelectorAll('[data-tick]').forEach((cb) => cb.addEventListener('change', async () => {
       if (cb.checked) done.add(cb.dataset.tick); else done.delete(cb.dataset.tick);
       cb.closest('.ex-card').classList.toggle('done', cb.checked);
@@ -279,5 +387,5 @@
     return { days };
   }
 
-  window.Workout = { library, planView, libraryView, presetSheet, editDaySheet, summary, addToDay, dayLabel, ORDER, detailSheet, setVideo, videoOf, anim, groupName };
+  window.Workout = { library, planView, libraryView, presetSheet, editDaySheet, summary, addToDay, dayLabel, ORDER, detailSheet, setVideo, videoOf, anim, groupName, restFor, restText };
 })();

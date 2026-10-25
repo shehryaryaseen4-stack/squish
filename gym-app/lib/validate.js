@@ -163,7 +163,10 @@ function workoutPlan(b) {
     const groups = (Array.isArray(raw.groups) ? raw.groups : []).filter((g) => /^[a-z]{2,20}$/.test(g)).slice(0, 6);
     const exercises = (Array.isArray(raw.exercises) ? raw.exercises : []).slice(0, 20).map((e) => {
       if (!e || !/^[a-z0-9-]{2,80}$/.test(String(e.id))) fail('Unknown exercise');
-      return { id: e.id, sets: num(e.sets || 3, { min: 1, max: 10, field: 'Sets' }), reps: str(e.reps || '10-12', { max: 12, field: 'Reps' }) };
+      const x = { id: e.id, sets: num(e.sets || 3, { min: 1, max: 10, field: 'Sets' }), reps: str(e.reps || '10-12', { max: 12, field: 'Reps' }) };
+      // Rest between sets in seconds; left out means "suggested for this exercise".
+      if (e.rest !== undefined && e.rest !== null && e.rest !== '') x.rest = num(e.rest, { min: 0, max: 600, field: 'Rest' });
+      return x;
     });
     if (groups.length || exercises.length) out[day] = { groups, exercises };
   }

@@ -138,3 +138,25 @@
 .today-workout small { font-size: 12px; font-weight: 800; color: var(--accent); text-transform: uppercase; letter-spacing: .06em; }
 .today-workout h3 { font-size: 16px; margin: 2px 0; }
 .today-workout p { font-size: 13px; color: var(--ink-3); }
+
+/* Rest between sets */
+.ex-body .rest-line { display: flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 12.5px; font-weight: 650; color: var(--ink-3); }
+.ex-body .rest-line .ico { width: 14px; height: 14px; }
+.set-btn { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; height: 36px; padding: 0 12px; border-radius: 11px; border: 0; background: var(--accent-soft); color: var(--accent); font: inherit; font-weight: 700; font-size: 13.5px; cursor: pointer; }
+.set-btn .ico { width: 16px; height: 16px; }
+.set-btn:active { transform: scale(.97); }
+.rest-tip { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0 4px; padding: 12px 14px; border-radius: 14px; background: var(--surface-2); font-size: 14px; line-height: 1.5; }
+.rest-tip .ico { color: var(--accent); flex: none; margin-top: 1px; }
+.rest-pick { height: 40px !important; font-size: 13.5px; padding-right: 34px; flex-basis: 100%; }
+.rest-timer { position: fixed; left: 12px; right: 12px; bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 70; max-width: 520px; margin: 0 auto; border-radius: 20px; background: var(--ink); color: var(--bg); box-shadow: var(--shadow-lg); overflow: hidden; animation: toast-in .3s var(--ease); }
+.rest-timer .rt-track { height: 4px; background: color-mix(in srgb, var(--bg) 20%, transparent); }
+.rest-timer .rt-track i { display: block; height: 100%; width: 100%; background: var(--accent); transition: width 1s linear; }
+.rest-timer .rt-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px 12px; }
+.rest-timer .rt-row > .ico { width: 24px; height: 24px; color: var(--accent); flex: none; }
+.rest-timer small { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; opacity: .7; }
+.rest-timer b { font-size: 26px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.rest-timer .rt-next { flex: 1; min-width: 0; font-size: 13px; opacity: .8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rest-timer .btn-ghost { background: color-mix(in srgb, var(--bg) 16%, transparent); color: var(--bg); }
+.setsreps { flex-wrap: wrap; justify-content: flex-end; }
+.setsreps .input { height: 40px; }
+.setsreps .rest-pick { width: 100%; max-width: 230px; }
