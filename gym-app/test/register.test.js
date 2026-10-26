@@ -117,6 +117,26 @@ test('attendance machines: add by type, check the connection, and punches check 
   assert.equal(test1.body.result, 'out');
 });
 
+test('a face terminal in access-control mode (SenseFace 2A) checks members in from its rtlog', async (t) => {
+  const app = await start();
+  t.after(app.close);
+  const { call, token, add } = app;
+  const m = await add('Sara', '03000000002', { planId: 'plan-1m', periodStart: '2026-10-01', date: '2026-10-01', paid: 5000 });
+  assert.equal((await call('/api/admin/devices', { method: 'POST', token, body: { type: 'zk-face', name: 'Entrance', sn: 'NYU7252500300' } })).status, 200);
+  assert.equal((await call('/iclock/registry?SN=NYU7252500300', { method: 'POST', text: 'DeviceType=acc' })).text, 'RegistryCode=NYU7252500300');
+  assert.match((await call('/iclock/push?SN=NYU7252500300')).text, /TransTables=User Transaction/);
+  const rows = [
+    `time=2026-10-19 07:05:00\tpin=${m.memberNo}\tcardno=0\teventaddr=1\tevent=0\tinoutstatus=0\tverifytype=15\tindex=1`,
+    'time=2026-10-19 07:06:00\tpin=0\tcardno=0\teventaddr=1\tevent=27\tinoutstatus=0\tverifytype=15\tindex=2', // a stranger
+    `time=2026-10-19 07:07:00\tpin=${m.memberNo}\tcardno=0\teventaddr=1\tevent=23\tinoutstatus=0\tverifytype=15\tindex=3`, // refused by the door
+  ].join('\n');
+  assert.equal((await call('/iclock/cdata?SN=NYU7252500300&table=rtlog&Stamp=1', { method: 'POST', text: rows })).text, 'OK: 1');
+  const att = (await call('/api/admin/attendance?date=2026-10-19', { token })).body.list;
+  assert.equal(att.length, 1);
+  assert.equal(att[0].in, '07:05');
+  assert.equal(att[0].source, 'face');
+});
+
 test('member photos: set from the app or the desk, shown to staff and on the entry screen', async (t) => {
   const app = await start();
   t.after(app.close);

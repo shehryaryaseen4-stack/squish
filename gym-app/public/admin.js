@@ -2102,6 +2102,7 @@
     return `<ol class="steps">
       <li>Connect the machine to the gym's internet: <b>Menu → COMM → Ethernet</b> (or <b>Wireless/WiFi</b>). It should show an IP address.</li>
       <li>Open <b>Menu → COMM → Cloud Server Setting</b> (on eSSL: <b>ADMS</b>; on some models: <b>Push</b>).</li>
+      ${device.type === 'zk-face' ? '<li>Face terminals like the <b>SenseFace 2A</b> can work in attendance or access-control mode. If the menu has <b>System → Device Type Setting</b> (or <b>Communication protocol</b>), choose <b>T&amp;A PUSH</b>. Both modes are accepted; T&amp;A is the one to pick when you can. Changing it may clear the users on the machine, so do it before adding members.</li>' : ''}
       <li>Set <b>Server mode</b> to ADMS, turn <b>Enable domain name</b> on, then fill in: <b>Server address</b> ${code(s.host)} · <b>Port</b> ${code(String(s.port))} · <b>HTTPS</b> ${s.https ? 'ON' : 'OFF'}. Save and <b>restart</b> the machine.</li>
       <li>Add members on the machine: <b>Menu → User Mgt → New User</b>, with <b>User ID = their member number</b>, then enroll the ${device.type === 'zk-face' ? 'face' : 'thumb'}.</li>
       <li>Wait one minute, then press <b>Check connection</b> below.</li></ol>`;

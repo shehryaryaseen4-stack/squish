@@ -547,10 +547,23 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     ].join('\n');
   }
 
+  // Access-control firmware ("A&C push", how e.g. the SenseFace 2A ships) registers first,
+  // then asks for these settings. Written from the push protocol as used by other servers;
+  // the attendance firmware (T&A push) is the tested path.
+  function accessOptions(sn) {
+    return [
+      'ServerVersion=3.1.2', 'ServerName=ADMS', 'PushVersion=3.1.2', 'ErrorDelay=30', 'RequestDelay=3',
+      'TransTimes=00:00\t14:00', 'TransInterval=1', 'TransTables=User Transaction', 'Realtime=1', `SessionID=${sn}`, 'TimeoutSec=10',
+    ].join('\n');
+  }
+  // rtlog events that mean the person was let in (normal verify, and its variants).
+  const OPEN_EVENTS = new Set([0, 1, 14, 15, 16, 17, 18, 19, 26]);
+  const VERIFY = { 1: 'fingerprint', 2: 'card', 3: 'card', 4: 'card', 15: 'face', 25: 'palm' };
+
   // Machines the gym can add from Settings, and what each one needs.
   const DEVICE_TYPES = [
     { id: 'zk-fingerprint', brand: 'ZKTeco', name: 'ZKTeco fingerprint machine', models: 'K40, K50, F18, F22, MB20, MB360, uFace', protocol: 'zk' },
-    { id: 'zk-face', brand: 'ZKTeco', name: 'ZKTeco face machine', models: 'SpeedFace V5L, ProFace X, MB560-VL, Horus, xFace', protocol: 'zk' },
+    { id: 'zk-face', brand: 'ZKTeco', name: 'ZKTeco face machine', models: 'SenseFace 2A, SenseFace 4, SpeedFace V5L, ProFace X, MB560-VL, Horus, xFace', protocol: 'zk' },
     { id: 'essl', brand: 'eSSL', name: 'eSSL / Identix / Realtime', models: 'eSSL X990, K21, iClock, Identix K90 (ZKTeco based)', protocol: 'zk' },
     { id: 'zlink', brand: 'ZKTeco', name: 'ZKTeco ZLink machine', models: 'Machines set up with the ZKBio Zlink app', protocol: 'zk' },
     { id: 'hik-face', brand: 'Hikvision', name: 'Hikvision face terminal', models: 'DS-K1T341, DS-K1T671, DS-K1T343 (MinMoe)', protocol: 'hik' },
@@ -621,11 +634,29 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     if (!device.approved) { store.save(); return [403, 'ERROR: add this machine in the gym app first']; }
     const path = url.pathname;
     if (method === 'GET' && path === '/iclock/cdata') { store.save(); return [200, deviceOptions(sn)]; }
+    if (method === 'POST' && path === '/iclock/registry') { store.save(); return [200, `RegistryCode=${sn}`]; }
+    if (path === '/iclock/push') { store.save(); return [200, accessOptions(sn)]; }
     // The machine asks for work (register a member, scan a finger) and reports back.
     if (method === 'GET' && path === '/iclock/getrequest') { const reply = enrollment.nextCommands(device); store.save(); return [200, reply]; }
     if (method === 'POST' && path === '/iclock/devicecmd') { enrollment.results(device, text); store.save(); return [200, 'OK']; }
     if (method === 'POST' && path === '/iclock/cdata') {
       const table = url.searchParams.get('table');
+      if (/^rtlog$/i.test(table || '')) {
+        // "time=2026-10-26 18:02:11\tpin=1001\tcardno=0\teventaddr=1\tevent=0\tinoutstatus=0\tverifytype=15"
+        let n = 0;
+        for (const line of String(text || '').split(/\r?\n/).filter((l) => l.trim())) {
+          const f = Object.fromEntries(line.trim().split('\t').map((x) => { const i = x.indexOf('='); return [x.slice(0, i).trim().toLowerCase(), x.slice(i + 1).trim()]; }));
+          const pin = String(f.pin || '').trim();
+          if (!pin || pin === '0' || !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(f.time || '')) continue;
+          if (f.event !== undefined && !OPEN_EVENTS.has(Number(f.event))) continue;
+          n++;
+          const r = recordPunch(pin, f.time.slice(0, 10), f.time.slice(11, 16), VERIFY[Number(f.verifytype)] || 'face');
+          if (r === 'unknown' && !device.unknownIds.includes(pin)) device.unknownIds = [...device.unknownIds, pin].slice(-20);
+          if (r === 'in' || r === 'out') device.punches++;
+        }
+        store.save();
+        return [200, `OK: ${n}`];
+      }
       if (table !== 'ATTLOG') {
         const n = enrollment.operlog(text);
         store.save();
