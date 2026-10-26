@@ -97,3 +97,46 @@ test('members log their sets and weigh-ins', async (t) => {
   assert.equal(saved.body.program.by, 'coach');
   assert.equal(saved.body.program.startedAt, '2026-10-19');
 });
+
+test('BMI: groups, healthy weight and the plan it leads to', () => {
+  const N = require('../public/nutrition');
+  const who = N.bmi({ weight: 70, height: 175, age: 30 });
+  assert.equal(who.value, 22.9);
+  assert.equal(who.category, 'normal');
+  assert.deepEqual(who.healthy, { min: 57, max: 76 });
+  // Asian ranges: the same body is overweight from 23.
+  const asia = N.bmi({ weight: 74, height: 175, age: 30 }, { asian: true });
+  assert.equal(asia.category, 'over');
+  assert.equal(asia.goal, 'lose');
+  assert.ok(N.isAsian('en-PK') && N.isAsian('ur-PK') && !N.isAsian('en-GB'));
+  const thin = N.bmi({ weight: 50, height: 175, age: 22 });
+  assert.equal(thin.category, 'under');
+  assert.equal(thin.goal, 'gain');
+  assert.equal(thin.gap, 7);
+  const heavy = N.bmi({ weight: 110, height: 170, age: 35 });
+  assert.equal(heavy.category, 'obese');
+  assert.ok(heavy.gap < -30 && heavy.milestone >= 7);
+  assert.equal(heavy.proteinKg, 72, 'protein from a healthy weight, not 110 kg');
+  // Teens get no goal from adult ranges.
+  assert.equal(N.bmi({ weight: 80, height: 165, age: 15 }).goal, null);
+
+  // The diet won't starve an underweight member or overfeed an obese one.
+  const dietThin = N.plan({ weight: 50, height: 175, age: 22, gender: 'male', goal: 'lose' }, 3);
+  assert.equal(dietThin.goal, 'fit');
+  assert.ok(dietThin.changed);
+  const dietHeavy = N.plan({ weight: 110, height: 170, age: 35, gender: 'male', goal: 'gain' }, 3);
+  assert.equal(dietHeavy.goal, 'recomp');
+  assert.ok(dietHeavy.target < dietHeavy.maintain);
+  assert.ok(dietHeavy.protein <= 150, `protein ${dietHeavy.protein}`);
+
+  // Workouts: low-impact cardio every day for a heavy body, no extra cardio when underweight.
+  const heavyPlan = C.plan({ ...base, weight: 110, height: 170, goal: 'fit', days: 3 }, lib);
+  for (const day of Object.values(heavyPlan.days)) {
+    const cardio = day.exercises.filter((x) => lib.byId[x.id].cardio);
+    assert.equal(cardio.length, 1);
+    assert.ok(!['running-treadmill', 'rope-jumping'].includes(cardio[0].id));
+    assert.equal(cardio[0].reps, '20 min');
+  }
+  const thinPlan = C.plan({ ...base, weight: 50, height: 175, focus: 'waist' }, lib);
+  assert.ok(Object.values(thinPlan.days).every((d) => !d.exercises.some((x) => lib.byId[x.id].cardio)));
+});

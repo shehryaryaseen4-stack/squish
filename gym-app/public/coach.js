@@ -174,6 +174,9 @@
   };
 
   const GROUP_OF = (lib, id) => lib.byId[id]?.group;
+  const Nutrition = typeof module !== 'undefined' && module.exports ? require('./nutrition') : root.Nutrition;
+  // Hard on the knees and ankles of a heavy body; bike, walk or elliptical instead.
+  const HIGH_IMPACT = ['running-treadmill', 'rope-jumping', 'mountain-climbers', 'battling-ropes'];
 
   function plan(p, lib) {
     const days = Math.max(2, Math.min(6, Number(p.days) || 3));
@@ -181,6 +184,10 @@
     const perDay = { 45: 5, 60: 6, 90: 8 }[p.minutes] || 6;
     const avoid = new Set((p.injuries || []).flatMap((k) => AVOID[k] || []));
     if (p.experience === 'new' || p.experience === 'lt1') SKILLED.forEach((id) => avoid.add(id));
+    const body = Nutrition.bmi(p, { asian: p.asian });
+    const heavy = body && !body.teen && body.category === 'obese';
+    const thin = body && !body.teen && body.category === 'under';
+    if (heavy) HIGH_IMPACT.forEach((id) => avoid.add(id));
     const used = new Map();
     const trained = p.experience === '1to3' || p.experience === '3plus';
     const pick = (slot, offset) => {
@@ -193,7 +200,7 @@
       return options[(n + offset) % Math.min(3, options.length)];
     };
     const reps = (slot) => {
-      if (slot === 'cardio') return p.goal === 'lose' ? '20 min' : '12 min';
+      if (slot === 'cardio') return p.goal === 'lose' || heavy ? '20 min' : '12 min';
       const compound = COMPOUND.has(slot);
       if (p.goal === 'lose') return compound ? '10-12' : '12-15';
       if (p.goal === 'gain') return compound ? (p.experience === '3plus' ? '6-8' : '8-10') : '10-12';
@@ -211,7 +218,8 @@
       const slots = [...tpl.slice(0, perDay)];
       // Focus muscles get an extra exercise on the days that train them.
       for (const f of focusSlots) if (tpl.some((s) => GROUP_OF(lib, SLOTS[s]?.[0]) === GROUP_OF(lib, SLOTS[f][0])) && !slots.includes(f)) slots.push(f);
-      if (p.goal === 'lose' || p.focus === 'waist') slots.push('cardio');
+      // Cardio for fat loss and for heavy bodies whatever the goal; underweight members save their energy for growing.
+      if ((p.goal === 'lose' || p.focus === 'waist' || heavy) && !thin) slots.push('cardio');
       const exercises = [];
       for (const slot of slots) {
         const id = pick(slot, i);
@@ -222,7 +230,7 @@
       const groups = [...new Set(exercises.map((x) => GROUP_OF(lib, x.id)))];
       out[day] = { groups, exercises };
     });
-    return { days: out, program: { by: 'coach', split: splitName, weeks: 8 } };
+    return { days: out, program: { by: 'coach', split: splitName, weeks: 8 }, bmi: body };
   }
 
   // Week of the 8-week block: weeks 1-2 learn the moves, 3-7 build, 8 is a lighter week.

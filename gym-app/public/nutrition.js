@@ -78,6 +78,50 @@
     return { key, food: f.name, qty, label, protein: round(f.p * portions), kcal: round(f.kcal * portions) };
   }
 
+  // ---- BMI ----------------------------------------------------------------------------
+  // WHO cut-offs; South and East Asian bodies carry more fat at the same BMI, so the
+  // WHO advises lower ones there (overweight from 23, obese from 27.5).
+  const ASIA = /-(PK|IN|BD|LK|NP|AF|CN|HK|TW|JP|KR|SG|MY|ID|PH|TH|VN|MM|KH|LA|BN|MV|BT)$/i;
+  const isAsian = (locale) => ASIA.test(String(locale || ''));
+  const CUTS = { who: [18.5, 25, 30], asian: [18.5, 23, 27.5] };
+  const BMI_INFO = {
+    under: { label: 'Underweight', goal: 'gain', text: 'You are below a healthy weight. Eat more and lift weights to add muscle, not just fat.' },
+    normal: { label: 'Healthy weight', goal: null, text: 'Your weight is in the healthy range for your height. Build muscle or stay fit, as you like.' },
+    over: { label: 'Overweight', goal: 'lose', text: 'A little above the healthy range. Losing some fat will make you fitter and faster, and show your muscle.' },
+    obese: { label: 'Obese', goal: 'lose', text: 'Losing fat is the most important goal for your health. Go step by step: low-impact cardio, weights, and eating a bit less every day.' },
+  };
+
+  /**
+   * body: { weight, height, age } → BMI, its group, the healthy weight for this
+   * height and how far away it is. asian: use the Asian cut-offs.
+   */
+  function bmi(body, { asian = false } = {}) {
+    const kg = Number(body?.weight);
+    const m = Number(body?.height) / 100;
+    if (!kg || !m) return null;
+    const value = Math.round((kg / (m * m)) * 10) / 10;
+    const [under, over, obese] = CUTS[asian ? 'asian' : 'who'];
+    const category = value < under ? 'under' : value < over ? 'normal' : value < obese ? 'over' : 'obese';
+    const healthy = { min: Math.ceil(under * m * m), max: Math.floor((over - 0.1) * m * m) };
+    const gap = kg < healthy.min ? healthy.min - kg : kg > healthy.max ? healthy.max - kg : 0;
+    // Safe pace: lose 0.5 kg a week (0.75 when very heavy), gain 0.25 kg a week of mostly muscle.
+    const perWeek = gap < 0 ? (category === 'obese' ? 0.75 : 0.5) : 0.25;
+    const teen = Number(body.age) > 0 && Number(body.age) < 18;
+    return {
+      value, category, cuts: [under, over, obese], asian, teen,
+      ...BMI_INFO[category],
+      // Under 18, BMI is read from growth charts by age, so don't push a goal.
+      goal: teen ? null : BMI_INFO[category].goal,
+      healthy,
+      gap: Math.round(gap * 10) / 10,
+      weeks: gap ? Math.ceil(Math.abs(gap) / perWeek) : 0,
+      // A long way to go: the first 7% already helps health a lot, so aim for that first.
+      milestone: category === 'obese' && gap < -8 ? Math.max(4, Math.round(kg * 0.07)) : null,
+      // Protein for heavy bodies is worked out from a healthy weight, not all the extra fat.
+      proteinKg: category === 'obese' ? Math.round(over * m * m) : kg,
+    };
+  }
+
   const ACTIVITY = (days) => (days <= 1 ? 1.2 : days <= 3 ? 1.375 : days <= 5 ? 1.55 : 1.725);
   const PROTEIN_PER_KG = { lose: 2.0, fit: 1.6, gain: 2.0 };
 
@@ -85,13 +129,22 @@
    * body: { weight, height, age, gender, goal: lose|fit|gain, diet: nonveg|egg|veg }
    * trainingDays: workout days in the week plan
    */
-  function plan(body, trainingDays = 3, adjust = 0) {
-    const { weight: kg, height: cm, age, gender, goal = 'fit', diet = 'nonveg' } = body;
+  function plan(body, trainingDays = 3, adjust = 0, { asian = false } = {}) {
+    const { weight: kg, height: cm, age, gender, diet = 'nonveg' } = body;
+    const b = bmi(body, { asian });
+    // The body overrules a goal that would hurt: no diet when underweight,
+    // no eating extra when obese (lift weights while losing fat instead).
+    let goal = body.goal || 'fit';
+    let changed = null;
+    if (b && !b.teen && goal === 'lose' && b.category === 'under') { goal = 'fit'; changed = 'You are underweight, so this plan doesn’t cut calories. Lose fat only once you are in the healthy range.'; }
+    if (b && !b.teen && goal === 'gain' && b.category === 'obese') { goal = 'recomp'; changed = 'At your BMI, eating extra would add more fat. This plan eats a little less while you lift, so you build muscle and lose fat together.'; }
     const bmr = 10 * kg + 6.25 * cm - 5 * age + (gender === 'female' ? -161 : 5);
     const maintain = bmr * ACTIVITY(trainingDays);
+    const change = goal === 'lose' ? (b?.category === 'obese' ? -550 : -450) : goal === 'recomp' ? -250 : goal === 'gain' ? (b?.category === 'under' ? 400 : 300) : 0;
     // adjust: the coach's change after weekly weigh-ins (e.g. -150 when weight isn't moving).
-    const target = Math.max(gender === 'female' ? 1200 : 1500, maintain + (goal === 'lose' ? -450 : goal === 'gain' ? 300 : 0) + (Number(adjust) || 0));
-    const protein = round(Math.min(kg, 120) * PROTEIN_PER_KG[goal], 5);
+    const target = Math.max(gender === 'female' ? 1200 : 1500, maintain + change + (Number(adjust) || 0));
+    const proteinKg = Math.min(b ? b.proteinKg : kg, 120);
+    const protein = round(proteinKg * PROTEIN_PER_KG[goal === 'recomp' ? 'gain' : goal], 5);
     const fat = round((target * 0.25) / 9, 5);
     const carbs = round((target - protein * 4 - fat * 9) / 4, 5);
 
@@ -149,6 +202,11 @@
     }
 
     return {
+      bmi: b,
+      goal,
+      changed,
+      proteinKg,
+      perKg: PROTEIN_PER_KG[goal === 'recomp' ? 'gain' : goal],
       bmr: round(bmr),
       maintain: round(maintain, 10),
       target: round(target, 10),
@@ -161,7 +219,7 @@
     };
   }
 
-  const api = { met, burn, dayBurn, plan, FOODS };
+  const api = { met, burn, dayBurn, plan, bmi, isAsian, FOODS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Nutrition = api;
 })(typeof window !== 'undefined' ? window : globalThis);

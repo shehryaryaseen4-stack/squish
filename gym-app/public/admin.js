@@ -778,8 +778,10 @@
     const w = m.weighIns || [];
     const names = { lose: 'Lose fat', fit: 'Stay fit', gain: 'Build muscle' };
     if (!b && !rows.length && !w.length) return '';
+    const bmi = b && window.Nutrition ? Nutrition.bmi(b, { asian: Nutrition.isAsian(S.data?.business?.locale) }) : null;
     return `<div class="coach-progress">
       ${b ? `<p><b>Coach profile:</b> ${esc(names[b.goal] || '')}${b.focus && b.focus !== 'balanced' && window.Coach ? ` · ${esc(Coach.FOCUS[b.focus].label)}` : ''} · ${b.days || 3} days a week · ${b.weight} kg${b.injuries?.length ? ` · avoid: ${esc(b.injuries.join(', '))}` : ''}${m.workoutPlan?.program?.by === 'coach' ? ' · plan made by the app coach' : ''}</p>` : ''}
+      ${bmi ? `<p><b>BMI:</b> ${bmi.value} · <span class="badge ${{ under: 'badge-warn', normal: 'badge-good', over: 'badge-warn', obese: 'badge-bad' }[bmi.category]}">${esc(bmi.teen ? 'Under 18' : bmi.label)}</span> · healthy for ${b.height} cm: ${bmi.healthy.min}–${bmi.healthy.max} kg${bmi.gap && !bmi.teen ? ` (${bmi.gap < 0 ? 'lose' : 'gain'} ${Math.abs(bmi.gap)} kg)` : ''}</p>` : ''}
       ${w.length ? `<p><b>Weight:</b> ${w.slice(-5).map((x) => `${x.kg} kg <span class="muted">(${esc(dateShort(x.d))})</span>`).join(' → ')}</p>` : ''}
       ${rows.length ? `<table class="tbl" style="margin-top:8px"><tr><th>Exercise</th><th class="num">Started</th><th class="num">Now</th><th class="num">Workouts</th></tr>${rows.map((r) => `<tr><td>${esc(r.id.replace(/-/g, ' '))}</td><td class="num">${r.first || 'body'}${r.first ? ' kg' : ''}</td><td class="num"><b>${r.last || 'body'}${r.last ? ' kg' : ''}</b>${r.last > r.first ? ` <span class="badge badge-good">+${Math.round((r.last - r.first) * 10) / 10}</span>` : ''}</td><td class="num">${r.sessions}</td></tr>`).join('')}</table>` : ''}</div>`;
   }

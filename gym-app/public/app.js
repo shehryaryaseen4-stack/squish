@@ -36,7 +36,7 @@
   }
 
   function renderTabs() {
-    const route = (location.hash.split('?')[0] || '#/').replace('#/workout/library', '#/workout').replace('#/diet', '#/workout').replace('#/coach', '#/workout');
+    const route = (location.hash.split('?')[0] || '#/').replace('#/workout/library', '#/workout').replace('#/diet', '#/workout').replace('#/coach', '#/workout').replace('#/bmi', '#/workout');
     const tabs = state.token
       ? [['#/', 'home', 'Home'], ['#/workout', 'dumbbell', 'Workout'], ['#/classes', 'calendar', 'Classes'], ['#/progress', 'activity', 'Progress'], ['#/profile', 'user', 'Profile']]
       : [['#/', 'home', 'Home'], ['#/classes', 'calendar', 'Classes'], ['#/login', 'lock', 'Member login']];
@@ -209,6 +209,7 @@
       ${dead ? `<div class="alert-card bad">${icon('alert')}<span class="tx">${s.status === 'unpaid' ? 'Your fee is not paid yet.' : 'Your membership has ended.'} Renew at the front desk to keep training.</span>${b.whatsapp ? `<a class="btn btn-primary btn-sm" href="${UI.waLink(b.whatsapp, `Hi! I'm ${m.name} (member ${m.memberNo}). I want to renew my membership.`)}" target="_blank" rel="noopener">Renew</a>` : ''}</div>` : ''}
       ${s.status === 'expiring' ? `<div class="alert-card warn">${icon('clock')}<span class="tx">Only ${s.daysLeft} day${s.daysLeft === 1 ? '' : 's'} left. Renew before ${dateShort(s.expiry)} so your training doesn't stop.</span></div>` : ''}
       ${s.balance > 0 ? `<div class="alert-card bad">${icon('wallet')}<span class="tx"><b>${rs(s.balance)}</b> is still pending on your fee.</span><a class="btn btn-ghost btn-sm" href="#/fees">Details</a></div>` : ''}
+      ${bmiTile(m)}
       <section class="section"><div class="section-head"><h2>Workout</h2><a class="link" href="#/workout">My plan</a></div><div id="today-workout"><div class="skel" style="height:96px;margin:0 20px;border-radius:22px"></div></div></section>
       <section class="section"><div class="section-head"><h2>This month</h2><a class="link" href="#/progress">See all</a></div>
         <div class="mini-stats"><div class="stat"><span>Visits</span><b>${s.visitsThisMonth}</b></div><div class="stat"><span>Avg. workout</span><b>${fmtMinutes(s.avgMinutes)}</b></div><div class="stat"><span>Last visit</span><b>${s.lastVisit ? (s.daysSinceVisit === 0 ? 'Today' : `${s.daysSinceVisit}d ago`) : '—'}</b></div></div></section>
@@ -293,7 +294,7 @@
     return { kg: kg || 70, known: Boolean(kg) };
   }
 
-  const fitTabs = (on) => `<div class="fit-tabs" role="tablist"><a href="#/workout" role="tab" aria-selected="${on === 'workout'}">${icon('dumbbell')}Workout</a><a href="#/diet" role="tab" aria-selected="${on === 'diet'}">${icon('flame')}Diet & calories</a></div>`;
+  const fitTabs = (on) => `<div class="fit-tabs" role="tablist"><a href="#/workout" role="tab" aria-selected="${on === 'workout'}">${icon('dumbbell')}Workout</a><a href="#/diet" role="tab" aria-selected="${on === 'diet'}">${icon('flame')}Diet</a><a href="#/bmi" role="tab" aria-selected="${on === 'bmi'}">${icon('ruler')}BMI</a></div>`;
 
   async function workoutView(params) {
     const d = await me();
@@ -336,18 +337,19 @@
     const plan = m.workoutPlan;
     const trainingDays = Object.values(plan?.days || {}).filter((x) => x?.exercises?.length).length || 3;
     const trend = Coach.weightTrend(m.weighIns || [], b.goal);
-    const p = Nutrition.plan(b, trainingDays, trend.kcal || 0);
+    const p = Nutrition.plan(b, trainingDays, trend.kcal || 0, { asian: asianBmi() });
     const lib = await Workout.library();
     const todayDay = plan?.days?.[todayKey()];
     const burnToday = todayDay ? Nutrition.dayBurn(todayDay, lib.byId, b.weight) : null;
     const weekBurn = Object.values(plan?.days || {}).reduce((a, x) => a + Nutrition.dayBurn(x, lib.byId, b.weight).kcal, 0);
-    const perKg = { lose: 2, fit: 1.6, gain: 2 }[b.goal];
     const short = p.protein - p.totals.protein;
 
     box.innerHTML = `<div class="card diet-target">
         <div class="dt-main"><div><small>Eat each day</small><b class="tnum">${p.target.toLocaleString()}</b><span>kcal</span></div><div><small>Protein</small><b class="tnum">${p.protein}</b><span>grams</span></div></div>
         <div class="dt-macros"><span><b>${p.carbs} g</b> carbs</span><span><b>${p.fat} g</b> fat</span><span><b>${p.water} L</b> water</span></div>
-        <p class="dt-why">${b.weight} kg × ${perKg} g = <b>${p.protein} g protein</b> a day to ${b.goal === 'gain' ? 'build muscle' : b.goal === 'lose' ? 'lose fat and keep your muscle' : 'stay fit'}. Your body uses about ${p.maintain.toLocaleString()} kcal a day with ${trainingDays} workout${trainingDays === 1 ? '' : 's'} a week${b.goal === 'lose' ? ', so eating less makes you lose fat' : b.goal === 'gain' ? ', so eating a bit more builds muscle' : ''}.</p></div>
+        <p class="dt-why">${p.proteinKg} kg × ${p.perKg} g = <b>${p.protein} g protein</b> a day to ${p.goal === 'gain' ? 'build muscle' : p.goal === 'lose' ? 'lose fat and keep your muscle' : p.goal === 'recomp' ? 'build muscle while losing fat' : 'stay fit'}${p.proteinKg !== b.weight ? ` (${p.proteinKg} kg is a healthy weight for your height, so protein isn't counted for extra fat)` : ''}. Your body uses about ${p.maintain.toLocaleString()} kcal a day with ${trainingDays} workout${trainingDays === 1 ? '' : 's'} a week${p.goal === 'lose' || p.goal === 'recomp' ? ', so eating less makes you lose fat' : p.goal === 'gain' ? ', so eating a bit more builds muscle' : ''}.</p></div>
+      ${p.changed ? `<p class="note-line warn">${esc(p.changed)}</p>` : ''}
+      ${bmiStrip(p.bmi)}
 
       <div class="card diet-burn">${icon('flame')}<div>${burnToday && burnToday.kcal ? `<b>Today's workout burns ≈ ${burnToday.kcal} kcal</b><span>${esc(Workout.dayLabel(todayDay))} · about ${burnToday.minutes} min. See each exercise in <a class="link" href="#/workout">Workout</a>.</span>` : `<b>Rest day today</b><span>${weekBurn ? `Your week of workouts burns ≈ ${weekBurn.toLocaleString()} kcal.` : 'Make a workout plan to see the calories you burn.'}</span>`}</div></div>
 
@@ -398,8 +400,9 @@
         <div class="two-col"><label class="field"><span>Weight (kg)</span><input class="input" name="weight" type="number" inputmode="decimal" min="25" max="300" value="${esc(b.weight || last('weight') || '')}" required></label>
           <label class="field"><span>Height (cm)</span><input class="input" name="height" type="number" inputmode="numeric" min="100" max="250" value="${esc(b.height || last('height') || '')}" required></label></div>
         <div class="two-col"><label class="field"><span>Age</span><input class="input" name="age" type="number" inputmode="numeric" min="10" max="100" value="${esc(age)}" required></label>
-          <label class="field"><span>Gender</span><select class="select" name="gender"><option value="male" ${(b.gender || m.gender) !== 'female' ? 'selected' : ''}>Male</option><option value="female" ${(b.gender || m.gender) === 'female' ? 'selected' : ''}>Female</option></select></label></div>
-        <div class="field"><span>Your goal</span>${chips('goal', GOALS, b.goal || 'fit')}</div>
+          <label class="field"><span>Gender</span><select class="select" name="gender" data-sex><option value="male" ${(b.gender || m.gender) !== 'female' ? 'selected' : ''}>Male</option><option value="female" ${(b.gender || m.gender) === 'female' ? 'selected' : ''}>Female</option></select></label></div>
+        <div class="bmi-live" data-bmi hidden></div>
+        <div class="field"><span>Your goal</span>${chips('goal', GOALS, b.goal || 'fit')}<p class="goal-hint" data-goalhint hidden></p></div>
         <div class="field"><span>What you want most</span>${chips('focus', Object.entries(Coach.FOCUS).map(([k, x]) => [k, x.label]), b.focus || 'balanced')}</div>
         <div class="field"><span>How long have you been training?</span>${chips('experience', EXPERIENCE, b.experience || 'new')}</div>
         <div class="two-col"><label class="field"><span>Days a week you can come</span><select class="select" name="days">${[2, 3, 4, 5, 6].map((n) => `<option value="${n}" ${Number(b.days || 3) === n ? 'selected' : ''}>${n} days</option>`).join('')}</select></label>
@@ -408,6 +411,28 @@
         <div class="field"><span>What you eat</span>${chips('diet', DIETS, b.diet || 'nonveg')}</div>
         <button class="btn btn-primary btn-block">${coach ? 'Make my plan' : 'Show my diet plan'}</button></form></div>`;
     const f = box.querySelector('form');
+    // Show the BMI while typing, and pick the goal it suggests until the member chooses one.
+    let goalTouched = Boolean(b.goal);
+    const live = () => {
+      const r = Nutrition.bmi({ weight: Number(f.weight.value), height: Number(f.height.value), age: Number(f.age.value) }, { asian: asianBmi() });
+      const out = f.querySelector('[data-bmi]');
+      const hint = f.querySelector('[data-goalhint]');
+      out.hidden = !r || r.value < 10 || r.value > 70;
+      hint.hidden = true;
+      if (out.hidden) return;
+      out.className = `bmi-live bmi-${r.category}`;
+      out.innerHTML = `<b>BMI ${r.value}</b><span>${r.teen ? 'Under 18: ask your trainer, BMI for teens is read by age' : `${esc(r.label)} · healthy for your height: ${r.healthy.min}–${r.healthy.max} kg`}</span>`;
+      if (!r.goal) return;
+      if (!goalTouched) { f.querySelector(`input[name="goal"][value="${r.goal}"]`).checked = true; }
+      const chosen = f.querySelector('input[name="goal"]:checked')?.value;
+      if (chosen !== r.goal) {
+        hint.hidden = false;
+        hint.textContent = r.category === 'under' ? 'For your BMI we suggest “Build muscle”: you need to gain healthy weight first.' : `For your BMI we suggest “Lose fat”. ${r.category === 'obese' ? 'Eating extra now would add more fat.' : 'You can build muscle while you lose it.'}`;
+      }
+    };
+    f.querySelectorAll('input[name="goal"]').forEach((x) => x.addEventListener('change', () => { goalTouched = true; live(); }));
+    ['weight', 'height', 'age'].forEach((k) => f[k].addEventListener('input', live));
+    live();
     f.addEventListener('submit', (e) => {
       e.preventDefault();
       busy(f.querySelector('button'), async () => {
@@ -418,10 +443,91 @@
           for (const k of ['weight', 'height', 'age', 'days', 'minutes']) body[k] = Math.round(Number(body[k]));
           state.me.member.body = await api('/api/member/body', { method: 'PUT', body });
           if (onSaved) return onSaved();
+          if (location.hash.startsWith('#/bmi')) { location.hash = '#/bmi'; return bmiView(new URLSearchParams()); }
           if (location.hash === '#/diet') dietView(new URLSearchParams()); else location.hash = '#/diet';
         } catch (err) { toast(err.message, 'bad'); }
       });
     });
+  }
+
+  // ---- BMI ---------------------------------------------------------------------------------
+
+  // Gyms in South and East Asia use the Asian BMI ranges.
+  const asianBmi = () => Nutrition.isAsian(state.gym?.business?.locale);
+  const GOAL_LABEL = Object.fromEntries(GOALS);
+
+  // Where the BMI sits on a 15-40 scale, with the four ranges coloured.
+  function bmiScale(r) {
+    const lo = 15;
+    const hi = 40;
+    const at = (v) => ((Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo)) * 100;
+    const [a, c, d] = r.cuts;
+    return `<div class="bmi-scale" aria-hidden="true"><div class="bs-bar"><i class="bs-under" style="width:${at(a)}%"></i><i class="bs-normal" style="width:${at(c) - at(a)}%"></i><i class="bs-over" style="width:${at(d) - at(c)}%"></i><i class="bs-obese" style="width:${100 - at(d)}%"></i></div>
+      <span class="bs-pin" style="left:${at(r.value)}%"></span>
+      <div class="bs-ticks"><span style="left:${at(a)}%">${a}</span><span style="left:${at(c)}%">${c}</span><span style="left:${at(d)}%">${d}</span></div></div>`;
+  }
+
+  function bmiTile(m) {
+    const r = m.body && Nutrition.bmi(m.body, { asian: asianBmi() });
+    if (!r) return `<a class="card bmi-tile" href="#/bmi">${icon('ruler')}<div><b>Check your BMI</b><span>Enter your weight and height to get a diet and workout made for your body.</span></div>${icon('chevronRight')}</a>`;
+    return `<a class="card bmi-tile" href="#/bmi"><div class="bt-num bmi-${r.teen ? 'normal' : r.category}"><b>${r.value}</b><small>BMI</small></div><div><b>${r.teen ? 'Your BMI' : esc(r.label)}</b><span>${r.gap && !r.teen ? `${r.gap < 0 ? 'Lose' : 'Gain'} ${Math.abs(r.gap)} kg to reach a healthy weight` : 'Healthy weight. Keep it up!'}</span></div>${icon('chevronRight')}</a>`;
+  }
+
+  // A one-line BMI reminder on the diet page.
+  const bmiStrip = (r) => (r ? `<a class="card bmi-strip" href="#/bmi"><span class="bmi-dot bmi-${r.teen ? 'normal' : r.category}"></span><span>BMI <b>${r.value}</b>${r.teen ? '' : ` · ${esc(r.label)}`}</span><span class="link">Why this plan ›</span></a>` : '');
+
+  async function bmiView(params) {
+    const d = await me();
+    const m = d.member;
+    render(`<div class="page-title"><h1>BMI & your body</h1><p>Your body mass index, a healthy weight for your height, and the plan that fits you.</p></div>${fitTabs('bmi')}<div id="bmi" class="pad" style="margin-top:14px"></div>`);
+    const box = document.getElementById('bmi');
+    if (!m.body || params.get('edit')) return bodyForm(box, d, { coach: true, onSaved: () => { location.hash = '#/bmi'; } });
+    const b = m.body;
+    const asian = asianBmi();
+    const r = Nutrition.bmi(b, { asian });
+    const lib = await Workout.library();
+    const coachPlan = Coach.plan({ ...b, asian }, lib);
+    // Same numbers as the Diet page: the days in the member's own plan.
+    const trainingDays = Object.values(m.workoutPlan?.days || {}).filter((x) => x?.exercises?.length).length || Object.keys(coachPlan.days).length;
+    const p = Nutrition.plan(b, trainingDays, Coach.weightTrend(m.weighIns || [], b.goal).kcal || 0, { asian });
+    const waist = [...(d.measurements || [])].reverse().find((x) => x.waist)?.waist;
+    const whtr = waist ? Math.round((waist / b.height) * 100) / 100 : null;
+    const cardio = Object.values(coachPlan.days).flatMap((x) => x.exercises).find((x) => lib.byId[x.id]?.cardio);
+    const advise = !r.teen && r.goal && r.goal !== b.goal;
+
+    const pace = r.gap < 0 ? `about ${r.category === 'obese' ? '0.75' : '0.5'} kg a week` : 'about 0.25 kg a week';
+    const history = (m.weighIns || []).slice(-8).map((x) => ({ ...x, bmi: Nutrition.bmi({ weight: x.kg, height: b.height }, { asian }).value }));
+    box.innerHTML = `<div class="card bmi-hero">
+        <div class="bh-top"><div class="bh-num bmi-${r.teen ? 'normal' : r.category}"><b class="tnum">${r.value}</b><small>BMI</small></div>
+          <div><h2>${r.teen ? 'Under 18' : esc(r.label)}</h2><p>${b.weight} kg · ${b.height} cm</p></div></div>
+        ${bmiScale(r)}
+        <div class="bh-facts"><div><small>Healthy weight for ${b.height} cm</small><b>${r.healthy.min}–${r.healthy.max} kg</b></div>
+          <div><small>${r.gap < 0 ? 'To lose' : r.gap > 0 ? 'To gain' : 'You are'}</small><b>${r.gap ? `${Math.abs(r.gap)} kg` : 'In range ✓'}</b></div>
+          ${r.gap ? `<div><small>Time at a safe pace</small><b>${r.weeks < 9 ? `${r.weeks} weeks` : `${Math.round(r.weeks / 4.3)} months`}</b></div>` : ''}</div>
+      </div>
+      <p class="bmi-text">${r.teen ? 'You are under 18, so BMI is read from growth charts for your age, not these ranges. Train with your trainer’s guidance and eat well to grow strong.' : esc(r.text)}
+        ${r.gap && !r.teen ? ` At ${pace}, that is a healthy, lasting change.` : ''}${r.milestone ? ` <b>First step: lose ${r.milestone} kg.</b> Even that much lowers blood pressure and sugar and makes training easier.` : ''}</p>
+      ${whtr ? `<div class="card bmi-note ${whtr > 0.5 ? 'warn' : ''}">${icon('ruler')}<div><b>Waist ${waist} cm (${whtr} × your height)</b><span>${whtr > 0.5 ? `Keep your waist under ${Math.floor(b.height / 2)} cm, half your height. Belly fat is the riskiest kind.` : 'Your waist is under half your height. Good sign!'}</span></div></div>` : ''}
+      ${r.category === 'over' && b.experience === '3plus' && !(whtr > 0.5) ? `<div class="card bmi-note">${icon('info')}<div><b>Lots of muscle?</b><span>BMI can’t tell muscle from fat. If you are muscular with a slim waist, a BMI a bit over the range is fine.</span></div></div>` : ''}
+      ${advise ? `<div class="card bmi-advise"><div><small>Recommended goal for your body</small><b>${esc(GOAL_LABEL[r.goal])}</b><span>Your goal now: ${esc(GOAL_LABEL[b.goal] || 'Stay fit')}.</span></div><button class="btn btn-primary btn-sm" data-goal="${r.goal}">Use this goal</button></div>` : ''}
+
+      <h2 class="diet-h">What we recommend for you</h2>
+      <a class="card bmi-rec" href="#/diet">${icon('flame')}<div><b>Diet: ${p.target.toLocaleString()} kcal and ${p.protein} g protein a day</b>
+        <span>${p.goal === 'lose' ? `About ${p.maintain - p.target > 0 ? (p.maintain - p.target).toLocaleString() : 0} kcal less than your body uses, so fat comes off slowly while protein keeps your muscle.` : p.goal === 'recomp' ? 'A little less than your body uses, with plenty of protein: lose fat and build muscle together.' : p.goal === 'gain' ? `About ${(p.target - p.maintain).toLocaleString()} kcal more than your body uses, with protein in every meal to build muscle.` : 'As much as your body uses, with enough protein to stay strong.'} Breakfast: ${esc(p.meals[0].items.map((x) => x.food.split(/ \(|,/)[0].toLowerCase()).join(', '))}, and more.</span></div>${icon('chevronRight')}</a>
+      <a class="card bmi-rec" href="#/coach">${icon('dumbbell')}<div><b>Workout: ${esc(coachPlan.program.split)}, ${Object.keys(coachPlan.days).length} days a week</b>
+        <span>${b.goal === 'gain' && r.category !== 'obese' ? 'Heavier weights, 8-10 reps.' : b.goal === 'lose' || r.category === 'obese' ? 'Weights for 10-15 reps with short rests.' : 'Weights for 8-15 reps.'} ${cardio ? `Plus ${esc(cardio.reps)} of ${r.category === 'obese' ? 'easy-on-the-joints ' : ''}cardio (${esc(lib.byId[cardio.id].name.toLowerCase())}).` : 'No extra cardio, so your food goes into muscle.'} Starting weights fit your body and go up as you get stronger.</span></div>${icon('chevronRight')}</a>
+
+      ${history.length > 1 ? `<h2 class="diet-h">Your BMI over time</h2><div class="card bmi-history">${history.map((x) => `<div><b>${x.bmi}</b><small>${x.kg} kg</small><span>${esc(dateShort(x.d))}</span></div>`).join('')}</div>` : `<p class="diet-note">Weigh yourself once a week on the <a class="link" href="#/diet">Diet</a> page to see your BMI change.</p>`}
+      <p class="diet-note">BMI is a quick guide for adults, not a diagnosis. ${asian ? 'This gym uses the Asian BMI ranges (WHO), because South and East Asian bodies carry more fat at the same BMI. ' : ''}If you have a health condition, ask a doctor.</p>
+      <button class="btn btn-ghost btn-block" data-edit style="margin-top:12px">${icon('edit')}Update weight, height or goal</button>`;
+    box.querySelector('[data-edit]').addEventListener('click', () => { location.hash = '#/bmi?edit=1'; });
+    box.querySelector('[data-goal]')?.addEventListener('click', (e) => busy(e.currentTarget, async () => {
+      try {
+        state.me.member.body = await api('/api/member/body', { method: 'PUT', body: { ...b, goal: r.goal } });
+        toast('Goal updated. Your diet changed, and your coach has a new plan for you.');
+        bmiView(new URLSearchParams());
+      } catch (err) { toast(err.message, 'bad'); }
+    }));
   }
 
   // ---- the coach ------------------------------------------------------------------------
@@ -434,7 +540,8 @@
     if (!m.body?.experience || params.get('edit')) return bodyForm(box, d, { coach: true, onSaved: () => coachView(new URLSearchParams()) });
     const lib = await Workout.library();
     const b = m.body;
-    const plan = Coach.plan(b, lib);
+    const plan = Coach.plan({ ...b, asian: asianBmi() }, lib);
+    const body = plan.bmi && !plan.bmi.teen ? plan.bmi : null;
     const focus = Coach.FOCUS[b.focus]?.label || 'Balanced';
     const goalText = { lose: 'lose fat while keeping your muscle', fit: 'get fit and strong', gain: 'build muscle' }[b.goal];
     const why = [
@@ -442,6 +549,8 @@
       `${b.goal === 'gain' ? 'Heavier sets of 8-10 reps' : b.goal === 'lose' ? 'Sets of 10-15 reps with short rests, plus cardio' : 'Sets of 8-15 reps'} to ${goalText}.`,
       b.focus !== 'balanced' ? `Extra work for: ${focus.toLowerCase()}.` : 'Every muscle trained evenly.',
       b.injuries?.length ? `No moves that load your ${b.injuries.map((x) => INJURIES.find((i) => i[0] === x)[1].toLowerCase()).join(', ')}.` : null,
+      body?.category === 'obese' ? `Your BMI is ${body.value}: 20 minutes of easy-on-the-joints cardio (bike, walk, elliptical) every workout, no running or jumping yet.` : null,
+      body?.category === 'under' ? `Your BMI is ${body.value}: no extra cardio, so your energy goes into growing muscle.` : null,
       ['new', 'lt1'].includes(b.experience) ? 'Machines and dumbbells first; barbell squats and deadlifts come once your form is solid.' : null,
       'Starting weights are on the light side. Log each set and the app raises the weight when you are ready.',
     ].filter(Boolean);
@@ -632,6 +741,7 @@
       if (page === 'workout') return await workoutView(params);
       if (page === 'diet') return await dietView(params);
       if (page === 'coach') return await coachView(params);
+      if (page === 'bmi') return await bmiView(params);
       if (page === 'progress') return await progressView(params);
       if (page === 'fees') return await feesView();
       if (page === 'profile') return await profileView();
