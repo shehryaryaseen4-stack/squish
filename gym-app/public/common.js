@@ -223,7 +223,7 @@
   // Lets the person take or choose a photo, then crops it to a centred square
   // and shrinks it, so uploads stay small. Resolves with a JPEG data URL, or
   // null if they cancel.
-  function pickPhoto({ size = 360 } = {}) {
+  function pickPhoto({ size = 360, height = size } = {}) {
     return new Promise((resolve, reject) => {
       const input = document.createElement('input');
       input.type = 'file';
@@ -234,11 +234,14 @@
         const url = URL.createObjectURL(file);
         const img = new Image();
         img.onload = () => {
-          const side = Math.min(img.naturalWidth, img.naturalHeight);
+          // Crop the centre to the wanted shape (a square, or tall for body photos).
+          const ratio = size / height;
+          const w = Math.min(img.naturalWidth, img.naturalHeight * ratio);
+          const h = w / ratio;
           const canvas = document.createElement('canvas');
           canvas.width = size;
-          canvas.height = size;
-          canvas.getContext('2d').drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, size, size);
+          canvas.height = height;
+          canvas.getContext('2d').drawImage(img, (img.naturalWidth - w) / 2, (img.naturalHeight - h) / 2, w, h, 0, 0, size, height);
           URL.revokeObjectURL(url);
           resolve(canvas.toDataURL('image/jpeg', 0.82));
         };

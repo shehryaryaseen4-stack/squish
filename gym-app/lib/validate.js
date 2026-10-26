@@ -240,6 +240,9 @@ function body(b) {
     minutes: [45, 60, 90].includes(Number(b.minutes)) ? Number(b.minutes) : 60,
     focus: ['balanced', 'chest', 'arms', 'back', 'legs', 'waist'].includes(b.focus) ? b.focus : 'balanced',
     injuries: (Array.isArray(b.injuries) ? b.injuries : []).filter((x) => ['knee', 'back', 'shoulder'].includes(x)),
+    // The pictures: how the body looks now and the body they want.
+    shape: ['skinny', 'slim', 'average', 'belly', 'heavy', 'bulky'].includes(b.shape) ? b.shape : null,
+    target: ['healthy', 'slim', 'toned', 'athletic', 'muscular', 'bodybuilder', 'curvy', 'fitness'].includes(b.target) ? b.target : null,
   };
 }
 

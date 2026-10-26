@@ -750,6 +750,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
         staff: d.staff.filter((s) => s.active !== false).map(({ id, name, role, color }) => ({ id, name, role, color })),
         today: today(),
         demo: Boolean(d.demo),
+        bodyPhotos: d.bodyPhotos || {},
       };
     }
     if (m === 'GET' && pathname === '/api/classes') {
@@ -821,7 +822,14 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
         return { weighIns: member.weighIns, body: member.body || null };
       }
       if (m === 'PUT' && pathname === '/api/member/body') {
-        member.body = { ...v.body(body), updatedAt: stamp() };
+        const next = v.body(body);
+        const old = member.body || {};
+        // The journey's clock restarts when the starting look or the wanted body changes.
+        const keep = next.target && old.journeyStart && old.target === next.target && old.shape === next.shape;
+        const journeyStart = keep ? old.journeyStart : next.target ? today() : null;
+        // The journey is measured from the weight on the day it started.
+        const startWeight = keep ? old.startWeight || next.weight : next.target ? next.weight : null;
+        member.body = { ...next, journeyStart, startWeight, updatedAt: stamp() };
         store.save();
         return member.body;
       }
@@ -1239,6 +1247,26 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
       }
     }
     // Exercise videos: a YouTube / Shorts link or a short clip uploaded by the gym
+    // Real photos for the body-type pictures ("male-now-belly", "female-want-toned"…).
+    if ((match = pathname.match(/^\/api\/admin\/body-photos\/((?:male|female)-(?:now|want)-[a-z]{3,12})$/))) {
+      need('settings');
+      const key = match[1];
+      d.bodyPhotos ||= {};
+      if (m === 'PUT') {
+        const img = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(String(body.image || ''));
+        if (!img) fail('Choose a photo (JPG or PNG)');
+        if (img[2].length > 900 * 1024) fail('That photo is too large. Please choose a smaller one.');
+        d.bodyPhotos[key] = store.savePhoto(`body-${key}`, img[2]);
+        store.save();
+        return d.bodyPhotos;
+      }
+      if (m === 'DELETE') {
+        store.deletePhoto(`body-${key}`);
+        delete d.bodyPhotos[key];
+        store.save();
+        return d.bodyPhotos;
+      }
+    }
     if ((match = pathname.match(/^\/api\/admin\/exercise-videos\/([\w-]{1,80})(\/file)?$/))) {
       need('settings', 'members.edit');
       const exId = match[1];

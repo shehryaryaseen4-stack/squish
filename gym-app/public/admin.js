@@ -778,9 +778,11 @@
     const w = m.weighIns || [];
     const names = { lose: 'Lose fat', fit: 'Stay fit', gain: 'Build muscle' };
     if (!b && !rows.length && !w.length) return '';
+    const journey = b && window.Body ? Body.current(b, today(), w) : null;
     const bmi = b && window.Nutrition ? Nutrition.bmi(b, { asian: Nutrition.isAsian(S.data?.business?.locale) }) : null;
     return `<div class="coach-progress">
       ${b ? `<p><b>Coach profile:</b> ${esc(names[b.goal] || '')}${b.focus && b.focus !== 'balanced' && window.Coach ? ` · ${esc(Coach.FOCUS[b.focus].label)}` : ''} · ${b.days || 3} days a week · ${b.weight} kg${b.injuries?.length ? ` · avoid: ${esc(b.injuries.join(', '))}` : ''}${m.workoutPlan?.program?.by === 'coach' ? ' · plan made by the app coach' : ''}</p>` : ''}
+      ${journey ? `<p><b>Body goal:</b> ${esc(journey.now.label)} → ${esc(journey.want.label)} · about ${journey.months} months · now: ${esc(journey.phase.label.toLowerCase())} (step ${journey.index + 1} of ${journey.phases.length}, ${Math.round(journey.progress * 100)}% done)</p>` : ''}
       ${bmi ? `<p><b>BMI:</b> ${bmi.value} · <span class="badge ${{ under: 'badge-warn', normal: 'badge-good', over: 'badge-warn', obese: 'badge-bad' }[bmi.category]}">${esc(bmi.teen ? 'Under 18' : bmi.label)}</span> · healthy for ${b.height} cm: ${bmi.healthy.min}–${bmi.healthy.max} kg${bmi.gap && !bmi.teen ? ` (${bmi.gap < 0 ? 'lose' : 'gain'} ${Math.abs(bmi.gap)} kg)` : ''}</p>` : ''}
       ${w.length ? `<p><b>Weight:</b> ${w.slice(-5).map((x) => `${x.kg} kg <span class="muted">(${esc(dateShort(x.d))})</span>`).join(' → ')}</p>` : ''}
       ${rows.length ? `<table class="tbl" style="margin-top:8px"><tr><th>Exercise</th><th class="num">Started</th><th class="num">Now</th><th class="num">Workouts</th></tr>${rows.map((r) => `<tr><td>${esc(r.id.replace(/-/g, ' '))}</td><td class="num">${r.first || 'body'}${r.first ? ' kg' : ''}</td><td class="num"><b>${r.last || 'body'}${r.last ? ' kg' : ''}</b>${r.last > r.first ? ` <span class="badge badge-good">+${Math.round((r.last - r.first) * 10) / 10}</span>` : ''}</td><td class="num">${r.sessions}</td></tr>`).join('')}</table>` : ''}</div>`;
@@ -1668,6 +1670,7 @@
 
       <section class="card form-section" id="wa"><div class="skel" style="height:120px"></div></section>
       <section class="card form-section" id="exvid"><div class="skel" style="height:120px"></div></section>
+      <section class="card form-section" id="bodyphotos" data-need="settings"></section>
 
       <section class="card form-section"><div class="panel-head"><div><h2>Membership plans</h2><p class="muted" style="font-size:13.5px">Monthly, quarterly, half-yearly, annual or anything you like.</p></div><button class="btn btn-primary btn-sm" data-addplan>${icon('plus')}Add plan</button></div>
         <div class="item-list">${S.data.plans.map((p) => `<div class="card item${p.active === false ? ' inactive' : ''}"><div class="ic-tile">${icon('star')}</div><div class="tx"><b>${esc(p.name)}${p.highlight ? ' <span class="badge badge-accent">Highlighted</span>' : ''}${p.active === false ? ' <span class="badge badge-muted">Hidden</span>' : ''}</b><span>${p.months} month${p.months > 1 ? 's' : ''} · ${rs(p.price)} · ${rs(Math.round(p.price / p.months))}/month</span></div><div class="acts"><button class="icon-btn" data-plan="${esc(p.id)}" aria-label="Edit ${esc(p.name)}">${icon('edit')}</button></div></div>`).join('')}</div></section>
@@ -1762,6 +1765,43 @@
     root.querySelectorAll('[data-staff]').forEach((x) => x.addEventListener('click', () => editStaff(S.data.staff.find((s) => s.id === x.dataset.staff))));
     drawWhatsApp();
     drawExerciseVideos();
+    drawBodyPhotos();
+  }
+
+  // ---- real photos for the body-type pictures ---------------------------------------------
+
+  async function drawBodyPhotos(sex = 'male') {
+    const box = document.getElementById('bodyphotos');
+    if (!box || !window.Body) return;
+    const gym = await api('/api/gym');
+    const mine = gym.bodyPhotos || {};
+    Body.setPhotos(Object.fromEntries(Object.entries(mine).map(([k, p]) => [k, UI.photoSrc(p)])));
+    const tile = (kind, x) => {
+      const key = Body.keyOf(sex, kind, x.id);
+      return `<div class="bp-tile"><div class="bp-pic">${Body.picture(sex, kind, x)}</div><b>${esc(x.label)}</b>
+        <div class="bp-actions"><button class="btn btn-soft btn-sm" data-up="${key}">${icon('camera')}${mine[key] ? 'Change' : 'Add photo'}</button>${mine[key] ? `<button class="icon-btn" data-del="${key}" aria-label="Remove photo">${icon('trash')}</button>` : ''}</div></div>`;
+    };
+    box.innerHTML = `<div class="panel-head"><div><h2>${icon('user')} Body type photos</h2><p class="muted" style="font-size:13.5px">Members pick “my body now” and “the body I want” from these pictures. Replace the drawings with real photos: stand straight, front view, plain background, tall photo. Use only photos you own or have a licence for, with the person’s permission.</p></div></div>
+      <div class="seg" role="group" style="margin-bottom:12px"><button data-sex="male" aria-pressed="${sex === 'male'}">Men</button><button data-sex="female" aria-pressed="${sex === 'female'}">Women</button></div>
+      <h3 class="bp-h">Body now</h3><div class="bp-grid">${Body.NOW[sex].map((x) => tile('now', x)).join('')}</div>
+      <h3 class="bp-h">The body they want</h3><div class="bp-grid">${Body.WANT[sex].map((x) => tile('want', x)).join('')}</div>`;
+    box.querySelectorAll('[data-sex]').forEach((b) => b.addEventListener('click', () => drawBodyPhotos(b.dataset.sex)));
+    box.querySelectorAll('[data-up]').forEach((b) => b.addEventListener('click', async () => {
+      try {
+        const image = await UI.pickPhoto({ size: 480, height: 800 });
+        if (!image) return;
+        await busy(b, () => api(`/api/admin/body-photos/${b.dataset.up}`, { method: 'PUT', body: { image } }));
+        toast('Photo saved');
+        drawBodyPhotos(sex);
+      } catch (e) { toast(e.message, 'bad'); }
+    }));
+    box.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
+      try {
+        await api(`/api/admin/body-photos/${b.dataset.del}`, { method: 'DELETE' });
+        Body.setPhotos({ [b.dataset.del]: null });
+        drawBodyPhotos(sex);
+      } catch (e) { toast(e.message, 'bad'); }
+    }));
   }
 
   // ---- short how-to videos on exercises ------------------------------------------------

@@ -379,3 +379,15 @@ button.kpi { text-align: left; font: inherit; color: inherit; cursor: pointer; }
 .notice { padding: 12px 14px; border-radius: 14px; font-size: 14px; background: var(--surface-2); }
 .notice.good { background: var(--good-soft); }
 .notice.warn { background: var(--warn-soft); }
+
+/* Body type photos */
+.bp-h { font-size: 14px; margin: 14px 0 8px; color: var(--ink-3); }
+.bp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+.bp-tile { display: grid; justify-items: center; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 14px; text-align: center; font-size: 13.5px; }
+.bp-pic { width: 100%; max-width: 110px; padding: 4px; border-radius: 10px; background: var(--surface-2); }
+.bp-actions { display: flex; gap: 4px; align-items: center; }
+.body-fig { display: block; width: 100%; height: auto; }
+.body-fig .sk-lit { stop-color: #f2c4a0; } .body-fig .sk-mid { stop-color: #e2a57c; } .body-fig .sk-edge { stop-color: #c4835c; }
+.body-fig .hair { fill: #3b2a20; }
+.body-fig .lines { fill: none; stroke: #9a5d3a; stroke-width: 1.6; stroke-linecap: round; }
+.body-photo { display: block; width: 100%; aspect-ratio: 3 / 5; object-fit: cover; border-radius: 8px; }
