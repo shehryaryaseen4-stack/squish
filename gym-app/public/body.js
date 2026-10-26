@@ -22,7 +22,6 @@
    * A front-view figure. fat 0 (very lean) … 3.5 (heavy); muscle 0 (none) … 3 (bodybuilder).
    * Returns SVG markup sized by CSS (viewBox 0 0 200 400).
    */
-  let uid = 0;
   function figure(sex, fat, muscle, { label = '' } = {}) {
     const f = sex === 'female';
     const F = fat;
@@ -82,49 +81,30 @@
       return `<path d="${smooth(pts, true)}"/><ellipse cx="${wristX}" cy="240" rx="6" ry="10"/>`;
     };
 
+    // Lines that show muscle when there is little fat over it.
+    const lines = [];
+    const show = Math.max(0, Math.min(1, M * 0.9 - F * 0.9 + 0.2));
+    if (!f && show > 0.15) {
+      lines.push(`<path d="M${cx},${100} Q${cx + chest * 0.55},${128 + M} ${cx + chest * 0.9},${110}" /><path d="M${cx},${100} Q${cx - chest * 0.55},${128 + M} ${cx - chest * 0.9},${110}" />`);
+    }
+    if (show > 0.35 && F < 1.2) {
+      const rows = [142, 158, 174];
+      lines.push(`<path d="M${cx},136 L${cx},196" />${rows.map((y) => `<path d="M${cx - 9},${y} L${cx + 9},${y}" />`).join('')}`);
+      lines.push(`<path d="M${cx - waist + 3},150 Q${cx - waist * 0.55},190 ${cx - 6},214" /><path d="M${cx + waist - 3},150 Q${cx + waist * 0.55},190 ${cx + 6},214" />`);
+    }
+    if (F >= 2) lines.push(`<path d="M${cx - belly * 0.75},${200 + F * 2} Q${cx},${214 + F * 3} ${cx + belly * 0.75},${200 + F * 2}" />`);
+    if (f) lines.push(`<path d="M${cx - chest * 0.85},${118} Q${cx - chest * 0.45},${132 + F * 2} ${cx - 3},${120}" /><path d="M${cx + chest * 0.85},${118} Q${cx + chest * 0.45},${132 + F * 2} ${cx + 3},${120}" />`);
+    if (M >= 1.5 && F < 1.5) lines.push(`<path d="M${cx - thigh * 0.6},${250} Q${cx - thigh * 0.45},${280} ${cx - knee * 0.4},${300}" /><path d="M${cx + thigh * 0.6},${250} Q${cx + thigh * 0.45},${280} ${cx + knee * 0.4},${300}" />`);
+
     const headW = f ? 16 : 16.5;
     const hair = f
-      ? `<path fill="#3b2a20" d="M${cx - 21},44 Q${cx - 24},6 ${cx},6 Q${cx + 24},6 ${cx + 21},44 L${cx + 23},86 Q${cx + 14},80 ${cx + 13},58 L${cx - 13},58 Q${cx - 14},80 ${cx - 23},86 Z"/>`
-      : `<path fill="#3b2a20" d="M${cx - 17},34 Q${cx - 18},10 ${cx},10 Q${cx + 18},10 ${cx + 17},34 Q${cx + 12},22 ${cx},22 Q${cx - 12},22 ${cx - 17},34 Z"/>`;
-    // Clothes follow the body: a tank top and shorts (leggings for women), cut out of the body shape.
-    const id = `bf${++uid}`;
-    const sh = shoulder;
-    const top = `M${cx - sh * 0.5},78 L${cx - sh * 0.3},77 Q${cx},${f ? 104 : 98} ${cx + sh * 0.3},77 L${cx + sh * 0.5},78 Q${cx + chest - 6},${100} ${cx + chest - 2},${118} L${cx + 120},${f ? 196 : 200} L${cx - 120},${f ? 196 : 200} L${cx - chest + 2},118 Q${cx - chest + 6},100 ${cx - sh * 0.5},78Z`;
-    const bottom = f ? `M0,194 H200 V368 H0Z` : `M0,198 H200 V${272 + F * 3} H0Z`;
-    const outfit = f ? { top: ['#f472b6', '#be185d'], bottom: ['#334155', '#0f172a'] } : { top: ['#cbd5e1', '#64748b'], bottom: ['#1f2937', '#0b1120'] };
-    // Shading: lit from the front-left, darker at the edges.
-    const shade = (gid, a, b) => `<linearGradient id="${id}${gid}" x1="0" x2="1"><stop offset="0" stop-color="${b}"/><stop offset=".35" stop-color="${a}"/><stop offset=".65" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient>`;
-    const definition = Math.max(0, Math.min(1, M * 0.8 - F * 0.7 + 0.15));
-    const muscleShade = [];
-    // Arms: shoulder cap and biceps show with muscle.
-    if (M >= 0.8) for (const s of [1, -1]) {
-      const x = cx + s * (sh + 2);
-      muscleShade.push(`<path d="M${x - s * 6},92 Q${x + s * (4 + M * 2)},104 ${x - s * 2},${120 + M * 2}" />`);
-    }
-    // Chest and stomach through the shirt, softer than bare skin.
-    const shirt = [];
-    if (!f && M >= 0.8) shirt.push(`<path d="M${cx},104 Q${cx + chest * 0.55},${126 + M} ${cx + chest * 0.92},112" /><path d="M${cx},104 Q${cx - chest * 0.55},${126 + M} ${cx - chest * 0.92},112" />`);
-    if (definition > 0.45 && F < 1.2) shirt.push(`<path d="M${cx},132 L${cx},192" />${[146, 162, 178].map((y) => `<path d="M${cx - 8},${y} Q${cx},${y + 2} ${cx + 8},${y}" />`).join('')}`);
-    if (F >= 2) shirt.push(`<path d="M${cx - belly * 0.8},${188 + F * 2} Q${cx},${202 + F * 3} ${cx + belly * 0.8},${188 + F * 2}" />`);
-    // Wrinkles where the shirt stretches over a belly.
-    if (F >= 1.2) shirt.push(`<path d="M${cx - waist * 0.7},${150} Q${cx},${156 + F} ${cx + waist * 0.7},${150}" />`);
-    const legs = !f && M >= 1.2 && F < 1.5 ? `<path d="M${cx - knee - 2},${296} Q${cx - calf - 2},${318} ${cx - calf + 2},${340}" /><path d="M${cx + knee + 2},${296} Q${cx + calf + 2},${318} ${cx + calf - 2},${340}" />` : '';
-    const shoes = [1, -1].map((s) => `<path d="M${cx + s * (gap + 1)},386 Q${cx + s * (gap + 1)},${379} ${cx + s * (ankle + 7)},380 Q${cx + s * (ankle + 14)},${384} ${cx + s * (ankle + 13)},393 L${cx + s * (gap + 1)},393Z" fill="#111827"/><path d="M${cx + s * (gap + 1)},391 L${cx + s * (ankle + 13)},391" stroke="#f8fafc" stroke-width="1.6"/>`).join('');
+      ? `<path class="hair" d="M${cx - 21},44 Q${cx - 24},6 ${cx},6 Q${cx + 24},6 ${cx + 21},44 L${cx + 23},86 Q${cx + 14},80 ${cx + 13},58 L${cx - 13},58 Q${cx - 14},80 ${cx - 23},86 Z"/>`
+      : `<path class="hair" d="M${cx - 17},34 Q${cx - 18},10 ${cx},10 Q${cx + 18},10 ${cx + 17},34 Q${cx + 12},22 ${cx},22 Q${cx - 12},22 ${cx - 17},34 Z"/>`;
+    // Soft light from the front-left gives the figure some depth.
     return `<svg class="body-fig" viewBox="0 0 200 400" role="img" aria-label="${label.replace(/[<&"]/g, '')}">
-      <defs>${shade('s', '#f0c29e', '#c98760')}${shade('t', outfit.top[0], outfit.top[1])}${shade('b', outfit.bottom[0], outfit.bottom[1])}
-        <clipPath id="${id}c"><path d="${body}"/></clipPath>
-        <radialGradient id="${id}h" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#f3c9a6"/><stop offset="1" stop-color="#c98760"/></radialGradient></defs>
-      <ellipse cx="${cx}" cy="394" rx="${Math.max(hip, thigh) + 22}" ry="5" fill="#000" opacity=".12"/>
-      ${f ? hair : ''}
-      <g fill="url(#${id}s)">${arm(1)}${arm(-1)}<path d="${body}"/></g>
-      <ellipse cx="${cx}" cy="36" rx="${headW + F * 1.2}" ry="${22 + F * 0.6}" fill="url(#${id}h)"/>
-      <path d="M${cx - 8},58 Q${cx},66 ${cx + 8},58 L${cx + 8},64 Q${cx},70 ${cx - 8},64Z" fill="#000" opacity=".1"/>
-      ${f ? '' : hair}
-      <g clip-path="url(#${id}c)"><path d="${top}" fill="url(#${id}t)"/><path d="${bottom}" fill="url(#${id}b)"/>
-        ${f ? '' : `<path d="M${cx + hip - 3},200 L${cx + thigh * 0.9},${270 + F * 3}" stroke="#e5e7eb" stroke-width="2.4" opacity=".8"/><path d="M${cx - hip + 3},200 L${cx - thigh * 0.9},${270 + F * 3}" stroke="#e5e7eb" stroke-width="2.4" opacity=".8"/>`}</g>
-      <g fill="none" stroke="#7c4a2d" stroke-width="1.5" stroke-linecap="round" opacity=".55">${muscleShade.join('')}${legs}</g>
-      <g fill="none" stroke="${f ? '#831843' : '#334155'}" stroke-width="1.4" stroke-linecap="round" opacity=".45">${shirt.join('')}</g>
-      ${shoes}</svg>`;
+      <defs><linearGradient id="bf-skin" x1="0" x2="1" y1="0" y2="0"><stop offset="0" class="sk-edge"/><stop offset=".38" class="sk-lit"/><stop offset=".62" class="sk-mid"/><stop offset="1" class="sk-edge"/></linearGradient></defs>
+      ${f ? hair : ''}<g class="skin" fill="url(#bf-skin)">${arm(1)}${arm(-1)}<path d="${body}"/><ellipse cx="${cx}" cy="${36}" rx="${headW + F * 1.2}" ry="${22 + F * 0.6}"/></g>${f ? '' : hair}
+      <g class="lines" style="opacity:${f ? 0.6 : Math.max(0.35, show)}">${lines.join('')}</g></svg>`;
   }
 
   // ---- the choices --------------------------------------------------------------------
