@@ -479,11 +479,6 @@ main.no-tabs { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 
 /* Body type pictures and the journey */
 .body-fig { display: block; width: 100%; height: auto; }
-.body-fig .sk-lit { stop-color: color-mix(in srgb, #f2c4a0 80%, var(--surface)); }
-.body-fig .sk-mid { stop-color: #e2a57c; }
-.body-fig .sk-edge { stop-color: #c4835c; }
-.body-fig .hair { fill: #3b2a20; }
-.body-fig .lines { fill: none; stroke: #9a5d3a; stroke-width: 1.6; stroke-linecap: round; }
 .body-photo { display: block; width: 100%; aspect-ratio: 3 / 5; object-fit: cover; border-radius: 10px; }
 .field-hint { display: block; font-size: 12.5px; color: var(--ink-3); font-weight: 500; margin: -2px 0 8px; }
 .shape-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
