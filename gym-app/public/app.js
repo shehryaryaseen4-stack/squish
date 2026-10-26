@@ -305,8 +305,8 @@
     await Workout.planView(document.getElementById('wk'), {
       kg: w.kg,
       kgKnown: w.known,
-      goal: effBody(d.member)?.goal,
-      profile: effBody(d.member),
+      goal: d.member.body?.goal,
+      profile: d.member.body,
       lifts: d.member.lifts || {},
       saveLift,
       plan: d.member.workoutPlan,
@@ -333,8 +333,7 @@
     const box = document.getElementById('diet');
     if (!m.body || params.get('edit')) return bodyForm(box, d);
 
-    const b = effBody(m);
-    const journey = journeyNow(m);
+    const b = m.body;
     const plan = m.workoutPlan;
     const trainingDays = Object.values(plan?.days || {}).filter((x) => x?.exercises?.length).length || 3;
     const trend = Coach.weightTrend(m.weighIns || [], b.goal);
@@ -350,7 +349,7 @@
         <div class="dt-macros"><span><b>${p.carbs} g</b> carbs</span><span><b>${p.fat} g</b> fat</span><span><b>${p.water} L</b> water</span></div>
         <p class="dt-why">${p.proteinKg} kg × ${p.perKg} g = <b>${p.protein} g protein</b> a day to ${p.goal === 'gain' ? 'build muscle' : p.goal === 'lose' ? 'lose fat and keep your muscle' : p.goal === 'recomp' ? 'build muscle while losing fat' : 'stay fit'}${p.proteinKg !== b.weight ? ` (${p.proteinKg} kg is a healthy weight for your height, so protein isn't counted for extra fat)` : ''}. Your body uses about ${p.maintain.toLocaleString()} kcal a day with ${trainingDays} workout${trainingDays === 1 ? '' : 's'} a week${p.goal === 'lose' || p.goal === 'recomp' ? ', so eating less makes you lose fat' : p.goal === 'gain' ? ', so eating a bit more builds muscle' : ''}.</p></div>
       ${p.changed ? `<p class="note-line warn">${esc(p.changed)}</p>` : ''}
-      ${journey ? journeyStrip(journey) : bmiStrip(p.bmi)}
+      ${bmiStrip(p.bmi)}
 
       <div class="card diet-burn">${icon('flame')}<div>${burnToday && burnToday.kcal ? `<b>Today's workout burns ≈ ${burnToday.kcal} kcal</b><span>${esc(Workout.dayLabel(todayDay))} · about ${burnToday.minutes} min. See each exercise in <a class="link" href="#/workout">Workout</a>.</span>` : `<b>Rest day today</b><span>${weekBurn ? `Your week of workouts burns ≈ ${weekBurn.toLocaleString()} kcal.` : 'Make a workout plan to see the calories you burn.'}</span>`}</div></div>
 
@@ -403,8 +402,7 @@
         <div class="two-col"><label class="field"><span>Age</span><input class="input" name="age" type="number" inputmode="numeric" min="10" max="100" value="${esc(age)}" required></label>
           <label class="field"><span>Gender</span><select class="select" name="gender" data-sex><option value="male" ${(b.gender || m.gender) !== 'female' ? 'selected' : ''}>Male</option><option value="female" ${(b.gender || m.gender) === 'female' ? 'selected' : ''}>Female</option></select></label></div>
         <div class="bmi-live" data-bmi hidden></div>
-        <div class="field"><span>How does your body look now?</span><small class="field-hint">Pick the picture closest to you today.</small><div class="shape-grid" data-shapes="now" role="radiogroup" aria-label="Your body now"></div><p class="goal-hint" data-goalhint hidden></p></div>
-        <div class="field"><span>Which body do you want?</span><small class="field-hint">Your diet, workout and timeline are made for this goal.</small><div class="shape-grid" data-shapes="want" role="radiogroup" aria-label="The body you want"></div></div>
+        <div class="field"><span>Your goal</span>${chips('goal', GOALS, b.goal || 'fit')}<p class="goal-hint" data-goalhint hidden></p></div>
         <div class="field"><span>What you want most</span>${chips('focus', Object.entries(Coach.FOCUS).map(([k, x]) => [k, x.label]), b.focus || 'balanced')}</div>
         <div class="field"><span>How long have you been training?</span>${chips('experience', EXPERIENCE, b.experience || 'new')}</div>
         <div class="two-col"><label class="field"><span>Days a week you can come</span><select class="select" name="days">${[2, 3, 4, 5, 6].map((n) => `<option value="${n}" ${Number(b.days || 3) === n ? 'selected' : ''}>${n} days</option>`).join('')}</select></label>
@@ -413,32 +411,8 @@
         <div class="field"><span>What you eat</span>${chips('diet', DIETS, b.diet || 'nonveg')}</div>
         <button class="btn btn-primary btn-block">${coach ? 'Make my plan' : 'Show my diet plan'}</button></form></div>`;
     const f = box.querySelector('form');
-    // The pictures follow the gender; the picked ones stay picked.
-    let shape = b.shape || '';
-    let target = b.target || '';
-    let focusTouched = Boolean(b.focus && b.focus !== 'balanced');
-    const drawShapes = () => {
-      const sex = f.gender.value;
-      const card = (name, x, on) => `<label class="shape-card"><input type="radio" name="${name}" value="${x.id}" ${on ? 'checked' : ''}><span class="shape-fig">${Body.picture(sex, name === 'shape' ? 'now' : 'want', x)}</span><b>${esc(x.label)}</b><small>${esc(x.hint)}</small></label>`;
-      f.querySelector('[data-shapes="now"]').innerHTML = Body.NOW[sex].map((x) => card('shape', x, x.id === shape)).join('');
-      const wants = Body.WANT[sex];
-      if (!wants.some((x) => x.id === target)) target = '';
-      f.querySelector('[data-shapes="want"]').innerHTML = wants.map((x) => card('target', x, x.id === target)).join('');
-    };
-    f.addEventListener('change', (e) => {
-      if (e.target.name === 'gender') drawShapes();
-      if (e.target.name === 'shape') shape = e.target.value;
-      if (e.target.name === 'focus') focusTouched = true;
-      if (e.target.name === 'target') {
-        target = e.target.value;
-        // The coach adds extra work where this body needs it.
-        const want = Body.WANT[f.gender.value].find((x) => x.id === target);
-        if (want && !focusTouched) f.querySelector(`input[name="focus"][value="${want.focus}"]`).checked = true;
-      }
-      if (['shape', 'gender'].includes(e.target.name)) live();
-    });
-    drawShapes();
-    // Show the BMI while typing, and say so when the picked picture doesn't match it.
+    // Show the BMI while typing, and pick the goal it suggests until the member chooses one.
+    let goalTouched = Boolean(b.goal);
     const live = () => {
       const r = Nutrition.bmi({ weight: Number(f.weight.value), height: Number(f.height.value), age: Number(f.age.value) }, { asian: asianBmi() });
       const out = f.querySelector('[data-bmi]');
@@ -448,9 +422,15 @@
       if (out.hidden) return;
       out.className = `bmi-live bmi-${r.category}`;
       out.innerHTML = `<b>BMI ${r.value}</b><span>${r.teen ? 'Under 18: ask your trainer, BMI for teens is read by age' : `${esc(r.label)} · healthy for your height: ${r.healthy.min}–${r.healthy.max} kg`}</span>`;
-      const odd = (r.category === 'obese' && ['skinny', 'slim'].includes(shape)) || (r.category === 'under' && ['belly', 'heavy'].includes(shape));
-      if (odd && !r.teen) { hint.hidden = false; hint.textContent = `Your BMI says “${r.label}”. Check that this picture really looks like you, so your timeline is right.`; }
+      if (!r.goal) return;
+      if (!goalTouched) { f.querySelector(`input[name="goal"][value="${r.goal}"]`).checked = true; }
+      const chosen = f.querySelector('input[name="goal"]:checked')?.value;
+      if (chosen !== r.goal) {
+        hint.hidden = false;
+        hint.textContent = r.category === 'under' ? 'For your BMI we suggest “Build muscle”: you need to gain healthy weight first.' : `For your BMI we suggest “Lose fat”. ${r.category === 'obese' ? 'Eating extra now would add more fat.' : 'You can build muscle while you lose it.'}`;
+      }
     };
+    f.querySelectorAll('input[name="goal"]').forEach((x) => x.addEventListener('change', () => { goalTouched = true; live(); }));
     ['weight', 'height', 'age'].forEach((k) => f[k].addEventListener('input', live));
     live();
     f.addEventListener('submit', (e) => {
@@ -461,10 +441,6 @@
           const body = Object.fromEntries(fd.entries());
           body.injuries = fd.getAll('injuries');
           for (const k of ['weight', 'height', 'age', 'days', 'minutes']) body[k] = Math.round(Number(body[k]));
-          if (!body.shape) throw new Error('Choose the picture that looks most like you now');
-          if (!body.target) throw new Error('Choose the body you want');
-          // The diet and coach follow the first step of the journey.
-          body.goal = Body.journey(body)?.phases[0].goal || 'fit';
           state.me.member.body = await api('/api/member/body', { method: 'PUT', body });
           if (onSaved) return onSaved();
           if (location.hash.startsWith('#/bmi')) { location.hash = '#/bmi'; return bmiView(new URLSearchParams()); }
@@ -473,46 +449,6 @@
       });
     });
   }
-
-  // ---- body goal journey ------------------------------------------------------------------
-
-  // Where the member is on the way to the body they picked; the diet and coach follow its step.
-  const journeyNow = (m) => (m?.body ? Body.current(m.body, today(), m.weighIns || []) : null);
-  const effBody = (m) => {
-    const j = journeyNow(m);
-    return j && m.body ? { ...m.body, goal: j.goal } : m.body;
-  };
-  const span = (weeks) => (weeks < 9 ? `${weeks} week${weeks === 1 ? '' : 's'}` : `${Math.round(weeks / 4.33)} months`);
-
-  // Expected weight N weeks after starting, along the steps.
-  function weightAt(j, week) {
-    for (const p of j.phases) if (week <= p.start + p.weeks) return Math.round((p.from + ((p.to - p.from) * (week - p.start)) / p.weeks) * 10) / 10;
-    return j.weightEnd;
-  }
-
-  function journeyCard(j, gender) {
-    const sex = gender === 'female' ? 'female' : 'male';
-    const total = j.weeks;
-    const here = Math.min(total, j.week - 1);
-    const checks = [4, 13, 26, 52, 104].filter((w) => w < total).slice(0, 3);
-    return `<div class="card journey">
-      <div class="jr-pics">
-        <figure>${Body.picture(sex, 'now', j.now)}<figcaption><small>Now</small><b>${esc(j.now.label)}</b><span>${j.weightNow} kg · ~${j.bodyFat}% fat</span></figcaption></figure>
-        <div class="jr-arrow"><b>${j.months}</b><small>month${j.months === 1 ? '' : 's'}</small>${icon('chevronRight')}</div>
-        <figure class="goal">${Body.picture(sex, 'want', j.want)}<figcaption><small>Your goal</small><b>${esc(j.want.label)}</b><span>${j.weightEnd} kg · ~${j.targetBodyFat}% fat</span></figcaption></figure>
-      </div>
-      <div class="jr-facts">${j.fatToLose >= 1 ? `<div><small>Fat to lose</small><b>${j.fatToLose} kg</b></div>` : ''}${j.muscleToGain >= 0.5 ? `<div><small>Muscle to build</small><b>${j.muscleToGain} kg</b></div>` : ''}<div><small>Done so far</small><b>${Math.round(j.progress * 100)}%</b></div></div>
-      <div class="jr-bar" aria-hidden="true">${j.phases.map((p, i) => `<i class="jr-${p.goal}${i === j.index ? ' on' : ''}" style="flex:${p.weeks}"></i>`).join('')}<span class="jr-pin" style="left:${(here / total) * 100}%"></span></div>
-      <ol class="jr-steps">${j.phases.map((p, i) => `<li class="${i === j.index ? 'on' : i < j.index ? 'done' : ''}"><span class="jr-dot jr-${p.goal}">${i < j.index ? icon('check') : i + 1}</span><div>
-          <b>${esc(p.label)}</b> <small>${span(p.weeks)} · ${p.from} → ${p.to} kg</small><p>${esc(p.text)}</p>
-          ${i === j.index ? `<p class="jr-now">You are here: week ${Math.max(1, j.week - p.start)} of ${p.weeks}. Your diet and workout are set for this step.</p>` : ''}</div></li>`).join('')}</ol>
-      ${checks.length ? `<div class="jr-checks"><small>Check your weight against the plan</small><div>${checks.map((w) => `<span><b>${weightAt(j, w)} kg</b>${w < 9 ? `${w} weeks` : `${Math.round(w / 4.33)} months`}</span>`).join('')}</div></div>` : ''}
-      ${j.months > 12 ? '<p class="jr-note">A big change takes time. Most people see a clear difference in the mirror in 8-12 weeks; keep showing up and the rest follows.</p>' : ''}
-      <p class="jr-note">Times are for natural training, 3+ workouts a week and eating to plan. Sleep 7-8 hours.</p>
-    </div>`;
-  }
-
-  const journeyStrip = (j) => `<a class="card bmi-strip" href="#/bmi"><span class="jr-dot jr-${j.goal} sm"></span><span>Step ${j.index + 1} of ${j.phases.length}: <b>${esc(j.phase.label)}</b> · to <b>${esc(j.want.label)}</b> in ~${j.months} mo</span><span class="link">›</span></a>`;
 
   // ---- BMI ---------------------------------------------------------------------------------
 
@@ -534,8 +470,7 @@
   function bmiTile(m) {
     const r = m.body && Nutrition.bmi(m.body, { asian: asianBmi() });
     if (!r) return `<a class="card bmi-tile" href="#/bmi">${icon('ruler')}<div><b>Check your BMI</b><span>Enter your weight and height to get a diet and workout made for your body.</span></div>${icon('chevronRight')}</a>`;
-    const j = journeyNow(m);
-    return `<a class="card bmi-tile" href="#/bmi"><div class="bt-num bmi-${r.teen ? 'normal' : r.category}"><b>${r.value}</b><small>BMI</small></div><div><b>${j ? `${esc(j.phase.label)} → ${esc(j.want.label)}` : r.teen ? 'Your BMI' : esc(r.label)}</b><span>${j ? `Step ${j.index + 1} of ${j.phases.length} · ${Math.round(j.progress * 100)}% done · about ${j.months} months in all` : r.gap && !r.teen ? `${r.gap < 0 ? 'Lose' : 'Gain'} ${Math.abs(r.gap)} kg to reach a healthy weight` : 'Healthy weight. Pick the body you want →'}</span></div>${icon('chevronRight')}</a>`;
+    return `<a class="card bmi-tile" href="#/bmi"><div class="bt-num bmi-${r.teen ? 'normal' : r.category}"><b>${r.value}</b><small>BMI</small></div><div><b>${r.teen ? 'Your BMI' : esc(r.label)}</b><span>${r.gap && !r.teen ? `${r.gap < 0 ? 'Lose' : 'Gain'} ${Math.abs(r.gap)} kg to reach a healthy weight` : 'Healthy weight. Keep it up!'}</span></div>${icon('chevronRight')}</a>`;
   }
 
   // A one-line BMI reminder on the diet page.
@@ -544,11 +479,10 @@
   async function bmiView(params) {
     const d = await me();
     const m = d.member;
-    render(`<div class="page-title"><h1>Your body & goal</h1><p>Where you are, the body you want, and how long it takes.</p></div>${fitTabs('bmi')}<div id="bmi" class="pad" style="margin-top:14px"></div>`);
+    render(`<div class="page-title"><h1>BMI & your body</h1><p>Your body mass index, a healthy weight for your height, and the plan that fits you.</p></div>${fitTabs('bmi')}<div id="bmi" class="pad" style="margin-top:14px"></div>`);
     const box = document.getElementById('bmi');
     if (!m.body || params.get('edit')) return bodyForm(box, d, { coach: true, onSaved: () => { location.hash = '#/bmi'; } });
-    const b = effBody(m);
-    const journey = journeyNow(m);
+    const b = m.body;
     const asian = asianBmi();
     const r = Nutrition.bmi(b, { asian });
     const lib = await Workout.library();
@@ -559,22 +493,20 @@
     const waist = [...(d.measurements || [])].reverse().find((x) => x.waist)?.waist;
     const whtr = waist ? Math.round((waist / b.height) * 100) / 100 : null;
     const cardio = Object.values(coachPlan.days).flatMap((x) => x.exercises).find((x) => lib.byId[x.id]?.cardio);
-    const advise = !journey && !r.teen && r.goal && r.goal !== b.goal;
+    const advise = !r.teen && r.goal && r.goal !== b.goal;
 
     const pace = r.gap < 0 ? `about ${r.category === 'obese' ? '0.75' : '0.5'} kg a week` : 'about 0.25 kg a week';
     const history = (m.weighIns || []).slice(-8).map((x) => ({ ...x, bmi: Nutrition.bmi({ weight: x.kg, height: b.height }, { asian }).value }));
-    box.innerHTML = `${journey ? journeyCard(journey, m.body.gender) : `<a class="card bmi-rec" href="#/bmi?edit=1">${icon('star')}<div><b>Pick your body type and your dream body</b><span>See how long it takes, and get a diet and workout for each step.</span></div>${icon('chevronRight')}</a>`}
-      <h2 class="diet-h">Your BMI</h2>
-      <div class="card bmi-hero">
+    box.innerHTML = `<div class="card bmi-hero">
         <div class="bh-top"><div class="bh-num bmi-${r.teen ? 'normal' : r.category}"><b class="tnum">${r.value}</b><small>BMI</small></div>
           <div><h2>${r.teen ? 'Under 18' : esc(r.label)}</h2><p>${b.weight} kg · ${b.height} cm</p></div></div>
         ${bmiScale(r)}
         <div class="bh-facts"><div><small>Healthy weight for ${b.height} cm</small><b>${r.healthy.min}–${r.healthy.max} kg</b></div>
           <div><small>${r.gap < 0 ? 'To lose' : r.gap > 0 ? 'To gain' : 'You are'}</small><b>${r.gap ? `${Math.abs(r.gap)} kg` : 'In range ✓'}</b></div>
-          ${r.gap && !journey ? `<div><small>Time at a safe pace</small><b>${r.weeks < 9 ? `${r.weeks} weeks` : `${Math.round(r.weeks / 4.3)} months`}</b></div>` : ''}</div>
+          ${r.gap ? `<div><small>Time at a safe pace</small><b>${r.weeks < 9 ? `${r.weeks} weeks` : `${Math.round(r.weeks / 4.3)} months`}</b></div>` : ''}</div>
       </div>
       <p class="bmi-text">${r.teen ? 'You are under 18, so BMI is read from growth charts for your age, not these ranges. Train with your trainer’s guidance and eat well to grow strong.' : esc(r.text)}
-        ${r.gap && !r.teen && !journey ? ` At ${pace}, that is a healthy, lasting change.` : ''}${r.milestone ? ` <b>First step: lose ${r.milestone} kg.</b> Even that much lowers blood pressure and sugar and makes training easier.` : ''}</p>
+        ${r.gap && !r.teen ? ` At ${pace}, that is a healthy, lasting change.` : ''}${r.milestone ? ` <b>First step: lose ${r.milestone} kg.</b> Even that much lowers blood pressure and sugar and makes training easier.` : ''}</p>
       ${whtr ? `<div class="card bmi-note ${whtr > 0.5 ? 'warn' : ''}">${icon('ruler')}<div><b>Waist ${waist} cm (${whtr} × your height)</b><span>${whtr > 0.5 ? `Keep your waist under ${Math.floor(b.height / 2)} cm, half your height. Belly fat is the riskiest kind.` : 'Your waist is under half your height. Good sign!'}</span></div></div>` : ''}
       ${r.category === 'over' && b.experience === '3plus' && !(whtr > 0.5) ? `<div class="card bmi-note">${icon('info')}<div><b>Lots of muscle?</b><span>BMI can’t tell muscle from fat. If you are muscular with a slim waist, a BMI a bit over the range is fine.</span></div></div>` : ''}
       ${advise ? `<div class="card bmi-advise"><div><small>Recommended goal for your body</small><b>${esc(GOAL_LABEL[r.goal])}</b><span>Your goal now: ${esc(GOAL_LABEL[b.goal] || 'Stay fit')}.</span></div><button class="btn btn-primary btn-sm" data-goal="${r.goal}">Use this goal</button></div>` : ''}
@@ -607,14 +539,12 @@
     const box = document.getElementById('coach');
     if (!m.body?.experience || params.get('edit')) return bodyForm(box, d, { coach: true, onSaved: () => coachView(new URLSearchParams()) });
     const lib = await Workout.library();
-    const b = effBody(m);
-    const journey = journeyNow(m);
+    const b = m.body;
     const plan = Coach.plan({ ...b, asian: asianBmi() }, lib);
     const body = plan.bmi && !plan.bmi.teen ? plan.bmi : null;
     const focus = Coach.FOCUS[b.focus]?.label || 'Balanced';
     const goalText = { lose: 'lose fat while keeping your muscle', fit: 'get fit and strong', gain: 'build muscle' }[b.goal];
     const why = [
-      journey ? `Goal: a${/^[aeiou]/i.test(journey.want.label) ? 'n' : ''} ${journey.want.label.toLowerCase()} body in about ${journey.months} month${journey.months === 1 ? '' : 's'}. Now: ${journey.phase.label.toLowerCase()} (step ${journey.index + 1} of ${journey.phases.length}).` : null,
       `${plan.program.split}: the best split for ${b.days} days a week${b.experience === 'new' ? ' when you are starting out' : ''}.`,
       `${b.goal === 'gain' ? 'Heavier sets of 8-10 reps' : b.goal === 'lose' ? 'Sets of 10-15 reps with short rests, plus cardio' : 'Sets of 8-15 reps'} to ${goalText}.`,
       b.focus !== 'balanced' ? `Extra work for: ${focus.toLowerCase()}.` : 'Every muscle trained evenly.',
@@ -854,23 +784,11 @@
     }
   }
 
-  // Real photos for the body-type pictures: the app's own set (public/shapes), then the gym's.
-  async function loadBodyPhotos(gym) {
-    const map = {};
-    try {
-      const r = await fetch(`${UI.apiBase()}/shapes/index.json`, { cache: 'no-cache' });
-      if (r.ok) for (const [k, f] of Object.entries(await r.json())) if (/^[\w.-]+$/.test(f)) map[k] = `${UI.apiBase()}/shapes/${f}`;
-    } catch { /* drawings are used */ }
-    for (const [k, p] of Object.entries(gym?.bodyPhotos || {})) map[k] = UI.photoSrc(p);
-    Body.setPhotos(map);
-  }
-
   let booted = false;
   async function boot() {
     if (window.APP_CONFIG?.native && !UI.apiBase()) return connectView();
     try {
       state.gym = await rawApi('/api/gym');
-      await loadBodyPhotos(state.gym);
     } catch (e) {
       if (window.APP_CONFIG?.native && !window.APP_CONFIG.apiBase) {
         try { localStorage.removeItem('serverUrl'); } catch { /* ignore */ }
