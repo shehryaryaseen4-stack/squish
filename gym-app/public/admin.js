@@ -1773,15 +1773,15 @@
   async function drawBodyPhotos(sex = 'male') {
     const box = document.getElementById('bodyphotos');
     if (!box || !window.Body) return;
-    const [gym] = await Promise.all([api('/api/gym'), Body.loadDefaults(window.APP_CONFIG?.demo ? '' : `${UI.apiBase()}/`)]);
+    const gym = await api('/api/gym');
     const mine = gym.bodyPhotos || {};
     Body.setPhotos(Object.fromEntries(Object.entries(mine).map(([k, p]) => [k, UI.photoSrc(p)])));
     const tile = (kind, x) => {
       const key = Body.keyOf(sex, kind, x.id);
       return `<div class="bp-tile"><div class="bp-pic">${Body.picture(sex, kind, x)}</div><b>${esc(x.label)}</b>
-        <div class="bp-actions"><button class="btn btn-soft btn-sm" data-up="${key}">${icon('camera')}${mine[key] ? 'Change' : Body.hasDefault(key) ? 'Use my own' : 'Add photo'}</button>${mine[key] ? `<button class="icon-btn" data-del="${key}" aria-label="Back to the app’s picture">${icon('trash')}</button>` : ''}</div></div>`;
+        <div class="bp-actions"><button class="btn btn-soft btn-sm" data-up="${key}">${icon('camera')}${mine[key] ? 'Change' : 'Add photo'}</button>${mine[key] ? `<button class="icon-btn" data-del="${key}" aria-label="Remove photo">${icon('trash')}</button>` : ''}</div></div>`;
     };
-    box.innerHTML = `<div class="panel-head"><div><h2>${icon('user')} Body type photos</h2><p class="muted" style="font-size:13.5px">Members pick “my body now” and “the body I want” from these pictures. You can use your own instead: stand straight, plain background, tall photo. Use only photos you own or have a licence for, with the person’s permission.</p></div></div>
+    box.innerHTML = `<div class="panel-head"><div><h2>${icon('user')} Body type photos</h2><p class="muted" style="font-size:13.5px">Members pick “my body now” and “the body I want” from these pictures. Replace the drawings with real photos: stand straight, front view, plain background, tall photo. Use only photos you own or have a licence for, with the person’s permission.</p></div></div>
       <div class="seg" role="group" style="margin-bottom:12px"><button data-sex="male" aria-pressed="${sex === 'male'}">Men</button><button data-sex="female" aria-pressed="${sex === 'female'}">Women</button></div>
       <h3 class="bp-h">Body now</h3><div class="bp-grid">${Body.NOW[sex].map((x) => tile('now', x)).join('')}</div>
       <h3 class="bp-h">The body they want</h3><div class="bp-grid">${Body.WANT[sex].map((x) => tile('want', x)).join('')}</div>`;

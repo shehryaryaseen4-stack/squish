@@ -22,7 +22,6 @@ for (const f of ['base.css', 'gym.css', 'app.css', 'admin.css', 'kiosk.css', 'di
   fs.writeFileSync(path.join(out, f), pub(f));
 }
 fs.cpSync(path.join(root, 'public', 'exercises'), path.join(out, 'exercises'), { recursive: true });
-fs.cpSync(path.join(root, 'public', 'shapes'), path.join(out, 'shapes'), { recursive: true, filter: (f) => !f.endsWith('.md') });
 fs.writeFileSync(path.join(out, 'config.js'), "window.APP_CONFIG = { apiBase: '', demo: true };\n");
 
 // The browser stand-in for lib/store.js: same API, kept in localStorage.

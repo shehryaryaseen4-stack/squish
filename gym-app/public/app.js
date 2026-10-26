@@ -854,10 +854,15 @@
     }
   }
 
-  // Pictures for the body types: the app's own set (public/shapes), then any the gym uploaded.
+  // Real photos for the body-type pictures: the app's own set (public/shapes), then the gym's.
   async function loadBodyPhotos(gym) {
-    await Body.loadDefaults(window.APP_CONFIG?.demo ? '' : `${UI.apiBase()}/`);
-    Body.setPhotos(Object.fromEntries(Object.entries(gym?.bodyPhotos || {}).map(([k, p]) => [k, UI.photoSrc(p)])));
+    const map = {};
+    try {
+      const r = await fetch(`${UI.apiBase()}/shapes/index.json`, { cache: 'no-cache' });
+      if (r.ok) for (const [k, f] of Object.entries(await r.json())) if (/^[\w.-]+$/.test(f)) map[k] = `${UI.apiBase()}/shapes/${f}`;
+    } catch { /* drawings are used */ }
+    for (const [k, p] of Object.entries(gym?.bodyPhotos || {})) map[k] = UI.photoSrc(p);
+    Body.setPhotos(map);
   }
 
   let booted = false;

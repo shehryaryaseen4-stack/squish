@@ -173,22 +173,11 @@
   // ---- real photos -----------------------------------------------------------------------
   // The gym (or the app's owner, in public/shapes/) can replace each drawing with a photo.
   let photos = {};
-  let defaults = {};
   const setPhotos = (map) => { photos = { ...photos, ...(map || {}) }; };
-  // The app's own pictures (public/shapes/index.json); root is where the app's files are.
-  async function loadDefaults(root) {
-    try {
-      const r = await fetch(`${root}shapes/index.json`, { cache: 'no-cache' });
-      if (!r.ok) return;
-      const map = await r.json();
-      defaults = Object.fromEntries(Object.entries(map).filter(([, f]) => /^[\w.-]+$/.test(f)).map(([k, f]) => [k, `${root}shapes/${f}`]));
-    } catch { /* the drawings are used */ }
-  }
   const keyOf = (sex, kind, id) => `${sex}-${kind}-${id}`;
   /** The photo for this look if there is one, else the drawing. kind: "now" or "want". */
   function picture(sex, kind, x) {
-    const key = keyOf(sex, kind, x.id);
-    const src = photos[key] || defaults[key];
+    const src = photos[keyOf(sex, kind, x.id)];
     const alt = x.label.replace(/[<&"]/g, '');
     if (src) return `<img class="body-photo" src="${String(src).replace(/"/g, '&quot;')}" alt="${alt}" loading="lazy">`;
     return figure(sex, x.fat, x.muscle, { label: x.label });
@@ -315,7 +304,7 @@
     return { ...j, week: week + 1, index: i, phase, goal: phase.goal, kgNow: kg, progress: Math.max(0, Math.min(1, progress)), done: week >= j.weeks };
   }
 
-  const api = { figure, picture, setPhotos, loadDefaults, hasDefault: (key) => Boolean(defaults[key]), keyOf, NOW, WANT, nowOf, wantOf, bodyFat, journey, current };
+  const api = { figure, picture, setPhotos, keyOf, NOW, WANT, nowOf, wantOf, bodyFat, journey, current };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Body = api;
 })(typeof window !== 'undefined' ? window : globalThis);
