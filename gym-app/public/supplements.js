@@ -324,12 +324,12 @@
     let body;
     if (type === 'tub' || type === 'big') {
       const top = type === 'big' ? 20 : 28;
-      body = `<rect x="27" y="${top}" width="66" height="15" rx="6" fill="#1f2937"/><rect x="30" y="${top + 11}" width="60" height="${106 - top - 11}" rx="10" fill="currentColor"/>${shine(36, top + 18, 106 - top - 30)}${label(top + 28, 32)}
+      body = `<rect x="27" y="${top}" width="66" height="15" rx="6" class="lid"/><rect x="30" y="${top + 11}" width="60" height="${106 - top - 11}" rx="10" fill="currentColor"/>${shine(36, top + 18, 106 - top - 30)}${label(top + 28, 32)}
         <path d="M86 100 h22 a4 4 0 0 1 0 8 h-22 Z" fill="#9ca3af"/><path d="M74 96 h16 v8 a8 8 0 0 1 -16 0 Z" fill="#d1d5db"/><ellipse cx="82" cy="96" rx="8" ry="2.5" fill="#f5e6c8"/>`;
     } else if (type === 'jar') {
-      body = `<rect x="33" y="40" width="54" height="13" rx="5" fill="#1f2937"/><rect x="35" y="50" width="50" height="56" rx="9" fill="currentColor"/>${shine(40, 58, 40)}${label(62, 26, 9)}<circle cx="96" cy="100" r="7" fill="#fff" opacity=".9"/><circle cx="104" cy="104" r="4" fill="#fff" opacity=".7"/>`;
+      body = `<rect x="33" y="40" width="54" height="13" rx="5" class="lid"/><rect x="35" y="50" width="50" height="56" rx="9" fill="currentColor"/>${shine(40, 58, 40)}${label(62, 26, 9)}<circle cx="96" cy="100" r="7" fill="#fff" opacity=".9"/><circle cx="104" cy="104" r="4" fill="#fff" opacity=".7"/>`;
     } else if (type === 'shaker') {
-      body = `<rect x="44" y="14" width="32" height="9" rx="3" fill="#1f2937"/><rect x="38" y="22" width="44" height="12" rx="4" fill="#374151"/><path d="M38 34 h44 l-5 72 a6 6 0 0 1 -6 5 h-22 a6 6 0 0 1 -6 -5 Z" fill="#fff" opacity=".9"/><path d="M41 60 h38 l-3.2 46 a6 6 0 0 1 -6 5 h-19.6 a6 6 0 0 1 -6 -5 Z" fill="currentColor"/>${shine(46, 40, 60)}<text x="60" y="90" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="800" font-size="11" fill="#fff">${tag}</text>`;
+      body = `<rect x="44" y="14" width="32" height="9" rx="3" class="lid"/><rect x="38" y="22" width="44" height="12" rx="4" class="lid2"/><path d="M38 34 h44 l-5 72 a6 6 0 0 1 -6 5 h-22 a6 6 0 0 1 -6 -5 Z" fill="#fff" opacity=".9"/><path d="M41 60 h38 l-3.2 46 a6 6 0 0 1 -6 5 h-19.6 a6 6 0 0 1 -6 -5 Z" fill="currentColor"/>${shine(46, 40, 60)}<text x="60" y="90" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="800" font-size="11" fill="#fff">${tag}</text>`;
     } else if (type === 'bottle' || type === 'softgel') {
       body = `<rect x="40" y="22" width="40" height="16" rx="5" fill="#f9fafb" stroke="#d1d5db"/><rect x="34" y="36" width="52" height="70" rx="12" fill="currentColor"/>${shine(40, 44, 54)}${label(54, 30, 12)}${type === 'softgel' ? '<ellipse cx="98" cy="96" rx="9" ry="6" fill="#fbbf24" opacity=".9" transform="rotate(-25 98 96)"/><ellipse cx="22" cy="104" rx="8" ry="5" fill="#fbbf24" opacity=".8"/>' : `${caps(99, 98)}${caps(20, 104)}`}`;
     } else {

@@ -557,17 +557,17 @@
         ${b ? `<div class="supp-expect">${e.fatPerMonth ? `<div><small>Fat off with your diet</small><b>~${e.fatPerMonth} kg</b><span>a month</span></div>` : ''}<div><small>Muscle you can build</small><b>~${e.muscle} kg</b><span>a month${['new', 'lt1', undefined].includes(b.experience) ? ' (first year)' : ''}</span></div><div><small>Visible change</small><b>8-12</b><span>weeks</span></div></div>`
           : `<a class="btn btn-soft btn-sm" href="#/diet" style="margin-top:10px">Enter your weight to see what fits you</a>`}
       </div>
-      <div class="chips-row" role="group" aria-label="Show" style="margin:14px 0 4px">${SUPP_GROUPS.filter(([id]) => id !== 'you' || b).map(([id, l]) => `<a class="chip" href="#/supps?g=${id}" aria-pressed="${show === id}">${l}</a>`).join('')}</div>
+      <div class="chips-row supp-filter" role="group" aria-label="Show" style="margin:14px 0 4px">${SUPP_GROUPS.filter(([id]) => id !== 'you' || b).map(([id, l]) => `<a class="chip" href="#/supps?g=${id}" aria-pressed="${show === id}">${l}</a>`).join('')}</div>
       <div class="supp-grid">${list.map((x) => {
         const a = guide.advice[x.id];
         const s = x.serving;
         // Every card has the same parts in the same places.
         return `<button class="card supp-card" data-supp="${x.id}">
           <span class="supp-banner">${Supplements.art(x)}${b ? `<span class="supp-fit ${a.fit}"><i></i>${FIT[a.fit][1]}</span>` : ''}</span>
-          <span class="supp-top"><span class="supp-ico">${icon(x.icon)}</span><span><b>${esc(x.name)}</b><small>${esc(x.kind)}</small></span></span>
-          <span class="supp-chips"><span>${s.protein} g protein</span><span>${s.kcal} kcal</span></span>
+          <span class="supp-top"><span class="supp-ico">${icon(x.icon)}</span><span><small>${esc(x.kind)}</small><b>${esc(x.name)}</b></span></span>
+          <span class="supp-stats"><span><b>${s.protein} g</b><small>protein</small></span><span><b>${s.kcal}</b><small>kcal</small></span><span>${evidenceDots(x.evidence)}<small>${EVIDENCE[x.evidence][1].replace(' research', '')}</small></span></span>
           <span class="supp-when">${icon('clock')}<span>${esc(x.when)}</span></span>
-          <span class="supp-foot">${evidenceDots(x.evidence)}<span class="supp-more">Details ${icon('chevronRight')}</span></span></button>`;
+          <span class="supp-more">See details ${icon('chevronRight')}</span></button>`;
       }).join('') || '<p class="muted">Nothing here.</p>'}</div>
       <p class="diet-note">Typical values; brands differ, so check your tub’s label. Buy from an authorised seller: fake supplements are common. Ask a doctor first if you have kidney, liver or heart problems, high blood pressure, take medicine, are pregnant, or are under 18. Steroids and “test boosters” are not supplements: they are risky and the app doesn’t recommend them.</p></div>`);
     const open = (id) => suppSheet(Supplements.byId[id], guide, b, diet);
