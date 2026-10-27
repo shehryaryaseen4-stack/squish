@@ -573,3 +573,4 @@ main.no-tabs { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 .supp-time b { font-size: 14.5px; }
 .supp-time span { color: var(--ink-2); }
 .supp-list.bad li::marker { color: var(--bad); }
+.supp-filter { display: flex; flex-wrap: wrap; gap: 8px 10px; }
