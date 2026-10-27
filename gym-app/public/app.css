@@ -574,3 +574,37 @@ main.no-tabs { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 .supp-time span { color: var(--ink-2); }
 .supp-list.bad li::marker { color: var(--bad); }
 .supp-filter { display: flex; flex-wrap: wrap; gap: 8px 10px; }
+
+/* What I ate today, and the food search */
+.food-today, .food-search { padding: 16px; margin-top: 12px; }
+.ft-sum { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ft-sum > div { display: grid; padding: 12px; border-radius: 14px; background: #111; color: #fff; }
+.ft-sum small { font-size: 12px; color: #a1a1aa; }
+.ft-sum b { font-size: 22px; color: var(--accent); }
+.ft-sum span { font-size: 12px; color: #d4d4d8; }
+.ft-bar { height: 6px; margin-top: 8px; border-radius: 99px; background: rgba(255, 255, 255, .15); overflow: hidden; }
+.ft-bar i { display: block; height: 100%; border-radius: 99px; background: var(--accent); }
+.ft-bar.prot i { background: #22c55e; }
+.ft-meal { margin-top: 14px; }
+.ft-meal h4 { margin: 0 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); }
+.ft-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.ft-item > div { flex: 1; display: grid; min-width: 0; }
+.ft-item b { font-size: 14.5px; }
+.ft-item span { font-size: 12.5px; color: var(--ink-3); }
+.ft-item .icon-btn { width: 32px; height: 32px; }
+.ft-empty { margin: 12px 0 0; font-size: 14px; }
+.ft-left { margin: 12px 0 0; font-size: 13.5px; font-weight: 700; color: var(--ink-2); }
+.food-search .input-group { position: relative; }
+.fs-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.fs-main { flex: 1; display: grid; gap: 2px; min-width: 0; }
+.fs-main b { font-size: 15px; }
+.fs-main > span { font-size: 12.5px; color: var(--ink-3); }
+.fs-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.fs-chips.big { margin: 14px 0 4px; }
+.fc { padding: 3px 9px; border-radius: 99px; font-size: 12px; font-weight: 700; background: var(--surface-2); color: var(--ink-2); }
+.fc.kcal { background: var(--accent-soft); color: color-mix(in srgb, var(--accent) 80%, var(--ink)); }
+.fc.prot { background: var(--good-soft); color: var(--good); }
+.fs-add { width: 42px; height: 42px; padding: 0; border-radius: 50%; flex: none; }
+.qty-row { display: flex; align-items: center; gap: 12px; }
+.qty-row b { font-size: 22px; min-width: 34px; text-align: center; }
+.qty-row .icon-btn { font-size: 22px; font-weight: 700; }

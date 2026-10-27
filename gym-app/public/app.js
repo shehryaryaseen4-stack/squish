@@ -358,6 +358,11 @@
         ${(m.weighIns || []).length ? `<div class="wi-list">${(m.weighIns || []).slice(-6).map((x) => `<span><b>${x.kg}</b><small>${esc(dateShort(x.d))}</small></span>`).join('')}</div>` : ''}
         <p class="wi-note ${trend.kcal ? 'warn' : ''}">${esc(trend.note)}${trend.kcal ? ` Your calories above already include this (${trend.kcal > 0 ? '+' : ''}${trend.kcal} kcal).` : ''}</p></div>
 
+      <h2 class="diet-h">Search food</h2>
+      <div class="card food-search"><div class="input-group">${icon('search')}<input class="input" type="search" data-food-q placeholder="Search any food: roti, anda, biryani…" aria-label="Search food" autocomplete="off"></div><div data-food-results></div></div>
+      <h2 class="diet-h">What I ate today</h2>
+      <div class="card food-today" data-food-today></div>
+
       <h2 class="diet-h">Your meals for today</h2>
       <div class="meals">${p.meals.map((meal) => {
         const [ic, name] = MEAL_NAMES[meal.id];
@@ -379,12 +384,123 @@
       <p class="diet-note">Numbers are estimates for a healthy adult. If you have a medical condition, are pregnant, or take medicine, ask a doctor first. Your trainer can adjust this plan with you.</p>
       <button class="btn btn-ghost btn-block" data-edit style="margin-top:12px">${icon('edit')}Change weight, goal or diet</button>`;
     box.querySelector('[data-edit]').addEventListener('click', () => { location.hash = '#/diet?edit=1'; });
+    foodLog(box, p);
     box.querySelector('.wi-form').addEventListener('submit', (e) => {
       e.preventDefault();
       busy(e.target.querySelector('button'), async () => {
         try { await weighIn(Number(e.target.kg.value)); toast('Saved. See you next week!'); dietView(new URLSearchParams()); } catch (err) { toast(err.message, 'bad'); }
       });
     });
+  }
+
+  // ---- what I ate: food search and the day's list --------------------------------------
+
+  const MEALS = [['breakfast', 'Breakfast'], ['lunch', 'Lunch'], ['snack', 'Snack'], ['dinner', 'Dinner']];
+  const mealNow = () => { const h = nowHere().minutes / 60; return h < 11 ? 'breakfast' : h < 16 ? 'lunch' : h < 19 ? 'snack' : 'dinner'; };
+  const amount = (q) => (q === 1 ? '' : ` × ${q}`);
+  const macroChips = (f, q = 1) => `<span class="fc kcal">${Math.round(f.kcal * q)} kcal</span><span class="fc prot">${Math.round(f.protein * q * 10) / 10} g protein</span><span class="fc">${Math.round(f.carbs * q)} g carbs</span><span class="fc">${Math.round(f.fat * q)} g fat</span>`;
+
+  function foodLog(box, plan) {
+    const day = today();
+    const member = () => state.me.member;
+    const items = () => member().foodLog?.[day] || [];
+    const own = () => member().customFoods || [];
+    const todayBox = box.querySelector('[data-food-today]');
+    const results = box.querySelector('[data-food-results]');
+    const input = box.querySelector('[data-food-q]');
+
+    const save = async (list) => {
+      const saved = await api('/api/member/food-log', { method: 'PUT', body: { date: day, items: list } });
+      state.me.member.foodLog = { ...(member().foodLog || {}), [day]: saved };
+      drawToday();
+    };
+
+    function drawToday() {
+      const list = items();
+      const t = Foods.totals(list);
+      const bar = (v, max) => `<i style="width:${Math.min(100, (v / max) * 100)}%"></i>`;
+      todayBox.innerHTML = `<div class="ft-sum">
+          <div><small>Calories</small><b>${t.kcal.toLocaleString()}</b><span>of ${plan.target.toLocaleString()}</span><div class="ft-bar">${bar(t.kcal, plan.target)}</div></div>
+          <div><small>Protein</small><b>${t.protein} g</b><span>of ${plan.protein} g</span><div class="ft-bar prot">${bar(t.protein, plan.protein)}</div></div></div>
+        ${list.length ? MEALS.filter(([id]) => list.some((x) => x.meal === id)).map(([id, label]) => `<div class="ft-meal"><h4>${label}</h4>${list.map((x, i) => (x.meal === id ? `<div class="ft-item"><div><b>${esc(x.name)}</b><span>${esc(x.portion)}${amount(x.qty)} · ${Math.round(x.kcal * x.qty)} kcal · ${Math.round(x.protein * x.qty * 10) / 10} g protein</span></div><button class="icon-btn" data-rm="${i}" aria-label="Remove ${esc(x.name)}">${icon('x')}</button></div>` : '')).join('')}</div>`).join('')
+          : '<p class="muted ft-empty">Nothing yet. Search a food above and tap + to add it.</p>'}
+        ${list.length ? `<p class="ft-left">${t.kcal < plan.target ? `${(plan.target - t.kcal).toLocaleString()} kcal left` : `${(t.kcal - plan.target).toLocaleString()} kcal over`} · ${t.protein < plan.protein ? `${plan.protein - t.protein} g protein to go` : 'protein target reached 💪'}</p>` : ''}`;
+      todayBox.querySelectorAll('[data-rm]').forEach((b) => b.addEventListener('click', () => busy(b, async () => {
+        try { await save(items().filter((_, i) => i !== Number(b.dataset.rm))); } catch (e) { toast(e.message, 'bad'); }
+      })));
+    }
+
+    function drawResults() {
+      const q = input.value.trim();
+      if (!q) { results.innerHTML = ''; return; }
+      const found = Foods.search(q, own());
+      results.innerHTML = `${found.map((f, i) => `<div class="fs-row"><div class="fs-main"><b>${esc(f.name)}${f.own ? ' <span class="badge badge-muted">mine</span>' : ''}</b><span>${esc(f.portion)}</span><div class="fs-chips">${macroChips(f)}</div></div><button class="btn btn-primary btn-sm fs-add" data-add="${i}" aria-label="Add ${esc(f.name)}">${icon('plus')}</button></div>`).join('')}
+        <button class="btn btn-ghost btn-block" data-own style="margin-top:8px">${icon('plus')}${found.length ? 'Not here? Add your own food' : `“${esc(q)}” is not in the list. Add it yourself`}</button>`;
+      results.querySelectorAll('[data-add]').forEach((b) => b.addEventListener('click', () => addSheet(found[Number(b.dataset.add)])));
+      results.querySelector('[data-own]').addEventListener('click', () => ownSheet(q));
+    }
+
+    // How much and for which meal, then onto the day's list.
+    function addSheet(f) {
+      let qty = 1;
+      let meal = mealNow();
+      sheet({
+        title: f.name,
+        html: `<p class="muted" style="margin:0 0 12px">${esc(f.portion)}</p>
+          <div class="field"><span>How much</span><div class="qty-row"><button class="icon-btn" data-q="-1" aria-label="Less">−</button><b data-qty>1</b><span class="muted">× ${esc(f.portion)}</span><button class="icon-btn" data-q="1" aria-label="More">+</button></div></div>
+          <div class="field"><span>Meal</span><div class="choice-row">${MEALS.map(([id, l]) => `<label class="choice-chip"><input type="radio" name="meal" value="${id}" ${id === meal ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div></div>
+          <div class="fs-chips big" data-macros>${macroChips(f)}</div>
+          <div class="sheet-actions"><button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" data-ok>${icon('plus')}Add to today</button></div>`,
+        onMount: (el, close) => {
+          const draw = () => { el.querySelector('[data-qty]').textContent = qty; el.querySelector('[data-macros]').innerHTML = macroChips(f, qty); };
+          el.querySelectorAll('[data-q]').forEach((b) => b.addEventListener('click', () => { qty = Math.min(20, Math.max(0.5, qty + Number(b.dataset.q) * 0.5)); draw(); }));
+          el.querySelectorAll('input[name=meal]').forEach((r) => r.addEventListener('change', () => { meal = r.value; }));
+          const ok = el.querySelector('[data-ok]');
+          ok.addEventListener('click', () => busy(ok, async () => {
+            try {
+              const { id, name, portion, kcal, protein, carbs, fat } = f;
+              await save([...items(), { id, name, portion, kcal, protein, carbs, fat, qty, meal }]);
+              close();
+              toast(`Added ${name}`);
+            } catch (e) { toast(e.message, 'bad'); }
+          }));
+        },
+      });
+    }
+
+    // A food that isn't in the list: the member types its numbers (from the packet label).
+    function ownSheet(name) {
+      sheet({
+        title: 'Add your own food',
+        html: `<form class="form-grid two" novalidate>
+            <label class="field span"><span>Food</span><input class="input" name="name" value="${esc(name)}" maxlength="60" required></label>
+            <label class="field span"><span>Portion</span><input class="input" name="portion" placeholder="e.g. 1 plate, 100 g, 1 packet" maxlength="40"></label>
+            <label class="field"><span>Calories (kcal)</span><input class="input" name="kcal" type="number" inputmode="decimal" min="0" required></label>
+            <label class="field"><span>Protein (g)</span><input class="input" name="protein" type="number" inputmode="decimal" min="0"></label>
+            <label class="field"><span>Carbs (g)</span><input class="input" name="carbs" type="number" inputmode="decimal" min="0"></label>
+            <label class="field"><span>Fat (g)</span><input class="input" name="fat" type="number" inputmode="decimal" min="0"></label></form>
+          <p class="muted" style="font-size:13px">Tip: packets show these on the nutrition label.</p>
+          <div class="sheet-actions"><button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" data-ok>${icon('check')}Save and add</button></div>`,
+        onMount: (el, close) => {
+          const ok = el.querySelector('[data-ok]');
+          ok.addEventListener('click', () => busy(ok, async () => {
+            const d = Object.fromEntries(new FormData(el.querySelector('form')).entries());
+            if (!d.name.trim()) return toast('Enter the food name', 'bad');
+            if (d.kcal === '') return toast('Enter the calories', 'bad');
+            const food = { id: `own-${Date.now().toString(36)}`, name: d.name.trim(), portion: d.portion.trim() || '1 portion', kcal: Number(d.kcal) || 0, protein: Number(d.protein) || 0, carbs: Number(d.carbs) || 0, fat: Number(d.fat) || 0 };
+            try {
+              state.me.member.customFoods = await api('/api/member/custom-foods', { method: 'PUT', body: { foods: [food, ...own()] } });
+              close();
+              setTimeout(() => addSheet(state.me.member.customFoods[0]), 240);
+            } catch (e) { toast(e.message, 'bad'); }
+          }));
+        },
+      });
+    }
+
+    let timer;
+    input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(drawResults, 120); });
+    drawToday();
   }
 
   const EXPERIENCE = [['new', 'Never / just started'], ['lt1', 'Under 1 year'], ['1to3', '1-3 years'], ['3plus', '3+ years']];

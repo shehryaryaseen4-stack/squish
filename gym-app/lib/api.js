@@ -427,6 +427,16 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
 
   // ---- member detail ------------------------------------------------------------
 
+  function foodItem(f = {}) {
+    const n = (k, max) => Math.round(v.num(f[k] ?? 0, { min: 0, max, field: k === 'kcal' ? 'Calories' : k[0].toUpperCase() + k.slice(1), int: false }) * 10) / 10;
+    return {
+      id: String(f.id || '').slice(0, 40),
+      name: v.str(f.name, { max: 60, field: 'Food name' }) || fail('Enter the food name'),
+      portion: v.str(f.portion, { max: 40 }) || '1 portion',
+      kcal: n('kcal', 5000), protein: n('protein', 300), carbs: n('carbs', 800), fat: n('fat', 400),
+    };
+  }
+
   function memberDetail(m) {
     const d = db();
     return {
@@ -843,6 +853,26 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
         member.lifts[ex] = list.sort((a, b) => a.d.localeCompare(b.d)).slice(-30);
         store.save();
         return member.lifts[ex];
+      }
+      // What the member ate on a day, from the food search: [{ name, portion, qty, meal, kcal, protein, carbs, fat }].
+      if (m === 'PUT' && pathname === '/api/member/food-log') {
+        const date = v.isoDate(body.date || today());
+        const items = (Array.isArray(body.items) ? body.items : []).slice(0, 80).map(foodItem).map((x, i) => ({
+          ...x,
+          qty: Math.round(v.num(body.items[i].qty ?? 1, { min: 0.25, max: 20, field: 'Amount', int: false }) * 4) / 4,
+          meal: ['breakfast', 'lunch', 'snack', 'dinner'].includes(body.items[i].meal) ? body.items[i].meal : 'snack',
+        }));
+        const log = { ...(member.foodLog || {}), [date]: items };
+        if (!items.length) delete log[date];
+        member.foodLog = Object.fromEntries(Object.entries(log).sort().slice(-30));
+        store.save();
+        return member.foodLog[date] || [];
+      }
+      // Foods the member added themselves, so they come up in the search next time.
+      if (m === 'PUT' && pathname === '/api/member/custom-foods') {
+        member.customFoods = (Array.isArray(body.foods) ? body.foods : []).slice(0, 60).map((f) => ({ ...foodItem(f), id: /^own-[\w-]{1,30}$/.test(String(f.id)) ? f.id : `own-${newId('f').slice(-8)}`, own: true }));
+        store.save();
+        return member.customFoods;
       }
       if (m === 'POST' && pathname === '/api/member/weigh-in') {
         const date = v.isoDate(body.date || today());
