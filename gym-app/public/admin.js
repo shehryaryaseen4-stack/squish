@@ -1668,6 +1668,7 @@
 
       <section class="card form-section" id="wa"><div class="skel" style="height:120px"></div></section>
       <section class="card form-section" id="exvid"><div class="skel" style="height:120px"></div></section>
+      <section class="card form-section" id="suppphotos" data-need="settings"></section>
 
       <section class="card form-section"><div class="panel-head"><div><h2>Membership plans</h2><p class="muted" style="font-size:13.5px">Monthly, quarterly, half-yearly, annual or anything you like.</p></div><button class="btn btn-primary btn-sm" data-addplan>${icon('plus')}Add plan</button></div>
         <div class="item-list">${S.data.plans.map((p) => `<div class="card item${p.active === false ? ' inactive' : ''}"><div class="ic-tile">${icon('star')}</div><div class="tx"><b>${esc(p.name)}${p.highlight ? ' <span class="badge badge-accent">Highlighted</span>' : ''}${p.active === false ? ' <span class="badge badge-muted">Hidden</span>' : ''}</b><span>${p.months} month${p.months > 1 ? 's' : ''} · ${rs(p.price)} · ${rs(Math.round(p.price / p.months))}/month</span></div><div class="acts"><button class="icon-btn" data-plan="${esc(p.id)}" aria-label="Edit ${esc(p.name)}">${icon('edit')}</button></div></div>`).join('')}</div></section>
@@ -1762,6 +1763,85 @@
     root.querySelectorAll('[data-staff]').forEach((x) => x.addEventListener('click', () => editStaff(S.data.staff.find((s) => s.id === x.dataset.staff))));
     drawWhatsApp();
     drawExerciseVideos();
+    drawSuppPhotos();
+  }
+
+  // ---- photos for the supplements guide ---------------------------------------------------
+  // Members who open whey, creatine… see the body that training with it builds. The gym adds a
+  // real photo it owns or has a licence for; the face is cut off before it is saved.
+
+  const SUPP_PHOTO_IDS = ['whey', 'casein', 'plant', 'gainer', 'creatine'];
+
+  async function drawSuppPhotos(sex = 'male') {
+    const box = document.getElementById('suppphotos');
+    if (!box || !window.Supplements) return;
+    const photos = (await api('/api/gym')).suppPhotos || {};
+    box.innerHTML = `<div class="panel-head"><div><h2>${icon('scoop')} Supplement result photos</h2><p class="muted" style="font-size:13.5px">When a member opens whey, creatine or another protein, they see the body that training with it builds, with the time, workouts, diet and what to avoid. Add a real photo for each one. The face is cut off before saving. Use only photos you own or have a licence for, with the person’s permission, and natural (no steroids) physiques.</p></div></div>
+      <div class="seg" role="group" style="margin-bottom:12px"><button data-sx="male" aria-pressed="${sex === 'male'}">For men</button><button data-sx="female" aria-pressed="${sex === 'female'}">For women</button></div>
+      <div class="bp-grid">${SUPP_PHOTO_IDS.map((base) => {
+        const x = Supplements.byId[base];
+        const id = sex === 'female' ? `${base}-f` : base;
+        return `<div class="bp-tile"><div class="bp-pic">${photos[id] ? `<img src="${esc(UI.photoSrc(photos[id]))}" alt="">` : `<span class="bp-empty" style="--c:${x.color}">${icon(x.icon)}</span>`}</div><b>${esc(x.name)}</b>
+          <div class="bp-actions"><button class="btn btn-soft btn-sm" data-sup="${id}">${icon('camera')}${photos[id] ? 'Change' : 'Add photo'}</button>${photos[id] ? `<button class="icon-btn" data-supdel="${id}" aria-label="Remove photo">${icon('trash')}</button>` : ''}</div></div>`;
+      }).join('')}</div>`;
+    box.querySelectorAll('[data-sx]').forEach((b) => b.addEventListener('click', () => drawSuppPhotos(b.dataset.sx)));
+    box.querySelectorAll('[data-sup]').forEach((b) => b.addEventListener('click', async () => {
+      try {
+        const image = await faceCropSheet();
+        if (!image) return;
+        await api(`/api/admin/supp-photos/${b.dataset.sup}`, { method: 'PUT', body: { image } });
+        toast('Photo saved');
+        drawSuppPhotos(sex);
+      } catch (e) { toast(e.message, 'bad'); }
+    }));
+    box.querySelectorAll('[data-supdel]').forEach((b) => b.addEventListener('click', async () => {
+      try { await api(`/api/admin/supp-photos/${b.dataset.supdel}`, { method: 'DELETE' }); drawSuppPhotos(sex); } catch (e) { toast(e.message, 'bad'); }
+    }));
+  }
+
+  // Choose a photo, then slide the line down until the face is above it; only what's below is kept.
+  function faceCropSheet() {
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.addEventListener('change', () => {
+        const file = input.files?.[0];
+        if (!file) return resolve(null);
+        const img = new Image();
+        const src = URL.createObjectURL(file);
+        img.onerror = () => { URL.revokeObjectURL(src); toast('That file is not a photo we can read. Try a JPG or PNG.', 'bad'); resolve(null); };
+        img.onload = () => {
+          let cut = 0.22;
+          sheet({
+            title: 'Hide the face',
+            html: `<p class="muted" style="margin:0 0 10px">Move the slider until the face is in the dark part. Only the body below the line is saved.</p>
+              <div class="crop-wrap"><img src="${src}" alt=""><div class="crop-shade" data-shade></div></div>
+              <label class="field" style="margin-top:12px"><span>Cut off the top</span><input type="range" min="0" max="60" value="22" data-cut></label>
+              <div class="sheet-actions"><button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" data-save>${icon('check')}Save photo</button></div>`,
+            onMount: (el, close) => {
+              const shade = el.querySelector('[data-shade]');
+              const draw = () => { shade.style.height = `${cut * 100}%`; };
+              el.querySelector('[data-cut]').addEventListener('input', (e) => { cut = Number(e.target.value) / 100; draw(); });
+              draw();
+              el.querySelector('[data-save]').addEventListener('click', () => {
+                const top = Math.round(img.naturalHeight * cut);
+                const h = img.naturalHeight - top;
+                const scale = Math.min(1, 600 / img.naturalWidth, 1000 / h);
+                const c = document.createElement('canvas');
+                c.width = Math.round(img.naturalWidth * scale);
+                c.height = Math.round(h * scale);
+                c.getContext('2d').drawImage(img, 0, top, img.naturalWidth, h, 0, 0, c.width, c.height);
+                URL.revokeObjectURL(src);
+                close(c.toDataURL('image/jpeg', 0.85));
+              });
+            },
+          }).then((v) => resolve(v || null));
+        };
+        img.src = src;
+      });
+      input.click();
+    });
   }
 
   // ---- short how-to videos on exercises ------------------------------------------------

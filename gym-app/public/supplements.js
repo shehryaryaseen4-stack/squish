@@ -227,8 +227,90 @@
     };
   }
 
+  // ---- what you can build with it ------------------------------------------------------
+  // The body comes from training and food; the supplement only helps. So the "result" for each
+  // protein is the body that training plus enough protein builds, with honest times.
+  const RESULTS = {
+    whey: { title: 'A lean, muscular body', sub: 'What hard training plus enough protein builds, naturally' },
+    casein: { title: 'A lean, muscular body', sub: 'What hard training plus enough protein builds, naturally' },
+    plant: { title: 'A lean, muscular body', sub: 'What hard training plus enough protein builds, naturally' },
+    gainer: { title: 'From thin to filled out', sub: 'For people who struggle to gain weight' },
+    creatine: { title: 'Stronger, fuller muscles', sub: 'Creatine on top of training and good food' },
+  };
+  const hasResult = (id) => Boolean(RESULTS[id]);
+  const one = (n) => Math.round(n * 10) / 10;
+
+  /** Time, training, food and what to avoid to build the body this supplement is bought for. */
+  function result(id, body, diet) {
+    const r = RESULTS[id];
+    if (!r) return null;
+    const female = body?.gender === 'female';
+    const rate = (MUSCLE_RATE[body?.experience] || MUSCLE_RATE.new) * (female ? 0.5 : 1);
+    const kg = Number(body?.weight) || (female ? 60 : 75);
+    const days = Math.max(3, Number(body?.days) || 4);
+    const protein = diet?.protein || Math.round(kg * 1.8 / 5) * 5;
+    const losing = diet && ['lose', 'recomp'].includes(diet.goal);
+    const kcal = diet ? (losing ? diet.target : Math.max(diet.target, diet.maintain + 250)) : null;
+    const g = forMember(body, diet).expect;
+
+    let timeline;
+    if (id === 'creatine') {
+      timeline = [
+        ['2 weeks', 'Lifts feel easier: an extra rep or two on most sets.'],
+        ['1 month', 'About 1-2 kg heavier on the scale, mostly water inside the muscles. They look fuller.'],
+        ['3 months', 'About 1-2 kg more lean muscle than training without it, and 5-10% stronger.'],
+        ['Ongoing', 'Keep taking it daily. If you stop, the extra water and strength fade over 4-6 weeks.'],
+      ];
+    } else if (id === 'gainer') {
+      timeline = [
+        ['1 month', `About 1-2 kg heavier. Face and arms look less thin.`],
+        ['3 months', `About 3-6 kg heavier, ${one(rate * 3)} kg or so of it muscle if you train hard.`],
+        ['6 months', 'Clothes fit better; chest, shoulders and legs look filled out.'],
+        ['After that', 'Switch to normal food and whey once you reach a healthy weight, or the gain turns into fat.'],
+      ];
+    } else {
+      timeline = [
+        ['1 month', 'Stronger on every lift; muscles feel firmer. The mirror barely changes yet.'],
+        ['3 months', `About ${one(rate * 3)} kg of muscle. Shirts get tighter on the shoulders and arms.`],
+        ['6 months', `About ${one(rate * 5.5)} kg of muscle. Clear shape in chest, shoulders and arms.`],
+        ['1 year', `About ${one(rate * 10)} kg of muscle. People notice you train.`],
+        ['2-3 years', 'The look in fitness photos, with low body fat. Stage bodybuilders train 5-10+ years, and many use drugs: no powder gives that.'],
+      ];
+    }
+    const training = [
+      `Weights ${days} days a week${body?.days ? ' (your plan)' : ''}: every muscle twice a week.`,
+      'Each muscle 10-20 hard sets a week, 6-12 reps, with the last 1-2 reps hard.',
+      'Add a little weight or a rep every week. The coach in the app tells you when.',
+      'Rest 1.5-3 minutes between sets of big lifts (squat, bench, rows).',
+      id === 'gainer' ? 'Only light cardio: 2 walks of 20 minutes a week, so the calories go into growing.' : 'Cardio 2-3 times a week, 20 minutes, for heart and fitness.',
+      'Sleep 7-9 hours and take 1-2 rest days a week: muscle grows while you rest.',
+    ];
+    const food = [
+      kcal ? `About ${kcal.toLocaleString()} kcal a day${losing ? ' while you lose fat; when you reach your weight, eat about 250 more to build faster' : ''}.` : 'Enough calories: a little more than you burn to build muscle.',
+      `${protein} g protein a day${g.scoops ? `: your meals plus ${g.scoops} scoop${g.scoops > 1 ? 's' : ''}` : ', mostly from meals'} (eggs, chicken, fish, daal, dahi, milk, paneer).`,
+      'Spread protein over 3-5 meals, 25-40 g each.',
+      'Carbs around training for energy: roti, rice, oats, banana, potatoes.',
+      `Water: about ${diet?.water || one(kg * 0.035)} litres a day, more in summer.`,
+    ];
+    if (id === 'gainer') food.splice(1, 0, 'Eat every 3-4 hours; take the gainer between meals, not instead of one.');
+    const avoid = [
+      'Cold drinks, packaged juices, sweets and bakery every day',
+      'Fried and fast food more than once a week',
+      'Alcohol, smoking and sheesha',
+      'Sleeping less than 6 hours',
+      'Skipping meals or protein on rest days',
+      'Steroids, SARMs, injections and “test boosters”: serious damage to heart, liver and hormones',
+      'Fat burners and stimulant mixes',
+      'Fake or unsealed tubs: buy from an authorised seller',
+      'Lifting too heavy with bad form: an injury stops all progress',
+    ];
+    if (id === 'creatine') avoid.unshift('Skipping days: take it every day', 'Drinking too little water');
+    if (id === 'gainer' || (!losing && id !== 'creatine')) avoid.push('Long, hard cardio every day while you are trying to grow');
+    return { ...r, timeline, training, food, avoid, rate: one(rate) };
+  }
+
   const byId = Object.fromEntries(LIST.map((x) => [x.id, x]));
-  const api = { LIST, byId, forMember };
+  const api = { LIST, byId, forMember, result, hasResult };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Supplements = api;
 })(typeof window !== 'undefined' ? window : globalThis);

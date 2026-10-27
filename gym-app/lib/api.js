@@ -781,6 +781,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
         staff: d.staff.filter((s) => s.active !== false).map(({ id, name, role, color }) => ({ id, name, role, color })),
         today: today(),
         demo: Boolean(d.demo),
+        suppPhotos: d.suppPhotos || {},
       };
     }
     if (m === 'GET' && pathname === '/api/classes') {
@@ -1270,6 +1271,26 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
       }
     }
     // Exercise videos: a YouTube / Shorts link or a short clip uploaded by the gym
+    // A photo of the body each protein is bought for, shown in the supplements guide (face cut off in the app).
+    if ((match = pathname.match(/^\/api\/admin\/supp-photos\/((?:whey|casein|plant|gainer|creatine)(?:-f)?)$/))) {
+      need('settings');
+      const id = match[1];
+      d.suppPhotos ||= {};
+      if (m === 'PUT') {
+        const img = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(String(body.image || ''));
+        if (!img) fail('Choose a photo (JPG or PNG)');
+        if (img[2].length > 900 * 1024) fail('That photo is too large. Please choose a smaller one.');
+        d.suppPhotos[id] = store.savePhoto(`supp-${id}`, img[2]);
+        store.save();
+        return d.suppPhotos;
+      }
+      if (m === 'DELETE') {
+        store.deletePhoto(`supp-${id}`);
+        delete d.suppPhotos[id];
+        store.save();
+        return d.suppPhotos;
+      }
+    }
     if ((match = pathname.match(/^\/api\/admin\/exercise-videos\/([\w-]{1,80})(\/file)?$/))) {
       need('settings', 'members.edit');
       const exId = match[1];

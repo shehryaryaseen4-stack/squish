@@ -189,7 +189,7 @@ const page = `<title>Iron Republic Gym App</title>
 (function () {
   const MODES = {
     member: { css: ['base.css', 'gym.css', 'app.css'], js: ['nutrition.js', 'coach.js', 'supplements.js', 'workout.js', 'app.js'], html: '<div class="app"><main id="view" tabindex="-1"></main><nav class="tabbar" id="tabbar" aria-label="Main" hidden></nav></div>', pins: 'Member 1001 · PIN 1111' },
-    manager: { css: ['base.css', 'gym.css', 'admin.css'], js: ['nutrition.js', 'coach.js', 'sheet.js', 'workout.js', 'admin.js'], html: '<div id="root"></div>', pins: 'Owner PIN 1234 · Front desk 0000' },
+    manager: { css: ['base.css', 'gym.css', 'admin.css'], js: ['nutrition.js', 'coach.js', 'supplements.js', 'sheet.js', 'workout.js', 'admin.js'], html: '<div id="root"></div>', pins: 'Owner PIN 1234 · Front desk 0000' },
     kiosk: { css: ['base.css', 'gym.css', 'admin.css', 'kiosk.css'], js: ['kiosk.js'], html: '<div id="root"></div>', pins: 'PIN 0000, then type 1001–1100' },
     display: { css: ['base.css', 'display.css'], js: ['display.js'], html: '<div id="root"></div>', pins: 'PIN 0000 · <button class="demo-punch" data-punch>Simulate a thumb punch</button>' },
   };

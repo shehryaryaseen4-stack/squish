@@ -44,3 +44,45 @@ test('advice fits the member: scoops from the protein gap, no gainer when heavy'
   // Women build muscle about half as fast.
   assert.equal(S.forMember({ ...heavy, gender: 'female' }, null).expect.muscle, 0.5);
 });
+
+test('what each protein builds: honest times, training, food and what to avoid', () => {
+  const man = { weight: 70, height: 175, age: 22, gender: 'male', goal: 'gain', experience: 'new', days: 4 };
+  const r = S.result('whey', man, N.plan(man, 4));
+  assert.equal(r.title, 'A lean, muscular body');
+  assert.deepEqual(r.timeline.map(([w]) => w), ['1 month', '3 months', '6 months', '1 year', '2-3 years']);
+  assert.match(r.timeline[3][1], /About 9 kg/);
+  assert.match(r.timeline[4][1], /no powder/);
+  assert.ok(r.training.some((t) => /4 days a week/.test(t)));
+  assert.ok(r.food.some((t) => /kcal a day/.test(t)) && r.food.some((t) => /protein a day/.test(t)));
+  assert.ok(r.avoid.some((t) => /Steroids/.test(t)));
+  // Women: about half the muscle.
+  assert.match(S.result('whey', { ...man, gender: 'female' }, null).timeline[3][1], /About 4\.5 kg/);
+  assert.ok(S.result('creatine', man, null).avoid[0].includes('every day'));
+  assert.ok(S.result('gainer', man, null).food.some((t) => /between meals/.test(t)));
+  assert.equal(S.result('fatburner', man, null), null);
+  assert.ok(S.hasResult('plant') && !S.hasResult('vitd'));
+});
+
+test('the gym adds result photos (settings right only)', async (t) => {
+  const { createServer } = require('../server');
+  const server = createServer({ seed: 'demo', reminders: false });
+  await new Promise((r) => server.listen(0, r));
+  t.after(() => new Promise((r) => server.close(r)));
+  const url = `http://127.0.0.1:${server.address().port}`;
+  const call = async (p, method = 'GET', body, token) => {
+    const res = await fetch(url + p, { method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: body ? JSON.stringify(body) : undefined });
+    return { status: res.status, body: await res.json() };
+  };
+  const owner = (await call('/api/admin/login', 'POST', { pin: '1234' })).body.token;
+  const desk = (await call('/api/admin/login', 'POST', { pin: '0000' })).body.token;
+  const image = `data:image/jpeg;base64,${Buffer.from('jpeg').toString('base64')}`;
+  assert.equal((await call('/api/admin/supp-photos/whey', 'PUT', { image }, owner)).status, 200);
+  assert.ok((await call('/api/gym')).body.suppPhotos.whey);
+  assert.equal((await call('/api/admin/supp-photos/whey', 'PUT', { image }, desk)).status, 403);
+  assert.equal((await call('/api/admin/supp-photos/steroids', 'PUT', { image }, owner)).status, 404);
+  assert.equal((await call('/api/admin/supp-photos/whey-f', 'PUT', { image }, owner)).status, 200);
+  await call('/api/admin/supp-photos/whey-f', 'DELETE', null, owner);
+  assert.equal((await call('/api/admin/supp-photos/whey', 'PUT', { image: 'nope' }, owner)).status, 400);
+  await call('/api/admin/supp-photos/whey', 'DELETE', null, owner);
+  assert.deepEqual((await call('/api/gym')).body.suppPhotos, {});
+});

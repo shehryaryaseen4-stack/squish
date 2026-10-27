@@ -566,11 +566,33 @@
           <span class="supp-foot">${b ? `<span class="badge badge-${FIT[a.fit][0] || 'muted'}">${FIT[a.fit][1]}</span>` : ''}${evidenceDots(x.evidence)}</span></span></button>`;
       }).join('') || '<p class="muted">Nothing here.</p>'}</div>
       <p class="diet-note">Typical values; brands differ, so check your tub’s label. Buy from an authorised seller: fake supplements are common. Ask a doctor first if you have kidney, liver or heart problems, high blood pressure, take medicine, are pregnant, or are under 18. Steroids and “test boosters” are not supplements: they are risky and the app doesn’t recommend them.</p></div>`);
-    view.querySelectorAll('[data-supp]').forEach((el) => el.addEventListener('click', () => suppSheet(Supplements.byId[el.dataset.supp], guide, Boolean(b))));
-    if (params.get('id') && Supplements.byId[params.get('id')]) suppSheet(Supplements.byId[params.get('id')], guide, Boolean(b));
+    const open = (id) => suppSheet(Supplements.byId[id], guide, b, diet);
+    view.querySelectorAll('[data-supp]').forEach((el) => el.addEventListener('click', () => open(el.dataset.supp)));
+    if (params.get('id') && Supplements.byId[params.get('id')]) open(params.get('id'));
   }
 
-  function suppSheet(x, guide, known) {
+  // The body this supplement is bought for: photo, time, training, food and what to avoid.
+  function suppResult(x, body, diet) {
+    const r = Supplements.result(x.id, body, diet);
+    if (!r) return '';
+    const photo = state.gym?.suppPhotos?.[(body?.gender || state.me?.member?.gender) === 'female' ? `${x.id}-f` : x.id];
+    const list = (items, cls = '') => `<ul class="supp-list ${cls}">${items.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>`;
+    return `<div class="supp-result" style="--c:${x.color}">
+        ${photo ? `<img class="supp-photo" src="${esc(UI.photoSrc(photo))}" alt="${esc(r.title)}">` : ''}
+        <div class="supp-result-head"><small>What you can build</small><b>${esc(r.title)}</b><span>${esc(r.sub)}</span></div>
+      </div>
+      <h4 class="supp-h">${icon('calendar')}How long it takes</h4>
+      <ol class="supp-time">${r.timeline.map(([when, text]) => `<li><b>${esc(when)}</b><span>${esc(text)}</span></li>`).join('')}</ol>
+      <h4 class="supp-h">${icon('dumbbell')}Training you need</h4>${list(r.training)}
+      <p class="supp-p"><a class="link" href="#/coach">Get your weekly plan from the coach ›</a></p>
+      <h4 class="supp-h">${icon('flame')}Food you need</h4>${list(r.food)}
+      <p class="supp-p"><a class="link" href="#/diet">See your meals ›</a></p>
+      <h4 class="supp-h">${icon('x')}Avoid</h4>${list(r.avoid, 'bad')}
+      <p class="supp-note muted">Times are averages for natural training (men; women build about half as fast). The supplement helps; the training and food do the work.</p>`;
+  }
+
+  function suppSheet(x, guide, body, diet) {
+    const known = Boolean(body);
     const a = guide.advice[x.id];
     const s = x.serving;
     const scoops = x.id === 'whey' || (x.id === 'plant' && a.fit === 'yes') ? guide.expect.scoops : 0;
@@ -579,6 +601,8 @@
       label: x.name,
       wide: true,
       html: `<div class="supp-head" style="--c:${x.color}"><span class="supp-ico lg">${icon(x.icon)}</span><div><small>${esc(x.kind)}</small><h3>${esc(x.name)}</h3>${evidenceDots(x.evidence)}</div><button class="icon-btn" data-close aria-label="Close">${icon('x')}</button></div>
+        ${suppResult(x, body, diet)}
+        <h4 class="supp-h">${icon('info')}What it is</h4>
         <p class="supp-what">${esc(x.what)}</p>
         ${known ? `<div class="supp-for ${a.fit}"><b>${FIT[a.fit][1]}</b><p>${esc(a.text)}</p></div>` : ''}
         <h4 class="supp-h">In ${esc(s.label)}</h4>

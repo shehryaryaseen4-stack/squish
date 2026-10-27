@@ -179,7 +179,7 @@ function gymHandler({ store, api, prefix = '', machines = true, machinePort = nu
         // An uploaded exercise video comes as the raw file.
         const rawVideo = req.method === 'PUT' && /^\/api\/admin\/exercise-videos\/[\w-]+\/file$/.test(pathname);
         const body = rawVideo ? { file: await readRaw(req, 40 * 1024 * 1024), type: req.headers['content-type'] || '' }
-          : ['POST', 'PUT', 'PATCH'].includes(req.method) ? await readBody(req, pathname.endsWith('/photo') ? 1024 * 1024 : pathname.endsWith('/members/import') ? 8 * 1024 * 1024 : undefined) : {};
+          : ['POST', 'PUT', 'PATCH'].includes(req.method) ? await readBody(req, pathname.endsWith('/photo') || pathname.includes('/supp-photos/') ? 1024 * 1024 + 256 * 1024 : pathname.endsWith('/members/import') ? 8 * 1024 * 1024 : undefined) : {};
         const result = await api.handle(req, res, Object.assign(new URL(url), { pathname }), body);
         return send(res, 200, JSON.stringify(result), undefined, { 'Cache-Control': 'no-store' });
       }
