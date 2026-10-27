@@ -561,12 +561,12 @@
       <div class="supp-grid">${list.map((x) => {
         const a = guide.advice[x.id];
         const s = x.serving;
-        const chips = [s.protein && `${s.protein} g protein`, s.kcal && `${s.kcal} kcal`, s.carbs >= 10 && `${s.carbs} g carbs`].filter(Boolean);
-        return `<button class="card supp-card" data-supp="${x.id}" style="--c:${x.color}">
-          <span class="supp-banner">${Supplements.art(x)}${b ? `<span class="supp-fit ${a.fit}">${FIT[a.fit][1]}</span>` : ''}</span>
+        // Every card has the same parts in the same places.
+        return `<button class="card supp-card" data-supp="${x.id}">
+          <span class="supp-banner">${Supplements.art(x)}${b ? `<span class="supp-fit ${a.fit}"><i></i>${FIT[a.fit][1]}</span>` : ''}</span>
           <span class="supp-top"><span class="supp-ico">${icon(x.icon)}</span><span><b>${esc(x.name)}</b><small>${esc(x.kind)}</small></span></span>
-          ${chips.length ? `<span class="supp-chips">${chips.map((t) => `<span>${t}</span>`).join('')}<span class="per">per ${esc(s.label.replace(/ \(.*\)/, ''))}</span></span>` : ''}
-          <span class="supp-when">${icon('clock')}${esc(x.when)}</span>
+          <span class="supp-chips"><span>${s.protein} g protein</span><span>${s.kcal} kcal</span></span>
+          <span class="supp-when">${icon('clock')}<span>${esc(x.when)}</span></span>
           <span class="supp-foot">${evidenceDots(x.evidence)}<span class="supp-more">Details ${icon('chevronRight')}</span></span></button>`;
       }).join('') || '<p class="muted">Nothing here.</p>'}</div>
       <p class="diet-note">Typical values; brands differ, so check your tub’s label. Buy from an authorised seller: fake supplements are common. Ask a doctor first if you have kidney, liver or heart problems, high blood pressure, take medicine, are pregnant, or are under 18. Steroids and “test boosters” are not supplements: they are risky and the app doesn’t recommend them.</p></div>`);
@@ -581,7 +581,7 @@
     if (!r) return '';
     const photo = state.gym?.suppPhotos?.[(body?.gender || state.me?.member?.gender) === 'female' ? `${x.id}-f` : x.id];
     const list = (items, cls = '') => `<ul class="supp-list ${cls}">${items.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>`;
-    return `<div class="supp-result" style="--c:${x.color}">
+    return `<div class="supp-result">
         ${photo ? `<img class="supp-photo" src="${esc(UI.photoSrc(photo))}" alt="${esc(r.title)}">` : ''}
         <div class="supp-result-head"><small>What you can build</small><b>${esc(r.title)}</b><span>${esc(r.sub)}</span></div>
       </div>
@@ -604,7 +604,7 @@
     sheet({
       label: x.name,
       wide: true,
-      html: `<div class="supp-hero" style="--c:${x.color}">${Supplements.art(x)}</div><div class="supp-head" style="--c:${x.color}"><span class="supp-ico lg">${icon(x.icon)}</span><div><small>${esc(x.kind)}</small><h3>${esc(x.name)}</h3>${evidenceDots(x.evidence)}</div><button class="icon-btn" data-close aria-label="Close">${icon('x')}</button></div>
+      html: `<div class="supp-hero">${Supplements.art(x)}</div><div class="supp-head"><span class="supp-ico lg">${icon(x.icon)}</span><div><small>${esc(x.kind)}</small><h3>${esc(x.name)}</h3>${evidenceDots(x.evidence)}</div><button class="icon-btn" data-close aria-label="Close">${icon('x')}</button></div>
         ${suppResult(x, body, diet)}
         <h4 class="supp-h">${icon('info')}What it is</h4>
         <p class="supp-what">${esc(x.what)}</p>
