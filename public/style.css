@@ -1078,3 +1078,18 @@ body:has(.acct) .site-footer{margin-top:0;}
 .also-btn .spinner{width:12px; height:12px;}
 .also-btn.is-err{border-color:#E5322D; color:#B42318;}
 .also-size{font-weight:500; color:var(--dim);}
+
+/* Converter pages: make the converted file smaller */
+.shrink-row{display:flex; align-items:center; flex-wrap:wrap; gap:8px 12px; margin-top:10px; padding:10px 12px; border:1px dashed var(--border); border-radius:10px; background:var(--bg-soft);}
+.shrink-label{display:inline-flex; align-items:center; gap:6px; font-size:.9rem; font-weight:700;}
+.shrink-label .ico{width:16px; height:16px; color:var(--brand);}
+.shrink-range{width:min(200px, 45vw); accent-color:var(--brand);}
+.shrink-val{min-width:3ch; font-weight:800;}
+.shrink-est{font-size:.85rem;}
+.shrink-level{max-width:100%; padding:6px 8px; border:1px solid var(--border); border-radius:8px; background:var(--panel); color:var(--ink); font:inherit; font-size:.9rem;}
+.shrink-go{margin-left:auto;}
+.shrink-row.is-done{border-style:solid; border-color:rgba(30,158,90,.35); background:rgba(30,158,90,.06);}
+.shrink-row.is-done .shrink-label .ico{color:#1E9E5A;}
+.shrink-row.is-done .shrink-dl{margin-left:auto;}
+.shrink-again{border:0; background:none; color:var(--brand); font:inherit; font-size:.88rem; font-weight:700; cursor:pointer; padding:4px;}
+.shrink-row .err-text{flex-basis:100%;}
