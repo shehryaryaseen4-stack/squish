@@ -477,10 +477,12 @@ function toolHtml({ inputs, outputs, dropTitle, dropSub, any = false, compress =
     <input type="file" id="fileInput" accept="${acceptFor(inputs, exts)}" multiple>
   </div>
   <div class="file-list" id="fileList" aria-live="polite"></div>
+  ${compress ? '' : '<div class="shrink-panel" id="shrinkPanel" hidden></div>'}
   <div class="tool-bar" id="toolBar" hidden>
     <div class="bar-status" id="barStatus"></div>
     <div class="bar-actions">
       <button class="btn btn-ghost" id="addMoreBtn" type="button">${icon('upload')}Add more files</button>
+      ${compress ? '' : `<button class="btn btn-ghost" id="shrinkBtn" type="button" hidden>${icon('compress')}Compress</button>`}
       <button class="btn btn-success" id="zipBtn" type="button" hidden>${icon('download')}Download all</button>
       <button class="btn btn-brand btn-convert" id="convertAllBtn" type="button">${compress ? `${icon('compress')}Compress` : `${icon('convert')}Convert`}</button>
     </div>

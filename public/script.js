@@ -726,82 +726,120 @@
     }
     else if (row.state === "error") text = `<span class="err-text">${esc(row.error)}</span>`;
     const action = row.state === "finished" ? `<button class="btn btn-success btn-sm dl-btn" type="button">${DL_ICON}Download</button>` : "";
-    return `<div class="file-status"><span class="badge-state ${cls}">${label}</span><div class="status-text">${text}</div>${action}</div>${alsoHtml(row)}${shrinkHtml(row)}`;
+    return `<div class="file-status"><span class="badge-state ${cls}">${label}</span><div class="status-text">${text}</div>${action}</div>${alsoHtml(row)}${shrinkedHtml(row)}`;
   }
-  // Converter pages: a converted image or PDF can be made smaller right away ("Make it smaller"),
-  // by a chosen percentage (images) or compression level (PDF). The converted file is sent back
-  // to the compressor; the original stays as it was.
+  // Converter pages: after converting, the results can be made smaller in one go. "Compress"
+  // (next to Download all) opens a panel: tick the files, pick how much smaller (each file by that
+  // percentage of its own size; PDFs by compression level) and compress them all at once. The
+  // compressed files replace the results, so Download / Download all give the smaller files.
   const SHRINK_API = { jpg: "jpeg", jpeg: "jpeg", png: "png", webp: "webp", avif: "avif", gif: "gif", tif: "tiff", tiff: "tiff", pdf: "pdf" };
-  function shrinkHtml(row){
-    if (compressMode || row.state !== "finished" || !SHRINK_API[row.outExt]) return "";
-    const c = row.shrink || (row.shrink = { reduce: 50, level: "recommended" });
-    const pdf = row.outExt === "pdf";
-    if (c.state === "done") {
-      const pct = Math.round((1 - c.size / row.outSize) * 100);
-      return `<div class="shrink-row is-done"><span class="shrink-label">${COMPRESS_ICON}Compressed</span>
-        <span class="muted">${fmtBytes(row.outSize)} &rarr; ${fmtBytes(c.size)}</span>${pct > 0 ? `<span class="saved">${pct}% smaller</span>` : `<span class="muted"> · already well compressed</span>`}
-        <button class="btn btn-success btn-sm shrink-dl" type="button">${DL_ICON}Download smaller file</button>
-        <button class="shrink-again" type="button">Change</button></div>`;
-    }
-    const busy = c.state === "busy";
-    const control = pdf
-      ? `<select class="shrink-level" aria-label="Compression level"${busy ? " disabled" : ""}>${PDF_LEVELS.map(([v, l]) => `<option value="${v}"${v === c.level ? " selected" : ""}>${l}</option>`).join("")}</select>`
-      : `<input type="range" class="shrink-range" min="10" max="90" step="5" value="${c.reduce}" aria-label="How much smaller"${busy ? " disabled" : ""}><span class="shrink-val">${c.reduce}%</span><span class="muted shrink-est">about ${fmtBytes(row.outSize * (1 - c.reduce / 100))}</span>`;
-    return `<div class="shrink-row"><span class="shrink-label">${COMPRESS_ICON}Make it smaller</span>${control}
-      <button class="btn btn-ghost btn-sm shrink-go" type="button"${busy ? " disabled" : ""}>${busy ? '<span class="spinner" aria-hidden="true"></span>Compressing…' : "Compress"}</button>
-      ${c.state === "error" ? `<span class="err-text">${esc(c.error)}</span>` : ""}</div>`;
+  const shrinkable = r => !compressMode && r.state === "finished" && !!SHRINK_API[r.outExt];
+  const shrinkBtn = document.getElementById("shrinkBtn");
+  const shrinkPanel = document.getElementById("shrinkPanel");
+  const shrinkState = { reduce: 30, level: "recommended", busy: false, picked: new Set() };
+  function shrinkedHtml(row){
+    if (!row.shrunk) return "";
+    const pct = Math.round((1 - row.shrunk.to / row.shrunk.from) * 100);
+    return `<div class="shrunk-line">${COMPRESS_ICON}Compressed: ${fmtBytes(row.shrunk.from)} &rarr; ${fmtBytes(row.shrunk.to)}`
+      + (pct > 0 ? ` <span class="saved">${pct}% smaller</span>` : ` <span class="muted">· already well compressed</span>`) + `</div>`;
   }
-  async function shrink(row){
-    const c = row.shrink;
-    c.state = "busy"; render();
+  function panelHtml(){
+    const list = rows.filter(shrinkable);
+    const st = shrinkState;
+    const imgs = list.filter(r => r.outExt !== "pdf"), pdfs = list.filter(r => r.outExt === "pdf");
+    const sizeOf = r => (r.orig || r.blob).size;
+    const items = list.map(r => {
+      const est = r.outExt === "pdf" ? "PDF: smaller by level" : `about ${fmtBytes(sizeOf(r) * (1 - st.reduce / 100))}`;
+      return `<label class="sp-item"><input type="checkbox" data-pick="${r.id}"${st.picked.has(r.id) ? " checked" : ""}${st.busy ? " disabled" : ""}>
+        <span class="sp-name">${esc(r.outName)}</span><span class="sp-size">${fmtBytes(sizeOf(r))} &rarr; <span data-est="${r.id}">${est}</span></span></label>`;
+    }).join("");
+    const n = list.filter(r => st.picked.has(r.id)).length;
+    return `<div class="sp-head"><strong>${COMPRESS_ICON}Compress your files</strong><button type="button" class="sp-x" data-sp-close aria-label="Close"${st.busy ? " disabled" : ""}>&times;</button></div>
+      <div class="sp-controls">
+        ${imgs.length ? `<label class="sp-range">Make each image smaller by <input type="range" min="10" max="90" step="5" value="${st.reduce}" data-sp-reduce${st.busy ? " disabled" : ""}><strong data-sp-val>${st.reduce}%</strong></label>` : ""}
+        ${pdfs.length ? `<label class="sp-level">PDF compression <select data-sp-level${st.busy ? " disabled" : ""}>${PDF_LEVELS.map(([v, l]) => `<option value="${v}"${v === st.level ? " selected" : ""}>${l}</option>`).join("")}</select></label>` : ""}
+      </div>
+      <p class="sp-hint">Each file is made smaller by this share of its own size: 30% of a 1 MB image leaves about 700 KB, 30% of a 2 MB image about 1.4 MB.</p>
+      <div class="sp-all"><label><input type="checkbox" data-pick-all${n === list.length ? " checked" : ""}${st.busy ? " disabled" : ""}> Select all (${list.length})</label></div>
+      <div class="sp-list">${items}</div>
+      <div class="sp-foot"><span class="sp-msg" data-sp-msg>${st.msg || ""}</span>
+        <button type="button" class="btn btn-ghost" data-sp-close${st.busy ? " disabled" : ""}>Cancel</button>
+        <button type="button" class="btn btn-brand" data-sp-go${st.busy || !n ? " disabled" : ""}>${st.busy ? '<span class="spinner" aria-hidden="true"></span>Compressing…' : `${COMPRESS_ICON}Compress ${n} file${n === 1 ? "" : "s"}`}</button></div>`;
+  }
+  function drawPanel(){ if (!shrinkPanel.hidden) shrinkPanel.innerHTML = panelHtml(); }
+  function openPanel(){
+    shrinkState.picked = new Set(rows.filter(shrinkable).map(r => r.id));
+    shrinkState.msg = "";
+    shrinkPanel.hidden = false;
+    drawPanel();
+    shrinkPanel.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "nearest" });
+  }
+  async function shrinkOne(row){
+    const src = row.orig || row.blob;  // always from the converted file, never compressed twice
     const form = new FormData();
-    form.append("file", row.blob, row.outName);
+    form.append("file", src, row.orig ? row.origName : row.outName);
     form.append("format", SHRINK_API[row.outExt]);
     form.append("quality", "75");
     form.append("maxDim", "0");
-    if (row.outExt === "pdf") form.append("level", c.level); else form.append("reduce", String(c.reduce));
-    try {
-      const res = await fetch("/api/compress", { method: "POST", body: form });
-      if (!res.ok) {
-        let msg = res.status === 429 ? "Too many files in a short time. Please wait a few minutes and try again." : "This file could not be made smaller.";
-        try { msg = (await res.json()).error || msg; } catch (e) {}
-        throw new Error(msg);
-      }
-      let blob = await res.blob();
-      if (blob.size >= row.outSize) blob = row.blob; // never hand back a bigger file
-      const name = row.outName.replace(/(\.[^.]+)$/, "-compressed$1");
-      Object.assign(c, { state: "done", blob, size: blob.size, name });
-      save(blob, name);
-    } catch (err) {
-      Object.assign(c, { state: "error", error: err.message });
+    if (row.outExt === "pdf") form.append("level", shrinkState.level); else form.append("reduce", String(shrinkState.reduce));
+    const res = await fetch("/api/compress", { method: "POST", body: form });
+    if (!res.ok) {
+      let msg = res.status === 429 ? "Too many files in a short time. Please wait a few minutes." : "could not be made smaller";
+      try { msg = (await res.json()).error || msg; } catch (e) {}
+      throw new Error(msg);
     }
-    render();
+    let blob = await res.blob();
+    if (!row.orig) { row.orig = row.blob; row.origName = row.outName; }
+    if (blob.size >= src.size) blob = src;  // never hand back a bigger file
+    row.blob = blob;
+    row.outName = blob === src ? row.origName : row.origName.replace(/(\.[^.]+)$/, "-compressed$1");
+    row.shrunk = { from: src.size, to: blob.size };
   }
-  fileList.addEventListener("input", e => {
-    const r = e.target.closest(".shrink-range");
-    if (!r) return;
-    const row = rows.find(x => String(x.id) === r.closest("[data-row]").dataset.row);
-    if (!row) return;
-    row.shrink.reduce = Number(r.value);
-    const box = r.closest(".shrink-row");
-    box.querySelector(".shrink-val").textContent = r.value + "%";
-    box.querySelector(".shrink-est").textContent = "about " + fmtBytes(row.outSize * (1 - row.shrink.reduce / 100));
-  });
-  fileList.addEventListener("change", e => {
-    const sel = e.target.closest(".shrink-level");
-    if (!sel) return;
-    const row = rows.find(x => String(x.id) === sel.closest("[data-row]").dataset.row);
-    if (row) row.shrink.level = sel.value;
-  });
-  fileList.addEventListener("click", e => {
-    const b = e.target.closest(".shrink-go, .shrink-dl, .shrink-again");
-    if (!b) return;
-    const row = rows.find(x => String(x.id) === b.closest("[data-row]").dataset.row);
-    if (!row || !row.shrink) return;
-    if (b.classList.contains("shrink-go")) shrink(row);
-    else if (b.classList.contains("shrink-dl")) save(row.shrink.blob, row.shrink.name);
-    else { row.shrink.state = ""; render(); }
-  });
+  async function shrinkPicked(){
+    const list = rows.filter(r => shrinkable(r) && shrinkState.picked.has(r.id));
+    if (!list.length) return;
+    shrinkState.busy = true; shrinkState.msg = `0 of ${list.length} done`; drawPanel();
+    let done = 0, failed = 0;
+    const work = list.slice();
+    const worker = async () => {
+      while (work.length) {
+        const row = work.shift();
+        try { await shrinkOne(row); } catch (e) { failed++; }
+        done++;
+        shrinkState.msg = `${done} of ${list.length} done`;
+        drawPanel();
+      }
+    };
+    await Promise.all([worker(), worker()]);
+    const before = list.reduce((n, r) => n + (r.shrunk ? r.shrunk.from : 0), 0), after = list.reduce((n, r) => n + (r.shrunk ? r.shrunk.to : 0), 0);
+    shrinkState.busy = false;
+    shrinkPanel.hidden = true;
+    render();
+    barStatus.innerHTML = `<span class="done-check" aria-hidden="true">&#10003;</span> ${list.length - failed} file${list.length - failed === 1 ? "" : "s"} compressed`
+      + (before > after ? ` &middot; saved ${fmtBytes(before - after)}` : "") + (failed ? ` &middot; ${failed} failed` : "");
+  }
+  if (shrinkBtn && shrinkPanel) {
+    shrinkBtn.addEventListener("click", () => (shrinkPanel.hidden ? openPanel() : (shrinkPanel.hidden = true)));
+    shrinkPanel.addEventListener("input", e => {
+      if (!e.target.matches("[data-sp-reduce]")) return;
+      shrinkState.reduce = Number(e.target.value);
+      shrinkPanel.querySelector("[data-sp-val]").textContent = e.target.value + "%";
+      rows.filter(shrinkable).forEach(r => {
+        const el = shrinkPanel.querySelector(`[data-est="${r.id}"]`);
+        if (el && r.outExt !== "pdf") el.textContent = `about ${fmtBytes((r.orig || r.blob).size * (1 - shrinkState.reduce / 100))}`;
+      });
+    });
+    shrinkPanel.addEventListener("change", e => {
+      const t = e.target;
+      if (t.matches("[data-sp-level]")) shrinkState.level = t.value;
+      else if (t.matches("[data-pick-all]")) { shrinkState.picked = new Set(t.checked ? rows.filter(shrinkable).map(r => r.id) : []); drawPanel(); }
+      else if (t.matches("[data-pick]")) { const id = Number(t.dataset.pick); if (t.checked) shrinkState.picked.add(id); else shrinkState.picked.delete(id); drawPanel(); }
+    });
+    shrinkPanel.addEventListener("click", e => {
+      if (e.target.closest("[data-sp-close]")) shrinkPanel.hidden = true;
+      else if (e.target.closest("[data-sp-go]")) shrinkPicked();
+    });
+  }
   // Compress pages for images: the compressed picture can also be downloaded in another format.
   let ALSO = [];
   try { ALSO = JSON.parse(tool.dataset.also || "[]"); } catch (e) { ALSO = []; }
@@ -938,12 +976,17 @@
     convertAllBtn.disabled = busy > 0 && ready === 0;
     zipBtn.hidden = done === 0;
     zipBtn.lastChild.textContent = done > 1 ? `Download all (${done})` : "Download";
+    if (shrinkBtn) {
+      shrinkBtn.hidden = busy > 0 || !rows.some(shrinkable);
+      if (shrinkBtn.hidden && shrinkPanel && !shrinkState.busy) shrinkPanel.hidden = true;
+      drawPanel();
+    }
     let status;
     if (busy) status = `<span class="spinner" aria-hidden="true"></span> ${compressMode ? "Compressing" : "Converting"} ${busy} file${busy > 1 ? "s" : ""}…`;
     else if (ready) status = `${ready} file${ready > 1 ? "s" : ""} ready`;
     else if (done) status = `<span class="done-check" aria-hidden="true">&#10003;</span> Done${failed ? ` &middot; ${failed} failed` : ""}`;
-    if (done && !busy) window.dispatchEvent(new Event("ff:converted"));
     else status = failed ? `${failed} file${failed > 1 ? "s" : ""} could not be converted` : "";
+    if (done && !busy) window.dispatchEvent(new Event("ff:converted"));
     barStatus.innerHTML = status;
   }
 

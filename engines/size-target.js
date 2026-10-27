@@ -13,17 +13,25 @@ async function compressToSize(run, input, target, maxDim, format) {
   // A time budget keeps very large images well inside the proxy's request timeout.
   const palette = format === 'png' || format === 'gif';
   const deadline = Date.now() + 25000;
+  // Some images jump in size between neighbouring qualities, where interpolation creeps up one
+  // step at a time; after an interpolated guess that overshoots, the next guess halves the gap.
   let fit = null, over = null; // { q, buf }
-  let q = 75;
-  for (let i = 0; i < 7 && Date.now() < deadline; i++) {
+  let q = 75, guessed = false;
+  for (let i = 0; i < 9 && Date.now() < deadline; i++) {
     const buf = await job(q, maxDim);
+    const missed = guessed && buf.length > target;
     if (buf.length <= target) fit = { q, buf }; else over = { q, buf };
     if (fit && (palette || fit.q >= 92 || fit.buf.length >= target * 0.93)) break;
     if (over && over.q <= 10) break;
+    guessed = false;
     if (fit && over) {
       if (over.q - fit.q <= 1) break;
-      const t = (Math.log(target) - Math.log(fit.buf.length)) / (Math.log(over.buf.length) - Math.log(fit.buf.length));
-      q = Math.min(over.q - 1, Math.max(fit.q + 1, Math.floor(fit.q + (over.q - fit.q) * t)));
+      if (missed) q = Math.floor((fit.q + over.q) / 2);
+      else {
+        const t = (Math.log(target) - Math.log(fit.buf.length)) / (Math.log(over.buf.length) - Math.log(fit.buf.length));
+        q = Math.min(over.q - 1, Math.max(fit.q + 1, Math.floor(fit.q + (over.q - fit.q) * t)));
+        guessed = true;
+      }
     } else q = fit ? Math.min(92, fit.q + 12) : Math.max(10, over.q - 25);
   }
   if (fit) return fit.buf;
