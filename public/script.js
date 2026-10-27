@@ -495,12 +495,14 @@
   }));
 
   // One upload + conversion. XHR (not fetch) so the card can show upload progress.
-  function requestConversion(row, onProgress){
+  // as: [id, label, apiFormat] to get a compressed picture in another format ("Download as").
+  function requestConversion(row, onProgress, as){
     return new Promise((resolve, reject) => {
-      const t = row.targets.find(x => x[0] === row.target);
+      const t = as ? [as[0], as[1], as[2]] : row.targets.find(x => x[0] === row.target);
       const form = new FormData();
       form.append("file", row.file);
       form.append("format", t ? t[2] : row.target);
+      if (as) form.append("compress", "1");
       form.append("quality", String(row.quality));
       if (compressMode) form.append("reduce", String(row.reduce)); // "make it N% smaller"
       if (compressMode && isPdfRow(row)) form.append("level", row.level);
@@ -724,8 +726,42 @@
     }
     else if (row.state === "error") text = `<span class="err-text">${esc(row.error)}</span>`;
     const action = row.state === "finished" ? `<button class="btn btn-success btn-sm dl-btn" type="button">${DL_ICON}Download</button>` : "";
-    return `<div class="file-status"><span class="badge-state ${cls}">${label}</span><div class="status-text">${text}</div>${action}</div>`;
+    return `<div class="file-status"><span class="badge-state ${cls}">${label}</span><div class="status-text">${text}</div>${action}</div>${alsoHtml(row)}`;
   }
+  // Compress pages for images: the compressed picture can also be downloaded in another format.
+  let ALSO = [];
+  try { ALSO = JSON.parse(tool.dataset.also || "[]"); } catch (e) { ALSO = []; }
+  function alsoHtml(row){
+    if (!compressMode || !ALSO.length || row.state !== "finished" || isPdfRow(row)) return "";
+    const own = row.fmt ? row.fmt.ext : "";
+    const chips = ALSO.filter(a => a[0] !== own && !(own === "jpeg" && a[0] === "jpg")).map(([id, label]) => {
+      const a = (row.also || {})[id] || {};
+      const inner = a.state === "busy" ? `<span class="spinner" aria-hidden="true"></span>${esc(label)}`
+        : a.state === "done" ? `${DL_ICON}${esc(label)} <span class="also-size">${fmtBytes(a.size)}</span>`
+        : esc(label);
+      return `<button type="button" class="also-btn${a.state === "error" ? " is-err" : ""}" data-as="${esc(id)}"${a.state === "busy" ? " disabled" : ""}${a.state === "error" ? ` title="${esc(a.error)}"` : ""}>${inner}</button>`;
+    }).join("");
+    return `<div class="also-row"><span class="also-label">Download as:</span>${chips}</div>`;
+  }
+  fileList.addEventListener("click", e => {
+    const b = e.target.closest(".also-btn");
+    if (!b) return;
+    const row = rows.find(r => String(r.id) === b.closest("[data-row]").dataset.row);
+    const as = ALSO.find(a => a[0] === b.dataset.as);
+    if (!row || !as) return;
+    row.also = row.also || {};
+    const a = row.also[as[0]];
+    if (a && a.state === "done") return save(a.blob, a.name);
+    if (a && a.state === "busy") return;
+    row.also[as[0]] = { state: "busy" };
+    render();
+    requestConversion(row, () => {}, as).then(res => {
+      row.also[as[0]] = { state: "done", blob: res.blob, name: res.name, size: res.blob.size };
+      save(res.blob, res.name);
+    }).catch(err => {
+      row.also[as[0]] = { state: "error", error: err.message };
+    }).finally(render);
+  });
   const DL_ICON = '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>';
   const catOf = id => (MAP && MAP.fmts[id] ? primaryCat(id) : ((OUTS.find(o => o[0] === id) || [])[3] || "none"));
   const labelOf = id => { for (const r of rows) { const t = (r.targets || []).find(x => x[0] === id); if (t) return t[1]; } return String(id).toUpperCase(); };

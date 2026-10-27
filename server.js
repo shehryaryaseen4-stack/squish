@@ -201,7 +201,12 @@ app.post('/api/compress', upload.single('file'), async (req, res) => {
     );
     // Compressing an image with "Reduce size by N%": aim for that size instead of a fixed quality.
     const reduce = Math.min(90, Math.max(0, parseInt(req.body.reduce, 10) || 0));
-    const sizeTarget = reduce && inFormat.id === outFormat.id && SIZE_TARGET_FORMATS.has(outFormat.apiFormat);
+    // "Download as" on a compress page (compress=1): the picture compressed into another format,
+    // aiming for the same size; formats without a quality setting are simply converted.
+    const alsoAs = req.body.compress === '1' && inFormat.id !== outFormat.id && inFormat.categories.includes('image');
+    // (a lossless format such as PNG is never shrunk in pixels to reach a size it cannot reach)
+    const sizeTarget = reduce && SIZE_TARGET_FORMATS.has(outFormat.apiFormat)
+      && (inFormat.id === outFormat.id || (alsoAs && ['jpeg', 'webp', 'avif'].includes(outFormat.apiFormat)));
     const result = sizeTarget
       ? await compressToSize(job, req.file.buffer, Math.floor(originalSize * (1 - reduce / 100)), maxDim, outFormat.apiFormat)
       : await job(quality, maxDim);
@@ -219,7 +224,7 @@ app.post('/api/compress', upload.single('file'), async (req, res) => {
     // things the visitor should know about the result (e.g. a scanned page that needs OCR)
     if (out.notes && out.notes.length) res.set('X-Convert-Notes', encodeURIComponent(JSON.stringify(out.notes.slice(0, 8))));
     res.send(out.buffer);
-    analytics.event(req, inFormat.id === outFormat.id ? 'compress' : 'convert', { pair, p: fromPage(req) });
+    analytics.event(req, inFormat.id === outFormat.id || alsoAs ? 'compress' : 'convert', { pair, p: fromPage(req) });
   } catch (err) {
     if (pair) analytics.event(req, 'fail', { pair, p: fromPage(req) });
     if (err.userMessage) return res.status(err.statusCode || 422).json({ error: err.userMessage });

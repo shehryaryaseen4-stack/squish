@@ -455,6 +455,8 @@ const BROAD_MIME = /^(application\/(octet-stream|zip|xml|x-zip-compressed)|text\
 const acceptFor = (inputs, exts) => [...new Set([...exts.map((e) => `.${e}`),
   ...inputs.flatMap((id) => (registry.getFormat(id).mimeTypes || []).filter((m) => !BROAD_MIME.test(m) || /^(zip|txt|xml)$/.test(id)))])].join(',');
 
+// Image compress pages also offer the compressed picture in other image formats ("Download as").
+const ALSO_IMAGE = ['jpg', 'png', 'webp', 'avif', 'gif', 'tiff'];
 function toolHtml({ inputs, outputs, dropTitle, dropSub, any = false, compress = false }) {
   const exts = [...new Set(inputs.flatMap((id) => registry.getFormat(id).extensions))];
   // extension -> category, so each file gets the right icon and "JPEG Image" / "MP4 Video" label
@@ -462,10 +464,12 @@ function toolHtml({ inputs, outputs, dropTitle, dropSub, any = false, compress =
   [...inputs, ...outputs].forEach((id) => { const f = registry.getFormat(id); f.extensions.forEach((e) => { cats[e] = f.category; }); });
   // Targets offered in each file's "to" select on single-conversion pages: [id, label, apiFormat, category]
   const outs = outputs.map((id) => { const f = registry.getFormat(id); return [f.id, f.label, f.apiFormat, f.category]; });
+  const live = compress && inputs.length === 1 && registry.getFormat(inputs[0]).category === 'image' ? outputsFor(inputs[0]) : [];
+  const also = ALSO_IMAGE.filter((id) => id !== inputs[0] && live.includes(id)).map((id) => { const f = registry.getFormat(id); return [f.id, f.label, f.apiFormat]; });
   // CloudConvert-style flow: drop files -> one card per file ("Convert JPEG -> [PNG]", Options, x)
   // -> Convert -> each card shows FINISHED + Download; "Download all" zips every result.
   // compress: files keep their format; cards read "Compress [PNG]" and the button says Compress
-  return `<section class="tool-card" id="convert" aria-label="${compress ? 'Upload and compress' : 'Upload and convert'}"${any ? ' data-any="1"' : ''}${compress ? ' data-mode="compress"' : ''} data-cats="${esc(JSON.stringify(cats))}" data-outputs="${esc(JSON.stringify(outs))}">
+  return `<section class="tool-card" id="convert" aria-label="${compress ? 'Upload and compress' : 'Upload and convert'}"${any ? ' data-any="1"' : ''}${compress ? ' data-mode="compress"' : ''}${also.length ? ` data-also="${esc(JSON.stringify(also))}"` : ''} data-cats="${esc(JSON.stringify(cats))}" data-outputs="${esc(JSON.stringify(outs))}">
   <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="Choose files" data-exts="${exts.join(',')}" data-max-mb="${MAX_MB}">
     ${icon('upload', 'drop-ico')}
     <div class="cta">${dropTitle}</div>

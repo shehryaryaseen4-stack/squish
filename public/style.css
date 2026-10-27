@@ -1067,3 +1067,14 @@ body:has(.acct) .site-footer{margin-top:0;}
   .ai-ask{position:sticky; bottom:8px; margin:0 10px;}
   .ai-doc-bar .pt-fname{max-width:100%;}
 }
+
+/* Compress pages: download the compressed picture in another format */
+.also-row{display:flex; align-items:center; flex-wrap:wrap; gap:6px 8px; margin-top:10px;}
+.also-label{font-size:.88rem; font-weight:700; color:var(--dim); margin-right:2px;}
+.also-btn{display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border:1px solid var(--border); border-radius:999px; background:var(--panel); color:var(--ink); font:inherit; font-size:.88rem; font-weight:700; cursor:pointer; transition:border-color .15s, background .15s;}
+.also-btn:hover:not(:disabled){border-color:var(--brand); background:var(--brand-soft);}
+.also-btn:disabled{cursor:default; opacity:.75;}
+.also-btn .ico{width:15px; height:15px; color:#1E9E5A;}
+.also-btn .spinner{width:12px; height:12px;}
+.also-btn.is-err{border-color:#E5322D; color:#B42318;}
+.also-size{font-weight:500; color:var(--dim);}
