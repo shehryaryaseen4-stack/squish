@@ -540,6 +540,12 @@
   const groupOf = (x) => (/protein|calories|amino/i.test(x.kind) ? 'protein' : /strength|energy|weight/i.test(x.kind) ? 'strength' : 'health');
   const evidenceDots = (e) => `<span class="ev" title="${EVIDENCE[e][1]}">${[1, 2, 3].map((i) => `<i class="${i <= EVIDENCE[e][0] ? 'on' : ''}"></i>`).join('')}<small>${EVIDENCE[e][1]}</small></span>`;
 
+  // The gym's own photo of the tub it sells, or the drawing.
+  const productPic = (x) => {
+    const src = state.gym?.suppPhotos?.[`${x.id}-prod`];
+    return src ? `<img class="supp-prod" src="${esc(UI.photoSrc(src))}" alt="${esc(x.name)}">` : Supplements.art(x);
+  };
+
   async function suppsView(params) {
     const d = await me();
     const m = d.member;
@@ -554,7 +560,7 @@
       <div class="card supp-truth"><b>What really builds your body</b>
         <ol><li><span>1</span>Training hard, 3+ times a week</li><li><span>2</span>Eating your calories and ${e.target} g protein a day</li><li><span>3</span>Sleeping 7-8 hours</li></ol>
         <p>Supplements add the last few percent, or make the food part easier. None of them builds muscle or burns fat on its own.</p>
-        ${b ? `<div class="supp-expect">${e.fatPerMonth ? `<div><small>Fat off with your diet</small><b>~${e.fatPerMonth} kg</b><span>a month</span></div>` : ''}<div><small>Muscle you can build</small><b>~${e.muscle} kg</b><span>a month${['new', 'lt1', undefined].includes(b.experience) ? ' (first year)' : ''}</span></div><div><small>Visible change</small><b>8-12</b><span>weeks</span></div></div>`
+        ${b ? `<div class="supp-expect">${e.fatPerMonth ? `<div><b>${e.fatPerMonth} kg</b><small>fat off a month</small></div>` : ''}<div><b>${e.muscle} kg</b><small>muscle a month</small></div><div><b>8-12</b><small>weeks to see it</small></div></div>`
           : `<a class="btn btn-soft btn-sm" href="#/diet" style="margin-top:10px">Enter your weight to see what fits you</a>`}
       </div>
       <div class="chips-row supp-filter" role="group" aria-label="Show" style="margin:14px 0 4px">${SUPP_GROUPS.filter(([id]) => id !== 'you' || b).map(([id, l]) => `<a class="chip" href="#/supps?g=${id}" aria-pressed="${show === id}">${l}</a>`).join('')}</div>
@@ -563,9 +569,10 @@
         const s = x.serving;
         // Every card has the same parts in the same places.
         return `<button class="card supp-card" data-supp="${x.id}">
-          <span class="supp-banner">${Supplements.art(x)}${b ? `<span class="supp-fit ${a.fit}"><i></i>${FIT[a.fit][1]}</span>` : ''}</span>
+          <span class="supp-banner">${productPic(x)}${b ? `<span class="supp-fit ${a.fit}"><i></i>${FIT[a.fit][1]}</span>` : ''}</span>
           <span class="supp-top"><span class="supp-ico">${icon(x.icon)}</span><span><small>${esc(x.kind)}</small><b>${esc(x.name)}</b></span></span>
-          <span class="supp-stats"><span><b>${s.protein} g</b><small>protein</small></span><span><b>${s.kcal}</b><small>kcal</small></span><span>${evidenceDots(x.evidence)}<small>${EVIDENCE[x.evidence][1].replace(' research', '')}</small></span></span>
+          <span class="supp-pills"><span>${s.protein} g protein</span><span>${s.kcal} kcal</span></span>
+          <span class="supp-ev ${x.evidence}">${evidenceDots(x.evidence)}</span>
           <span class="supp-when">${icon('clock')}<span>${esc(x.when)}</span></span>
           <span class="supp-more">See details ${icon('chevronRight')}</span></button>`;
       }).join('') || '<p class="muted">Nothing here.</p>'}</div>
@@ -604,7 +611,7 @@
     sheet({
       label: x.name,
       wide: true,
-      html: `<div class="supp-hero">${Supplements.art(x)}</div><div class="supp-head"><span class="supp-ico lg">${icon(x.icon)}</span><div><small>${esc(x.kind)}</small><h3>${esc(x.name)}</h3>${evidenceDots(x.evidence)}</div><button class="icon-btn" data-close aria-label="Close">${icon('x')}</button></div>
+      html: `<div class="supp-hero">${productPic(x)}</div><div class="supp-head"><span class="supp-ico lg">${icon(x.icon)}</span><div><small>${esc(x.kind)}</small><h3>${esc(x.name)}</h3>${evidenceDots(x.evidence)}</div><button class="icon-btn" data-close aria-label="Close">${icon('x')}</button></div>
         ${suppResult(x, body, diet)}
         <h4 class="supp-h">${icon('info')}What it is</h4>
         <p class="supp-what">${esc(x.what)}</p>

@@ -390,3 +390,7 @@ button.kpi { text-align: left; font: inherit; color: inherit; cursor: pointer; }
 .crop-wrap { position: relative; max-height: 60vh; overflow: hidden; border-radius: 12px; display: flex; justify-content: center; background: #000; }
 .crop-wrap img { max-width: 100%; max-height: 60vh; display: block; }
 .crop-shade { position: absolute; left: 0; right: 0; top: 0; background: rgba(0, 0, 0, .82); border-bottom: 3px solid var(--accent); }
+
+.bp-pic.square { aspect-ratio: 1; color: var(--accent); }
+.bp-pic .supp-art { width: 80%; height: 80%; }
+.bp-pic .supp-art .lid { fill: #374151; } .bp-pic .supp-art .lid2 { fill: #6b7280; }

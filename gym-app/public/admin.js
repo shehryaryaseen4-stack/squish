@@ -1669,6 +1669,7 @@
       <section class="card form-section" id="wa"><div class="skel" style="height:120px"></div></section>
       <section class="card form-section" id="exvid"><div class="skel" style="height:120px"></div></section>
       <section class="card form-section" id="suppphotos" data-need="settings"></section>
+      <section class="card form-section" id="prodphotos" data-need="settings"></section>
 
       <section class="card form-section"><div class="panel-head"><div><h2>Membership plans</h2><p class="muted" style="font-size:13.5px">Monthly, quarterly, half-yearly, annual or anything you like.</p></div><button class="btn btn-primary btn-sm" data-addplan>${icon('plus')}Add plan</button></div>
         <div class="item-list">${S.data.plans.map((p) => `<div class="card item${p.active === false ? ' inactive' : ''}"><div class="ic-tile">${icon('star')}</div><div class="tx"><b>${esc(p.name)}${p.highlight ? ' <span class="badge badge-accent">Highlighted</span>' : ''}${p.active === false ? ' <span class="badge badge-muted">Hidden</span>' : ''}</b><span>${p.months} month${p.months > 1 ? 's' : ''} · ${rs(p.price)} · ${rs(Math.round(p.price / p.months))}/month</span></div><div class="acts"><button class="icon-btn" data-plan="${esc(p.id)}" aria-label="Edit ${esc(p.name)}">${icon('edit')}</button></div></div>`).join('')}</div></section>
@@ -1764,6 +1765,32 @@
     drawWhatsApp();
     drawExerciseVideos();
     drawSuppPhotos();
+    drawProductPhotos();
+  }
+
+  // Photos of the tubs the gym sells, shown on the supplement cards instead of the drawings.
+  async function drawProductPhotos() {
+    const box = document.getElementById('prodphotos');
+    if (!box || !window.Supplements) return;
+    const photos = (await api('/api/gym')).suppPhotos || {};
+    box.innerHTML = `<div class="panel-head"><div><h2>${icon('camera')} Supplement product photos</h2><p class="muted" style="font-size:13.5px">Take a photo of each tub or bottle you sell, on a plain background. It shows on the member’s supplement card instead of the drawing. Use your own photos, not pictures from brand websites.</p></div></div>
+      <div class="bp-grid">${Supplements.LIST.map((x) => {
+        const id = `${x.id}-prod`;
+        return `<div class="bp-tile"><div class="bp-pic square">${photos[id] ? `<img src="${esc(UI.photoSrc(photos[id]))}" alt="">` : Supplements.art(x)}</div><b>${esc(x.name)}</b>
+          <div class="bp-actions"><button class="btn btn-soft btn-sm" data-prod="${id}">${icon('camera')}${photos[id] ? 'Change' : 'Add photo'}</button>${photos[id] ? `<button class="icon-btn" data-proddel="${id}" aria-label="Remove photo">${icon('trash')}</button>` : ''}</div></div>`;
+      }).join('')}</div>`;
+    box.querySelectorAll('[data-prod]').forEach((b) => b.addEventListener('click', async () => {
+      try {
+        const image = await UI.pickPhoto({ size: 600 });
+        if (!image) return;
+        await api(`/api/admin/supp-photos/${b.dataset.prod}`, { method: 'PUT', body: { image } });
+        toast('Photo saved');
+        drawProductPhotos();
+      } catch (e) { toast(e.message, 'bad'); }
+    }));
+    box.querySelectorAll('[data-proddel]').forEach((b) => b.addEventListener('click', async () => {
+      try { await api(`/api/admin/supp-photos/${b.dataset.proddel}`, { method: 'DELETE' }); drawProductPhotos(); } catch (e) { toast(e.message, 'bad'); }
+    }));
   }
 
   // ---- photos for the supplements guide ---------------------------------------------------

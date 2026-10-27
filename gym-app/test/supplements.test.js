@@ -81,6 +81,9 @@ test('the gym adds result photos (settings right only)', async (t) => {
   assert.equal((await call('/api/admin/supp-photos/whey', 'PUT', { image }, desk)).status, 403);
   assert.equal((await call('/api/admin/supp-photos/steroids', 'PUT', { image }, owner)).status, 404);
   assert.equal((await call('/api/admin/supp-photos/whey-f', 'PUT', { image }, owner)).status, 200);
+  assert.equal((await call('/api/admin/supp-photos/omega3-prod', 'PUT', { image }, owner)).status, 200);
+  assert.equal((await call('/api/admin/supp-photos/omega3-f', 'PUT', { image }, owner)).status, 404);
+  await call('/api/admin/supp-photos/omega3-prod', 'DELETE', null, owner);
   await call('/api/admin/supp-photos/whey-f', 'DELETE', null, owner);
   assert.equal((await call('/api/admin/supp-photos/whey', 'PUT', { image: 'nope' }, owner)).status, 400);
   await call('/api/admin/supp-photos/whey', 'DELETE', null, owner);

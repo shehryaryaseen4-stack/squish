@@ -1271,8 +1271,9 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
       }
     }
     // Exercise videos: a YouTube / Shorts link or a short clip uploaded by the gym
-    // A photo of the body each protein is bought for, shown in the supplements guide (face cut off in the app).
-    if ((match = pathname.match(/^\/api\/admin\/supp-photos\/((?:whey|casein|plant|gainer|creatine)(?:-f)?)$/))) {
+    // Photos for the supplements guide: the body each protein is bought for (face cut off in the app),
+    // and "<id>-prod", a photo of the tub the gym sells.
+    if ((match = pathname.match(/^\/api\/admin\/supp-photos\/((?:whey|casein|plant|gainer|creatine)(?:-f)?|(?:whey|casein|plant|gainer|creatine|preworkout|bcaa|fatburner|vitd|omega3|multivitamin|electrolytes)-prod)$/))) {
       need('settings');
       const id = match[1];
       d.suppPhotos ||= {};

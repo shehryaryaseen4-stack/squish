@@ -485,10 +485,11 @@ main.no-tabs { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 .supp-truth li { display: flex; align-items: center; gap: 10px; }
 .supp-truth li span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 12px; font-weight: 800; flex: none; }
 .supp-truth p { margin: 0; font-size: 13.5px; color: var(--ink-3); line-height: 1.5; }
-.supp-expect { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 8px; margin-top: 12px; }
-.supp-expect div { display: grid; padding: 10px 12px; border-radius: 14px; }
-.supp-expect small { font-size: 11.5px; color: var(--ink-3); }
-.supp-expect b { font-size: 18px; }
+.supp-expect { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; margin-top: 14px; border-radius: 16px; background: #111; overflow: hidden; }
+.supp-expect div { display: grid; justify-items: center; gap: 2px; padding: 14px 6px; text-align: center; }
+.supp-expect div + div { border-left: 1px solid rgba(255, 255, 255, .12); }
+.supp-expect small { font-size: 12px; line-height: 1.3; }
+.supp-expect b { font-size: 21px; }
 .supp-expect span { font-size: 12px; color: var(--ink-3); }
 .supp-grid { display: grid; gap: 10px; margin-top: 10px; }
 @media (min-width: 640px) { .supp-grid { grid-template-columns: 1fr 1fr; } }
@@ -509,12 +510,17 @@ main.no-tabs { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 .supp-ico { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; flex: none; background: #111; color: var(--accent); }
 .supp-ico .ico { width: 22px; height: 22px; }
 .supp-ico.lg { width: 56px; height: 56px; }
-.supp-stats { display: grid; grid-template-columns: 1fr 1fr 1.2fr; margin: 0 14px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
-.supp-stats > span { display: grid; justify-items: center; align-content: center; gap: 2px; padding: 9px 4px; text-align: center; }
-.supp-stats > span + span { border-left: 1px solid var(--line); }
-.supp-stats b { font-size: 16px; }
-.supp-stats small { font-size: 11.5px; color: var(--ink-3); }
-.supp-stats .ev small { display: none; }
+.supp-pills { display: flex; gap: 6px; padding: 0 14px; }
+.supp-pills span { padding: 5px 11px; border-radius: 99px; font-size: 13px; font-weight: 800; background: var(--accent-soft); color: color-mix(in srgb, var(--accent) 80%, var(--ink)); }
+.supp-ev { display: flex; padding: 0 14px; }
+.supp-ev .ev { padding: 5px 11px 5px 9px; border-radius: 99px; background: var(--surface-2); }
+.supp-ev.strong .ev { background: var(--good-soft); }
+.supp-ev.strong .ev small { color: var(--good); font-weight: 800; }
+.supp-ev .ev i { width: 9px; height: 9px; }
+.supp-ev .ev small { font-size: 12.5px; font-weight: 700; color: var(--ink-2); }
+.supp-prod { width: 100%; height: 100%; object-fit: cover; }
+.supp-banner:has(.supp-prod) { align-items: stretch; }
+.supp-hero .supp-prod { max-height: 220px; width: auto; max-width: 100%; border-radius: 14px; }
 .supp-when { display: flex; align-items: flex-start; gap: 7px; margin: 0 14px; min-height: 40px; font-size: 13.5px; font-weight: 600; color: var(--ink-2); line-height: 1.45; }
 .supp-when > span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .supp-when .ico { width: 16px; height: 16px; color: var(--accent); flex: none; margin-top: 2px; }
@@ -528,9 +534,8 @@ main.no-tabs { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 .fit-tabs a[aria-selected="true"] { background: var(--accent); color: #fff; box-shadow: none; }
 .supp-filter .chip { background: #111; color: #fff; border-color: #111; }
 .supp-filter .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
-.supp-expect div { background: #111; }
-.supp-expect small, .supp-expect span { color: #a1a1aa; }
-.supp-expect b { color: #fff; }
+.supp-expect small { color: #e4e4e7; }
+.supp-expect b { color: var(--accent); }
 .ev { display: inline-flex; align-items: center; gap: 3px; }
 .ev i { width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
 .ev i.on { background: var(--good); }
