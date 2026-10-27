@@ -6,3 +6,4 @@ npm-debug.log*
 data
 models/*.onnx
 __pycache__
+world-tour

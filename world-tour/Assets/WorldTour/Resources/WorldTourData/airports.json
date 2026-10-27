@@ -1,0 +1,17 @@
+{
+  "note": "Airport coordinates are approximate public reference positions. 'regional' airports only have domestic routes.",
+  "airports": [
+    { "code": "ISB", "name": "Islamabad International Airport", "country": "PAK", "lat": 33.549, "lon": 72.826, "type": "international" },
+    { "code": "LHE", "name": "Allama Iqbal International Airport", "country": "PAK", "lat": 31.522, "lon": 74.404, "type": "international" },
+    { "code": "KHI", "name": "Jinnah International Airport", "country": "PAK", "lat": 24.907, "lon": 67.161, "type": "international" },
+    { "code": "GIL", "name": "Gilgit Airport", "country": "PAK", "lat": 35.919, "lon": 74.334, "type": "regional" },
+    { "code": "KDU", "name": "Skardu International Airport", "country": "PAK", "lat": 35.336, "lon": 75.536, "type": "regional" },
+    { "code": "CDG", "name": "Paris Charles de Gaulle Airport", "country": "FRA", "lat": 49.010, "lon": 2.548, "type": "international" },
+    { "code": "DXB", "name": "Dubai International Airport", "country": "ARE", "lat": 25.253, "lon": 55.366, "type": "international" },
+    { "code": "HND", "name": "Tokyo Haneda Airport", "country": "JPN", "lat": 35.549, "lon": 139.780, "type": "international" },
+    { "code": "FCO", "name": "Rome Fiumicino Airport", "country": "ITA", "lat": 41.800, "lon": 12.239, "type": "international" },
+    { "code": "LHR", "name": "London Heathrow Airport", "country": "GBR", "lat": 51.470, "lon": -0.454, "type": "international" },
+    { "code": "ZRH", "name": "Zurich Airport", "country": "CHE", "lat": 47.458, "lon": 8.556, "type": "international" },
+    { "code": "GVA", "name": "Geneva Airport", "country": "CHE", "lat": 46.238, "lon": 6.109, "type": "international" }
+  ]
+}

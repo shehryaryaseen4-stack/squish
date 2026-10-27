@@ -1,0 +1,159 @@
+{
+  "note": "Destination coordinates are approximate WGS84 reference points. detail: 'explorable' = has a playable 3D area, 'mapOnly' = selectable on the map, 3D area not built yet.",
+  "destinations": [
+    {
+      "id": "lahore", "name": "Lahore", "country": "PAK", "kind": "city",
+      "lat": 31.5497, "lon": 74.3436, "airport": "LHE", "detail": "explorable",
+      "description": "Cultural capital of Punjab, known for Mughal architecture, food streets and gardens.",
+      "pois": [
+        { "name": "Badshahi Mosque", "kind": "landmark", "lat": 31.5881, "lon": 74.3099 },
+        { "name": "Lahore Fort", "kind": "landmark", "lat": 31.5880, "lon": 74.3150 },
+        { "name": "Minar-e-Pakistan", "kind": "landmark", "lat": 31.5925, "lon": 74.3095 },
+        { "name": "Shalimar Gardens", "kind": "landmark", "lat": 31.5858, "lon": 74.3820 }
+      ],
+      "environment": {
+        "note": "Stylised, compressed layout inspired by the Walled City area. Not to real scale.",
+        "seed": 1947,
+        "halfSize": 220,
+        "blockSize": 36,
+        "roadWidth": 10,
+        "buildingHeightMin": 5,
+        "buildingHeightMax": 18,
+        "groundColor": "#9C8B6E",
+        "roadColor": "#4A4A4E",
+        "parkColor": "#5E8C4A",
+        "buildingColors": ["#B5654A", "#C98A5E", "#D9C3A0", "#A8483A", "#E3D8C3", "#8F6B4E"],
+        "spawn": [0, -175],
+        "landmarks": [
+          { "id": "lahore_minar", "name": "Minar-e-Pakistan", "type": "minar", "x": -45, "z": 150, "radius": 38, "park": true,
+            "description": "National monument built where the Lahore Resolution was passed in 1940." },
+          { "id": "lahore_badshahi", "name": "Badshahi Mosque", "type": "mosque", "x": -45, "z": 55, "radius": 48, "park": false,
+            "description": "Mughal-era mosque completed in 1673, famous for its red sandstone and marble domes." },
+          { "id": "lahore_fort", "name": "Lahore Fort", "type": "fort", "x": 85, "z": 60, "radius": 50, "park": false,
+            "description": "Citadel of the Mughal emperors, a UNESCO World Heritage Site alongside Shalimar Gardens." },
+          { "id": "lahore_anarkali", "name": "Anarkali Bazaar", "type": "bazaar", "x": 20, "z": -95, "radius": 34, "park": false,
+            "description": "One of the oldest surviving markets in South Asia, full of fabric, food and jewellery stalls." }
+        ]
+      }
+    },
+    {
+      "id": "islamabad", "name": "Islamabad", "country": "PAK", "kind": "city",
+      "lat": 33.6844, "lon": 73.0479, "airport": "ISB", "detail": "mapOnly",
+      "description": "Pakistan's planned capital at the foot of the Margalla Hills.",
+      "pois": [
+        { "name": "Faisal Mosque", "kind": "landmark", "lat": 33.7295, "lon": 73.0372 },
+        { "name": "Pakistan Monument", "kind": "landmark", "lat": 33.6931, "lon": 73.0689 },
+        { "name": "Margalla Hills", "kind": "mountain", "lat": 33.7500, "lon": 73.0500 }
+      ]
+    },
+    {
+      "id": "karachi", "name": "Karachi", "country": "PAK", "kind": "city",
+      "lat": 24.8607, "lon": 67.0011, "airport": "KHI", "detail": "mapOnly",
+      "description": "Pakistan's largest city and port on the Arabian Sea coast.",
+      "pois": [
+        { "name": "Mazar-e-Quaid", "kind": "landmark", "lat": 24.8754, "lon": 67.0400 },
+        { "name": "Clifton Beach", "kind": "coast", "lat": 24.7936, "lon": 67.0283 }
+      ]
+    },
+    {
+      "id": "hunza", "name": "Hunza (Karimabad)", "country": "PAK", "kind": "mountain",
+      "lat": 36.3167, "lon": 74.6500, "airport": "GIL", "detail": "mapOnly",
+      "description": "High mountain valley on the Karakoram Highway. Reached via Gilgit Airport, then by road.",
+      "pois": [
+        { "name": "Baltit Fort", "kind": "landmark", "lat": 36.3262, "lon": 74.6699 },
+        { "name": "Attabad Lake", "kind": "lake", "lat": 36.3300, "lon": 74.8700 },
+        { "name": "Rakaposhi", "kind": "mountain", "lat": 36.1428, "lon": 74.4892 }
+      ]
+    },
+    {
+      "id": "skardu", "name": "Skardu", "country": "PAK", "kind": "mountain",
+      "lat": 35.2971, "lon": 75.6333, "airport": "KDU", "detail": "mapOnly",
+      "description": "Gateway to Baltistan's lakes, plateaus and the Karakoram's highest peaks.",
+      "pois": [
+        { "name": "Shangrila (Lower Kachura Lake)", "kind": "lake", "lat": 35.4219, "lon": 75.4547 },
+        { "name": "Deosai National Park", "kind": "mountain", "lat": 35.0333, "lon": 75.4500 },
+        { "name": "K2", "kind": "mountain", "lat": 35.8808, "lon": 76.5155 }
+      ]
+    },
+    {
+      "id": "paris", "name": "Paris", "country": "FRA", "kind": "city",
+      "lat": 48.8566, "lon": 2.3522, "airport": "CDG", "detail": "mapOnly",
+      "description": "The French capital on the Seine, famous for art, cafes and iconic monuments.",
+      "pois": [
+        { "name": "Eiffel Tower", "kind": "landmark", "lat": 48.8584, "lon": 2.2945 },
+        { "name": "Louvre Museum", "kind": "landmark", "lat": 48.8606, "lon": 2.3376 },
+        { "name": "Notre-Dame", "kind": "landmark", "lat": 48.8530, "lon": 2.3499 },
+        { "name": "Arc de Triomphe", "kind": "landmark", "lat": 48.8738, "lon": 2.2950 }
+      ]
+    },
+    {
+      "id": "dubai", "name": "Dubai", "country": "ARE", "kind": "city",
+      "lat": 25.2048, "lon": 55.2708, "airport": "DXB", "detail": "mapOnly",
+      "description": "Desert metropolis of skyscrapers, beaches and artificial islands.",
+      "pois": [
+        { "name": "Burj Khalifa", "kind": "landmark", "lat": 25.1972, "lon": 55.2744 },
+        { "name": "Palm Jumeirah", "kind": "coast", "lat": 25.1124, "lon": 55.1390 },
+        { "name": "Burj Al Arab", "kind": "landmark", "lat": 25.1412, "lon": 55.1853 }
+      ]
+    },
+    {
+      "id": "tokyo", "name": "Tokyo", "country": "JPN", "kind": "city",
+      "lat": 35.6762, "lon": 139.6503, "airport": "HND", "detail": "mapOnly",
+      "description": "Japan's vast capital, mixing neon districts with temples and gardens.",
+      "pois": [
+        { "name": "Tokyo Tower", "kind": "landmark", "lat": 35.6586, "lon": 139.7454 },
+        { "name": "Senso-ji", "kind": "landmark", "lat": 35.7148, "lon": 139.7967 },
+        { "name": "Shibuya Crossing", "kind": "landmark", "lat": 35.6595, "lon": 139.7005 },
+        { "name": "Mount Fuji", "kind": "mountain", "lat": 35.3606, "lon": 138.7274 }
+      ]
+    },
+    {
+      "id": "rome", "name": "Rome", "country": "ITA", "kind": "city",
+      "lat": 41.9028, "lon": 12.4964, "airport": "FCO", "detail": "mapOnly",
+      "description": "The Eternal City, layered with ancient ruins, piazzas and fountains.",
+      "pois": [
+        { "name": "Colosseum", "kind": "landmark", "lat": 41.8902, "lon": 12.4922 },
+        { "name": "Trevi Fountain", "kind": "landmark", "lat": 41.9009, "lon": 12.4833 },
+        { "name": "St. Peter's Basilica", "kind": "landmark", "lat": 41.9022, "lon": 12.4539 },
+        { "name": "Pantheon", "kind": "landmark", "lat": 41.8986, "lon": 12.4769 }
+      ]
+    },
+    {
+      "id": "london", "name": "London", "country": "GBR", "kind": "city",
+      "lat": 51.5072, "lon": -0.1276, "airport": "LHR", "detail": "mapOnly",
+      "description": "Historic capital on the Thames with royal palaces, museums and markets.",
+      "pois": [
+        { "name": "Big Ben", "kind": "landmark", "lat": 51.5007, "lon": -0.1246 },
+        { "name": "Tower Bridge", "kind": "landmark", "lat": 51.5055, "lon": -0.0754 },
+        { "name": "London Eye", "kind": "landmark", "lat": 51.5033, "lon": -0.1196 },
+        { "name": "Buckingham Palace", "kind": "landmark", "lat": 51.5014, "lon": -0.1419 }
+      ]
+    },
+    {
+      "id": "zurich", "name": "Zurich", "country": "CHE", "kind": "city",
+      "lat": 47.3769, "lon": 8.5417, "airport": "ZRH", "detail": "mapOnly",
+      "description": "Lakeside Swiss city and the main air gateway to the Alps.",
+      "pois": [
+        { "name": "Lake Zurich", "kind": "lake", "lat": 47.3000, "lon": 8.5900 }
+      ]
+    },
+    {
+      "id": "zermatt", "name": "Zermatt", "country": "CHE", "kind": "mountain",
+      "lat": 46.0207, "lon": 7.7491, "airport": "GVA", "detail": "mapOnly",
+      "description": "Car-free alpine village beneath the Matterhorn. Reached via Geneva, then by train.",
+      "pois": [
+        { "name": "Matterhorn", "kind": "mountain", "lat": 45.9763, "lon": 7.6586 },
+        { "name": "Gornergrat", "kind": "mountain", "lat": 45.9839, "lon": 7.7847 }
+      ]
+    },
+    {
+      "id": "interlaken", "name": "Interlaken", "country": "CHE", "kind": "mountain",
+      "lat": 46.6863, "lon": 7.8632, "airport": "ZRH", "detail": "mapOnly",
+      "description": "Resort town between two lakes, base for the Jungfrau region.",
+      "pois": [
+        { "name": "Jungfraujoch", "kind": "mountain", "lat": 46.5475, "lon": 7.9853 },
+        { "name": "Lake Brienz", "kind": "lake", "lat": 46.7270, "lon": 7.9670 }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "note": "Fictional game-economy values. Not real airline prices.",
+  "startingCoins": 1500,
+  "startingDestination": "islamabad",
+  "flight": {
+    "baseFare": 80,
+    "perKm": 0.12,
+    "internationalSurcharge": 150,
+    "regionalSurcharge": 40,
+    "minimumFare": 120
+  },
+  "rewards": {
+    "firstVisit": 200,
+    "landmarkVisit": 75
+  }
+}

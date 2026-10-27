@@ -1,0 +1,17 @@
+# Unity generated
+/Library/
+/Temp/
+/Obj/
+/Build/
+/Builds/
+/Logs/
+/UserSettings/
+/MemoryCaptures/
+*.csproj
+!/Tests/**/*.csproj
+*.sln
+*.apk
+*.aab
+# .NET test/compile-check output
+/Tests/**/bin/
+/Tests/**/obj/
