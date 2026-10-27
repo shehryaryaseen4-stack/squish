@@ -560,10 +560,14 @@
       <div class="chips-row" role="group" aria-label="Show" style="margin:14px 0 4px">${SUPP_GROUPS.filter(([id]) => id !== 'you' || b).map(([id, l]) => `<a class="chip" href="#/supps?g=${id}" aria-pressed="${show === id}">${l}</a>`).join('')}</div>
       <div class="supp-grid">${list.map((x) => {
         const a = guide.advice[x.id];
-        return `<button class="card supp-card" data-supp="${x.id}" style="--c:${x.color}"><span class="supp-ico">${icon(x.icon)}</span>
-          <span class="supp-main"><b>${esc(x.name)}</b><small>${esc(x.kind)}${x.serving.protein ? ` · ${x.serving.protein} g protein a scoop` : ''}</small>
+        const s = x.serving;
+        const chips = [s.protein && `${s.protein} g protein`, s.kcal && `${s.kcal} kcal`, s.carbs >= 10 && `${s.carbs} g carbs`].filter(Boolean);
+        return `<button class="card supp-card" data-supp="${x.id}" style="--c:${x.color}">
+          <span class="supp-banner">${Supplements.art(x)}${b ? `<span class="supp-fit ${a.fit}">${FIT[a.fit][1]}</span>` : ''}</span>
+          <span class="supp-top"><span class="supp-ico">${icon(x.icon)}</span><span><b>${esc(x.name)}</b><small>${esc(x.kind)}</small></span></span>
+          ${chips.length ? `<span class="supp-chips">${chips.map((t) => `<span>${t}</span>`).join('')}<span class="per">per ${esc(s.label.replace(/ \(.*\)/, ''))}</span></span>` : ''}
           <span class="supp-when">${icon('clock')}${esc(x.when)}</span>
-          <span class="supp-foot">${b ? `<span class="badge badge-${FIT[a.fit][0] || 'muted'}">${FIT[a.fit][1]}</span>` : ''}${evidenceDots(x.evidence)}</span></span></button>`;
+          <span class="supp-foot">${evidenceDots(x.evidence)}<span class="supp-more">Details ${icon('chevronRight')}</span></span></button>`;
       }).join('') || '<p class="muted">Nothing here.</p>'}</div>
       <p class="diet-note">Typical values; brands differ, so check your tub’s label. Buy from an authorised seller: fake supplements are common. Ask a doctor first if you have kidney, liver or heart problems, high blood pressure, take medicine, are pregnant, or are under 18. Steroids and “test boosters” are not supplements: they are risky and the app doesn’t recommend them.</p></div>`);
     const open = (id) => suppSheet(Supplements.byId[id], guide, b, diet);
@@ -600,7 +604,7 @@
     sheet({
       label: x.name,
       wide: true,
-      html: `<div class="supp-head" style="--c:${x.color}"><span class="supp-ico lg">${icon(x.icon)}</span><div><small>${esc(x.kind)}</small><h3>${esc(x.name)}</h3>${evidenceDots(x.evidence)}</div><button class="icon-btn" data-close aria-label="Close">${icon('x')}</button></div>
+      html: `<div class="supp-hero" style="--c:${x.color}">${Supplements.art(x)}</div><div class="supp-head" style="--c:${x.color}"><span class="supp-ico lg">${icon(x.icon)}</span><div><small>${esc(x.kind)}</small><h3>${esc(x.name)}</h3>${evidenceDots(x.evidence)}</div><button class="icon-btn" data-close aria-label="Close">${icon('x')}</button></div>
         ${suppResult(x, body, diet)}
         <h4 class="supp-h">${icon('info')}What it is</h4>
         <p class="supp-what">${esc(x.what)}</p>

@@ -492,16 +492,30 @@ main.no-tabs { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 .supp-expect span { font-size: 12px; color: var(--ink-3); }
 .supp-grid { display: grid; gap: 10px; margin-top: 10px; }
 @media (min-width: 640px) { .supp-grid { grid-template-columns: 1fr 1fr; } }
-.supp-card { display: flex; gap: 14px; align-items: flex-start; padding: 14px; text-align: left; font: inherit; color: inherit; cursor: pointer; width: 100%; }
-.supp-ico { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; flex: none; background: color-mix(in srgb, var(--c) 16%, transparent); color: var(--c); }
-.supp-ico .ico { width: 26px; height: 26px; }
-.supp-ico.lg { width: 60px; height: 60px; }
-.supp-main { display: grid; gap: 3px; min-width: 0; }
-.supp-main b { font-size: 16px; }
-.supp-main small { font-size: 12.5px; color: var(--ink-3); }
-.supp-when { display: flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 650; color: var(--ink-2); }
-.supp-when .ico { width: 14px; height: 14px; color: var(--c); flex: none; }
-.supp-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
+.supp-card { display: flex; flex-direction: column; gap: 10px; padding: 0 0 14px; overflow: hidden; text-align: left; font: inherit; color: inherit; cursor: pointer; width: 100%; border-color: color-mix(in srgb, var(--c) 25%, var(--line)); transition: transform .15s, box-shadow .15s; }
+.supp-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md, 0 8px 24px rgba(0,0,0,.08)); }
+.supp-banner { position: relative; display: flex; justify-content: center; align-items: flex-end; height: 120px; background: radial-gradient(circle at 70% 30%, color-mix(in srgb, var(--c) 35%, transparent), transparent 60%), linear-gradient(135deg, color-mix(in srgb, var(--c) 22%, var(--surface)), color-mix(in srgb, var(--c) 8%, var(--surface))); }
+.supp-art { width: 112px; height: 112px; filter: drop-shadow(0 6px 10px color-mix(in srgb, var(--c) 35%, transparent)); }
+.supp-fit { position: absolute; top: 10px; left: 10px; padding: 4px 10px; border-radius: 99px; font-size: 12px; font-weight: 800; background: var(--surface); color: var(--ink-2); box-shadow: var(--shadow-sm); }
+.supp-fit.yes { background: var(--good); color: #fff; }
+.supp-fit.no { background: var(--bad); color: #fff; }
+.supp-top { display: flex; align-items: center; gap: 12px; padding: 0 14px; }
+.supp-top > span:last-child { display: grid; min-width: 0; }
+.supp-top b { font-size: 16.5px; line-height: 1.25; }
+.supp-top small { font-size: 12.5px; color: var(--c); font-weight: 700; }
+.supp-ico { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; flex: none; background: color-mix(in srgb, var(--c) 16%, transparent); color: var(--c); }
+.supp-ico .ico { width: 23px; height: 23px; }
+.supp-ico.lg { width: 56px; height: 56px; }
+.supp-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 0 14px; }
+.supp-chips span { padding: 4px 10px; border-radius: 99px; font-size: 12.5px; font-weight: 800; background: color-mix(in srgb, var(--c) 14%, transparent); color: color-mix(in srgb, var(--c) 75%, var(--ink)); }
+.supp-chips .per { padding: 0; background: none; font-weight: 500; color: var(--ink-3); }
+.supp-when { display: flex; align-items: flex-start; gap: 7px; margin: 0 14px; padding: 9px 11px; border-radius: 12px; background: var(--surface-2); font-size: 13.5px; font-weight: 650; color: var(--ink-2); line-height: 1.4; }
+.supp-when .ico { width: 16px; height: 16px; color: var(--c); flex: none; margin-top: 1px; }
+.supp-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 14px; }
+.supp-more { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; font-weight: 800; color: var(--c); }
+.supp-more .ico { width: 15px; height: 15px; }
+.supp-hero { display: flex; justify-content: center; margin: -6px 0 14px; padding: 14px 0 6px; border-radius: 18px; background: radial-gradient(circle at 70% 30%, color-mix(in srgb, var(--c) 35%, transparent), transparent 60%), linear-gradient(135deg, color-mix(in srgb, var(--c) 24%, var(--surface)), color-mix(in srgb, var(--c) 8%, var(--surface))); }
+.supp-hero .supp-art { width: 150px; height: 150px; }
 .ev { display: inline-flex; align-items: center; gap: 3px; }
 .ev i { width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
 .ev i.on { background: var(--good); }
