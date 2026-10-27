@@ -1,6 +1,8 @@
 // Stroke icons (24px grid, Lucide-style). icon('name', 'extra-class') returns inline SVG.
 (function () {
   const P = {
+    scoop: '<path d="M3 10h11v2.5a5.5 5.5 0 0 1-11 0Z"/><path d="M14 11.5h5.5a1.5 1.5 0 0 1 0 3H14"/><path d="M5 6.5c1-1 2-1 3 0s2 1 3 0"/>',
+    pill: '<rect x="3" y="8.5" width="18" height="7" rx="3.5" transform="rotate(-35 12 12)"/><path d="m9.5 8.4 5 7.2"/>',
     home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/>',
     grid: '<rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/>',
     calendar: '<rect x="3" y="4.5" width="18" height="17" rx="3"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/>',

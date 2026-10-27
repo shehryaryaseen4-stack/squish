@@ -36,7 +36,7 @@
   }
 
   function renderTabs() {
-    const route = (location.hash.split('?')[0] || '#/').replace('#/workout/library', '#/workout').replace('#/diet', '#/workout').replace('#/coach', '#/workout').replace('#/bmi', '#/workout');
+    const route = (location.hash.split('?')[0] || '#/').replace('#/workout/library', '#/workout').replace('#/diet', '#/workout').replace('#/coach', '#/workout').replace('#/bmi', '#/workout').replace('#/supps', '#/workout');
     const tabs = state.token
       ? [['#/', 'home', 'Home'], ['#/workout', 'dumbbell', 'Workout'], ['#/classes', 'calendar', 'Classes'], ['#/progress', 'activity', 'Progress'], ['#/profile', 'user', 'Profile']]
       : [['#/', 'home', 'Home'], ['#/classes', 'calendar', 'Classes'], ['#/login', 'lock', 'Member login']];
@@ -294,7 +294,7 @@
     return { kg: kg || 70, known: Boolean(kg) };
   }
 
-  const fitTabs = (on) => `<div class="fit-tabs" role="tablist"><a href="#/workout" role="tab" aria-selected="${on === 'workout'}">${icon('dumbbell')}Workout</a><a href="#/diet" role="tab" aria-selected="${on === 'diet'}">${icon('flame')}Diet</a><a href="#/bmi" role="tab" aria-selected="${on === 'bmi'}">${icon('ruler')}BMI</a></div>`;
+  const fitTabs = (on) => `<div class="fit-tabs" role="tablist"><a href="#/workout" role="tab" aria-selected="${on === 'workout'}">${icon('dumbbell')}Workout</a><a href="#/diet" role="tab" aria-selected="${on === 'diet'}">${icon('flame')}Diet</a><a href="#/bmi" role="tab" aria-selected="${on === 'bmi'}">${icon('ruler')}BMI</a><a href="#/supps" role="tab" aria-selected="${on === 'supps'}" title="Supplements">${icon('scoop')}Supps</a></div>`;
 
   async function workoutView(params) {
     const d = await me();
@@ -368,6 +368,8 @@
       }).join('')}</div>
       <div class="card diet-total"><div><small>Protein in this plan</small><b class="${short > 10 ? 'warn' : ''}">${p.totals.protein} g</b><span>of ${p.protein} g</span></div><div><small>Calories</small><b>${p.totals.kcal.toLocaleString()}</b><span>of ${p.target.toLocaleString()} kcal</span></div></div>
       ${short > 10 ? `<p class="note-line">${short} g short: add a scoop of whey or ${Math.ceil(short / 6)} more eggs.</p>` : ''}
+
+      <a class="card bmi-rec" href="#/supps">${icon('scoop')}<div><b>Supplements: what you need</b><span>Whey, creatine and more: what a scoop holds, how to take it, the good and the bad, and how many scoops fit your diet.</span></div>${icon('chevronRight')}</a>
 
       <h2 class="diet-h">Protein in common foods</h2>
       <div class="card protein-table"><table><tbody>${['egg', 'chicken', 'fish', 'beef', 'daal', 'chana', 'paneer', 'soya', 'milk', 'dahi', 'whey', 'roti'].map((k) => {
@@ -528,6 +530,68 @@
         bmiView(new URLSearchParams());
       } catch (err) { toast(err.message, 'bad'); }
     }));
+  }
+
+  // ---- supplements ---------------------------------------------------------------------------
+
+  const FIT = { yes: ['good', 'Good for you'], maybe: ['', 'Optional'], no: ['bad', 'Not for you'] };
+  const EVIDENCE = { strong: [3, 'Strong research'], some: [2, 'Some research'], weak: [1, 'Weak research'], none: [0, 'No real proof'] };
+  const SUPP_GROUPS = [['all', 'All'], ['you', 'Good for you'], ['protein', 'Protein'], ['strength', 'Strength & energy'], ['health', 'Health']];
+  const groupOf = (x) => (/protein|calories|amino/i.test(x.kind) ? 'protein' : /strength|energy|weight/i.test(x.kind) ? 'strength' : 'health');
+  const evidenceDots = (e) => `<span class="ev" title="${EVIDENCE[e][1]}">${[1, 2, 3].map((i) => `<i class="${i <= EVIDENCE[e][0] ? 'on' : ''}"></i>`).join('')}<small>${EVIDENCE[e][1]}</small></span>`;
+
+  async function suppsView(params) {
+    const d = await me();
+    const m = d.member;
+    const b = m.body;
+    const days = Object.values(m.workoutPlan?.days || {}).filter((x) => x?.exercises?.length).length || 3;
+    const diet = b ? Nutrition.plan(b, days, Coach.weightTrend(m.weighIns || [], b.goal).kcal || 0, { asian: asianBmi() }) : null;
+    const guide = Supplements.forMember(b, diet);
+    const show = params.get('g') || 'all';
+    const list = Supplements.LIST.filter((x) => show === 'all' || (show === 'you' ? b && guide.advice[x.id].fit === 'yes' : groupOf(x) === show));
+    const e = guide.expect;
+    render(`<div class="page-title"><h1>Supplements</h1><p>What each one does, how to take it, and what it means for you.</p></div>${fitTabs('supps')}<div class="pad" style="margin-top:14px">
+      <div class="card supp-truth"><b>What really builds your body</b>
+        <ol><li><span>1</span>Training hard, 3+ times a week</li><li><span>2</span>Eating your calories and ${e.target} g protein a day</li><li><span>3</span>Sleeping 7-8 hours</li></ol>
+        <p>Supplements add the last few percent, or make the food part easier. None of them builds muscle or burns fat on its own.</p>
+        ${b ? `<div class="supp-expect">${e.fatPerMonth ? `<div><small>Fat off with your diet</small><b>~${e.fatPerMonth} kg</b><span>a month</span></div>` : ''}<div><small>Muscle you can build</small><b>~${e.muscle} kg</b><span>a month${['new', 'lt1', undefined].includes(b.experience) ? ' (first year)' : ''}</span></div><div><small>Visible change</small><b>8-12</b><span>weeks</span></div></div>`
+          : `<a class="btn btn-soft btn-sm" href="#/diet" style="margin-top:10px">Enter your weight to see what fits you</a>`}
+      </div>
+      <div class="chips-row" role="group" aria-label="Show" style="margin:14px 0 4px">${SUPP_GROUPS.filter(([id]) => id !== 'you' || b).map(([id, l]) => `<a class="chip" href="#/supps?g=${id}" aria-pressed="${show === id}">${l}</a>`).join('')}</div>
+      <div class="supp-grid">${list.map((x) => {
+        const a = guide.advice[x.id];
+        return `<button class="card supp-card" data-supp="${x.id}" style="--c:${x.color}"><span class="supp-ico">${icon(x.icon)}</span>
+          <span class="supp-main"><b>${esc(x.name)}</b><small>${esc(x.kind)}${x.serving.protein ? ` · ${x.serving.protein} g protein a scoop` : ''}</small>
+          <span class="supp-when">${icon('clock')}${esc(x.when)}</span>
+          <span class="supp-foot">${b ? `<span class="badge badge-${FIT[a.fit][0] || 'muted'}">${FIT[a.fit][1]}</span>` : ''}${evidenceDots(x.evidence)}</span></span></button>`;
+      }).join('') || '<p class="muted">Nothing here.</p>'}</div>
+      <p class="diet-note">Typical values; brands differ, so check your tub’s label. Buy from an authorised seller: fake supplements are common. Ask a doctor first if you have kidney, liver or heart problems, high blood pressure, take medicine, are pregnant, or are under 18. Steroids and “test boosters” are not supplements: they are risky and the app doesn’t recommend them.</p></div>`);
+    view.querySelectorAll('[data-supp]').forEach((el) => el.addEventListener('click', () => suppSheet(Supplements.byId[el.dataset.supp], guide, Boolean(b))));
+    if (params.get('id') && Supplements.byId[params.get('id')]) suppSheet(Supplements.byId[params.get('id')], guide, Boolean(b));
+  }
+
+  function suppSheet(x, guide, known) {
+    const a = guide.advice[x.id];
+    const s = x.serving;
+    const scoops = x.id === 'whey' || (x.id === 'plant' && a.fit === 'yes') ? guide.expect.scoops : 0;
+    const facts = [['Protein', `${s.protein} g`], ['Calories', `${s.kcal}`], ['Carbs', `${s.carbs} g`], ['Fat', `${s.fat} g`]];
+    sheet({
+      label: x.name,
+      wide: true,
+      html: `<div class="supp-head" style="--c:${x.color}"><span class="supp-ico lg">${icon(x.icon)}</span><div><small>${esc(x.kind)}</small><h3>${esc(x.name)}</h3>${evidenceDots(x.evidence)}</div><button class="icon-btn" data-close aria-label="Close">${icon('x')}</button></div>
+        <p class="supp-what">${esc(x.what)}</p>
+        ${known ? `<div class="supp-for ${a.fit}"><b>${FIT[a.fit][1]}</b><p>${esc(a.text)}</p></div>` : ''}
+        <h4 class="supp-h">In ${esc(s.label)}</h4>
+        <div class="supp-facts">${facts.map(([k, v]) => `<div><b>${v}</b><small>${k}</small></div>`).join('')}</div>
+        ${scoops ? `<p class="supp-note">${scoops} scoop${scoops > 1 ? 's' : ''} a day = <b>${s.protein * scoops} g protein</b> and ${s.kcal * scoops} kcal.</p>` : ''}
+        <h4 class="supp-h">${icon('clock')}How to take it</h4>
+        <p class="supp-p"><b>How much:</b> ${esc(x.dose)}</p><p class="supp-p"><b>When:</b> ${esc(x.timing)}</p>
+        <h4 class="supp-h">${icon('check')}What it does</h4><ul class="supp-list good">${x.benefits.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
+        <h4 class="supp-h">${icon('alert')}Side effects and risks</h4><ul class="supp-list bad">${x.risks.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>
+        <h4 class="supp-h">${icon('trending')}When you’ll see results</h4><p class="supp-p">${esc(x.results)}</p>
+        <h4 class="supp-h">${icon('info')}What research says</h4><p class="supp-p">${esc(x.evidenceText)}</p>
+        <p class="supp-p"><b>Skip it if:</b> ${esc(x.skip)}</p>`,
+    });
   }
 
   // ---- the coach ------------------------------------------------------------------------
@@ -742,6 +806,7 @@
       if (page === 'diet') return await dietView(params);
       if (page === 'coach') return await coachView(params);
       if (page === 'bmi') return await bmiView(params);
+      if (page === 'supps') return await suppsView(params);
       if (page === 'progress') return await progressView(params);
       if (page === 'fees') return await feesView();
       if (page === 'profile') return await profileView();

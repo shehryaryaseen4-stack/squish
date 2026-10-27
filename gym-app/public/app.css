@@ -476,3 +476,53 @@ main.no-tabs { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
 .bmi-live span { font-size: 13.5px; color: var(--ink-3); }
 .goal-hint { margin: 8px 0 0; font-size: 13px; color: var(--warn); font-weight: 650; }
 .note-line.warn { color: var(--warn); }
+
+/* Supplements */
+.fit-tabs a { font-size: 13.5px; gap: 5px; min-width: 0; }
+.supp-truth { padding: 18px; }
+.supp-truth > b { font-size: 16px; }
+.supp-truth ol { list-style: none; padding: 0; margin: 10px 0; display: grid; gap: 6px; font-size: 14px; }
+.supp-truth li { display: flex; align-items: center; gap: 10px; }
+.supp-truth li span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 12px; font-weight: 800; flex: none; }
+.supp-truth p { margin: 0; font-size: 13.5px; color: var(--ink-3); line-height: 1.5; }
+.supp-expect { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 8px; margin-top: 12px; }
+.supp-expect div { display: grid; padding: 10px 12px; border-radius: 14px; background: var(--surface-2); }
+.supp-expect small { font-size: 11.5px; color: var(--ink-3); }
+.supp-expect b { font-size: 18px; }
+.supp-expect span { font-size: 12px; color: var(--ink-3); }
+.supp-grid { display: grid; gap: 10px; margin-top: 10px; }
+@media (min-width: 640px) { .supp-grid { grid-template-columns: 1fr 1fr; } }
+.supp-card { display: flex; gap: 14px; align-items: flex-start; padding: 14px; text-align: left; font: inherit; color: inherit; cursor: pointer; width: 100%; }
+.supp-ico { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; flex: none; background: color-mix(in srgb, var(--c) 16%, transparent); color: var(--c); }
+.supp-ico .ico { width: 26px; height: 26px; }
+.supp-ico.lg { width: 60px; height: 60px; }
+.supp-main { display: grid; gap: 3px; min-width: 0; }
+.supp-main b { font-size: 16px; }
+.supp-main small { font-size: 12.5px; color: var(--ink-3); }
+.supp-when { display: flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 650; color: var(--ink-2); }
+.supp-when .ico { width: 14px; height: 14px; color: var(--c); flex: none; }
+.supp-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
+.ev { display: inline-flex; align-items: center; gap: 3px; }
+.ev i { width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
+.ev i.on { background: var(--good); }
+.ev small { margin-left: 4px; font-size: 11.5px; color: var(--ink-3); }
+.supp-head { display: flex; align-items: center; gap: 14px; margin: -4px 0 12px; }
+.supp-head > div { flex: 1; min-width: 0; }
+.supp-head > div > small { font-size: 12px; font-weight: 700; color: var(--c); text-transform: uppercase; letter-spacing: .06em; }
+.supp-head h3 { margin: 2px 0 4px; font-size: 21px; }
+.supp-what { margin: 0 0 12px; font-size: 14.5px; line-height: 1.5; }
+.supp-for { padding: 12px 14px; border-radius: 14px; background: var(--surface-2); border-left: 4px solid var(--ink-3); }
+.supp-for.yes { background: var(--good-soft); border-color: var(--good); }
+.supp-for.no { background: var(--bad-soft); border-color: var(--bad); }
+.supp-for p { margin: 4px 0 0; font-size: 14px; line-height: 1.45; }
+.supp-h { display: flex; align-items: center; gap: 7px; margin: 18px 0 6px; font-size: 15px; }
+.supp-h .ico { width: 17px; height: 17px; color: var(--accent); }
+.supp-facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.supp-facts div { display: grid; padding: 10px 6px; border-radius: 12px; background: var(--surface-2); text-align: center; }
+.supp-facts b { font-size: 17px; }
+.supp-facts small { font-size: 11.5px; color: var(--ink-3); }
+.supp-note { margin: 8px 0 0; font-size: 13.5px; }
+.supp-p { margin: 4px 0; font-size: 14px; line-height: 1.5; color: var(--ink-2); }
+.supp-list { margin: 0; padding-left: 20px; display: grid; gap: 4px; font-size: 14px; line-height: 1.45; }
+.supp-list.good li::marker { color: var(--good); }
+.supp-list.bad li::marker { color: var(--bad); }
