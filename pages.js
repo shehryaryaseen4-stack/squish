@@ -296,7 +296,7 @@ function megaMenu() {
     `<a class="mega-head" href="/converters">All ${TOTAL_COUNT.toLocaleString('en-US')} conversions &rarr;</a>`]);
   groups.push(['pdf-tools', 'PDF tools', pdfGroups().flatMap(([, items]) => items).map(([href, label]) => ({ id: 'pdf', href, text: esc(label), live: true })),
     '<a class="mega-head" href="/pdf-tools">All PDF tools &rarr;</a>']);
-  groups.push(['apps', 'More tools', MENU_APPS.map((t) => ({ id: APP_ICON[t.app] || 'jpg', href: `/${t.slug}`, text: esc(t.name), live: true })),
+  groups.push(['apps', 'Image &amp; more tools', MENU_APPS.map((t) => ({ id: APP_ICON[t.app] || 'jpg', href: `/${t.slug}`, text: esc(t.name), live: true })),
     '<span class="mega-head">Photo, video, text and document tools</span>']);
   CATS.forEach((c) => {
     const items = registry.getFormatsByCategory(c.id).map((f) => ({ id: f.id, href: formatPath(f.id), live: formatIsLive(f.id) }));
@@ -320,6 +320,10 @@ function topbar(full = false) {
     : `<details class="nav-menu" name="ff-menu" data-menu data-lazy="/menu.html?v=${megaVersion}"><summary class="nav-item">Tools<span class="caret" aria-hidden="true"></span></summary><div class="dropdown mega-wait"><ul><li><a href="/converters">All formats and converters</a></li></ul></div></details>`;
   const compress = ALL_COMPRESSORS.map((c) =>
     `<li><a href="${c.route}">${icon('compress')}Compress ${F(c.from).label}${c.status === 'live' ? '' : ' <span class="soon-tag">soon</span>'}</a></li>`).join('');
+  // Image tools in their own menu: they were only inside Tools > More tools, where people missed them.
+  const imageList = ['/passport-photo-maker', '/crop-image', '/image-resizer', '/remove-background', '/rotate-image', '/flip-image', '/compress-jpg', '/image-to-text', '/favicon-generator']
+    .filter((x) => APP_BY_SLUG.has(x.slice(1)) || x === '/compress-jpg')
+    .map((x) => `<li><a href="${x}">${icon(x === '/compress-jpg' ? 'compress' : 'image')}${esc(x === '/compress-jpg' ? 'Compress Image' : APP_BY_SLUG.get(x.slice(1)).name)}</a></li>`).join('');
   const convertList = CATS.map((c) =>
     `<li><a href="${categoryPath(c.id)}">${icon(c.icon)}${c.converterName}${categoryIsLive(c.id) ? '' : ' <span class="soon-tag">soon</span>'}</a></li>`).join('');
 
@@ -330,6 +334,7 @@ function topbar(full = false) {
       <details class="nav-menu nav-simple" name="ff-menu" data-menu><summary class="nav-item">Convert<span class="caret" aria-hidden="true"></span></summary><div class="dropdown"><ul>${convertList}</ul></div></details>
       <details class="nav-menu nav-simple" name="ff-menu" data-menu><summary class="nav-item">Compress<span class="caret" aria-hidden="true"></span></summary><div class="dropdown"><ul>${compress}</ul></div></details>
       <details class="nav-menu nav-simple nav-pdf" name="ff-menu" data-menu><summary class="nav-item">PDF Tools<span class="caret" aria-hidden="true"></span></summary>${pdfMenu()}</details>
+      <details class="nav-menu nav-simple" name="ff-menu" data-menu><summary class="nav-item">Image Tools<span class="caret" aria-hidden="true"></span></summary><div class="dropdown"><ul>${imageList}</ul></div></details>
       ${PDF_EDITOR ? '<a class="nav-item nav-link nav-resume" href="/resume-maker">Resume<span class="nav-long">&nbsp;Builder</span></a>' : ''}
     </nav>
     <div class="top-actions">${PDF_EDITOR ? `
