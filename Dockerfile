@@ -7,6 +7,8 @@ FROM node:20-bookworm-slim AS node
 
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
+# UTF-8 file names everywhere (archives, office files, ebooks with accented or non-Latin names)
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # audio + video
     ffmpeg \

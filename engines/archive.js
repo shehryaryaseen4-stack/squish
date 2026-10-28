@@ -18,6 +18,11 @@ const { job, run, listFiles, UserError } = require('./cli');
 
 const has = (bin) => (process.env.PATH || '').split(':').some((d) => { try { fsSync.accessSync(path.join(d, bin), fsSync.constants.X_OK); return true; } catch { return false; } });
 const UNAR = has('unar') && has('lsar');
+const SEVEN_ZIP = has('7z');
+// File names inside archives are usually UTF-8 (Windows names with é, ü, Urdu or Chinese
+// letters). Under the C locale of a bare container bsdtar refuses such names ("Pathname cannot be
+// converted"), so every archive tool runs with a UTF-8 locale.
+const UTF8 = { env: { LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8' } };
 const UNAR_FALLBACK = new Set(['rar', 'cab']);
 
 const MAX_EXTRACT = Math.max(1, Number(process.env.MAX_EXTRACT_MB || 500)) * 1024 * 1024;
@@ -70,7 +75,7 @@ function pipeThrough(cmd, args, inFile, outFile, cap) {
 }
 
 async function listedSize(cmd, args) {
-  const { stdout } = await run(cmd, args);
+  const { stdout } = await run(cmd, args, UTF8);
   const text = stdout.toString();
   if (cmd === '7z') return [...text.matchAll(/^Size = (\d+)/gm)].reduce((s, m) => s + Number(m[1]), 0);
   if (cmd === 'lsar') return [...text.matchAll(/"XADFileSize":\s*(\d+)/g)].reduce((s, m) => s + Number(m[1]), 0);
@@ -92,6 +97,24 @@ async function removeEscapes(root) {
   await walk(root);
 }
 
+// Old Windows ZIPs store names in a legacy code page, not UTF-8. Unpacked, such names are not
+// valid UTF-8 and cannot be packed again, so they are renamed (read as Windows-1252).
+const validUtf8 = (b) => { try { new TextDecoder('utf-8', { fatal: true }).decode(b); return true; } catch { return false; } };
+async function fixNames(dir) {
+  for (const name of await fs.readdir(dir, { encoding: 'buffer' })) {
+    let full = path.join(dir, name.toString());
+    if (!validUtf8(name)) {
+      const raw = Buffer.concat([Buffer.from(dir + path.sep), name]);
+      const base = new TextDecoder('windows-1252').decode(name).replace(/[/\0]/g, '_') || 'file';
+      let fixed = path.join(dir, base);
+      for (let n = 2; fsSync.existsSync(fixed); n++) fixed = path.join(dir, `${n}-${base}`);
+      await fs.rename(raw, fixed);
+      full = fixed;
+    }
+    if ((await fs.lstat(full)).isDirectory()) await fixNames(full);
+  }
+}
+
 // "report.pdf.gz" -> "report.pdf"; anything unusable -> "file"
 const innerName = (filename) => String(filename || '').replace(/\.[^.]+$/, '').replace(/[^\w.-]+/g, '_').replace(/^\.+/, '').slice(0, 120) || 'file';
 
@@ -107,17 +130,25 @@ async function unpack(dir, input, fromId, filename) {
     const mid = path.join(dir, 'mid');
     await fs.mkdir(mid);
     if (await listedSize('7z', ['l', '-slt', input]) > MAX_EXTRACT) throw TOO_BIG();
-    await run('7z', ['x', '-y', '-bd', `-o${mid}`, input]);
+    await run('7z', ['x', '-y', '-bd', `-o${mid}`, input], UTF8);
     const [tarFile] = await listFiles(mid);
     if (!tarFile) throw new UserError('This archive is empty.');
     return unpackWith(dir, x, tarFile, false);
   }
+  const final = (e) => e.statusCode === 413 || /password/.test(e.userMessage || '');
+  const fresh = async () => { await fs.rm(x, { recursive: true, force: true }); await fs.mkdir(x); };
   try {
     return await unpackWith(dir, x, input, SEVEN_ZIP_IN.has(fromId));
   } catch (e) {
-    if (!UNAR || !UNAR_FALLBACK.has(fromId) || e.statusCode === 413 || /password/.test(e.userMessage || '')) throw e;
-    await fs.rm(x, { recursive: true, force: true });
-    await fs.mkdir(x);
+    if (final(e)) throw e;
+    // a second opinion: 7-Zip reads ZIP variants libarchive does not (Deflate64 from Windows,
+    // odd headers), then unar for old RAR and CAB
+    if (SEVEN_ZIP && !SEVEN_ZIP_IN.has(fromId)) {
+      await fresh();
+      try { return await unpackWith(dir, x, input, true); } catch (e2) { if (final(e2)) throw e2; }
+    }
+    if (!UNAR || !UNAR_FALLBACK.has(fromId)) throw e;
+    await fresh();
     return unpackWithUnar(x, input);
   }
 }
@@ -125,13 +156,14 @@ async function unpack(dir, input, fromId, filename) {
 async function unpackWithUnar(x, input) {
   try {
     if (await listedSize('lsar', ['-j', input]) > MAX_EXTRACT) throw TOO_BIG();
-    await run('unar', ['-q', '-f', '-D', '-p', '', '-o', x, input]);
+    await run('unar', ['-q', '-f', '-D', '-p', '', '-o', x, input], UTF8);
   } catch (e) {
     if (e.userMessage) throw e;
     if (/passw|encrypt/i.test(`${e.stderr || ''}${e.stdout || ''}`)) throw new UserError('This archive is password-protected.');
     throw new UserError('This archive could not be read. It may be damaged or use an unsupported variant.', 415);
   }
   await removeEscapes(x);
+  await fixNames(x);
   return x;
 }
 
@@ -139,10 +171,10 @@ async function unpackWith(dir, x, input, use7z) {
   try {
     if (use7z) {
       if (await listedSize('7z', ['l', '-slt', input]) > MAX_EXTRACT) throw TOO_BIG();
-      await run('7z', ['x', '-y', '-bd', '-snl-', `-o${x}`, input]);
+      await run('7z', ['x', '-y', '-bd', '-snl-', `-o${x}`, input], UTF8);
     } else {
       if (await listedSize('bsdtar', ['-tvf', input]) > MAX_EXTRACT) throw TOO_BIG();
-      await run('bsdtar', ['-xf', input, '-C', x, '--no-same-owner', '--no-same-permissions']);
+      await run('bsdtar', ['-xf', input, '-C', x, '--no-same-owner', '--no-same-permissions'], UTF8);
     }
   } catch (e) {
     if (e.userMessage) throw e;
@@ -150,6 +182,7 @@ async function unpackWith(dir, x, input, use7z) {
     throw new UserError('This archive could not be read. It may be damaged or use an unsupported variant.', 415);
   }
   await removeEscapes(x);
+  await fixNames(x);
   return x;
 }
 
@@ -170,10 +203,10 @@ async function convertArchive({ buffer, from, to, filename }) {
       await pipeThrough(cmd, cArgs, files[0], output, Number.MAX_SAFE_INTEGER);
     } else if (to.id === 'tar-7z') {
       const tarFile = path.join(dir, 'bundle.tar');
-      await run('bsdtar', ['--format', 'pax', '-cf', tarFile, '-C', x, ...(await fs.readdir(x))]);
-      await run('7z', ['a', '-t7z', '-bd', output, tarFile]);
+      await run('bsdtar', ['--format', 'pax', '-cf', tarFile, '-C', x, ...(await fs.readdir(x))], UTF8);
+      await run('7z', ['a', '-t7z', '-bd', output, tarFile], UTF8);
     } else if (PACK[to.id]) {
-      await run('bsdtar', [...PACK[to.id], '-cf', output, '-C', x, ...(await fs.readdir(x))]);
+      await run('bsdtar', [...PACK[to.id], '-cf', output, '-C', x, ...(await fs.readdir(x))], UTF8);
     } else {
       throw new UserError(`Creating ${to.label} archives is not supported.`);
     }

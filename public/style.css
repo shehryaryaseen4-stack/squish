@@ -466,7 +466,7 @@ input[type=range]{width:150px; accent-color:var(--brand);}
 .done-check{display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; background:#1E9E5A; color:#fff; font-size:.75rem;}
 .bar-actions{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
 .btn-convert{padding:11px 22px; font-size:1rem;}
-.btn-convert[hidden], #zipBtn[hidden]{display:none;}
+.btn-convert[hidden], #zipBtn[hidden], #shrinkBtn[hidden]{display:none;}
 #zipBtn{padding:11px 20px; font-size:1rem;}
 @media (max-width:760px){
   .file-convert{width:100%;}
