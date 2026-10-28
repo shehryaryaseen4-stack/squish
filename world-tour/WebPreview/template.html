@@ -1,0 +1,1143 @@
+<title>World Tour</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: full-bleed game canvas with airport-wayfinding overlays (amber signage on night-sky navy). Single dark look by design. */
+:root {
+  --ink: #0d1624;
+  --panel: rgba(16, 27, 43, 0.93);
+  --line: #2a3d57;
+  --text: #e9eef5;
+  --muted: #9fb0c6;
+  --sign: #f2c230;
+  --go: #63d98a;
+  --stop: #ff8a7a;
+  --sky: #3fa7e8;
+  --display: "Big Shoulders Display", "Arial Narrow", Impact, sans-serif;
+  --body: "Atkinson Hyperlegible", "Segoe UI", Roboto, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; overflow: hidden; }
+[hidden] { display: none !important; }
+body { background: var(--ink); color: var(--text); font: 15px/1.45 var(--body); }
+#app { position: fixed; inset: 0; }
+#map, #three { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; }
+#three canvas { display: block; touch-action: none; }
+#ui { position: absolute; inset: 0; pointer-events: none;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: max(10px, env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-bottom, 0px)); }
+#ui > section { position: absolute; inset: inherit; padding: inherit; inset: 0; pointer-events: none; }
+.p { pointer-events: auto; }
+button { font: 700 15px var(--body); color: var(--ink); background: var(--sign); border: 0; border-radius: 6px; padding: 9px 14px; cursor: pointer; min-height: 40px; }
+button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+button:disabled { background: #3a4659; color: #8593a6; cursor: not-allowed; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--sky); outline-offset: 2px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; backdrop-filter: blur(4px); }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.coins { font: 500 18px var(--mono); color: var(--sign); white-space: nowrap; }
+h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; letter-spacing: 0.01em; }
+.eyebrow { font: 700 11px var(--body); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+
+/* top bar */
+.bar { position: absolute; top: max(10px, env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 8px 12px; }
+.bar .where { flex: 1 1 180px; min-width: 0; }
+.bar h2 { font-size: 24px; line-height: 1; }
+.bar .acts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.bar .acts button { min-height: 36px; padding: 6px 12px; }
+
+/* menu */
+#menu { display: grid; place-items: center; background: radial-gradient(ellipse at 50% 40%, rgba(13,22,36,0.35), rgba(13,22,36,0.9)); }
+.menu-card { width: min(440px, 100%); padding: 28px 28px 22px; display: grid; gap: 12px; }
+.menu-card h1 { font-size: clamp(54px, 13vw, 84px); line-height: 0.85; font-weight: 800; color: var(--sign); text-transform: uppercase; }
+.board { display: grid; grid-template-columns: auto 1fr auto; gap: 2px 12px; font: 500 13px var(--mono); background: #0a111c; border-radius: 6px; padding: 10px 12px; margin-block: 4px; }
+.board span:nth-child(3n) { color: var(--sign); text-align: right; }
+.menu-card button { min-height: 50px; font-size: 17px; }
+.note { font-size: 12px; color: var(--muted); }
+
+/* map overlays */
+#search { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); top: 96px; width: min(340px, calc(100% - 32px)); max-height: calc(100% - 210px); display: flex; flex-direction: column; padding: 10px; gap: 8px; }
+#search input { font: 16px var(--body); padding: 10px; border-radius: 6px; border: 1px solid var(--line); background: #0a111c; color: var(--text); }
+#results { overflow: auto; display: grid; gap: 6px; }
+#results button { text-align: left; background: #1c2c44; color: var(--text); font-weight: 400; }
+#results button b { color: var(--text); }
+#info { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); top: 96px; bottom: 16px; width: min(380px, calc(100% - 32px)); overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+#info h2 { font-size: 34px; line-height: 1; }
+.status { display: inline-flex; align-items: center; gap: 6px; font: 700 12px var(--body); letter-spacing: 0.06em; text-transform: uppercase; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+.ticket { border: 1px dashed var(--line); border-radius: 8px; padding: 12px; display: grid; gap: 6px; background: #0b1420; }
+.ticket .route { font: 500 22px var(--mono); letter-spacing: 0.04em; }
+.short { color: var(--stop); font-weight: 700; }
+ul.tips { margin: 0; padding-left: 18px; color: var(--muted); }
+#legend { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); padding: 10px 12px; display: grid; gap: 4px; font-size: 13px; }
+#legend div { display: flex; align-items: center; gap: 8px; }
+.modal { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(5, 9, 15, 0.65); padding: 16px; }
+.modal .panel { width: min(460px, 100%); padding: 20px; display: grid; gap: 12px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* flight */
+#flightPanel { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(14px, env(safe-area-inset-bottom, 0px)); width: min(620px, calc(100% - 32px)); padding: 14px 16px; display: grid; grid-template-columns: 1fr auto; gap: 8px 14px; align-items: center; }
+#flightPanel h3 { font-size: 28px; color: var(--sign); }
+.progress { height: 10px; background: #253650; border-radius: 5px; overflow: hidden; }
+.progress i { display: block; height: 100%; width: 0; background: var(--sign); }
+
+/* arrival */
+#arrival { display: grid; place-items: center; background: rgba(13, 22, 36, 0.8); }
+#arrival .panel { width: min(520px, 100%); padding: 24px; display: grid; gap: 12px; }
+#arrival h1 { font-size: clamp(40px, 9vw, 60px); line-height: 0.95; }
+.reward { color: var(--go); font-weight: 700; }
+
+/* explore hud */
+#objectives { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); top: 96px; padding: 10px 12px; width: min(290px, calc(100% - 32px)); font-size: 14px; display: grid; gap: 3px; }
+#objectives .done { color: var(--go); }
+#navbar { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(14px, env(safe-area-inset-bottom, 0px)); padding: 8px 14px; display: flex; gap: 10px; align-items: center; max-width: calc(100% - 32px); font-size: 14px; }
+#arrow { width: 22px; height: 22px; flex: none; color: var(--sign); }
+#interact { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); bottom: 70px; width: min(380px, calc(100% - 32px)); padding: 14px; display: grid; gap: 8px; }
+#interact h3 { font-size: 26px; }
+#stick { position: absolute; left: max(24px, calc(env(safe-area-inset-left, 0px) + 16px)); bottom: max(70px, calc(env(safe-area-inset-bottom, 0px) + 60px)); width: 130px; height: 130px; border-radius: 50%; background: rgba(255,255,255,0.12); border: 2px solid rgba(255,255,255,0.25); touch-action: none; }
+#knob { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px; border-radius: 50%; background: rgba(255,255,255,0.55); }
+#help { position: absolute; left: 50%; top: 96px; transform: translateX(-50%); padding: 8px 14px; font-size: 13px; text-align: center; width: min(560px, calc(100% - 32px)); }
+
+/* pause & profile */
+#pause, #profile { display: grid; place-items: center; background: rgba(5, 9, 15, 0.6); }
+#pause .panel { width: min(380px, 100%); padding: 22px; display: grid; gap: 10px; }
+#pause h1 { font-size: 44px; text-align: center; }
+#profile .panel { width: min(720px, 100%); max-height: 100%; overflow: auto; padding: 20px; display: grid; gap: 10px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.stats div { background: #0b1420; border-radius: 6px; padding: 8px 10px; }
+.stats b { display: block; font: 500 20px var(--mono); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+td { padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+td.amt { font-family: var(--mono); text-align: right; white-space: nowrap; }
+.tablewrap { overflow-x: auto; }
+
+#toasts { position: absolute; left: 50%; transform: translateX(-50%); top: 84px; display: grid; gap: 6px; width: min(520px, calc(100% - 32px)); z-index: 5; }
+.toast { background: rgba(5,9,15,0.88); border-left: 4px solid var(--sign); padding: 9px 12px; border-radius: 4px; font-weight: 700; }
+.toast.good { border-color: var(--go); } .toast.bad { border-color: var(--stop); }
+#boot { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); }
+
+@media (max-width: 640px) {
+  #info { top: auto; bottom: 0; left: 0; right: 0; width: auto; max-height: 58%; border-radius: 12px 12px 0 0;
+    padding-bottom: max(16px, env(safe-area-inset-bottom, 0px)); padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  #legend { display: none; }
+  #objectives { top: auto; bottom: 210px; font-size: 12px; width: 200px; padding: 8px 10px; }
+  #objectives h3 { font-size: 16px !important; }
+  #interact { bottom: 60px; }
+  .bar h2 { font-size: 20px; }
+  #help { top: 110px; }
+  #toasts { top: 140px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div id="app">
+  <canvas id="map" aria-label="World map"></canvas>
+  <div id="three" hidden></div>
+  <div id="boot">Loading World Tour…</div>
+  <div id="ui">
+    <section id="menu" hidden>
+      <div class="menu-card panel p">
+        <div class="eyebrow">Open-world travel simulator · browser preview</div>
+        <h1>World<br>Tour</h1>
+        <div class="board" aria-label="Departures">
+          <span>LHE</span><span>Lahore</span><span>3D</span>
+          <span>CDG</span><span>Paris</span><span>map</span>
+          <span>HND</span><span>Tokyo</span><span>map</span>
+        </div>
+        <button id="btnContinue">Continue</button>
+        <button id="btnNew" class="ghost">New game</button>
+        <p class="note">A web preview of the Unity prototype, using the same game data. Progress is saved in this browser only. Map data: Natural Earth (public domain). Fares are fictional game coins.</p>
+      </div>
+    </section>
+
+    <section id="mapui" hidden>
+      <div class="bar panel p">
+        <div class="where"><h2>World map</h2><div class="muted" id="mapWhere"></div></div>
+        <div class="acts">
+          <span class="coins" id="mapCoins"></span>
+          <button id="btnBackCity" hidden>Back to city</button>
+          <button class="ghost" id="btnZoomIn" aria-label="Zoom in">+</button>
+          <button class="ghost" id="btnZoomOut" aria-label="Zoom out">−</button>
+          <button class="ghost" id="btnSearch">Search</button>
+          <button class="ghost" id="btnProfile">Profile</button>
+          <button class="ghost" id="btnMenu">Menu</button>
+        </div>
+      </div>
+      <div id="search" class="panel p" hidden>
+        <input id="q" type="search" placeholder="City, country, airport or landmark" autocomplete="off" aria-label="Search destinations">
+        <div id="results"></div>
+      </div>
+      <div id="info" class="panel p" hidden></div>
+      <div id="legend" class="panel p">
+        <div><span class="dot" style="background:var(--sign)"></span>You are here</div>
+        <div><span class="dot" style="background:var(--go)"></span>Explorable 3D destination</div>
+        <div><span class="dot" style="background:#b9c2cf"></span>Map only (3D not built yet)</div>
+        <div class="muted">Zoom in for airports and sights · tap a country for info</div>
+      </div>
+      <div id="confirm" class="modal p" hidden></div>
+    </section>
+
+    <section id="flightui" hidden>
+      <div class="bar panel p"><div class="where"><h2 id="flightTitle"></h2><div class="muted" id="flightSub"></div></div></div>
+      <div id="flightPanel" class="panel p">
+        <div><h3 id="phaseTitle"></h3><div id="phaseText"></div></div>
+        <button id="btnSkip">Skip</button>
+        <div class="progress" style="grid-column:1/-1"><i id="flightBar"></i></div>
+      </div>
+    </section>
+
+    <section id="arrival" hidden><div class="panel p" id="arrivalCard"></div></section>
+
+    <section id="explore" hidden>
+      <div class="bar panel p">
+        <div class="where"><h2 id="cityName"></h2><div class="muted" id="citySub"></div></div>
+        <div class="acts"><span class="coins" id="cityCoins"></span><button class="ghost" id="btnCityMap">World map</button><button class="ghost" id="btnCityMenu">Menu</button></div>
+      </div>
+      <div id="objectives" class="panel p"></div>
+      <div id="help" class="panel"></div>
+      <div id="interact" class="panel p" hidden></div>
+      <div id="navbar" class="panel"><svg id="arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 20 20 12 15 4 20Z" fill="currentColor"/></svg><span id="navText"></span></div>
+      <div id="stick" class="p" aria-label="Movement joystick"><div id="knob"></div></div>
+    </section>
+
+    <section id="pause" hidden>
+      <div class="panel p">
+        <h1>Paused</h1>
+        <button id="pResume">Resume</button>
+        <button class="ghost" id="pSave">Save game</button>
+        <button class="ghost" id="pMap">World map</button>
+        <button class="ghost" id="pProfile">Profile &amp; spending</button>
+        <button class="ghost" id="pMain">Save &amp; main menu</button>
+        <button class="ghost" id="pReset">Reset progress</button>
+      </div>
+    </section>
+
+    <section id="profile" hidden><div class="panel p" id="profileCard"></div></section>
+    <div id="toasts"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+const DATA = /*__DATA__*/null;
+
+// ================= core rules (mirror of Scripts/Core) =================
+const E = DATA.economy;
+const countryById = new Map(DATA.countries.countries.map(c => [c.id, c]));
+const airportBy = new Map(DATA.airports.airports.map(a => [a.code, a]));
+const destBy = new Map(DATA.destinations.destinations.map(d => [d.id, d]));
+const DESTS = DATA.destinations.destinations;
+for (const c of DATA.countries.countries) {
+  c.minLon = 180; c.maxLon = -180; c.minLat = 90; c.maxLat = -90;
+  for (const r of c.rings) for (let i = 0; i < r.length; i += 2) {
+    c.minLon = Math.min(c.minLon, r[i]); c.maxLon = Math.max(c.maxLon, r[i]);
+    c.minLat = Math.min(c.minLat, r[i + 1]); c.maxLat = Math.max(c.maxLat, r[i + 1]);
+  }
+}
+const explorable = d => d.detail === "explorable" && !!d.environment;
+const countryName = id => countryById.get(id)?.name ?? id;
+const rad = d => d * Math.PI / 180;
+function distKm(la1, lo1, la2, lo2) {
+  const a = Math.sin(rad(la2 - la1) / 2) ** 2 + Math.cos(rad(la1)) * Math.cos(rad(la2)) * Math.sin(rad(lo2 - lo1) / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+function interp(la1, lo1, la2, lo2, t) {
+  const p1 = rad(la1), l1 = rad(lo1), p2 = rad(la2), l2 = rad(lo2);
+  const d = distKm(la1, lo1, la2, lo2) / 6371;
+  if (d < 1e-9) return [la1, lo1];
+  const a = Math.sin((1 - t) * d) / Math.sin(d), b = Math.sin(t * d) / Math.sin(d);
+  const x = a * Math.cos(p1) * Math.cos(l1) + b * Math.cos(p2) * Math.cos(l2);
+  const y = a * Math.cos(p1) * Math.sin(l1) + b * Math.cos(p2) * Math.sin(l2);
+  const z = a * Math.sin(p1) + b * Math.sin(p2);
+  return [Math.atan2(z, Math.hypot(x, y)) * 180 / Math.PI, Math.atan2(y, x) * 180 / Math.PI];
+}
+function hasRoute(a, b) {
+  if (!a || !b || a.code === b.code) return false;
+  if (a.type === "regional" || b.type === "regional") return a.country === b.country && !(a.type === "regional" && b.type === "regional");
+  return true;
+}
+function fare(a, b, km) {
+  const f = E.flight;
+  let v = f.baseFare + f.perKm * km;
+  if (a.country !== b.country) v += f.internationalSurcharge;
+  if (a.type === "regional" || b.type === "regional") v += f.regionalSurcharge;
+  return Math.round(Math.max(f.minimumFare, v));
+}
+
+let P = null; // player profile
+const SAVE_KEY = "worldtour_save_v1";
+function newProfile() {
+  return { coins: E.startingCoins, current: E.startingDestination, visitedD: [E.startingDestination], visitedL: [], history: [], flights: 0, spent: 0, earned: 0, ticket: null };
+}
+function record(amount, cat, desc) {
+  P.history.push({ t: Date.now(), a: amount, c: cat, d: desc, b: P.coins });
+  if (P.history.length > 200) P.history.shift();
+}
+function spend(n, cat, desc) { if (n > P.coins) return false; P.coins -= n; P.spent += n; record(-n, cat, desc); return true; }
+function earn(n, cat, desc) { P.coins += n; P.earned += n; record(n, cat, desc); }
+const current = () => destBy.get(P.current);
+
+function quote(toId) {
+  const from = current(), to = destBy.get(toId);
+  const fa = airportBy.get(from.airport), ta = airportBy.get(to.airport);
+  const km = distKm(fa.lat, fa.lon, ta.lat, ta.lon);
+  const q = { from, to, fa, ta, km, price: fare(fa, ta, km), intl: fa.country !== ta.country, reason: null };
+  if (to.id === from.id) q.reason = "You are already here.";
+  else if (fa.code === ta.code) q.reason = "Same airport. Ground travel is not built yet.";
+  else if (!hasRoute(fa, ta)) q.reason = `No direct route ${fa.code}–${ta.code}. Regional airports only connect to domestic hubs.`;
+  else if (!explorable(to)) q.reason = "The 3D area for this destination has not been built yet.";
+  q.available = !q.reason;
+  q.shortfall = Math.max(0, q.price - P.coins);
+  q.canBook = q.available && q.shortfall === 0;
+  return q;
+}
+function book(toId) {
+  if (P.ticket) return { ok: false, msg: "You already have a flight in progress." };
+  const q = quote(toId);
+  if (!q.available) return { ok: false, msg: q.reason };
+  if (q.shortfall) return { ok: false, msg: `Not enough coins: you need ${q.shortfall} more.` };
+  spend(q.price, "Flight", `Flight ${q.fa.code} → ${q.ta.code} (${q.to.name})`);
+  P.ticket = { ref: "WT" + Math.floor(100000 + Math.random() * 900000), from: q.from.id, to: q.to.id, fa: q.fa.code, ta: q.ta.code, price: q.price, km: q.km };
+  return { ok: true, ticket: P.ticket };
+}
+function completeFlight() {
+  const t = P.ticket, d = destBy.get(t.to);
+  P.ticket = null; P.current = d.id; P.flights++;
+  const first = !P.visitedD.includes(d.id);
+  let reward = 0;
+  if (first) { P.visitedD.push(d.id); reward = E.rewards.firstVisit; earn(reward, "Reward", "First visit: " + d.name); }
+  return { d, first, reward };
+}
+function earnTips() {
+  const out = [], here = current();
+  if (here.environment) for (const l of here.environment.landmarks) if (!P.visitedL.includes(l.id)) out.push(`Visit ${l.name} in ${here.name} (+${E.rewards.landmarkVisit})`);
+  for (const d of DESTS) if (explorable(d) && !P.visitedD.includes(d.id)) out.push(`First visit to ${d.name} (+${E.rewards.firstVisit})`);
+  if (!out.length) out.push("More ways to earn (daily challenges, missions) come in a later update.");
+  return out;
+}
+function save(announce) {
+  if (!P) return;
+  let ok = true;
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(P)); } catch (e) { ok = false; }
+  if (announce) toast(ok ? "Game saved in this browser." : "This browser blocked saving.", ok ? "good" : "bad");
+}
+function loadSave() {
+  try { const s = localStorage.getItem(SAVE_KEY); if (!s) return null; const p = JSON.parse(s); if (!destBy.has(p.current)) p.current = E.startingDestination; return p; } catch (e) { return null; }
+}
+function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
+
+function search(q) {
+  q = q.trim().toLowerCase();
+  if (!q) return DESTS.slice();
+  const scored = [];
+  for (const d of DESTS) {
+    let best = 0;
+    const consider = (txt, w) => { if (!txt) return; const t = txt.toLowerCase(), i = t.indexOf(q); if (i < 0) return; best = Math.max(best, w + (i === 0 ? 50 : 0) + (t.length === q.length ? 50 : 0)); };
+    consider(d.name, 300); consider(countryName(d.country), 200); consider(d.airport, 180); consider(airportBy.get(d.airport)?.name, 120);
+    for (const p of d.pois) consider(p.name, 100);
+    if (best) scored.push([best, d]);
+  }
+  return scored.sort((a, b) => b[0] - a[0] || a[1].name.localeCompare(b[1].name)).map(s => s[1]);
+}
+function countryAt(lat, lon) {
+  for (const c of DATA.countries.countries) {
+    if (lat < c.minLat || lat > c.maxLat || lon < c.minLon || lon > c.maxLon) continue;
+    let inside = false;
+    for (const r of c.rings) {
+      const n = r.length / 2;
+      for (let i = 0, j = n - 1; i < n; j = i++) {
+        const yi = r[i * 2 + 1], yj = r[j * 2 + 1];
+        if ((yi > lat) !== (yj > lat) && lon < (r[j * 2] - r[i * 2]) * (lat - yi) / (yj - yi) + r[i * 2]) inside = !inside;
+      }
+    }
+    if (inside) return c;
+  }
+  return null;
+}
+
+// ================= ui helpers =================
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmt = n => Math.round(n).toLocaleString("en-US");
+const coins = n => fmt(n) + " c";
+function toast(text, kind) {
+  const el = document.createElement("div");
+  el.className = "toast " + (kind || "");
+  el.textContent = text;
+  $("toasts").appendChild(el);
+  while ($("toasts").children.length > 3) $("toasts").firstChild.remove();
+  setTimeout(() => el.remove(), 3600);
+}
+const SECTIONS = ["menu", "mapui", "flightui", "arrival", "explore", "pause", "profile"];
+let screen = "menu";
+function show(s) {
+  screen = s;
+  for (const id of SECTIONS) $(id).hidden = id !== s;
+  if (s === "pause" || s === "profile") $("explore").hidden = true;
+  const in3D = !!city && (s === "explore" || ((s === "pause" || s === "profile") && city));
+  $("three").hidden = !in3D;
+  $("map").style.visibility = in3D ? "hidden" : "visible";
+  keys.clear(); stick.x = stick.y = 0;
+  mapDirty = true;
+  refreshCoins();
+}
+function refreshCoins() {
+  if (!P) return;
+  $("mapCoins").textContent = coins(P.coins);
+  $("cityCoins").textContent = coins(P.coins);
+}
+
+// ================= world map =================
+const mapCanvas = $("map"), mctx = mapCanvas.getContext("2d");
+let W = 1, H = 1, DPR = 1, mapDirty = true;
+const vp = { zoom: 1, cu: 0.5, cv: 0.5 };
+const CONT = { "Asia": [196,178,128], "Europe": [160,186,140], "Africa": [206,160,112], "North America": [150,176,120], "South America": [130,170,110], "Oceania": [196,150,120], "Antarctica": [226,232,236] };
+const featured = new Set(DESTS.map(d => d.country));
+const paths = DATA.countries.countries.map(c => {
+  const p = new Path2D();
+  for (const r of c.rings) { for (let i = 0; i < r.length; i += 2) { const x = r[i] + 180, y = 90 - r[i + 1]; i ? p.lineTo(x, y) : p.moveTo(x, y); } p.closePath(); }
+  let h = 17; for (const ch of c.id || "") h = (h * 31 + ch.charCodeAt(0)) | 0;
+  const delta = (h & 31) - 16, base = CONT[c.continent] || [180,170,140], f = featured.has(c.id);
+  const col = base.map(v => { v += delta; if (f) v += (255 - v) / 3; return Math.max(0, Math.min(255, v)); });
+  if (f) col[2] = Math.max(0, col[2] - 40);
+  return { c, p, fill: `rgb(${col.map(Math.round).join(",")})` };
+});
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  mapCanvas.width = Math.round(W * DPR); mapCanvas.height = Math.round(H * DPR);
+  clampVp(); mapDirty = true;
+  if (renderer) { renderer.setSize(W, H); camera.aspect = W / H; camera.updateProjectionMatrix(); }
+}
+const mapW = () => Math.max(W, H * 2) * vp.zoom;
+function clampVp() {
+  const hu = W / mapW() / 2, hv = H / (mapW() / 2) / 2;
+  vp.cu = hu >= 0.5 ? 0.5 : Math.max(hu, Math.min(1 - hu, vp.cu));
+  vp.cv = hv >= 0.5 ? 0.5 : Math.max(hv, Math.min(1 - hv, vp.cv));
+}
+function toScreen(lat, lon) { const mw = mapW(); return [W / 2 + ((lon + 180) / 360 - vp.cu) * mw, H / 2 + ((90 - lat) / 180 - vp.cv) * mw / 2]; }
+function toLatLon(x, y) { const mw = mapW(); const u = vp.cu + (x - W / 2) / mw, v = vp.cv + (y - H / 2) / (mw / 2); return [90 - v * 180, u * 360 - 180]; }
+function zoomAt(x, y, f) {
+  const [lat, lon] = toLatLon(x, y);
+  vp.zoom = Math.max(1, Math.min(40, vp.zoom * f));
+  const mw = mapW();
+  vp.cu = (lon + 180) / 360 - (x - W / 2) / mw; vp.cv = (90 - lat) / 180 - (y - H / 2) / (mw / 2);
+  clampVp(); mapDirty = true;
+}
+function centerOn(lat, lon, zoom) { vp.zoom = Math.max(1, Math.min(40, zoom)); vp.cu = (lon + 180) / 360; vp.cv = (90 - lat) / 180; clampVp(); mapDirty = true; }
+
+let selected = null, selectedCountry = null;
+function markerColor(d) { return P && d.id === P.current ? "#f2c230" : explorable(d) ? "#63d98a" : "#b9c2cf"; }
+function label(text, x, y, font, color, align) {
+  mctx.font = font; mctx.textAlign = align || "left"; mctx.textBaseline = "middle";
+  mctx.lineWidth = 3; mctx.strokeStyle = "rgba(5,9,15,0.85)"; mctx.strokeText(text, x, y);
+  mctx.fillStyle = color; mctx.fillText(text, x, y);
+}
+function circle(x, y, r, fill, stroke) {
+  mctx.beginPath(); mctx.arc(x, y, r, 0, Math.PI * 2); mctx.fillStyle = fill; mctx.fill();
+  if (stroke) { mctx.lineWidth = 2; mctx.strokeStyle = stroke; mctx.stroke(); }
+}
+function drawMap(route) {
+  const mw = mapW(), k = mw / 360;
+  mctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  mctx.fillStyle = "#224a70"; mctx.fillRect(0, 0, W, H);
+  mctx.setTransform(DPR * k, 0, 0, DPR * k, DPR * (W / 2 - vp.cu * mw), DPR * (H / 2 - vp.cv * mw / 2));
+  mctx.lineWidth = 1 / k; mctx.strokeStyle = "rgba(255,255,255,0.08)";
+  mctx.beginPath();
+  for (let lon = 0; lon <= 360; lon += 30) { mctx.moveTo(lon, 0); mctx.lineTo(lon, 180); }
+  for (let lat = 30; lat < 180; lat += 30) { mctx.moveTo(0, lat); mctx.lineTo(360, lat); }
+  mctx.stroke();
+  mctx.strokeStyle = "rgba(30,30,28,0.75)"; mctx.lineWidth = 0.9 / k;
+  for (const p of paths) { mctx.fillStyle = selectedCountry === p.c ? "#f5df8e" : p.fill; mctx.fill(p.p, "evenodd"); mctx.stroke(p.p); }
+  mctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+  const font = "600 12px 'Atkinson Hyperlegible', sans-serif";
+  mctx.font = font;
+  for (const c of DATA.countries.countries) {
+    const a = toScreen(c.maxLat, c.minLon), b = toScreen(c.minLat, c.maxLon);
+    const tw = mctx.measureText(c.name).width;
+    if (b[0] - a[0] < tw * 1.3) continue;
+    const [x, y] = toScreen(c.labelLat, c.labelLon);
+    if (x < 0 || x > W || y < 0 || y > H) continue;
+    label(c.name, x, y, font, "rgba(255,255,255,0.85)", "center");
+  }
+  if (route) return;
+  if (vp.zoom >= 4) for (const a of DATA.airports.airports) {
+    const [x, y] = toScreen(a.lat, a.lon);
+    mctx.fillStyle = "#3fa7e8"; mctx.fillRect(x - 4, y - 4, 8, 8);
+    label(a.code, x + 7, y, "500 11px 'IBM Plex Mono', monospace", "#9fd3ff");
+  }
+  if (vp.zoom >= 7) for (const d of DESTS) for (const p of d.pois) {
+    const [x, y] = toScreen(p.lat, p.lon);
+    circle(x, y, 4, { mountain: "#dfe3f5", lake: "#66c0ff", coast: "#66f0f0" }[p.kind] || "#ff9ad8");
+    label(p.name, x + 7, y, "12px 'Atkinson Hyperlegible', sans-serif", "#fffbe8");
+  }
+  for (const d of DESTS) {
+    const [x, y] = toScreen(d.lat, d.lon);
+    const sel = d === selected;
+    if (sel) circle(x, y, 14, "rgba(255,255,255,0.9)");
+    circle(x, y, sel ? 10 : 7.5, markerColor(d), "rgba(5,9,15,0.8)");
+    label(d.name + (P && P.visitedD.includes(d.id) ? " ✓" : ""), x + 12, y, "700 13px 'Atkinson Hyperlegible', sans-serif", "#fff");
+  }
+}
+
+// pointer input for the map (drag to pan, pinch / wheel to zoom, tap to select)
+const ptrs = new Map();
+let gesture = null;
+mapCanvas.addEventListener("pointerdown", e => {
+  if (screen !== "mapui") return;
+  mapCanvas.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+  if (ptrs.size === 1) gesture = { moved: 0, pinched: false };
+  else if (gesture) gesture.pinched = true;
+});
+mapCanvas.addEventListener("pointermove", e => {
+  if (!ptrs.has(e.pointerId)) return;
+  const prev = ptrs.get(e.pointerId), cur = [e.clientX, e.clientY];
+  if (ptrs.size === 1) {
+    const dx = cur[0] - prev[0], dy = cur[1] - prev[1], mw = mapW();
+    vp.cu -= dx / mw; vp.cv -= dy / (mw / 2); clampVp(); mapDirty = true;
+    gesture.moved += Math.hypot(dx, dy);
+  } else if (ptrs.size === 2) {
+    const other = [...ptrs.entries()].find(([id]) => id !== e.pointerId)[1];
+    const d0 = Math.hypot(prev[0] - other[0], prev[1] - other[1]), d1 = Math.hypot(cur[0] - other[0], cur[1] - other[1]);
+    if (d0 > 1) zoomAt((cur[0] + other[0]) / 2, (cur[1] + other[1]) / 2, d1 / d0);
+  }
+  ptrs.set(e.pointerId, cur);
+});
+function endPtr(e) {
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.delete(e.pointerId);
+  if (ptrs.size === 0 && gesture && !gesture.pinched && gesture.moved < 10 && e.type === "pointerup") tap(e.clientX, e.clientY);
+  if (ptrs.size === 0) gesture = null;
+}
+mapCanvas.addEventListener("pointerup", endPtr);
+mapCanvas.addEventListener("pointercancel", endPtr);
+mapCanvas.addEventListener("wheel", e => { if (screen !== "mapui") return; e.preventDefault(); zoomAt(e.clientX, e.clientY, e.deltaY < 0 ? 1.25 : 0.8); }, { passive: false });
+function tap(x, y) {
+  let best = null, bd = 26;
+  for (const d of DESTS) { const [sx, sy] = toScreen(d.lat, d.lon); const dd = Math.hypot(sx - x, sy - y); if (dd < bd) { bd = dd; best = d; } }
+  if (best) return select(best, false);
+  const [lat, lon] = toLatLon(x, y);
+  selectedCountry = countryAt(lat, lon); selected = null; mapDirty = true;
+  renderInfo();
+}
+function select(d, center) {
+  selected = d; selectedCountry = null; mapDirty = true;
+  if (center) centerOn(d.lat, d.lon, Math.max(vp.zoom, 5));
+  renderInfo();
+}
+
+function renderInfo() {
+  const box = $("info");
+  if (!selected && !selectedCountry) { box.hidden = true; return; }
+  box.hidden = false; box.scrollTop = 0;
+  if (selectedCountry) {
+    const c = selectedCountry, list = DESTS.filter(d => d.country === c.id);
+    box.innerHTML = `<div class="eyebrow">${esc(c.continent)}</div><h2>${esc(c.name)}</h2>` +
+      (list.length ? `<p>Destinations:</p><div class="row">${list.map(d => `<button class="ghost" data-dest="${d.id}">${esc(d.name)} · ${explorable(d) ? "3D" : "map only"}</button>`).join("")}</div>`
+                   : `<p class="muted">No destinations here yet. This country is on the map but has not been developed.</p>`) +
+      `<button class="ghost" data-close>Close</button>`;
+    return;
+  }
+  const d = selected, ap = airportBy.get(d.airport);
+  let html = `<div class="eyebrow">${esc(d.kind)} · ${esc(countryName(d.country))}</div><h2>${esc(d.name)}</h2>
+    <div class="status" style="color:${explorable(d) ? "var(--go)" : "var(--muted)"}"><span class="dot" style="background:${explorable(d) ? "var(--go)" : "#b9c2cf"}"></span>${explorable(d) ? "Explorable 3D area" : "Map preview only · 3D not built yet"}</div>
+    <p style="margin:4px 0">${esc(d.description)}</p>
+    <div class="muted"><b>Airport:</b> ${esc(ap.name)} (<span class="mono">${ap.code}</span>)</div>
+    <div class="muted"><b>Highlights:</b> ${d.pois.map(p => esc(p.name)).join(", ")}</div>`;
+  if (d.id === P.current) {
+    html += `<p style="color:var(--sign);font-weight:700;margin:6px 0 0">You are here.</p>`;
+    if (explorable(d)) html += `<button data-explore>${city ? "Return to the streets" : "Explore " + esc(d.name)}</button>`;
+  } else {
+    const q = quote(d.id);
+    html += `<div class="ticket"><div class="eyebrow">Flight</div>
+      <div class="route">${q.fa.code} → ${q.ta.code}</div>
+      <div class="muted">${esc(q.from.name)} to ${esc(q.to.name)} · <span class="mono">${fmt(q.km)} km</span> · ${q.intl ? "International" : "Domestic"}</div>
+      <div>Fare <span class="coins">${coins(q.price)}</span> &nbsp; Balance <span class="mono">${coins(P.coins)}</span></div>
+      <div class="note">Fictional game-economy fare, not a real airline price.</div>`;
+    if (!q.available) html += `<div class="muted">${esc(q.reason)}</div>`;
+    else if (q.shortfall) html += `<div class="short">You need ${coins(q.shortfall)} more.</div><div>Ways to earn coins:</div><ul class="tips">${earnTips().map(t => `<li>${esc(t)}</li>`).join("")}</ul>`;
+    html += `<button data-book ${q.canBook ? "" : "disabled"}>Book flight · ${coins(q.price)}</button></div>`;
+  }
+  html += `<button class="ghost" data-close>Close</button>`;
+  box.innerHTML = html;
+}
+$("info").addEventListener("click", e => {
+  const t = e.target.closest("button"); if (!t) return;
+  if (t.dataset.dest) select(destBy.get(t.dataset.dest), true);
+  else if ("close" in t.dataset) { selected = selectedCountry = null; mapDirty = true; renderInfo(); }
+  else if ("explore" in t.dataset) enterCity(selected);
+  else if ("book" in t.dataset) openConfirm();
+});
+function openConfirm() {
+  const q = quote(selected.id);
+  $("confirm").innerHTML = `<div class="panel"><h2 style="font-size:32px">Confirm booking</h2>
+    <div class="ticket"><div class="route">${q.fa.code} → ${q.ta.code}</div>
+    <div>${esc(q.fa.name)}<br>to ${esc(q.ta.name)}</div>
+    <div class="muted">Distance <span class="mono">${fmt(q.km)} km</span></div>
+    <div>Fare <span class="coins">${coins(q.price)}</span></div>
+    <div>Balance after: <span class="mono">${coins(P.coins)} → <b>${coins(P.coins - q.price)}</b></span></div></div>
+    <div class="row"><button id="cPay">Pay &amp; board</button><button class="ghost" id="cCancel">Cancel</button></div></div>`;
+  $("confirm").hidden = false;
+  $("cCancel").onclick = () => { $("confirm").hidden = true; };
+  $("cPay").onclick = () => {
+    $("confirm").hidden = true;
+    const r = book(selected.id);
+    if (!r.ok) { toast(r.msg, "bad"); return; }
+    save(); toast(`−${r.ticket.price} coins · ticket ${r.ticket.ref}`);
+    selected = null; renderInfo(); unloadCity(); startFlight(r.ticket);
+  };
+}
+function renderSearch() {
+  const list = search($("q").value);
+  $("results").innerHTML = list.length ? list.map(d => `<button data-dest="${d.id}"><b>${esc(d.name)}</b>, ${esc(countryName(d.country))} <span class="mono muted">${d.airport} · ${explorable(d) ? "3D" : "map"}</span></button>`).join("")
+    : `<div class="muted">No matching destinations.</div>`;
+}
+$("q").addEventListener("input", renderSearch);
+$("results").addEventListener("click", e => { const b = e.target.closest("button[data-dest]"); if (b) select(destBy.get(b.dataset.dest), true); });
+$("btnSearch").onclick = () => { const s = $("search"); s.hidden = !s.hidden; $("btnSearch").textContent = s.hidden ? "Search" : "Close search"; if (!s.hidden) { renderSearch(); $("q").focus(); } };
+$("btnZoomIn").onclick = () => zoomAt(W / 2, H / 2, 1.5);
+$("btnZoomOut").onclick = () => zoomAt(W / 2, H / 2, 1 / 1.5);
+$("btnProfile").onclick = () => openProfile("mapui");
+$("btnMenu").onclick = () => show("pause");
+$("btnBackCity").onclick = () => show("explore");
+function openMap() {
+  const c = current(); centerOn(c.lat, c.lon, 3);
+  selected = selectedCountry = null; renderInfo(); $("confirm").hidden = true;
+  $("mapWhere").textContent = `Location: ${c.name}, ${countryName(c.country)}`;
+  $("btnBackCity").hidden = !city; if (city) $("btnBackCity").textContent = "Back to " + city.dest.name;
+  show("mapui");
+}
+
+// ================= flight =================
+const PHASES = [[0.16, "Boarding", "Passengers are boarding. Please have your ticket ready."], [0.30, "Takeoff", "Cabin crew, prepare for departure."], [0.82, "Cruising", "Sit back and enjoy the flight."], [1, "Descent & landing", "We have started our descent. Fasten your seat belt."]];
+let flight = null;
+function startFlight(t) {
+  const a = airportBy.get(t.fa), b = airportBy.get(t.ta);
+  flight = { t, a, b, start: performance.now(), dur: Math.min(18, Math.max(9, 8 + t.km / 900)) * 1000, landed: false };
+  $("flightTitle").textContent = `Flight ${t.ref}  ${a.code} → ${b.code}`;
+  $("flightSub").textContent = `${a.name} to ${b.name} · ${fmt(t.km)} km`;
+  const [mlat, mlon] = interp(a.lat, a.lon, b.lat, b.lon, 0.5);
+  const base = Math.max(W, H * 2), du = Math.max(0.002, Math.abs(a.lon - b.lon) / 360), dv = Math.max(0.002, Math.abs(a.lat - b.lat) / 180);
+  centerOn(mlat, mlon, Math.min(14, Math.min(0.5 * W / (du * base), 0.4 * H / (dv * base / 2))));
+  show("flightui");
+}
+function drawFlight(now) {
+  const f = flight, prog = Math.min(1, (now - f.start) / f.dur);
+  const frac = (x => x * x * (3 - 2 * x))(Math.max(0, Math.min(1, (prog - 0.16) / 0.81)));
+  drawMap(true);
+  for (let i = 0; i <= 60; i++) {
+    const [la, lo] = interp(f.a.lat, f.a.lon, f.b.lat, f.b.lon, i / 60), [x, y] = toScreen(la, lo);
+    circle(x, y, 2.4, i / 60 <= frac ? "#f2c230" : "rgba(255,255,255,0.6)");
+  }
+  for (const ap of [f.a, f.b]) { const [x, y] = toScreen(ap.lat, ap.lon); circle(x, y, 7, "#3fa7e8", "#05090f"); label(ap.code, x + 11, y, "500 18px 'IBM Plex Mono', monospace", "#fff"); }
+  const [pla, plo] = interp(f.a.lat, f.a.lon, f.b.lat, f.b.lon, frac), [px, py] = toScreen(pla, plo);
+  const [nla, nlo] = interp(f.a.lat, f.a.lon, f.b.lat, f.b.lon, Math.min(1, frac + 0.01)), [nx, ny] = toScreen(nla, nlo);
+  mctx.save(); mctx.translate(px, py); mctx.rotate(Math.atan2(ny - py, nx - px));
+  mctx.fillStyle = "#f2c230"; mctx.strokeStyle = "#05090f"; mctx.lineWidth = 1.5;
+  mctx.beginPath(); mctx.moveTo(16, 0); mctx.lineTo(-10, -12); mctx.lineTo(-5, 0); mctx.lineTo(-10, 12); mctx.closePath(); mctx.fill(); mctx.stroke();
+  mctx.restore();
+  const ph = PHASES.find(p => prog <= p[0]) || PHASES[3];
+  $("phaseTitle").textContent = ph[1]; $("phaseText").textContent = ph[2];
+  $("flightBar").style.width = (prog * 100).toFixed(1) + "%";
+  if (prog >= 1) land();
+}
+function land() {
+  if (!flight || flight.landed) return;
+  flight.landed = true;
+  const r = completeFlight(); save();
+  const ap = airportBy.get(r.d.airport);
+  $("arrivalCard").innerHTML = `<div class="eyebrow">Arrivals · ${ap.code}</div><h1>Welcome to ${esc(r.d.name)}</h1>
+    <p>You have landed at ${esc(ap.name)}, ${esc(countryName(r.d.country))}.</p>
+    ${r.first ? `<p class="reward">First visit reward: +${r.reward} coins</p>` : ""}
+    <p>Balance: <span class="coins">${coins(P.coins)}</span></p>
+    ${explorable(r.d) ? "" : `<p class="muted">The 3D area for this destination has not been built yet.</p>`}
+    <div class="row">${explorable(r.d) ? `<button id="aExplore">Start exploring</button>` : ""}<button class="ghost" id="aMap">World map</button></div>`;
+  show("arrival");
+  if ($("aExplore")) $("aExplore").onclick = () => enterCity(r.d);
+  $("aMap").onclick = openMap;
+}
+$("btnSkip").onclick = land;
+
+// ================= 3D city (mirror of CityBuilder.cs) =================
+let renderer = null, scene, camera, sun, city = null;
+const keys = new Set(), stick = { x: 0, y: 0, active: false };
+function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function hex(h) { return new THREE.Color(h); }
+function initThree() {
+  if (renderer) return;
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(W, H);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
+  $("three").appendChild(renderer.domElement);
+  camera = new THREE.PerspectiveCamera(60, W / H, 0.2, 600);
+  setupLook(renderer.domElement);
+}
+function buildCity(dest) {
+  const spec = dest.environment, R = rng(spec.seed), rand = (a, b) => a + R() * (b - a);
+  scene = new THREE.Scene();
+  const haze = new THREE.Color(0.78, 0.82, 0.86);
+  scene.background = haze; scene.fog = new THREE.Fog(haze, 120, 380);
+  scene.add(new THREE.HemisphereLight(0x9fb3d1, 0x4d4337, 0.75));
+  sun = new THREE.DirectionalLight(0xfff0d1, 0.95);
+  sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.05;
+  Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, near: 1, far: 300 });
+  scene.add(sun, sun.target);
+
+  const batches = new Map(), colliders = [];
+  const GEO = { box: new THREE.BoxGeometry(1, 1, 1), cyl: new THREE.CylinderGeometry(0.5, 0.5, 2, 14), sph: new THREE.SphereGeometry(0.5, 16, 10) };
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), eul = new THREE.Euler();
+  // Unity space: x east, y up, z north. Three space: z flipped (north = -z).
+  function part(type, x, y, z, sx, sy, sz, color, collider = true, rotY = 0, rotZ = 0) {
+    const c = color instanceof THREE.Color ? color : hex(color);
+    const cast = sy > 0.3; // flat ground pieces never cast shadows
+    const key = type + c.getHexString() + cast;
+    if (!batches.has(key)) batches.set(key, { type, color: c, mats: [], cast });
+    eul.set(0, -rotY * Math.PI / 180, -rotZ * Math.PI / 180); q.setFromEuler(eul);
+    m4.compose(new THREE.Vector3(x, y, -z), q, new THREE.Vector3(sx, sy, sz));
+    batches.get(key).mats.push(m4.clone());
+    if (collider) {
+      const hy = type === "cyl" ? sy : sy / 2, a = Math.abs(Math.cos(rotY * Math.PI / 180)), b = Math.abs(Math.sin(rotY * Math.PI / 180));
+      const hx = a * sx / 2 + b * sz / 2, hz = b * sx / 2 + a * sz / 2;
+      colliders.push({ x0: x - hx, x1: x + hx, y0: y - hy, y1: y + hy, z0: -z - hz, z1: -z + hz });
+    }
+  }
+  const mul = (c, k) => { const o = hex(c).clone(); o.r = Math.min(1, o.r * k); o.g = Math.min(1, o.g * k); o.b = Math.min(1, o.b * k); return o; };
+  const hsv = (h, s, v) => new THREE.Color().setHSL(h, s * v / (1 - Math.abs(2 * v * (1 - s / 2) - 1) || 1), v * (1 - s / 2));
+  const Hh = spec.halfSize, ground = spec.groundColor;
+  part("box", 0, -0.5, 0, Hh * 2 + 40, 1, Hh * 2 + 40, ground, false);
+  part("box", 0, -0.6, 0, 1500, 1, 1500, mul(ground, 0.85), false);
+  for (const [x, z, sx, sz] of [[0, Hh + 2, Hh * 2 + 8, 4], [0, -Hh - 2, Hh * 2 + 8, 4], [Hh + 2, 0, 4, Hh * 2 + 8], [-Hh - 2, 0, 4, Hh * 2 + 8]])
+    colliders.push({ x0: x - sx / 2, x1: x + sx / 2, y0: 0, y1: 20, z0: -z - sz / 2, z1: -z + sz / 2 });
+
+  const spawn = { x: spec.spawn[0], z: spec.spawn[1] };
+  const inGrounds = (x, z, m) => spec.landmarks.some(l => Math.hypot(x - l.x, z - l.z) < l.radius + m);
+  const cleared = (x, z, m) => Math.hypot(x - spawn.x, z - spawn.z) < 14 + m || inGrounds(x, z, m);
+  const tree = (x, z) => { const h = rand(2.2, 3.5); part("cyl", x, h / 2, z, 0.4, h / 2, 0.4, "#664730"); const s = rand(3, 4.5); part("sph", x, h + s * 0.35, z, s, s * 0.85, s, new THREE.Color(0.25, rand(0.45, 0.58), 0.2), false); };
+  const pitch = spec.blockSize + spec.roadWidth, n = Math.floor(Hh * 2 / pitch), start = -n * pitch / 2;
+  const palette = spec.buildingColors;
+  for (let k = 0; k <= n; k++) for (let i = 0; i < n; i++) {
+    const line = start + k * pitch, mid = start + (i + 0.5) * pitch;
+    if (!inGrounds(mid, line, -6)) part("box", mid, 0.02, line, pitch, 0.04, spec.roadWidth, spec.roadColor, false);
+    if (!inGrounds(line, mid, -6)) part("box", line, 0.02, mid, spec.roadWidth, 0.04, pitch, spec.roadColor, false);
+  }
+  function building(x, z, w, d, h, color) {
+    part("box", x, h / 2, z, w, h, d, color);
+    part("box", x, h + 0.4, z, w + 0.4, 0.8, d + 0.4, mul(color, 0.8), false);
+    if (R() < 0.6) part("box", x, 3.2, z, w + 0.3, 0.9, d + 0.3, hsv(R(), 0.55, 0.85), false);
+  }
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+    const cx = start + (i + 0.5) * pitch, cz = start + (j + 0.5) * pitch;
+    if (cleared(cx, cz, spec.blockSize * 0.6)) continue;
+    part("box", cx, 0.08, cz, spec.blockSize, 0.16, spec.blockSize, "#b3ada1", false);
+    const roll = R(), pick = () => palette[Math.floor(R() * palette.length)];
+    if (roll < 0.08) { part("box", cx, 0.18, cz, spec.blockSize - 2, 0.1, spec.blockSize - 2, spec.parkColor, false); for (let t = 0; t < 4; t++) tree(cx + rand(-12, 12), cz + rand(-12, 12)); }
+    else if (roll < 0.22) building(cx, cz, spec.blockSize - 6, spec.blockSize - 6, rand(spec.buildingHeightMin, spec.buildingHeightMax) * 1.2, pick());
+    else {
+      const lot = spec.blockSize / 2 - 2.5;
+      for (let qd = 0; qd < 4; qd++) building(cx + (qd % 2 ? 1 : -1) * (lot / 2 + 1), cz + (qd < 2 ? -1 : 1) * (lot / 2 + 1), lot - rand(0, 3), lot - rand(0, 3), rand(spec.buildingHeightMin, spec.buildingHeightMax), pick());
+    }
+  }
+  // arrival point
+  part("cyl", spawn.x, 0.05, spawn.z, 16, 0.05, 16, "#bfb8a8", false);
+  part("box", spawn.x + 5, 1.5, spawn.z, 0.2, 3, 0.2, "#404047");
+  part("box", spawn.x + 5, 3, spawn.z, 0.15, 1, 2.4, "#ffcc1a", false);
+
+  const B = {
+    mosque(o) {
+      const red = "#a84d3b", marble = "#f2f0e6", dark = "#59261f", half = 42, wallH = 8, gate = 6, seg = half - gate;
+      part("box", o.x, 0.15, o.z, half * 2, 0.3, half * 2, "#cc8c73");
+      part("box", o.x, wallH / 2, o.z + half, half * 2, wallH, 2, red); part("box", o.x, wallH / 2, o.z - half, half * 2, wallH, 2, red);
+      part("box", o.x - half, wallH / 2, o.z, 2, wallH, half * 2, red);
+      part("box", o.x + half, wallH / 2, o.z + half - seg / 2, 2, wallH, seg, red); part("box", o.x + half, wallH / 2, o.z - half + seg / 2, 2, wallH, seg, red);
+      part("box", o.x + half, 7, o.z + gate + 2, 5, 14, 4, red); part("box", o.x + half, 7, o.z - gate - 2, 5, 14, 4, red);
+      part("box", o.x + half, 12.5, o.z, 5, 3, gate * 2 + 8, red); part("sph", o.x + half, 14.5, o.z, 4, 3, 4, marble, false);
+      part("box", o.x - 29, 7, o.z, 22, 14, 62, red);
+      part("box", o.x - 17.5, 9, o.z, 1.5, 18, 16, mul(red, 1.1));
+      part("box", o.x - 16.9, 6.5, o.z, 0.6, 11, 9, dark, false);
+      for (const s of [-1, 1]) part("box", o.x - 17.2, 5, o.z + s * 19, 0.6, 8, 7, dark, false);
+      for (const [z, size] of [[0, 15], [-19, 10.5], [19, 10.5]]) {
+        part("cyl", o.x - 29, 15.2, o.z + z, size * 0.75, 1.2, size * 0.75, marble, false);
+        part("sph", o.x - 29, 16.2 + size * 0.38, o.z + z, size, size * 0.95, size, marble, false);
+        part("cyl", o.x - 29, 16.2 + size * 0.85, o.z + z, 0.4, 1.6, 0.4, "#d9b34d", false);
+      }
+      for (const [cx, cz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+        const px = o.x + cx * half, pz = o.z + cz * half;
+        part("cyl", px, 21, pz, 4.2, 21, 4.2, red);
+        part("cyl", px, 14, pz, 5.6, 0.4, 5.6, marble, false); part("cyl", px, 28, pz, 5.6, 0.4, 5.6, marble, false);
+        part("cyl", px, 43.5, pz, 4.6, 1.5, 4.6, marble, false); part("sph", px, 46, pz, 4, 3.6, 4, marble, false);
+      }
+      part("box", o.x + 8, 0.35, o.z, 9, 0.1, 9, "#59a6bf", false);
+      return 48;
+    },
+    fort(o) {
+      const brick = "#b36b4d", marble = "#edebe0", hx = 46, hz = 36, wallH = 12, gate = 6, seg = hz - gate;
+      const wall = (x, z, sx, sz, alongX) => {
+        part("box", o.x + x, wallH / 2, o.z + z, sx, wallH, sz, brick);
+        const len = alongX ? sx : sz;
+        for (let t = -len / 2 + 1.5; t < len / 2; t += 4) part("box", o.x + x + (alongX ? t : 0), wallH + 0.8, o.z + z + (alongX ? 0 : t), 1.6, 1.6, 1.6, mul(brick, 0.95), false);
+      };
+      wall(0, hz, hx * 2, 3, true); wall(0, -hz, hx * 2, 3, true); wall(hx, 0, 3, hz * 2, false);
+      wall(-hx, hz - seg / 2, 3, seg, false); wall(-hx, -hz + seg / 2, 3, seg, false);
+      for (const s of [-1, 1]) { part("cyl", o.x - hx - 1, 8, o.z + s * (gate + 3.5), 7, 8, 7, brick); part("sph", o.x - hx - 1, 17, o.z + s * (gate + 3.5), 4, 3, 4, marble, false); }
+      part("box", o.x - hx, 13.5, o.z, 4, 3, gate * 2 + 2, brick);
+      for (const [cx, cz] of [[hx, hz], [hx, -hz], [-hx, hz], [-hx, -hz]]) {
+        part("cyl", o.x + cx, 8, o.z + cz, 9, 8, 9, brick); part("cyl", o.x + cx, 17, o.z + cz, 4, 1.5, 4, marble, false); part("sph", o.x + cx, 19, o.z + cz, 4, 3, 4, marble, false);
+      }
+      part("box", o.x - 8, 0.2, o.z, 36, 0.2, 30, "#598c4d", false);
+      part("box", o.x + 28, 5, o.z + 10, 20, 10, 28, marble);
+      for (let i = -1; i <= 1; i++) part("sph", o.x + 28, 11, o.z + 10 + i * 8, 5, 4.5, 5, marble, false);
+      part("box", o.x + 18, 7, o.z - 22, 26, 14, 14, mul(brick, 1.05));
+      return 20;
+    },
+    minar(o) {
+      const stone = "#e6e3d9";
+      part("cyl", o.x, 0.15, o.z, 30, 0.15, 30, "#d1c7b3", false);
+      for (let i = 0; i < 5; i++) part("box", o.x, 1.5, o.z, 5, 3, 26, mul(stone, 0.97), true, i * 72);
+      part("cyl", o.x, 3, o.z, 13, 3, 13, stone);
+      let y = 6;
+      for (let i = 0; i < 10; i++) {
+        const r = 8.5 + (4.2 - 8.5) * i / 9, h = 5.2;
+        part("cyl", o.x, y + h / 2, o.z, r, h / 2, r, stone, i < 2); y += h;
+        if (i === 3 || i === 7) part("cyl", o.x, y, o.z, r + 2.2, 0.35, r + 2.2, mul(stone, 0.92), false);
+      }
+      part("sph", o.x, y + 1.6, o.z, 5, 4.5, 5, stone, false);
+      part("cyl", o.x, y + 4.5, o.z, 0.3, 1.5, 0.3, "#bfbfc7", false);
+      return y + 6;
+    },
+    bazaar(o) {
+      const wood = "#734d33";
+      part("box", o.x, 0.1, o.z, 10, 0.08, 60, "#8c8073", false);
+      for (let z = -26; z <= 26; z += 6.5) for (const side of [-1, 1]) {
+        const px = o.x + side * 7, pz = o.z + z;
+        part("box", px, 0.5, pz, 3, 1, 5, wood);
+        part("box", px + side * 1.6, 1.8, pz, 0.3, 3.6, 5.5, mul(wood, 0.9));
+        part("box", px - side * 0.3, 3.4, pz, 4.2, 0.15, 5.6, hsv(R(), 0.75, 0.9), false, 0, side * 14);
+        for (let g = 0; g < 4; g++) { const s = rand(0.35, 0.7); part("box", px + rand(-0.8, 0.8), 1.25, pz + rand(-1.8, 1.8), s, s, s, hsv(R(), 0.6, 0.95), false); }
+        part("box", px + side * 6, 4, pz, 8, 8, 6.4, hsv(R() * 0.12 + 0.03, 0.35, rand(0.6, 0.85)));
+      }
+      for (const end of [-1, 1]) {
+        const gz = o.z + end * 31;
+        part("box", o.x - 5.5, 3.5, gz, 1.2, 7, 1.2, "#bf5940"); part("box", o.x + 5.5, 3.5, gz, 1.2, 7, 1.2, "#bf5940");
+        part("box", o.x, 7.5, gz, 12.4, 1.6, 1.2, "#f2bf33", false);
+      }
+      return 9;
+    },
+    generic(o) { part("cyl", o.x, 5, o.z, 4, 5, 4, "#d9d9cc"); return 10; },
+  };
+  const landmarks = [];
+  for (const l of spec.landmarks) {
+    const o = { x: l.x, z: l.z };
+    part("cyl", o.x, 0.06, o.z, l.radius * 2, 0.06, l.radius * 2, l.park ? spec.parkColor : "#c7b394", false);
+    const top = (B[l.type] || B.generic)(o);
+    if (l.park) for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2 + rand(-0.1, 0.1), r = l.radius - rand(3, 8); tree(o.x + Math.cos(a) * r, o.z + Math.sin(a) * r); }
+    landmarks.push({ spec: l, x: o.x, z: -o.z, top, radius: l.radius + 8 });
+  }
+  const mats = new Map();
+  for (const b of batches.values()) {
+    const key = b.color.getHexString();
+    if (!mats.has(key)) mats.set(key, new THREE.MeshLambertMaterial({ color: b.color }));
+    const mesh = new THREE.InstancedMesh(GEO[b.type], mats.get(key), b.mats.length);
+    b.mats.forEach((m, i) => mesh.setMatrixAt(i, m));
+    mesh.castShadow = b.cast; mesh.receiveShadow = true;
+    scene.add(mesh);
+  }
+  const markerGeo = new THREE.BoxGeometry(2.4, 2.4, 2.4);
+  for (const l of landmarks) {
+    l.mesh = new THREE.Mesh(markerGeo, new THREE.MeshLambertMaterial({ color: 0xf2c230, emissive: 0x4a3400 }));
+    if (P.visitedL.includes(l.spec.id)) markVisited(l);
+    scene.add(l.mesh);
+  }
+  // face the nearest landmark on arrival
+  let near = landmarks[0];
+  for (const l of landmarks) if (Math.hypot(l.x - spawn.x, l.z + spawn.z) < Math.hypot(near.x - spawn.x, near.z + spawn.z)) near = l;
+  const player = makePlayer();
+  player.pos.set(spawn.x, 0, -spawn.z);
+  const yaw = Math.atan2(-(near.x - spawn.x), -(near.z + spawn.z));
+  return { dest, scene, colliders, landmarks, player, spawn: player.pos.clone(), cam: { yaw, pitch: 0.25, dist: 6.5, pos: null }, nearby: null };
+}
+function markVisited(l) { l.mesh.material = new THREE.MeshLambertMaterial({ color: 0x9a9aa0 }); }
+function makePlayer() {
+  const g = new THREE.Group(), vis = new THREE.Group(); g.add(vis);
+  const m = c => new THREE.MeshLambertMaterial({ color: c });
+  const add = (geo, mat, x, y, z) => { const o = new THREE.Mesh(geo, mat); o.position.set(x, y, z); o.castShadow = true; vis.add(o); return o; };
+  add(new THREE.CylinderGeometry(0.3, 0.3, 0.9, 12), m(0x268c99), 0, 0.85, 0);
+  add(new THREE.SphereGeometry(0.3, 12, 8), m(0x268c99), 0, 1.28, 0);
+  add(new THREE.SphereGeometry(0.3, 12, 8), m(0x1c5d66), 0, 0.42, 0);
+  add(new THREE.SphereGeometry(0.19, 14, 10), m(0xd9a680), 0, 1.66, 0);
+  add(new THREE.BoxGeometry(0.36, 0.08, 0.42), m(0xe64d33), 0, 1.84, -0.04);
+  add(new THREE.BoxGeometry(0.42, 0.55, 0.2), m(0xd98c26), 0, 1.06, 0.3);
+  scene.add(g);
+  return { obj: g, vis, pos: g.position, vy: 0, bob: 0, facing: 0 };
+}
+
+function enterCity(dest) {
+  if (city && city.dest === dest) { show("explore"); return; }
+  unloadCity();
+  initThree();
+  city = buildCity(dest);
+  $("cityName").textContent = dest.name.toUpperCase();
+  $("citySub").textContent = countryName(dest.country) + " · exploring on foot";
+  $("help").hidden = false;
+  $("help").innerHTML = "Move: joystick or WASD · Run: push the stick fully or hold Shift<br>Look: drag the screen · Zoom: mouse wheel · Visit: button or E";
+  clearTimeout(enterCity.t); enterCity.t = setTimeout(() => { $("help").hidden = true; }, 12000);
+  hudCache = {};
+  show("explore");
+}
+function unloadCity() {
+  if (!city) return;
+  city.scene.traverse(o => { if (o.isMesh && o.material && o.material.dispose) o.material.dispose(); });
+  city = null;
+}
+
+// ---- input ----
+addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT") return;
+  keys.add(e.code);
+  if (e.code === "Escape") {
+    if (screen === "explore") show("pause");
+    else if (screen === "pause" || screen === "profile") resume();
+    else if (screen === "mapui") { if (!$("confirm").hidden) $("confirm").hidden = true; else if (selected || selectedCountry) { selected = selectedCountry = null; renderInfo(); mapDirty = true; } else if (city) show("explore"); }
+  }
+  if (e.code === "KeyE" && screen === "explore" && city?.nearby && !P.visitedL.includes(city.nearby.spec.id)) visit(city.nearby);
+});
+addEventListener("keyup", e => keys.delete(e.code));
+addEventListener("blur", () => keys.clear());
+(function setupStick() {
+  const el = $("stick"), knob = $("knob");
+  let id = null;
+  const upd = e => {
+    const r = el.getBoundingClientRect(), rad = r.width / 2;
+    let dx = (e.clientX - r.left - rad) / rad, dy = (e.clientY - r.top - rad) / rad;
+    const m = Math.hypot(dx, dy); if (m > 1) { dx /= m; dy /= m; }
+    stick.x = dx; stick.y = -dy;
+    knob.style.transform = `translate(${dx * rad}px, ${dy * rad}px)`;
+  };
+  el.addEventListener("pointerdown", e => { id = e.pointerId; el.setPointerCapture(id); stick.active = true; upd(e); });
+  el.addEventListener("pointermove", e => { if (e.pointerId === id) upd(e); });
+  const end = e => { if (e.pointerId !== id) return; id = null; stick.active = false; stick.x = stick.y = 0; knob.style.transform = ""; };
+  el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end);
+})();
+function setupLook(el) {
+  const looks = new Map();
+  el.addEventListener("pointerdown", e => { el.setPointerCapture(e.pointerId); looks.set(e.pointerId, [e.clientX, e.clientY]); });
+  el.addEventListener("pointermove", e => {
+    if (!looks.has(e.pointerId) || !city) return;
+    const [x, y] = looks.get(e.pointerId); looks.set(e.pointerId, [e.clientX, e.clientY]);
+    city.cam.yaw -= (e.clientX - x) * 0.006; city.cam.pitch = Math.max(-0.12, Math.min(1.1, city.cam.pitch + (e.clientY - y) * 0.005));
+  });
+  const end = e => looks.delete(e.pointerId);
+  el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end);
+  el.addEventListener("wheel", e => { e.preventDefault(); if (city) city.cam.dist = Math.max(3, Math.min(14, city.cam.dist + Math.sign(e.deltaY) * 0.8)); }, { passive: false });
+}
+
+// ---- simulation ----
+function groundAndCollide(p, nx, nz, y) {
+  const r = 0.35;
+  let gy = 0;
+  for (const c of city.colliders) {
+    if (c.y1 <= y + 0.45) { // low enough to stand on / step onto
+      if (nx > c.x0 - 0.05 && nx < c.x1 + 0.05 && nz > c.z0 - 0.05 && nz < c.z1 + 0.05 && c.y1 > gy) gy = c.y1;
+      continue;
+    }
+    if (c.y0 > y + 1.8) continue;
+    const cx = Math.max(c.x0, Math.min(nx, c.x1)), cz = Math.max(c.z0, Math.min(nz, c.z1));
+    const dx = nx - cx, dz = nz - cz, d = Math.hypot(dx, dz);
+    if (d < r) {
+      if (d > 1e-6) { nx = cx + dx / d * r; nz = cz + dz / d * r; }
+      else { // centre inside the box: push out along the shortest axis
+        const opts = [[c.x0 - r - nx, 0], [c.x1 + r - nx, 0], [0, c.z0 - r - nz], [0, c.z1 + r - nz]].sort((a, b) => Math.hypot(...a) - Math.hypot(...b));
+        nx += opts[0][0]; nz += opts[0][1];
+      }
+    }
+  }
+  return [nx, nz, gy];
+}
+function rayDist(o, dir, max) {
+  let best = max;
+  for (const c of city.colliders) {
+    let t0 = 0, t1 = best, ok = true;
+    for (const [oa, da, a0, a1] of [[o.x, dir.x, c.x0, c.x1], [o.y, dir.y, c.y0, c.y1], [o.z, dir.z, c.z0, c.z1]]) {
+      if (Math.abs(da) < 1e-8) { if (oa < a0 || oa > a1) { ok = false; break; } continue; }
+      let ta = (a0 - oa) / da, tb = (a1 - oa) / da; if (ta > tb) [ta, tb] = [tb, ta];
+      t0 = Math.max(t0, ta); t1 = Math.min(t1, tb); if (t0 > t1) { ok = false; break; }
+    }
+    if (ok && t0 > 0.05 && t0 < best) best = t0;
+  }
+  return best;
+}
+function step(dt) {
+  const pl = city.player, cam = city.cam;
+  let ix = stick.x, iy = stick.y;
+  if (!stick.active) {
+    ix = (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0) - (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0);
+    iy = (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0) - (keys.has("KeyS") || keys.has("ArrowDown") ? 1 : 0);
+    const m = Math.hypot(ix, iy); if (m > 1) { ix /= m; iy /= m; }
+  }
+  const run = keys.has("ShiftLeft") || keys.has("ShiftRight") || (stick.active && Math.hypot(ix, iy) > 0.92);
+  const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw);
+  const mx = fx * iy + rx * ix, mz = fz * iy + rz * ix, speed = (run ? 8 : 4.2) * Math.min(1, Math.hypot(ix, iy));
+  if (Math.hypot(mx, mz) > 0.05) {
+    const target = Math.atan2(mx, mz);
+    let d = target - pl.facing; d = Math.atan2(Math.sin(d), Math.cos(d));
+    pl.facing += d * (1 - Math.exp(-12 * dt));
+  }
+  const len = Math.hypot(mx, mz) || 1;
+  let nx = pl.pos.x + mx / len * speed * dt, nz = pl.pos.z + mz / len * speed * dt;
+  let gy; [nx, nz, gy] = groundAndCollide(pl, nx, nz, pl.pos.y);
+  pl.vy -= 20 * dt;
+  let ny = pl.pos.y + pl.vy * dt;
+  if (ny <= gy) { ny = gy; pl.vy = 0; }
+  pl.pos.set(nx, ny, nz);
+  pl.obj.rotation.y = pl.facing + Math.PI;
+  if (speed > 0.1) pl.bob += dt * speed * 2.2; else pl.bob = 0;
+  pl.vis.position.y = Math.abs(Math.sin(pl.bob)) * 0.08;
+
+  // camera
+  const pivot = new THREE.Vector3(pl.pos.x, pl.pos.y + 1.6, pl.pos.z);
+  const dir = new THREE.Vector3(Math.sin(cam.yaw) * Math.cos(cam.pitch), Math.sin(cam.pitch), Math.cos(cam.yaw) * Math.cos(cam.pitch));
+  const dist = Math.max(0.8, rayDist(pivot, dir, cam.dist) - 0.25);
+  const desired = pivot.clone().addScaledVector(dir, dist);
+  if (!cam.pos) cam.pos = desired.clone();
+  cam.pos.lerp(desired, 1 - Math.exp(-14 * dt));
+  if (cam.pos.distanceTo(pivot) > desired.distanceTo(pivot)) cam.pos.copy(desired);
+  camera.position.copy(cam.pos); camera.lookAt(pivot);
+  sun.position.set(pl.pos.x - 60, 90, pl.pos.z + 70); sun.target.position.copy(pl.pos);
+
+  const t = performance.now() / 1000;
+  city.nearby = null; let best = 1e9;
+  for (const l of city.landmarks) {
+    l.mesh.position.set(l.x, l.top + 6 + Math.sin(t * 2) * 0.6, l.z);
+    l.mesh.rotation.set(Math.PI / 4, t, Math.PI / 4);
+    const d = Math.hypot(pl.pos.x - l.x, pl.pos.z - l.z);
+    if (d < l.radius && d < best) { best = d; city.nearby = l; }
+  }
+}
+let hudCache = {};
+function setHud(id, html) { if (hudCache[id] !== html) { hudCache[id] = html; $(id).innerHTML = html; } }
+function updateHud() {
+  const pl = city.player, ls = city.landmarks, done = ls.filter(l => P.visitedL.includes(l.spec.id)).length;
+  setHud("objectives", `<h3 style="font-size:20px">Sightseeing ${done}/${ls.length}</h3>` + ls.map(l => {
+    const v = P.visitedL.includes(l.spec.id);
+    return `<div class="${v ? "done" : ""}">${v ? "✓" : "○"} ${esc(l.spec.name)}${v ? "" : ` <span class="mono muted">+${E.rewards.landmarkVisit}</span>`}</div>`;
+  }).join(""));
+  let target = null, bd = 1e9;
+  for (const l of ls) { if (P.visitedL.includes(l.spec.id)) continue; const d = Math.hypot(pl.pos.x - l.x, pl.pos.z - l.z); if (d < bd) { bd = d; target = l; } }
+  let text;
+  if (!target) text = "All sights here visited. Open the world map to plan your next trip.";
+  else if (target === city.nearby) text = `You are at ${target.spec.name}.`;
+  else {
+    const north = Math.atan2(target.x - pl.pos.x, -(target.z - pl.pos.z)) * 180 / Math.PI;
+    const names = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+    text = `Next sight: ${target.spec.name} · ${Math.round(bd / 5) * 5} m ${names[Math.floor(((north + 360 + 22.5) % 360) / 45)]}`;
+  }
+  setHud("navText", esc(text));
+  $("arrow").style.visibility = target && target !== city.nearby ? "visible" : "hidden";
+  if (target) {
+    const ang = Math.atan2(target.x - pl.pos.x, target.z - pl.pos.z) - Math.atan2(-Math.sin(city.cam.yaw), -Math.cos(city.cam.yaw));
+    $("arrow").style.transform = `rotate(${(-ang * 180 / Math.PI).toFixed(1)}deg)`;
+  }
+  const n = city.nearby;
+  $("interact").hidden = !n;
+  if (n) {
+    const v = P.visitedL.includes(n.spec.id);
+    setHud("interact", `<h3>${esc(n.spec.name)}</h3><div class="muted">${esc(n.spec.description)}</div>` +
+      (v ? `<div class="reward">✓ Visited</div>` : `<button data-visit>Visit &amp; take photo · +${E.rewards.landmarkVisit} coins</button>`));
+  }
+}
+$("interact").addEventListener("click", e => { if (e.target.closest("[data-visit]") && city?.nearby) visit(city.nearby); });
+function visit(l) {
+  if (P.visitedL.includes(l.spec.id)) return;
+  P.visitedL.push(l.spec.id);
+  earn(E.rewards.landmarkVisit, "Reward", "Sightseeing: " + l.spec.name);
+  markVisited(l); save(); refreshCoins(); hudCache.interact = null;
+  toast(`Visited ${l.spec.name}! +${E.rewards.landmarkVisit} coins`, "good");
+}
+
+// ================= menus =================
+function resume() { if (city) show("explore"); else openMap(); }
+let profileReturn = "mapui";
+function openProfile(from) {
+  profileReturn = from;
+  const visited = P.visitedD.map(id => destBy.get(id)?.name).filter(Boolean);
+  const totalL = DESTS.reduce((s, d) => s + (d.environment ? d.environment.landmarks.length : 0), 0);
+  $("profileCard").innerHTML = `<div class="eyebrow">Traveller profile</div><h1 style="font-size:40px">Passport</h1>
+    <div class="stats">
+      <div><span class="muted">Coins</span><b style="color:var(--sign)">${fmt(P.coins)}</b></div>
+      <div><span class="muted">Flights</span><b>${P.flights}</b></div>
+      <div><span class="muted">Spent</span><b>${fmt(P.spent)}</b></div>
+      <div><span class="muted">Earned</span><b>${fmt(P.earned)}</b></div>
+      <div><span class="muted">Landmarks</span><b>${P.visitedL.length}/${totalL}</b></div>
+    </div>
+    <div>Location: <b>${esc(current().name)}, ${esc(countryName(current().country))}</b></div>
+    <div>Destinations visited (${visited.length}/${DESTS.length}): ${visited.map(esc).join(", ")}</div>
+    <h3 style="font-size:22px;margin-top:6px">Spending history</h3>
+    <div class="tablewrap"><table><tbody>${P.history.length ? P.history.slice().reverse().map(t => `<tr><td class="muted mono">${new Date(t.t).toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</td><td>${esc(t.c)}: ${esc(t.d)}</td><td class="amt" style="color:${t.a >= 0 ? "var(--go)" : "var(--stop)"}">${t.a >= 0 ? "+" : ""}${fmt(t.a)}</td><td class="amt muted">${fmt(t.b)}</td></tr>`).join("") : `<tr><td class="muted">No transactions yet.</td></tr>`}</tbody></table></div>
+    <button id="profBack">Back</button>`;
+  $("profBack").onclick = () => profileReturn === "pause" ? show("pause") : resume();
+  show("profile");
+}
+$("pResume").onclick = resume;
+$("pSave").onclick = () => save(true);
+$("pMap").onclick = openMap;
+$("pProfile").onclick = () => openProfile("pause");
+$("pMain").onclick = () => { save(); unloadCity(); toMenu(); };
+$("pReset").onclick = () => {
+  const b = $("pReset");
+  if (b.dataset.armed) { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} P = null; unloadCity(); toast("Progress deleted.", "bad"); toMenu(); return; }
+  b.dataset.armed = "1"; b.textContent = "Tap again to delete all progress";
+  setTimeout(() => { delete b.dataset.armed; b.textContent = "Reset progress"; }, 3000);
+};
+$("btnCityMap").onclick = openMap;
+$("btnCityMenu").onclick = () => show("pause");
+$("btnContinue").onclick = () => {
+  P = loadSave();
+  if (!P) { toast("No saved game found in this browser.", "bad"); return; }
+  if (P.ticket) startFlight(P.ticket);
+  else if (explorable(current())) enterCity(current());
+  else openMap();
+};
+$("btnNew").onclick = () => {
+  const b = $("btnNew");
+  if (hasSave() && !b.dataset.armed) {
+    b.dataset.armed = "1"; b.textContent = "Tap again to overwrite your save";
+    setTimeout(() => { delete b.dataset.armed; b.textContent = "New game"; }, 3000);
+    return;
+  }
+  P = newProfile(); save();
+  toast(`Welcome! You start in ${current().name} with ${coins(P.coins)}. Fly to Lahore to explore in 3D.`, "good");
+  openMap();
+  select(destBy.get("lahore"), false);
+};
+function toMenu() {
+  $("btnContinue").disabled = !hasSave();
+  vp.zoom = 1; vp.cu = vp.cv = 0.5; clampVp();
+  show("menu");
+}
+addEventListener("pagehide", () => save());
+document.addEventListener("visibilitychange", () => { if (document.hidden) save(); });
+
+// ================= loop =================
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (screen === "flightui" && flight) drawFlight(now);
+  else if (screen === "explore" && city) { step(dt); updateHud(); renderer.render(city.scene, camera); }
+  else if ((screen === "pause" || screen === "profile") && city) renderer.render(city.scene, camera);
+  else if (mapDirty) { drawMap(false); mapDirty = false; }
+  requestAnimationFrame(frame);
+}
+addEventListener("resize", resize);
+resize();
+$("boot").remove();
+if (typeof THREE === "undefined") toast("3D library failed to load; the map still works.", "bad");
+toMenu();
+requestAnimationFrame(frame);
+</script>

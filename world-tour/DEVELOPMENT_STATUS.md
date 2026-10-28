@@ -8,6 +8,13 @@ There was no Unity Editor in the development environment. The work was verified 
 
 Gameplay feel, visuals, performance and the Android build have **not** been tested. The first job is to run it in the Editor.
 
+## Browser preview
+
+`WebPreview/` contains a single-page browser version of the same milestone, built from the same JSON data, so the game can be tried from a link without Unity. It uses Three.js and saves progress in the browser.
+- Build it with `python3 -I WebPreview/build.py out.html` (add `--standalone` to open the file directly).
+- The full loop was played through in headless Chromium on desktop and phone sizes: book ISB→LHE (−120), first-visit reward (+200), four landmark visits (+75 each), then reload and Continue. There were no console errors.
+- The Unity project is still the main target; the preview is for quick checking only.
+
 ## Completed
 
 - **Project setup.** Separate Unity project in `world-tour/`; the rest of the repo is untouched. The game starts itself from code, so no scene authoring is needed.
