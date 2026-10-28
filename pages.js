@@ -296,7 +296,7 @@ function megaMenu() {
     `<a class="mega-head" href="/converters">All ${TOTAL_COUNT.toLocaleString('en-US')} conversions &rarr;</a>`]);
   groups.push(['pdf-tools', 'PDF tools', pdfGroups().flatMap(([, items]) => items).map(([href, label]) => ({ id: 'pdf', href, text: esc(label), live: true })),
     '<a class="mega-head" href="/pdf-tools">All PDF tools &rarr;</a>']);
-  groups.push(['apps', 'Image &amp; more tools', MENU_APPS.map((t) => ({ id: APP_ICON[t.app] || 'jpg', href: `/${t.slug}`, text: esc(t.name), live: true })),
+  groups.push(['apps', 'Image & more tools', MENU_APPS.map((t) => ({ id: APP_ICON[t.app] || 'jpg', href: `/${t.slug}`, text: esc(t.name), live: true })),
     '<span class="mega-head">Photo, video, text and document tools</span>']);
   CATS.forEach((c) => {
     const items = registry.getFormatsByCategory(c.id).map((f) => ({ id: f.id, href: formatPath(f.id), live: formatIsLive(f.id) }));
