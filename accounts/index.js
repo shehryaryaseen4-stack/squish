@@ -17,6 +17,7 @@ const store = require('./store');
 const admin = require('./admin');
 const mail = require('./mail');
 const analytics = require('./analytics');
+const feedback = require('./feedback');
 // PDF tools that run in the browser report their use with the beacon (names only from this list).
 const BROWSER_TOOLS = new Set(require('../content/pdf-tools').tools.filter((t) => t.browser).map((t) => t.name));
 
@@ -141,6 +142,16 @@ function mount(app, { pages, baseOf }) {
     if (b.e === 'pdf' || b.e === 'combine') analytics.event(req, b.e, { p: b.p, d: b.d });
     else if (b.e === 'tool') { if (BROWSER_TOOLS.has(b.d)) analytics.event(req, 'tool', { pair: b.d, p: b.p }); }
     else analytics.pageview(req, b, req.get('host'));
+    res.set('Cache-Control', 'no-store').status(204).end();
+  });
+
+  // Ratings from the "How was your experience?" popup (accounts/feedback.js).
+  const feedbackLimit = rateLimit({ windowMs: 60 * 60 * 1000, max: 10, standardHeaders: false, legacyHeaders: false });
+  app.post('/api/feedback', feedbackLimit, json, (req, res) => {
+    const b = req.body && typeof req.body === 'object' ? req.body : {};
+    const origin = req.get('origin');
+    if (origin) { try { if (new URL(origin).host !== req.get('host')) return res.status(204).end(); } catch { return res.status(204).end(); } }
+    if (feedback.add({ rating: b.rating, text: b.text, page: b.p, country: req.get('cf-ipcountry') })) analytics.event(req, 'rating', { p: b.p, d: `${Math.round(Number(b.rating))} stars` });
     res.set('Cache-Control', 'no-store').status(204).end();
   });
 
@@ -330,7 +341,7 @@ function mount(app, { pages, baseOf }) {
   app.get(A, (req, res) => {
     if (!isAdmin(req)) return html(res, admin.loginPage(A));
     const range = analytics.RANGES[req.query.range] ? req.query.range : 'today';
-    html(res, admin.dashboard({ users: store.users(), daily: store.daily(), path: A, store, stats: analytics.summary(range), range, accounts: ON, channelOf: analytics.channelOf }));
+    html(res, admin.dashboard({ users: store.users(), daily: store.daily(), path: A, store, stats: analytics.summary(range), range, accounts: ON, channelOf: analytics.channelOf, ratings: feedback.summary() }));
   });
   app.post(`${A}/login`, authLimit, json, sameOrigin, (req, res) => {
     const same = (a, b) => { const x = crypto.createHash('sha256').update(String(a)).digest(); return crypto.timingSafeEqual(x, crypto.createHash('sha256').update(String(b)).digest()); };

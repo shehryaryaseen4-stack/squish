@@ -196,7 +196,16 @@ function journeys(recent, tz, oneDay, channelOf) {
 
 const RANGE_LABELS = [['today', 'Today', 'today', 'yesterday'], ['yesterday', 'Yesterday', 'yesterday', 'the day before'], ['7d', '7 days', 'the last 7 days', 'the 7 days before'], ['30d', '30 days', 'the last 30 days', 'the 30 days before'], ['90d', '90 days', 'the last 90 days', 'the 90 days before']];
 
-function dashboard({ users, daily, path, store, stats, range = 'today', accounts = false, channelOf = () => 'Other sites' }) {
+// Ratings from the "How was your experience?" popup: average, stars and the latest comments.
+function ratingsCard(R, tz) {
+  if (!R.count) return card('Visitor ratings', 'After a file is ready, visitors are asked how it went.', '<p class="ad-empty-s">No ratings yet.</p>');
+  const bars = [5, 4, 3, 2, 1].map((n) => `<li><span>${n} &#9733;</span><i style="--w:${Math.round((R.stars[n] / R.count) * 100)}%"></i><b>${fmt(R.stars[n])}</b></li>`).join('');
+  const recent = R.recent.filter((f) => f.c).slice(0, 15).map((f) => `<li><span class="ad-stars">${'&#9733;'.repeat(f.r)}${'&#9734;'.repeat(5 - f.r)}</span><q>${esc(f.c)}</q><span class="ad-dim">${esc(f.p || '')} &middot; ${esc(when(f.t, tz))}${f.cc ? ` &middot; ${flag(f.cc)}` : ''}</span></li>`).join('');
+  return card(`Visitor ratings <span class="ad-dim">${R.average.toFixed(1)} &#9733; from ${plural(R.count, 'rating')}</span>`, 'After a file is ready, visitors are asked how it went. Everyone also gets the link to review the site on Google.',
+    `<div class="ad-ratings"><ul class="ad-rbars">${bars}</ul>${recent ? `<ul class="ad-comments">${recent}</ul>` : '<p class="ad-empty-s">No written comments yet.</p>'}</div>`, 'ad-span2');
+}
+
+function dashboard({ users, daily, path, store, stats, range = 'today', accounts = false, channelOf = () => 'Other sites', ratings = null }) {
   const tz = store.TZ;
   const S = stats, P = S.prev || { views: 0, visitors: 0, actors: 0, events: {} };
   const ev = (k, o = S.events) => o[k] || 0;
@@ -306,6 +315,7 @@ function dashboard({ users, daily, path, store, stats, range = 'today', accounts
     </div>
     ${Object.keys(S.refs).length ? card('Websites linking to you', 'Other websites that sent visitors.', rank(S.refs, { label: (k) => `<a href="https://${esc(k)}" target="_blank" rel="noopener nofollow">${esc(k)}</a>` }), 'ad-span2') : ''}
   </div>
+  ${ratings ? ratingsCard(ratings, tz) : ''}
   ${card(`Visitor journeys <span class="ad-dim">${range === 'today' ? 'live, newest first' : 'newest first'}</span>`, 'Each line is one visitor: where they came from, the pages they opened and what they did. Visitors are shown as a short code, never by name or IP address.', journeys(S.recent, tz, oneDay, channelOf), 'ad-journey-card')}
   ${accountsHtml}
   <p class="ad-foot">Times are ${esc(tz.replace('_', ' '))} time. ${range === 'today' ? 'This page updates itself every minute. ' : ''}Visitors are counted without cookies: the same person on the same device counts once a day. Search engine robots and visitors who block scripts are not counted.</p>

@@ -87,6 +87,99 @@
   window.addEventListener("pt:done", thanks);
   window.addEventListener("ff:converted", thanks);
 
+  // "How was your experience?": a short rating popup the second time a visitor gets a file ready
+  // (on a later page or visit, never the first, so it never gets in the way of a first-time
+  // visitor), at most twice, 30 days apart,
+  // and never again once they rate. Every rating, high or low, gets the same invitation to review
+  // the site on Google (Google does not allow asking only happy visitors) plus an optional comment
+  // for us, which the owner reads on the dashboard (accounts/feedback.js).
+  const REVIEW = document.body.dataset.review || "";
+  const ls = (k, v) => { try { if (v === undefined) return localStorage.getItem("ff:" + k); localStorage.setItem("ff:" + k, v); } catch (_) { /* storage off */ } return null; };
+  let askedHere = false, usedHere = false;
+  function maybeAsk(){
+    if (usedHere) return; // one use per page, however many files or re-renders
+    usedHere = true;
+    const uses = Number(ls("uses") || 0) + 1;
+    ls("uses", String(uses));
+    const asks = Number(ls("asks") || 0), last = Number(ls("askedAt") || 0);
+    if (askedHere || ls("rated") || uses < 2 || asks >= 2 || Date.now() - last < 30 * 864e5) return;
+    askedHere = true;
+    setTimeout(() => { if (!document.querySelector("dialog[open]")) askRating(); }, 2500);
+  }
+  window.addEventListener("pt:done", maybeAsk);
+  window.addEventListener("ff:converted", maybeAsk);
+
+  const STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.6 2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.5l-5.9 3.1 1.2-6.5L2.5 9.5l6.6-.9z"/></svg>';
+  function askRating(){
+    ls("asks", String(Number(ls("asks") || 0) + 1));
+    ls("askedAt", String(Date.now()));
+    const dlg = document.createElement("dialog");
+    dlg.className = "rate-dlg";
+    dlg.setAttribute("aria-labelledby", "rateTitle");
+    dlg.innerHTML = `<button type="button" class="rate-x" aria-label="Close">&times;</button>
+      <div class="rate-step" data-step="1">
+        <div class="rate-badge" aria-hidden="true">${STAR}</div>
+        <h2 id="rateTitle">How was your experience with ${esc(SITE_NAME)}?</h2>
+        <p class="rate-sub">Your rating helps us keep these tools free, fast and easy to use.</p>
+        <div class="rate-stars" role="radiogroup" aria-label="Your rating">${[1, 2, 3, 4, 5].map(n => `<button type="button" class="rate-star" role="radio" aria-checked="false" data-n="${n}" aria-label="${n} star${n > 1 ? "s" : ""}">${STAR}</button>`).join("")}</div>
+        <div class="rate-scale" aria-hidden="true"><span>Not good</span><span>Excellent</span></div>
+      </div>
+      <div class="rate-step" data-step="2" hidden>
+        <div class="rate-chosen" aria-hidden="true"></div>
+        <h2 class="rate-h2"></h2>
+        ${REVIEW ? `<p class="rate-sub">Would you share your experience on Google? It takes a minute and helps others find tools they can trust.</p>
+        <a class="btn btn-brand rate-google" href="${esc(REVIEW)}" target="_blank" rel="noopener"><span class="rate-g" aria-hidden="true">G</span>Write a review on Google</a>
+        <div class="rate-or"><span>or tell us directly</span></div>` : ""}
+        <label class="rate-label" for="rateText"></label>
+        <textarea id="rateText" class="rate-text" rows="3" maxlength="1000"></textarea>
+        <div class="rate-actions"><button type="button" class="btn btn-ghost rate-close">No thanks</button><button type="button" class="btn ${REVIEW ? "btn-ghost" : "btn-brand"} rate-send">Send feedback</button></div>
+      </div>
+      <div class="rate-step" data-step="3" hidden>
+        <div class="rate-badge rate-done" aria-hidden="true">&#10003;</div>
+        <h2>Thank you!</h2>
+        <p class="rate-sub">We read every message. It helps us decide what to improve next.</p>
+        <div class="rate-actions"><button type="button" class="btn btn-brand rate-close">Close</button></div>
+      </div>`;
+    document.body.appendChild(dlg);
+    let rating = 0, sent = false;
+    const send = (text) => {
+      if (sent || !rating) return;
+      sent = true;
+      fetch("/api/feedback", { method: "POST", keepalive: true, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rating, text: text || "", p: location.pathname }) }).catch(() => {});
+    };
+    const step = (n) => dlg.querySelectorAll(".rate-step").forEach(s => { s.hidden = s.dataset.step !== String(n); });
+    const close = () => { send(dlg.querySelector(".rate-text").value.trim()); dlg.close(); };
+    dlg.addEventListener("close", () => { send(dlg.querySelector(".rate-text").value.trim()); dlg.remove(); });
+    dlg.querySelector(".rate-x").addEventListener("click", close);
+    dlg.querySelectorAll(".rate-close").forEach(b => b.addEventListener("click", close));
+    dlg.addEventListener("click", e => { if (e.target === dlg) close(); }); // a click outside the card
+    const stars = [...dlg.querySelectorAll(".rate-star")];
+    const light = (n) => stars.forEach((s, i) => s.classList.toggle("on", i < n));
+    stars.forEach(s => {
+      s.addEventListener("mouseenter", () => light(Number(s.dataset.n)));
+      s.addEventListener("mouseleave", () => light(rating));
+      s.addEventListener("click", () => {
+        rating = Number(s.dataset.n);
+        light(rating);
+        stars.forEach(x => x.setAttribute("aria-checked", String(x === s)));
+        ls("rated", String(rating));
+        dlg.querySelector(".rate-chosen").innerHTML = stars.map((_, i) => `<span class="${i < rating ? "on" : ""}">${STAR}</span>`).join("");
+        dlg.querySelector(".rate-h2").textContent = rating >= 4 ? "Thank you! We're glad it helped." : rating === 3 ? "Thanks for your rating." : "Sorry it wasn't better.";
+        dlg.querySelector(".rate-label").textContent = rating >= 4 ? "Anything we could make even better? (optional)" : "What went wrong, or what could we improve? (optional)";
+        setTimeout(() => { step(2); (dlg.querySelector(".rate-google") || dlg.querySelector(".rate-text")).focus(); }, 250);
+      });
+    });
+    const google = dlg.querySelector(".rate-google");
+    if (google) google.addEventListener("click", () => { send(dlg.querySelector(".rate-text").value.trim()); setTimeout(() => dlg.close(), 300); });
+    dlg.querySelector(".rate-send").addEventListener("click", () => {
+      const text = dlg.querySelector(".rate-text").value.trim();
+      if (!text) { dlg.querySelector(".rate-text").focus(); return; }
+      send(text);
+      step(3);
+    });
+    dlg.showModal();
+  }
+
   // Ad slots: present only when ADSENSE_CLIENT and slot IDs are set on the server.
   // adsbygoogle.push() throws when a slot is already filled or the ad script is blocked; that must
   // never stop the rest of this file (menus, search, the converter), so each push is guarded.

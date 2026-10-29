@@ -188,3 +188,15 @@ a{color:inherit;}
   .ad-tiles > :last-child{grid-column:1 / -1;}
   .ad-users-head .ad-search{max-width:none;}
 }
+
+/* Visitor ratings */
+.ad-ratings{display:grid; grid-template-columns:minmax(180px, 260px) 1fr; gap:22px; align-items:start;}
+.ad-rbars{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:7px;}
+.ad-rbars li{display:grid; grid-template-columns:38px 1fr 42px; align-items:center; gap:8px; font-size:.9rem;}
+.ad-rbars i{display:block; height:9px; border-radius:6px; background:linear-gradient(90deg, #F5A623 var(--w), rgba(127,127,127,.18) var(--w));}
+.ad-rbars b{text-align:right;}
+.ad-comments{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:12px; max-height:360px; overflow:auto;}
+.ad-comments li{display:flex; flex-direction:column; gap:3px; padding-bottom:10px; border-bottom:1px solid rgba(127,127,127,.18);}
+.ad-comments q{quotes:none;}
+.ad-stars{color:#F5A623; letter-spacing:1px; font-size:.9rem;}
+@media (max-width:720px){ .ad-ratings{grid-template-columns:1fr;} }
