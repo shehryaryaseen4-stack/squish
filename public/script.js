@@ -91,9 +91,10 @@
   // (on a later page or visit, never the first, so it never gets in the way of a first-time
   // visitor), at most twice, 30 days apart,
   // and never again once they rate. Every rating, high or low, gets the same invitation to review
-  // the site on Google (Google does not allow asking only happy visitors) plus an optional comment
+  // the site (Trustpilot, Google ...; neither allows asking only happy visitors) plus an optional comment
   // for us, which the owner reads on the dashboard (accounts/feedback.js).
-  const REVIEW = document.body.dataset.review || "";
+  const REVIEW = document.body.dataset.review || "", REVIEW_SITE = document.body.dataset.reviewSite || "a review site";
+  const REVIEW_ICON = { Google: '<span class="rate-g" aria-hidden="true">G</span>', Trustpilot: '<span class="rate-tp" aria-hidden="true">&#9733;</span>' }[REVIEW_SITE] || "";
   const ls = (k, v) => { try { if (v === undefined) return localStorage.getItem("ff:" + k); localStorage.setItem("ff:" + k, v); } catch (_) { /* storage off */ } return null; };
   let askedHere = false, usedHere = false;
   function maybeAsk(){
@@ -127,8 +128,8 @@
       <div class="rate-step" data-step="2" hidden>
         <div class="rate-chosen" aria-hidden="true"></div>
         <h2 class="rate-h2"></h2>
-        ${REVIEW ? `<p class="rate-sub">Would you share your experience on Google? It takes a minute and helps others find tools they can trust.</p>
-        <a class="btn btn-brand rate-google" href="${esc(REVIEW)}" target="_blank" rel="noopener"><span class="rate-g" aria-hidden="true">G</span>Write a review on Google</a>
+        ${REVIEW ? `<p class="rate-sub">Would you share your experience on ${esc(REVIEW_SITE)}? It takes a minute and helps others find tools they can trust.</p>
+        <a class="btn btn-brand rate-google" href="${esc(REVIEW)}" target="_blank" rel="noopener">${REVIEW_ICON}Write a review on ${esc(REVIEW_SITE)}</a>
         <div class="rate-or"><span>or tell us directly</span></div>` : ""}
         <label class="rate-label" for="rateText"></label>
         <textarea id="rateText" class="rate-text" rows="3" maxlength="1000"></textarea>

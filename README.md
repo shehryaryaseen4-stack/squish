@@ -234,7 +234,7 @@ and earning links from other sites.
 | `INDEXNOW_KEY` | unset | Serves `/<key>.txt` for IndexNow. |
 | `TWITTER_SITE` | unset | `twitter:site` handle on share cards. |
 | `SITE_UPDATED` | content file dates | Sitemap `lastmod` override (YYYY-MM-DD). |
-| `GOOGLE_REVIEW_URL` | unset | Google review link (`https://g.page/r/.../review`) for the "How was your experience?" popup shown the second time a visitor finishes a file. Ratings and comments appear on the dashboard (`DATA_DIR/feedback.json`); every rating gets the same Google invitation, as Google's review policy requires. |
+| `REVIEW_URL` (or `GOOGLE_REVIEW_URL`) | unset | Public review page for the "How was your experience?" popup shown the second time a visitor finishes a file, e.g. `https://www.trustpilot.com/evaluate/yourdomain.com`; the button names the site (Trustpilot, Google ...). Ratings and comments appear on the dashboard (`DATA_DIR/feedback.json`); every rating gets the same invitation, as review sites require. |
 | `PDF_AI` | unset | `1` switches on the PDF intelligence tools (`/ai-pdf-summarizer`, `/translate-pdf`, `/pdf-to-markdown`); without it they have no page, link or API route. |
 | `ANTHROPIC_API_KEY` | unset | Turns on the AI tools (`/ai-pdf-summarizer` with chat, `/translate-pdf`), which use Claude through the Anthropic API. Without it their pages say the AI is not switched on yet. `/pdf-to-markdown` needs no key. |
 | `AI_MODEL` | `claude-opus-5-5` | Claude model for the AI tools. `claude-haiku-5-5` is far cheaper per request. |

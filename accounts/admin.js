@@ -201,7 +201,7 @@ function ratingsCard(R, tz) {
   if (!R.count) return card('Visitor ratings', 'After a file is ready, visitors are asked how it went.', '<p class="ad-empty-s">No ratings yet.</p>');
   const bars = [5, 4, 3, 2, 1].map((n) => `<li><span>${n} &#9733;</span><i style="--w:${Math.round((R.stars[n] / R.count) * 100)}%"></i><b>${fmt(R.stars[n])}</b></li>`).join('');
   const recent = R.recent.filter((f) => f.c).slice(0, 15).map((f) => `<li><span class="ad-stars">${'&#9733;'.repeat(f.r)}${'&#9734;'.repeat(5 - f.r)}</span><q>${esc(f.c)}</q><span class="ad-dim">${esc(f.p || '')} &middot; ${esc(when(f.t, tz))}${f.cc ? ` &middot; ${flag(f.cc)}` : ''}</span></li>`).join('');
-  return card(`Visitor ratings <span class="ad-dim">${R.average.toFixed(1)} &#9733; from ${plural(R.count, 'rating')}</span>`, 'After a file is ready, visitors are asked how it went. Everyone also gets the link to review the site on Google.',
+  return card(`Visitor ratings <span class="ad-dim">${R.average.toFixed(1)} &#9733; from ${plural(R.count, 'rating')}</span>`, 'After a file is ready, visitors are asked how it went. Everyone also gets the link to review the site publicly (REVIEW_URL).',
     `<div class="ad-ratings"><ul class="ad-rbars">${bars}</ul>${recent ? `<ul class="ad-comments">${recent}</ul>` : '<p class="ad-empty-s">No written comments yet.</p>'}</div>`, 'ad-span2');
 }
 

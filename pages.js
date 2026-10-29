@@ -62,9 +62,21 @@ const PDF_TOOL_BY_SLUG = new Map(PDF_TOOLS.map((t) => [t.slug, t]));
 
 const SITE = process.env.SITE_NAME || brand.NAME;
 const CONTACT_EMAIL = process.env.CONTACT_EMAIL || '';
-// The "How was your experience?" popup links here (the site's Google Business Profile review
-// link, e.g. https://g.page/r/XXXX/review); without it the popup only collects ratings.
-const REVIEW_URL = /^https:\/\/[^\s"<>]+$/.test(process.env.GOOGLE_REVIEW_URL || '') ? process.env.GOOGLE_REVIEW_URL : '';
+// The "How was your experience?" popup links to the site's public review page: REVIEW_URL
+// (Trustpilot, e.g. https://www.trustpilot.com/evaluate/flipitfree.com, or any review site) or
+// GOOGLE_REVIEW_URL (https://g.page/r/XXXX/review). The button names the site from the address.
+// Without one, the popup only collects ratings for the dashboard.
+const REVIEW_URL = [process.env.REVIEW_URL, process.env.GOOGLE_REVIEW_URL].find((u) => /^https:\/\/[^\s"<>]+$/.test(u || '')) || '';
+const REVIEW_SITE = (() => {
+  let host = '';
+  try { host = new URL(REVIEW_URL).hostname.replace(/^www\./, ''); } catch { return ''; }
+  if (/trustpilot\./.test(host)) return 'Trustpilot';
+  if (/(^|\.)google\.|^g\.page$/.test(host)) return 'Google';
+  if (/sitejabber\./.test(host)) return 'Sitejabber';
+  if (/g2\.com$/.test(host)) return 'G2';
+  if (/alternativeto\./.test(host)) return 'AlternativeTo';
+  return host;
+})();
 // The site's social profiles (Facebook, YouTube, X...), comma separated; they tell search engines
 // which accounts belong to this brand (Organization.sameAs).
 const SOCIAL_LINKS = (process.env.SOCIAL_LINKS || '').split(/[\s,]+/).filter((u) => /^https:\/\/[^\s"<>]+$/.test(u));
@@ -639,7 +651,7 @@ function baseFields(base, urlPath, title, desc, extra) {
   return {
     TITLE: esc(title), META_DESC: esc(desc), ROBOTS: 'index, follow, max-image-preview:large, max-snippet:-1', URL: url,
     CANONICAL_TAG: `<link rel="canonical" href="${url}">`,
-    TOPBAR: topbar(true), FOOTER: footer(), DEFAULT_FORMAT: 'auto', REVIEW_ATTR: REVIEW_URL ? ` data-review="${esc(REVIEW_URL)}"` : '', JSONLD: '{}', TOOL: '', CONTENT: '', RELATED: '', BODY: '', PRIVACY: PRIVACY_SERVER, SCRIPTS: '',
+    TOPBAR: topbar(true), FOOTER: footer(), DEFAULT_FORMAT: 'auto', REVIEW_ATTR: REVIEW_URL ? ` data-review="${esc(REVIEW_URL)}" data-review-site="${esc(REVIEW_SITE)}"` : '', JSONLD: '{}', TOOL: '', CONTENT: '', RELATED: '', BODY: '', PRIVACY: PRIVACY_SERVER, SCRIPTS: '',
     CSS_V: seo.ASSET_V.css, JS_V: seo.ASSET_V.js,
     _url: url, _title: esc(title), _desc: esc(desc), _image: `${base}/og/${ogKey(urlPath)}.png`, _noindex: false,
     ...extra,

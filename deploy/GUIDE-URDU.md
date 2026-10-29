@@ -156,13 +156,12 @@ AI PDF Summarizer (chat ke saath) aur Translate PDF, Anthropic ka Claude AI iste
 
 Key sirf `.env` mein rakhein: kisi ko na bhejein, chat ya GitHub mein bhi nahi. Kharche ki hadd ke liye `.env` mein `AI_DAILY_MAX` (poori site, roz ki requests) aur `AI_PER_HOUR` (ek visitor, ghante ki requests) badal sakte hain, aur Anthropic console mein bhi monthly limit lagayein. Sasta model chahiye ho to `AI_MODEL=claude-haiku-5-5`.
 
-## Google review popup
+## Review popup (Trustpilot)
 
-Jab koi visitor doosri dafa file convert karta hai to ek popup poochta hai "How was your experience?". Stars aur comment aap ke dashboard (`/admin`) pe "Visitor ratings" me aate hain. Google review ka button tab aata hai jab link set ho:
+Jab koi visitor doosri dafa file convert karta hai to popup poochta hai "How was your experience?". Stars aur comment aap ke dashboard (`/admin`) pe "Visitor ratings" me aate hain. Review ka button tab aata hai jab link set ho:
 
-1. https://business.google.com pe apni site ka **Google Business Profile** banayein (online business / service area chun sakte hain).
-2. Profile me **"Ask for reviews"** / **"Get more reviews"** pe click karein aur link copy karein (aisa: `https://g.page/r/XXXX/review`).
-3. Server pe `nano /opt/flipfree/.env` me likhein: `GOOGLE_REVIEW_URL=https://g.page/r/XXXX/review`
-4. Save karke `bash /opt/flipfree/deploy/update.sh` chalayein.
+1. https://business.trustpilot.com pe free account banayein (domain wali email se verify).
+2. Server pe `nano /opt/flipfree/.env` me likhein: `REVIEW_URL=https://www.trustpilot.com/evaluate/flipitfree.com`
+3. Save karke `bash /opt/flipfree/deploy/update.sh` chalayein.
 
-Google ki policy: review sirf khush logon se mangna mana hai, is liye popup har rating wale ko Google ka button dikhata hai.
+Button khud "Write a review on Trustpilot" likhta hai. Trustpilot aur Google dono ki policy: review sirf khush logon se mangna mana hai, is liye popup har rating wale ko button dikhata hai. (Google Business Profile sirf un businesses ko milti hai jo customers se aamne saamne milte hain; sirf website ke liye nahi.)

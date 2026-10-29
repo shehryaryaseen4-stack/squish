@@ -26,11 +26,12 @@ test('ratings are kept with their comment, newest first, and summed up', () => {
   assert.equal(require('../accounts/feedback').summary().count, 2, 'saved to DATA_DIR/feedback.json');
 });
 
-test('pages carry the Google review link only when it is a valid https URL', () => {
+test('pages carry the review link only when it is a valid https URL, with the site named', () => {
   const { execFileSync } = require('child_process');
-  const body = (url) => execFileSync(process.execPath, ['-e', "const p=require('./pages'); process.stdout.write(/<body[^>]*>/.exec(p.homePage('https://x'))[0])"],
-    { cwd: path.join(__dirname, '..'), env: { ...process.env, GOOGLE_REVIEW_URL: url } }).toString();
-  assert.match(body('https://g.page/r/ABC123/review'), /data-review="https:\/\/g\.page\/r\/ABC123\/review"/);
-  assert.doesNotMatch(body('javascript:alert(1)'), /data-review/);
-  assert.doesNotMatch(body(''), /data-review/);
+  const body = (env) => execFileSync(process.execPath, ['-e', "const p=require('./pages'); process.stdout.write(/<body[^>]*>/.exec(p.homePage('https://x'))[0])"],
+    { cwd: path.join(__dirname, '..'), env: { ...process.env, REVIEW_URL: '', GOOGLE_REVIEW_URL: '', ...env } }).toString();
+  assert.match(body({ REVIEW_URL: 'https://www.trustpilot.com/evaluate/flipitfree.com' }), /data-review="https:\/\/www\.trustpilot\.com\/evaluate\/flipitfree\.com" data-review-site="Trustpilot"/);
+  assert.match(body({ GOOGLE_REVIEW_URL: 'https://g.page/r/ABC123/review' }), /data-review="https:\/\/g\.page\/r\/ABC123\/review" data-review-site="Google"/);
+  assert.doesNotMatch(body({ REVIEW_URL: 'javascript:alert(1)' }), /data-review/);
+  assert.doesNotMatch(body({}), /data-review/);
 });
