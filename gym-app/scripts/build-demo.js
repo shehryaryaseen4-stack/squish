@@ -84,6 +84,7 @@ const modules = {
   './net': lib('net.js'),
   './reminders': lib('reminders.js'),
   './enroll': lib('enroll.js'),
+  './gate': lib('gate.js'),
   './demo': lib('demo.js'),
   './store': browserStore,
   './api': lib('api.js'),

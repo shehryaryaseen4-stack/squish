@@ -2119,7 +2119,7 @@
     const badge = (dv) => (dv.online ? '<span class="badge badge-good"><i class="dot"></i>Connected</span>' : dv.lastSeen ? '<span class="badge badge-warn">Offline</span>' : '<span class="badge badge-muted">Not connected yet</span>');
     box.innerHTML = `${added.map((dv) => `<div class="card item"><div class="ic-tile">${icon(dv.protocol === 'hik' || dv.type === 'zk-face' ? 'user' : 'fingerprint')}</div>
       <div class="tx"><b>${esc(dv.name)} ${badge(dv)}</b><span>${esc(typeName(dv.type))}${dv.sn ? ` · serial ${esc(dv.sn)}` : ''} · ${dv.punches} punches${dv.lastSeen ? ` · last seen ${new Date(dv.lastSeen).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}` : ''}${dv.unknownIds?.length ? ` · <span class="money-neg">IDs not matching a member: ${dv.unknownIds.map(esc).join(', ')}</span>` : ''}</span></div>
-      <div class="acts"><button class="btn btn-ghost btn-sm" data-setup="${esc(dv.id)}">${icon('info')}Setup</button><button class="btn btn-soft btn-sm" data-check="${esc(dv.id)}">${icon('refresh')}Check</button>${dv.protocol === 'zk' ? `<button class="btn btn-ghost btn-sm" data-syncall="${esc(dv.id)}" title="Put every member's name and number on this machine">${icon('users')}Send members</button>` : ''}<button class="icon-btn" data-rename="${esc(dv.id)}" aria-label="Rename">${icon('edit')}</button><button class="icon-btn" data-rmdev="${esc(dv.id)}" aria-label="Remove">${icon('trash')}</button></div></div>`).join('')}
+      <div class="acts"><button class="btn btn-ghost btn-sm" data-setup="${esc(dv.id)}">${icon('info')}Setup</button><button class="btn btn-soft btn-sm" data-check="${esc(dv.id)}">${icon('refresh')}Check</button>${dv.protocol === 'zk' ? `<button class="btn btn-ghost btn-sm" data-syncall="${esc(dv.id)}" title="Put every member's name and number on this machine">${icon('users')}Send members</button><button class="btn btn-${dv.gateOn ? 'soft' : 'ghost'} btn-sm" data-gate="${esc(dv.id)}">${icon('lock')}Gate${dv.gateOn ? ` · ${dv.gateBlockedCount} blocked` : ''}</button><button class="btn btn-ghost btn-sm" data-log="${esc(dv.id)}">${icon('list')}Log</button>` : ''}<button class="icon-btn" data-rename=""${esc(dv.id)}" aria-label="Rename">${icon('edit')}</button><button class="icon-btn" data-rmdev="${esc(dv.id)}" aria-label="Remove">${icon('trash')}</button></div></div>`).join('')}
       ${found.map((dv) => `<div class="card item" style="border-style:dashed"><div class="ic-tile">${icon('alert')}</div><div class="tx"><b>New machine found · serial ${esc(dv.sn)}</b><span>It is calling the server but hasn't been added. Is it yours?</span></div>
         <div class="acts"><button class="btn btn-primary btn-sm" data-addfound="${esc(dv.sn)}">Add it</button><button class="icon-btn" data-rmdev="${esc(dv.id)}" aria-label="Ignore">${icon('x')}</button></div></div>`).join('')}
       ${!added.length && !found.length ? `<div class="note-box" style="margin:0;background:var(--surface-2)">${icon('info')}<span>No machine yet. Press <b>Add machine</b>, pick the one you have, and follow the steps.</span></div>` : ''}`;
@@ -2131,6 +2131,8 @@
       if (!(await confirmSheet({ title: 'Send all members to this machine?', message: 'Every member\u2019s number and name is added to the machine, ready for a finger or face. Fingerprints already on the machine stay.', confirm: 'Send members' }))) return;
       try { const r = await api(`/api/admin/devices/${b.dataset.syncall}/sync`, { method: 'POST' }); toast(`${r.queued} members will be on the machine within a few minutes`); } catch (err) { toast(err.message, 'bad'); }
     }));
+    box.querySelectorAll('[data-gate]').forEach((b) => b.addEventListener('click', () => gateSheet(byId(b.dataset.gate))));
+    box.querySelectorAll('[data-log]').forEach((b) => b.addEventListener('click', () => logSheet(byId(b.dataset.log))));
     box.querySelectorAll('[data-rmdev]').forEach((b) => b.addEventListener('click', async () => {
       if (!(await confirmSheet({ title: 'Remove this machine?', message: 'Punches from it will be refused until you add it again.', confirm: 'Remove', danger: true }))) return;
       await api(`/api/admin/devices/${b.dataset.rmdev}`, { method: 'DELETE' });
@@ -2141,6 +2143,83 @@
       html: `<input class="input" data-name value="${esc(byId(b.dataset.rename).name)}" maxlength="60"><div class="sheet-actions"><button class="btn btn-primary" data-ok>Save</button></div>`,
       onMount: (el, close) => el.querySelector('[data-ok]').addEventListener('click', async () => { await api(`/api/admin/devices/${b.dataset.rename}`, { method: 'PUT', body: { name: el.querySelector('[data-name]').value } }); close(); drawDevices(); }),
     })));
+  }
+
+  // ---- the gate: members whose fee has run out can't open it -------------------------------
+
+  async function gateSheet(dv) {
+    let st = await api(`/api/admin/devices/${dv.id}/gate`);
+    sheet({
+      title: `Gate · ${dv.name}`,
+      wide: true,
+      html: '<div data-gate-body></div>',
+      onMount: (el, close) => {
+        const body = el.querySelector('[data-gate-body]');
+        const draw = () => {
+          const access = st.mode === 'access';
+          body.innerHTML = `<p class="muted" style="margin:0 0 12px">The machine opens the gate by itself when a face or finger matches. Turn this on and the app tells the machine who may pass: members whose fee has run out can’t get in, and can again within half a minute of paying.</p>
+            <label class="toggle-row"><span><b>Keep out members whose fee has run out</b><br><span class="muted" style="font-weight:500;font-size:13px">Also members not paid yet, frozen, or marked as left</span></span><span class="switch"><input type="checkbox" data-on ${st.enabled ? 'checked' : ''}><span></span></span></label>
+            <label class="field" style="margin-top:10px"><span>Let them in for a few days after the fee ends</span><select class="select" data-grace>${[[0, 'No, block on the first day'], [1, '1 day'], [2, '2 days'], [3, '3 days'], [5, '5 days'], [7, '7 days']].map(([v, l]) => `<option value="${v}" ${st.graceDays === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+            <div class="note-box" style="margin:12px 0;background:var(--surface-2)">${icon('info')}<span>${access
+              ? '<b>Access-control mode.</b> Blocked members stay on the machine with their face; only their right to open the door is taken away.'
+              : `<b>Attendance mode.</b> The machine has no “no entry” switch, so blocked members are taken off it and put back after paying, with the face and fingerprints the app has saved (${st.saved} member${st.saved === 1 ? '' : 's'} saved so far). Faces are saved when members register while the machine is connected, or with the button below.`}</span></div>
+            ${!access ? `<label class="toggle-row"><span><b>Also block members whose face isn’t saved yet</b><br><span class="muted" style="font-weight:500;font-size:13px">They will need to register their face again after paying</span></span><span class="switch"><input type="checkbox" data-nobackup ${st.withoutBackup ? 'checked' : ''}><span></span></span></label>` : ''}
+            <h3 style="margin:16px 0 6px;font-size:15px">Blocked now: ${st.blocked.length}</h3>
+            ${st.blocked.length ? `<div class="gate-list">${st.blocked.map((x) => `<span><b>#${x.memberNo}</b> ${esc(x.name)} <small>${esc(x.reason || '')}</small></span>`).join('')}</div>` : '<p class="muted" style="margin:0">Nobody.</p>'}
+            ${st.skipped.length ? `<h3 style="margin:16px 0 6px;font-size:15px">Not blocked, face not saved: ${st.skipped.length}</h3><div class="gate-list">${st.skipped.map((x) => `<span><b>#${x.memberNo}</b> ${esc(x.name)}</span>`).join('')}</div>` : ''}
+            <div class="sheet-actions">${!access ? `<button class="btn btn-ghost" data-backup>${icon('download')}Save faces from the machine</button>` : ''}<button class="btn btn-primary" data-save>${icon('check')}Save</button></div>
+            <p class="muted" style="font-size:12.5px;margin:10px 0 0">After turning this on, test it once: pick a member whose fee has ended, wait a minute, and try the gate. The machine’s answers are in <b>Log</b>.</p>`;
+          body.querySelector('[data-save]').addEventListener('click', (e) => busy(e.currentTarget, async () => {
+            try {
+              st = await api(`/api/admin/devices/${dv.id}/gate`, { method: 'PUT', body: { enabled: body.querySelector('[data-on]').checked, graceDays: Number(body.querySelector('[data-grace]').value), withoutBackup: Boolean(body.querySelector('[data-nobackup]')?.checked) } });
+              toast(st.enabled ? `Gate control on · ${st.blocked.length} blocked` : 'Gate control off: everyone can pass');
+              draw();
+              drawDevices();
+            } catch (err) { toast(err.message, 'bad'); }
+          }));
+          body.querySelector('[data-backup]')?.addEventListener('click', (e) => busy(e.currentTarget, async () => {
+            try { const r = await api(`/api/admin/devices/${dv.id}/backup`, { method: 'POST' }); toast(`Asked the machine for ${r.asked} members’ faces. Check again in a few minutes.`); } catch (err) { toast(err.message, 'bad'); }
+          }));
+        };
+        draw();
+      },
+    });
+  }
+
+  // What the machine sent and what the app answered, to find out why something doesn't work.
+  async function logSheet(dv) {
+    const load = () => api(`/api/admin/devices/${dv.id}/log`);
+    let r = await load();
+    const text = () => r.log.map((x) => `${x.t}  ${x.m} ${x.p}${x.n > 1 ? ` (×${x.n})` : ''}\n${x.body ? `  machine: ${x.body.replace(/\n/g, '\n           ')}\n` : ''}  app ${x.status}: ${x.reply.replace(/\n/g, '\n           ')}`).join('\n\n');
+    sheet({
+      title: `Log · ${dv.name}`,
+      wide: true,
+      html: '<div data-log-body></div>',
+      onMount: (el) => {
+        const body = el.querySelector('[data-log-body]');
+        const draw = () => {
+          body.innerHTML = `<p class="muted" style="margin:0 0 10px">Serial ${esc(r.sn || '')} · ${r.acMode ? 'access-control mode' : 'attendance mode'} · newest first. If something doesn’t work, press <b>Copy log</b> and send it to your app support.</p>
+            ${r.log.length ? `<div class="dev-log">${r.log.map((x) => `<div class="dl ${x.status >= 400 ? 'bad' : ''}"><div class="dl-head"><b>${esc(x.m)} ${esc(x.p)}</b>${x.n > 1 ? `<span class="badge badge-muted">×${x.n}</span>` : ''}<small>${esc(new Date(x.t).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' }))}</small></div>
+              ${x.body ? `<pre class="dl-in">${esc(x.body)}</pre>` : ''}<pre class="dl-out">${esc(`${x.status} ${x.reply}`)}</pre></div>`).join('')}</div>`
+              : `<div class="note-box" style="margin:0;background:var(--surface-2)">${icon('info')}<span>Nothing yet: the machine hasn’t called the app. Check its <b>Cloud Server Setting</b> (address, port, HTTPS) and that it is on the internet.</span></div>`}
+            <div class="sheet-actions"><button class="btn btn-ghost" data-clear>${icon('trash')}Clear</button><button class="btn btn-ghost" data-reload>${icon('refresh')}Refresh</button><button class="btn btn-primary" data-copy>${icon('copy')}Copy log</button></div>`;
+          body.querySelector('[data-copy]').addEventListener('click', async () => {
+            try { await navigator.clipboard.writeText(text()); toast('Log copied'); } catch { downloadText(`machine-log-${r.sn}.txt`, text()); }
+          });
+          body.querySelector('[data-reload]').addEventListener('click', async () => { r = await load(); draw(); });
+          body.querySelector('[data-clear]').addEventListener('click', async () => { await api(`/api/admin/devices/${dv.id}/log`, { method: 'DELETE' }); r = await load(); draw(); });
+        };
+        draw();
+      },
+    });
+  }
+
+  function downloadText(name, text) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
 
   function serverHost() {

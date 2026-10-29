@@ -9,6 +9,7 @@ const v = require('./validate');
 const { PERMISSIONS, PERM_IDS, PRESETS, migrateAccess } = require('./access');
 const { clientIp } = require('./net');
 const { createReminders, TEMPLATES } = require('./reminders');
+const { createGate } = require('./gate');
 const { createEnroll } = require('./enroll');
 
 const { fail, HttpError } = v;
@@ -58,6 +59,8 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
 
   const findMember = (id) => db().members.find((m) => m.id === id) || fail('Member not found', 404);
   const summaryOf = (m, opts) => summarize(db(), m, today(), indexDb(db()), opts);
+  const gate = createGate({ db, store, stamp: () => new Date(clock()).toISOString(), now: () => new Date(clock()).getTime(), enrollment, summaryOf });
+  enrollment.gateState = (dv, m) => dv.gateBlocked?.[m.id]?.how || null;
 
   function summaries() {
     const d = db();
@@ -585,8 +588,8 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
 
   function publicDevice(dv) {
     const seenAgo = dv.lastSeen ? nowMs() - Date.parse(dv.lastSeen) : null;
-    const { commands = [], ...rest } = dv;
-    return { ...rest, online: seenAgo !== null && seenAgo < ONLINE_MS, seenAgo, waiting: commands.filter((c) => c.status === 'pending' || c.status === 'sent').length };
+    const { commands = [], log, gateBlocked, gateSkipped, gateCheckedAt, ...rest } = dv;
+    return { ...rest, online: seenAgo !== null && seenAgo < ONLINE_MS, seenAgo, waiting: commands.filter((c) => c.status === 'pending' || c.status === 'sent').length, gateOn: Boolean(dv.gate?.enabled), gateBlockedCount: Object.keys(gateBlocked || {}).length };
   }
 
   function addDevice(body) {
@@ -630,7 +633,27 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
 
   // ZKTeco & friends: returns [status, text] for the machine. Unknown machines
   // are listed under "found" in Settings until the owner adds them.
+  // Every request a machine makes, and our answer, for the machine's log in Settings.
+  // Repeated "anything for me?" polls are counted on one line.
+  function logDevice(device, method, url, text, status, reply) {
+    if (!device) return;
+    const table = url.searchParams.get('table');
+    const entry = { t: stamp(), m: method, p: `${url.pathname}${table ? `?table=${table}` : ''}`, body: String(text || '').slice(0, 800), status, reply: String(reply || '').slice(0, 600), n: 1 };
+    const log = device.log || [];
+    const last = log[log.length - 1];
+    if (last && !entry.body && !last.body && last.p === entry.p && last.m === entry.m && last.reply === entry.reply && last.status === status) { last.n++; last.t = entry.t; }
+    else log.push(entry);
+    device.log = log.slice(-300);
+  }
+
   function handleDevice(method, url, text) {
+    const result = deviceReply(method, url, text);
+    const sn = String(url.searchParams.get('SN') || '').trim().toUpperCase();
+    logDevice(db().devices.find((x) => x.protocol === 'zk' && x.sn.toUpperCase() === sn), method, url, text, result[0], result[1]);
+    return result;
+  }
+
+  function deviceReply(method, url, text) {
     const d = db();
     const sn = String(url.searchParams.get('SN') || '').trim().slice(0, 40);
     if (!sn) return [400, 'ERROR: SN missing'];
@@ -644,14 +667,20 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     if (!device.approved) { store.save(); return [403, 'ERROR: add this machine in the gym app first']; }
     const path = url.pathname;
     if (method === 'GET' && path === '/iclock/cdata') { store.save(); return [200, deviceOptions(sn)]; }
-    if (method === 'POST' && path === '/iclock/registry') { store.save(); return [200, `RegistryCode=${sn}`]; }
-    if (path === '/iclock/push') { store.save(); return [200, accessOptions(sn)]; }
+    if (method === 'POST' && path === '/iclock/registry') { device.acMode = true; store.save(); return [200, `RegistryCode=${sn}`]; }
+    if (path === '/iclock/push') { device.acMode = true; store.save(); return [200, accessOptions(sn)]; }
     // The machine asks for work (register a member, scan a finger) and reports back.
-    if (method === 'GET' && path === '/iclock/getrequest') { const reply = enrollment.nextCommands(device); store.save(); return [200, reply]; }
+    if (method === 'GET' && path === '/iclock/getrequest') {
+      gate.check(device);
+      const reply = enrollment.nextCommands(device);
+      store.save();
+      return [200, reply];
+    }
     if (method === 'POST' && path === '/iclock/devicecmd') { enrollment.results(device, text); store.save(); return [200, 'OK']; }
     if (method === 'POST' && path === '/iclock/cdata') {
       const table = url.searchParams.get('table');
       if (/^rtlog$/i.test(table || '')) {
+        device.acMode = true;
         // "time=2026-10-26 18:02:11\tpin=1001\tcardno=0\teventaddr=1\tevent=0\tinoutstatus=0\tverifytype=15"
         let n = 0;
         for (const line of String(text || '').split(/\r?\n/).filter((l) => l.trim())) {
@@ -668,7 +697,9 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
         return [200, `OK: ${n}`];
       }
       if (table !== 'ATTLOG') {
-        const n = enrollment.operlog(text);
+        // Answers to "send me this member's face" come as bare rows of that table.
+        const rows = String(text || '').split(/\r?\n/).map((l) => (l && table && !/^(FP|FACE|BIODATA|USER|USERINFO|FINGERTMP)\s/.test(l) && /^(FINGERTMP|BIODATA|USERINFO|FACE)$/i.test(table) ? `${table.toUpperCase()} ${l}` : l)).join('\n');
+        const n = enrollment.operlog(rows);
         store.save();
         return [200, `OK: ${n}`];
       }
@@ -1190,8 +1221,31 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
       const member = d.members.find((x) => x.memberNo === Number(body.memberNo));
       return { result, member: memberPublic(member), summary: summaryOf(member) };
     }
-    if ((match = pathname.match(/^\/api\/admin\/devices\/([\w.-]+)(\/check|\/sync)?$/))) {
+    if ((match = pathname.match(/^\/api\/admin\/devices\/([\w.-]+)(\/check|\/sync|\/log|\/gate|\/backup)?$/))) {
       const device = d.devices.find((x) => x.id === match[1]) || fail('Machine not found', 404);
+      if (match[2] === '/log') {
+        if (m === 'DELETE') { device.log = []; store.save(); return { log: [] }; }
+        return { log: [...(device.log || [])].reverse(), sn: device.sn, acMode: Boolean(device.acMode) };
+      }
+      if (match[2] === '/gate') {
+        if (device.protocol !== 'zk') fail('The gate can be controlled on ZKTeco-type machines');
+        if (m === 'PUT') {
+          device.gate = {
+            enabled: Boolean(body.enabled),
+            graceDays: [0, 1, 2, 3, 5, 7].includes(Number(body.graceDays)) ? Number(body.graceDays) : 0,
+            withoutBackup: Boolean(body.withoutBackup),
+          };
+          gate.check(device, { force: true });
+          store.save();
+        }
+        return gate.status(device);
+      }
+      if (m === 'POST' && match[2] === '/backup') {
+        if (device.protocol !== 'zk') fail('Only ZKTeco-type machines');
+        const n = gate.backup(device, d.members.filter((x) => !x.left && !gate.hasBackup(x)));
+        store.save();
+        return { asked: n };
+      }
       if (m === 'GET' && match[2] === '/check') return checkDevice(device);
       if (m === 'POST' && match[2] === '/sync') {
         if (device.protocol !== 'zk') fail('Only ZKTeco-type machines take members from the app');

@@ -25,6 +25,7 @@ const PENDING_MS = 10 * 60 * 1000;
 const machineName = (name) => String(name || '').normalize('NFKD').replace(/[^\x20-\x7e]/g, '').replace(/[\t\r\n]/g, ' ').trim().slice(0, 24);
 
 function createEnroll({ db, store, stamp, now = () => Date.now() }) {
+  const api = {};
   const zkDevices = () => db().devices.filter((dv) => dv.protocol === 'zk' && dv.approved);
 
   function queue(device, cmd, meta = {}) {
@@ -42,16 +43,30 @@ function createEnroll({ db, store, stamp, now = () => Date.now() }) {
   }
 
   const userLine = (m, extra = '') => `DATA UPDATE USERINFO PIN=${m.memberNo}\tName=${machineName(m.name)}\tPri=0${extra}`;
+  // Access-control firmware keeps users in "user" and door rights in "userauthorize".
+  const accessLines = (m, blocked) => [
+    `DATA UPDATE user CardNo=${m.credentials?.card || ''}\tPin=${m.memberNo}\tPassword=\tGroup=0\tStartTime=0\tEndTime=0\tName=${machineName(m.name)}\tPrivilege=0`,
+    ...(blocked ? [] : [`DATA UPDATE userauthorize Pin=${m.memberNo}\tAuthorizeTimezoneId=1\tAuthorizeDoorId=1`]),
+  ];
+  // Set by the gate: members it keeps off a machine, or whose door rights it took away.
+  api.gateState = () => null;
+
+  function putUser(dv, m) {
+    const gate = api.gateState(dv, m);
+    if (gate === 'removed') return;
+    if (dv.acMode) for (const line of accessLines(m, gate === 'rights')) queue(dv, line, { kind: 'user', memberId: m.id });
+    else queue(dv, userLine(m), { kind: 'user', memberId: m.id });
+  }
 
   // Put a member (or everyone) on every machine, so their ID is ready for a finger or face.
   function syncMember(m) {
-    for (const dv of zkDevices()) queue(dv, userLine(m), { kind: 'user', memberId: m.id });
+    for (const dv of zkDevices()) putUser(dv, m);
   }
   function syncAll(device) {
-    for (const m of db().members.filter((x) => !x.left)) queue(device, userLine(m), { kind: 'user', memberId: m.id });
+    for (const m of db().members.filter((x) => !x.left)) putUser(device, m);
   }
   function removeMember(m) {
-    for (const dv of zkDevices()) queue(dv, `DATA DELETE USERINFO PIN=${m.memberNo}`, { kind: 'delete', memberId: m.id });
+    for (const dv of zkDevices()) queue(dv, dv.acMode ? `DATA DELETE user Pin=${m.memberNo}` : `DATA DELETE USERINFO PIN=${m.memberNo}`, { kind: 'delete', memberId: m.id });
   }
 
   function enroll(member, device, { method, finger = 6, card = '', pin = '' }) {
@@ -136,6 +151,11 @@ function createEnroll({ db, store, stamp, now = () => Date.now() }) {
       const fields = Object.fromEntries(line.slice(head.length).trim().split('\t').map((p) => { const i = p.indexOf('='); return [p.slice(0, i).trim().toLowerCase(), p.slice(i + 1).trim()]; }));
       const m = byNo.get(String(fields.pin || '').trim());
       if (!m) continue;
+      // Keep the face and fingerprint templates, so a member taken off the machine can be put back.
+      if ((fields.tmp || '').length > 10) {
+        const key = head === 'BIODATA' ? `bio:${fields.type}:${fields.no || 0}:${fields.index || 0}` : head === 'FACE' ? `face:${fields.fid || 0}` : `fp:${fields.fid || 0}`;
+        m.templates = { ...(m.templates || {}), [key]: line.slice(0, 60000) };
+      }
       if (head === 'FP' || head === 'FINGERTMP') mark(m.id, 'fingerprint', null, Number(fields.fid) || 0);
       else if (head === 'FACE') mark(m.id, 'face');
       else if (head === 'BIODATA') {
@@ -159,7 +179,7 @@ function createEnroll({ db, store, stamp, now = () => Date.now() }) {
     return { credentials: member.credentials || {}, commands: list.sort((a, b) => b.id - a.id).slice(0, 10) };
   }
 
-  return { METHODS, queue, syncMember, syncAll, removeMember, enroll, nextCommands, results, operlog, status, zkDevices };
+  return Object.assign(api, { METHODS, queue, userLine, syncMember, syncAll, removeMember, enroll, nextCommands, results, operlog, status, zkDevices });
 }
 
 module.exports = { createEnroll, METHODS, machineName };

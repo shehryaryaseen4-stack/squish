@@ -394,3 +394,19 @@ button.kpi { text-align: left; font: inherit; color: inherit; cursor: pointer; }
 .bp-pic.square { aspect-ratio: 1; color: var(--accent); }
 .bp-pic .supp-art { width: 80%; height: 80%; }
 .bp-pic .supp-art .lid { fill: #374151; } .bp-pic .supp-art .lid2 { fill: #6b7280; }
+
+/* Gate and machine log */
+.gate-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.gate-list span { padding: 5px 10px; border-radius: 99px; background: var(--surface-2); font-size: 13px; }
+.gate-list small { color: var(--bad); font-weight: 700; margin-left: 4px; }
+.dev-log { display: grid; gap: 8px; max-height: 55vh; overflow: auto; }
+.dl { padding: 10px; border-radius: 12px; background: var(--surface-2); }
+.dl.bad { background: var(--bad-soft); }
+.dl-head { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.dl-head small { margin-left: auto; color: var(--ink-3); }
+.dl pre { margin: 6px 0 0; padding: 8px; border-radius: 8px; font-size: 12px; white-space: pre-wrap; word-break: break-all; max-height: 160px; overflow: auto; }
+.dl-in { background: #111; color: #e5e7eb; }
+.dl-out { background: var(--surface); color: var(--ink-2); }
+#devices > .item { flex-wrap: wrap; }
+#devices > .item > .tx { flex: 1 1 260px; }
+#devices > .item > .acts { flex-wrap: wrap; justify-content: flex-end; flex: 1 1 100%; }
