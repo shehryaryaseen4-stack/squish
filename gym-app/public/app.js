@@ -575,14 +575,62 @@
   const GOAL_LABEL = Object.fromEntries(GOALS);
 
   // Where the BMI sits on a 15-40 scale, with the four ranges coloured.
-  function bmiScale(r) {
-    const lo = 15;
-    const hi = 40;
-    const at = (v) => ((Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo)) * 100;
-    const [a, c, d] = r.cuts;
-    return `<div class="bmi-scale" aria-hidden="true"><div class="bs-bar"><i class="bs-under" style="width:${at(a)}%"></i><i class="bs-normal" style="width:${at(c) - at(a)}%"></i><i class="bs-over" style="width:${at(d) - at(c)}%"></i><i class="bs-obese" style="width:${100 - at(d)}%"></i></div>
-      <span class="bs-pin" style="left:${at(r.value)}%"></span>
-      <div class="bs-ticks"><span style="left:${at(a)}%">${a}</span><span style="left:${at(c)}%">${c}</span><span style="left:${at(d)}%">${d}</span></div></div>`;
+  // BMI ranges and what each one means (the WHO classes, moved down for the Asian cut-offs).
+  function bmiZones(cuts) {
+    const [u, o, ob] = cuts;
+    return [
+      { from: 0, to: 16, color: '#c62828', label: 'Severely underweight', group: 'Underweight', text: 'Far below a healthy weight. See a doctor and eat more.' },
+      { from: 16, to: 17, color: '#e57373', label: 'Moderately underweight', group: 'Underweight', text: 'Below a healthy weight: eat more and build muscle.' },
+      { from: 17, to: u, color: '#fdd835', label: 'Mildly underweight', group: 'Underweight', text: 'A little under: a few kg of muscle will help.' },
+      { from: u, to: o, color: '#2e7d32', label: 'Normal', group: 'Normal', text: 'A healthy weight for your height.' },
+      { from: o, to: ob, color: '#fbc02d', label: 'Overweight', group: 'Overweight', text: 'Some extra fat: a higher risk of diabetes and heart problems.' },
+      { from: ob, to: ob + 5, color: '#e57373', label: 'Obese, class I', group: 'Obesity', text: 'High health risk. Losing 5-10% of your weight helps a lot.' },
+      { from: ob + 5, to: ob + 10, color: '#c62828', label: 'Obese, class II', group: 'Obesity', text: 'Very high health risk. Lose weight step by step.' },
+      { from: ob + 10, to: 99, color: '#7f1d1d', label: 'Obese, class III', group: 'Obesity', text: 'Extremely high risk. Work with a doctor too.' },
+    ];
+  }
+
+  // A half-circle meter with a needle, like a speedometer.
+  function bmiGauge(r) {
+    const zones = bmiZones(r.cuts);
+    const lo = 12;
+    const hi = r.cuts[2] + 17;
+    const cx = 160;
+    const cy = 160;
+    const R = 130;
+    const rIn = 84;
+    // Each range gets room to read, like a printed BMI chart (not a straight scale).
+    const room = [1, 0.75, 0.85, 1.7, 1.7, 1.3, 1.2, 1.1];
+    const spans = zones.map((z, i) => [Math.max(lo, z.from), Math.min(hi, z.to), room[i]]);
+    const total = room.reduce((a, b) => a + b, 0);
+    const share = (v) => {
+      v = Math.min(hi, Math.max(lo, v));
+      let done = 0;
+      for (const [a, b, w] of spans) {
+        if (v <= b) return (done + (w * (v - a)) / (b - a)) / total;
+        done += w;
+      }
+      return 1;
+    };
+    const ang = (v) => Math.PI * (1 - share(v));
+    const pt = (rad, v) => [cx + rad * Math.cos(ang(v)), cy - rad * Math.sin(ang(v))].map((n) => n.toFixed(1)).join(',');
+    const band = (a, b) => `M${pt(R, a)} A${R},${R} 0 0 1 ${pt(R, b)} L${pt(rIn, b)} A${rIn},${rIn} 0 0 0 ${pt(rIn, a)}Z`;
+    const ticks = [...new Set(zones.slice(1).map((z) => z.from))].filter((v) => v > lo && v < hi);
+    const groups = [['Underweight', lo, r.cuts[0]], ['Normal', r.cuts[0], r.cuts[1]], ['Overweight', r.cuts[1], r.cuts[2]], ['Obesity', r.cuts[2], hi]];
+    const angle = (ang(r.value) * 180) / Math.PI;
+    const zone = zones.find((z) => r.value >= z.from && r.value < z.to);
+    return `<svg class="bmi-gauge" viewBox="0 0 320 210" role="img" aria-label="BMI ${r.value}, ${zone.label}">
+        <defs><path id="bg-arc" d="M${cx - R - 12},${cy} A${R + 12},${R + 12} 0 0 1 ${cx + R + 12},${cy}"/></defs>
+        ${zones.map((z) => (z.to > lo && z.from < hi ? `<path d="${band(Math.max(lo, z.from), Math.min(hi, z.to))}" fill="${z.color}" stroke="#fff" stroke-width="1.5"/>` : '')).join('')}
+        ${groups.map(([name, a, b]) => `<text class="bg-name"><textPath href="#bg-arc" startOffset="${((share(a) + share(b)) / 2) * 100}%" text-anchor="middle">${name}</textPath></text>`).join('')}
+        ${ticks.map((v) => { const [x, y] = pt(rIn + 11, v).split(','); return `<text class="bg-tick" x="${x}" y="${y}" transform="rotate(${90 - (ang(v) * 180) / Math.PI} ${x} ${y})" text-anchor="middle" dominant-baseline="middle">${v}</text>`; }).join('')}
+
+        <g class="bg-needle" style="--to:${-angle}deg"><path d="M${cx},${cy - 5} L${cx + rIn - 8},${cy} L${cx},${cy + 5}Z" fill="#374151"/><path d="M${cx + rIn - 18},${cy - 7} L${cx + rIn - 2},${cy} L${cx + rIn - 18},${cy + 7}Z" fill="#111"/></g>
+        <circle cx="${cx}" cy="${cy}" r="9" fill="#4b5563"/><circle cx="${cx}" cy="${cy}" r="3.5" fill="#fff"/>
+        <text class="bg-value" x="${cx}" y="${cy + 40}" text-anchor="middle">BMI = ${r.value}</text>
+      </svg>
+      <p class="bg-result">Your BMI is <b style="color:${zone.color === '#fdd835' || zone.color === '#fbc02d' ? '#b7791f' : zone.color}">${r.teen ? 'read by age (under 18)' : zone.label}</b></p>
+      <ul class="bg-legend">${zones.map((z) => `<li class="${z === zone ? 'on' : ''}"><i style="background:${z.color}"></i><div><b>${z.label}</b><small>${z.from === 0 ? `under ${z.to}` : z.to === 99 ? `${z.from} and over` : `${z.from} – ${Math.round((z.to - 0.1) * 10) / 10}`}</small><span>${z.text}</span></div>${z === zone ? '<em>You</em>' : ''}</li>`).join('')}</ul>`;
   }
 
   function bmiTile(m) {
@@ -616,10 +664,8 @@
     const pace = r.gap < 0 ? `about ${r.category === 'obese' ? '0.75' : '0.5'} kg a week` : 'about 0.25 kg a week';
     const history = (m.weighIns || []).slice(-8).map((x) => ({ ...x, bmi: Nutrition.bmi({ weight: x.kg, height: b.height }, { asian }).value }));
     box.innerHTML = `<div class="card bmi-hero">
-        <div class="bh-top"><div class="bh-num bmi-${r.teen ? 'normal' : r.category}"><b class="tnum">${r.value}</b><small>BMI</small></div>
-          <div><h2>${r.teen ? 'Under 18' : esc(r.label)}</h2><p>${b.weight} kg · ${b.height} cm</p></div></div>
-        ${bmiScale(r)}
-        <div class="bh-facts"><div><small>Healthy weight for ${b.height} cm</small><b>${r.healthy.min}–${r.healthy.max} kg</b></div>
+        ${bmiGauge(r)}
+        <div class="bh-facts"><div><small>Your weight and height</small><b>${b.weight} kg · ${b.height} cm</b></div><div><small>BMI Prime</small><b>${Math.round((r.value / r.cuts[1]) * 100) / 100}</b></div><div><small>Healthy weight for ${b.height} cm</small><b>${r.healthy.min}–${r.healthy.max} kg</b></div>
           <div><small>${r.gap < 0 ? 'To lose' : r.gap > 0 ? 'To gain' : 'You are'}</small><b>${r.gap ? `${Math.abs(r.gap)} kg` : 'In range ✓'}</b></div>
           ${r.gap ? `<div><small>Time at a safe pace</small><b>${r.weeks < 9 ? `${r.weeks} weeks` : `${Math.round(r.weeks / 4.3)} months`}</b></div>` : ''}</div>
       </div>
