@@ -84,6 +84,8 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     const d = db();
     const s = token && (d.admin.sessions || []).find((x) => x.hash === sha(token) && x.expires > Date.now());
     if (!s) fail('Please sign in again', 401);
+    // A device in daily use (the front desk, the entry screen on the wall) stays signed in.
+    if (s.expires - Date.now() < SESSION_MS / 2) s.expires = Date.now() + SESSION_MS;
     if (s.role === 'owner') return { role: 'owner', name: 'Owner', perms: PERM_IDS };
     const user = d.admin.users.find((u) => u.id === s.userId && u.active !== false);
     if (!user) fail('Please sign in again', 401);

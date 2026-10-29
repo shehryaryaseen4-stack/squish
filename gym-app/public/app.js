@@ -1019,8 +1019,9 @@
   function connectView(error) {
     const platform = (window.APP_CONFIG?.platformUrl || '').replace(/\/+$/, '');
     view.innerHTML = `<div class="view" style="padding:calc(48px + env(safe-area-inset-top)) 24px 24px">
-      <div class="empty" style="padding:0 0 20px"><div class="empty-icon">${icon('store')}</div><h3>Connect your gym</h3><p>${platform ? 'Enter your gym\u2019s code (ask the front desk), or its full web address.' : 'Enter your gym\u2019s address, for example https://yourdomain.com/g/your-gym'}</p></div>
-      <form class="form" style="padding:0" novalidate><label class="field"><span>${platform ? 'Gym code or address' : 'Gym address'}</span><input class="input" name="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="${platform ? 'e.g. fit-zone' : 'https://'}" value="${esc(store.get('serverUrlDraft', ''))}"></label>
+      <div class="empty" style="padding:0 0 20px"><div class="empty-icon">${icon('store')}</div><h3>Connect your gym</h3><p>${platform ? 'Enter your gym\u2019s code (ask the front desk), or its full web address.' : 'Enter your gym\u2019s address. In the gym, on its WiFi: the address shown on the gym computer, e.g. 192.168.1.5:3100'}</p></div>
+      <form class="form" style="padding:0" novalidate><label class="field"><span>${platform ? 'Gym code or address' : 'Gym address'}</span><input class="input" name="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="${platform ? 'e.g. fit-zone' : 'https:// or 192.168.1.5:3100'}" value="${esc(store.get('serverUrlDraft', ''))}"></label>
+      <label class="toggle-row" style="margin:4px 0 10px"><span><b>This is the gym’s entry screen</b><br><span class="muted" style="font-size:13px;font-weight:500">For a TV or wall screen at the entrance: it shows who comes in</span></span><span class="switch"><input type="checkbox" name="display" ${store.get('deviceRoleDraft', false) ? 'checked' : ''}><span></span></span></label>
       ${error ? `<p class="field-error">${esc(error)}</p>` : ''}<button class="btn btn-primary btn-block">Connect</button></form></div>`;
     const form = view.querySelector('form');
     form.addEventListener('submit', (e) => {
@@ -1028,9 +1029,13 @@
       let url = form.url.value.trim().replace(/\/(admin|index)(\.html)?$/, '').replace(/\/+$/, '');
       store.set('serverUrlDraft', url);
       if (platform && /^[a-z0-9-]+$/i.test(url)) url = `${platform}/g/${url.toLowerCase()}`;
-      else if (url && !/^https?:\/\//.test(url)) url = `https://${url}`;
+      // A laptop on the gym's WiFi (192.168.1.5:3100) talks plain http; websites use https.
+      else if (url && !/^https?:\/\//.test(url)) url = `${/^(\d{1,3}\.){3}\d{1,3}(:\d+)?(\/|$)|^localhost|\.local(:\d+)?(\/|$)/i.test(url) ? 'http' : 'https'}://${url}`;
       if (!/^https?:\/\/./.test(url)) return connectView('Enter your gym\u2019s code or address');
       try { localStorage.setItem('serverUrl', url); } catch { /* ignore */ }
+      store.set('deviceRoleDraft', form.display.checked);
+      try { if (form.display.checked) localStorage.setItem('deviceRole', 'display'); else localStorage.removeItem('deviceRole'); } catch { /* ignore */ }
+      if (form.display.checked) { location.href = 'display.html'; return; }
       boot();
     });
   }
@@ -1049,17 +1054,27 @@
   let booted = false;
   async function boot() {
     if (window.APP_CONFIG?.native && !UI.apiBase()) return connectView();
+    // A device set up as the entrance TV opens straight into the entry screen.
+    try { if (window.APP_CONFIG?.native && localStorage.getItem('deviceRole') === 'display') { location.href = 'display.html'; return; } } catch { /* ignore */ }
     try {
       state.gym = await rawApi('/api/gym');
     } catch (e) {
       if (window.APP_CONFIG?.native && !window.APP_CONFIG.apiBase) {
-        try { localStorage.removeItem('serverUrl'); } catch { /* ignore */ }
-        return connectView(`Could not reach that server. ${e.message}`);
+        // An address that worked before is kept: the gym's laptop may just be off.
+        if (!store.get('serverWorked', false)) {
+          try { localStorage.removeItem('serverUrl'); } catch { /* ignore */ }
+          return connectView(`Could not reach that server. ${e.message}`);
+        }
+        view.innerHTML = emptyState('alert', "Can't reach the gym", 'Check that you are on the gym’s WiFi and the gym computer is on.', '<button class="btn btn-primary" data-retry>Try again</button> <button class="btn btn-ghost" data-change>Change address</button>');
+        view.querySelector('[data-retry]').addEventListener('click', () => location.reload());
+        view.querySelector('[data-change]').addEventListener('click', () => { try { localStorage.removeItem('serverUrl'); } catch { /* ignore */ } store.set('serverWorked', false); connectView(); });
+        return;
       }
       view.innerHTML = emptyState('alert', "Can't connect", e.message, '<button class="btn btn-primary" data-retry>Try again</button>');
       view.querySelector('[data-retry]').addEventListener('click', () => location.reload());
       return;
     }
+    if (window.APP_CONFIG?.native) store.set('serverWorked', true);
     const b = state.gym.business;
     UI.setBusiness(b);
     UI.setAccent(b.accent);

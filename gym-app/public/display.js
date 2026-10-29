@@ -102,7 +102,8 @@
     try {
       const f = await api('/api/admin/display');
       failures = 0;
-      document.querySelector('.live')?.classList.remove('off');
+      const live = document.querySelector('.live');
+      if (live) { live.classList.remove('off'); live.lastChild.textContent = 'Live · updates every 2 seconds'; }
       const fresh = f.events.filter((e) => !seen.has(e.key)).reverse();
       for (const e of f.events) seen.add(e.key);
       // On the first load just list what already happened; spotlight only new entries.
@@ -114,6 +115,9 @@
       if (e.status === 401) { token = null; store.remove('displayToken'); return signIn(); }
       failures++;
       if (failures > 2) document.querySelector('.live')?.classList.add('off');
+      // The gym computer was switched off or restarted: say so, and carry on when it is back.
+      const live = document.querySelector('.live');
+      if (live && failures > 2) live.lastChild.textContent = 'Waiting for the gym computer…';
     }
   }
 
@@ -160,7 +164,15 @@
       (el.requestFullscreen ? el.requestFullscreen() : Promise.reject()).catch(() => toast('Use the TV browser\'s full screen button (often F11).'));
     });
     poll();
+    keepAwake();
   }
+
+  // Keep a wall screen from going dark (where the browser allows it).
+  let wake = null;
+  async function keepAwake() {
+    try { if (!wake && navigator.wakeLock) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); } } catch { /* not allowed here */ }
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && token) keepAwake(); });
 
   async function signIn() {
     try { gym = (await rawApi('/api/gym')).business; } catch { gym = { name: 'Gym', accent: '#f97316', timeZone: 'Asia/Karachi' }; }
@@ -169,7 +181,8 @@
       ${UI.brandMark(gym, { cls: 'mark', style: 'width:72px;height:72px;border-radius:22px;display:grid;place-items:center;margin:0 auto 16px;font-size:30px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--accent),#222)' })}
       <h1 style="font-size:28px">Start the entry screen</h1><p style="color:#9a9ab0;margin-top:6px">Enter the owner or front desk PIN once on this screen.</p>
       <form style="margin-top:22px;display:grid;gap:12px"><input class="input" type="password" inputmode="numeric" maxlength="8" placeholder="PIN" autofocus style="text-align:center;font-size:22px;letter-spacing:.3em"><button class="btn btn-primary btn-block">Start</button></form>
-      <p style="margin-top:18px"><a class="link" href="${UI.url('/admin.html')}">← Dashboard</a></p></div></div>`;
+      <p style="margin-top:18px">${window.APP_CONFIG?.native ? '<a class="link" href="#" data-member>← Use as the member app instead</a>' : `<a class="link" href="${UI.url('/admin.html')}">← Dashboard</a>`}</p></div></div>`;
+    root.querySelector('[data-member]')?.addEventListener('click', (e) => { e.preventDefault(); try { localStorage.removeItem('deviceRole'); } catch { /* ignore */ } location.href = 'index.html'; });
     root.querySelector('form').addEventListener('submit', async (e) => {
       e.preventDefault();
       try {
@@ -186,7 +199,18 @@
 
   (async () => {
     try { gym = (await rawApi('/api/gym')).business; } catch { /* sign-in shows the problem */ }
-    if (!token || !gym) return signIn();
-    try { await api('/api/admin/display'); main(); } catch { token = null; store.remove('displayToken'); signIn(); }
+    if (!token) return signIn();
+    // Signed in before: wait for the gym computer rather than asking for the PIN again.
+    for (;;) {
+      try {
+        if (!gym) gym = (await rawApi('/api/gym')).business;
+        await api('/api/admin/display');
+        return main();
+      } catch (e) {
+        if (e.status === 401) { token = null; store.remove('displayToken'); return signIn(); }
+        root.innerHTML = `<div class="ds" style="place-items:center;grid-template-rows:1fr"><div style="text-align:center;max-width:460px"><h1 style="font-size:26px">Waiting for the gym computer…</h1><p style="color:#9a9ab0;margin-top:8px">Is the gym app running on the laptop, and is this screen on the same WiFi? Trying again every few seconds.</p></div></div>`;
+        await new Promise((r) => setTimeout(r, 8000));
+      }
+    }
   })();
 })();

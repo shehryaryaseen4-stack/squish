@@ -183,6 +183,8 @@ For one gym without a website: the laptop is the server, and the dashboard, the 
 4. **Machine:** Settings → Fingerprint & face machines → Add machine shows the laptop's WiFi address and port to enter under COMM → Cloud Server Setting (HTTPS off).
 5. Optional: **`Start Gym when PC starts.bat`** (run once) starts the server whenever the laptop starts, and **`Backup data.bat`** copies the data to a dated folder.
 
+**Entry screen on a separate Android screen** (TV box, Android LCD or tablet at the entrance, on the same WiFi): install the Android app, enter the laptop's address (e.g. `192.168.1.5:3100`; plain http is used for local addresses), turn on **This is the gym's entry screen**, and enter the front desk PIN once. From then on the device opens straight into the entry screen, keeps the screen on, stays signed in, and if the laptop is off or restarting it shows "Waiting for the gym computer…" and carries on by itself when it is back. A screen with only a browser can open `http://<laptop IP>:3100/display.html` instead, but it can't load the page while the laptop is off.
+
 Keep the laptop's IP fixed (reserve it in the router's DHCP settings), set the laptop to never sleep while plugged in, and back up the `data` folder (members, fees, photos) regularly. Phones can only reach the app inside the gym's WiFi.
 
 ## Put a gym online
