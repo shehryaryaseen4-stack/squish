@@ -1292,6 +1292,24 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     }
     if (m === 'GET' && pathname === '/api/admin/leads') need('leads');
     if (m === 'GET' && pathname === '/api/admin/leads') return [...d.leads].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    // The gym's logo: shown in the apps, on screens and receipts, and as the app icon.
+    if (pathname === '/api/admin/logo') {
+      need('settings');
+      if (m === 'PUT') {
+        const img = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/.exec(String(body.image || ''));
+        if (!img) fail('Choose an image (PNG or JPG)');
+        if (img[2].length > 900 * 1024) fail('That logo is too large. Please choose a smaller one.');
+        d.business.logo = store.savePhoto('gym-logo', img[2]);
+        store.save();
+        return d.business;
+      }
+      if (m === 'DELETE') {
+        store.deletePhoto('gym-logo');
+        delete d.business.logo;
+        store.save();
+        return d.business;
+      }
+    }
     if (m === 'PUT' && pathname === '/api/admin/business') {
       need('settings');
       d.business = v.business(body, d.business);

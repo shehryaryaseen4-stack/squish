@@ -76,7 +76,7 @@
   function topbar() {
     const b = state.gym.business;
     const st = openStatus();
-    return `<header class="topbar"><div class="brand-mark" aria-hidden="true">${esc(b.name.charAt(0))}</div>
+    return `<header class="topbar">${UI.brandMark(b)}
       <div class="brand-text"><h1>${esc(b.name)}</h1><span class="open-status ${st.open ? 'open' : 'closed'}"><i class="dot"></i>${esc(st.text)}</span></div>
       ${b.phone ? `<a class="icon-btn" href="tel:${esc(b.phone)}" aria-label="Call ${esc(b.name)}">${icon('phone')}</a>` : ''}</header>`;
   }
@@ -146,7 +146,7 @@
 
   function loginView() {
     const b = state.gym.business;
-    render(`<div class="login-wrap"><div class="brand-mark" style="display:grid">${esc(b.name.charAt(0))}</div><h1>Member login</h1><p>Use your member number (or mobile) and the PIN the gym sent you.</p>
+    render(`<div class="login-wrap">${UI.brandMark(b, { style: 'display:grid' })}<h1>Member login</h1><p>Use your member number (or mobile) and the PIN the gym sent you.</p>
       <form class="form" style="padding:0" novalidate>
         <label class="field"><span>Member number or mobile</span><input class="input" name="id" inputmode="numeric" autocomplete="username" value="${esc(store.get('lastMemberId', ''))}" placeholder="e.g. 1001"></label>
         <label class="field"><span>PIN</span><input class="input pin-input" name="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password" placeholder="••••"></label>

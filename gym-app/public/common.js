@@ -211,6 +211,14 @@
     return p.startsWith('data:') ? p : `${apiBase()}${p}`;
   }
 
+  // The gym's logo in its square tile, or the first letter of its name.
+  function brandMark(b, { cls = 'brand-mark', style = '' } = {}) {
+    const src = photoSrc(b?.logo);
+    return src
+      ? `<div class="${cls} has-logo"${style ? ` style="${style}"` : ''}><img src="${esc(src)}" alt="${esc(b.name || '')}"></div>`
+      : `<div class="${cls}"${style ? ` style="${style}"` : ''}>${esc((b?.name || '').charAt(0))}</div>`;
+  }
+
   // A round member picture, or their initials when there is no photo yet.
   function avatarHtml(m, size = '', color) {
     const c = color || (m?.gender === 'female' ? '#e5487f' : 'var(--accent)');
@@ -252,6 +260,6 @@
   window.UI = {
     esc, api, apiBase, url, money, time12, dateLong, dateShort, dayName, dayNum, monthName, addDays, weekday, duration,
     initials, toast, sheet, confirmSheet, busy, setAccent, store, icsFor, waLink, setBusiness, DAYS, DAY_LABELS,
-    photoSrc, avatarHtml, pickPhoto,
+    photoSrc, avatarHtml, pickPhoto, brandMark,
   };
 })();

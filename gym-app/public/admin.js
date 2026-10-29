@@ -88,7 +88,7 @@
     UI.setAccent(business.accent);
     let pin = '';
     root.innerHTML = `<div class="login"><div class="login-card">
-      <div class="brand-mark">${esc(business.name.charAt(0))}</div>
+      ${UI.brandMark(business)}
       <h1>${esc(business.name)}</h1><p>Enter your PIN</p>
       <div class="pin-dots" aria-live="polite" aria-label="PIN entered">${'<i></i>'.repeat(4)}</div>
       <div class="keypad">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `<button class="key" data-k="${n}">${n}</button>`).join('')}
@@ -222,7 +222,7 @@
     const inBottom = bottom.includes(page);
     const screens = can('checkin');
     root.innerHTML = `<div class="shell">
-      <aside class="side"><div class="side-brand"><div class="brand-mark">${esc(b.name.charAt(0))}</div><div><b>${esc(b.name)}</b><span>${isOwner() ? 'Owner' : esc(S.data.userName || 'Staff')}</span></div></div>
+      <aside class="side"><div class="side-brand">${UI.brandMark(b)}<div><b>${esc(b.name)}</b><span>${isOwner() ? 'Owner' : esc(S.data.userName || 'Staff')}</span></div></div>
         ${pages.map(([id, ic, label]) => `<a class="nav-item" href="#/${id}" ${id === page ? 'aria-current="page"' : ''}>${icon(ic)}${esc(label)}</a>`).join('')}
         <div class="spacer"></div>
         ${screens ? `<a class="nav-item" href="${UI.url('/display.html')}" data-screen="entry">${icon('tv')}Entry screen (TV)</a>
@@ -923,7 +923,8 @@
     const paid = p.installments.reduce((a, i) => a + i.amount, 0);
     sheet({
       title: `Receipt #${p.receiptNo}`,
-      html: `<div class="card" style="padding:4px 16px;box-shadow:none">
+      html: `<div class="receipt-head">${UI.brandMark(S.data.business)}<div><b>${esc(S.data.business.name)}</b><span>${esc(S.data.business.address || S.data.business.tagline || '')}</span></div></div>
+        <div class="card" style="padding:4px 16px;box-shadow:none">
           <div class="sum-line"><span>Member</span><b>${esc(m.name)} #${m.memberNo}</b></div>
           <div class="sum-line"><span>Plan</span><b>${esc(p.planName)}</b></div>
           <div class="sum-line"><span>Valid</span><b>${dateShort(p.periodStart)} – ${dateShort(p.periodEnd)}</b></div>
@@ -1636,6 +1637,9 @@
     shell('settings', 'Settings', '', `
       ${can('settings') ? `<form id="settings" novalidate>
       <section class="card form-section"><h2>Gym</h2><p>Shown in the member app and on receipts.</p>
+        <div class="logo-row"><div class="logo-box" data-logo-box>${b.logo ? `<img src="${esc(UI.photoSrc(b.logo))}" alt="Logo">` : `<span>${esc(b.name.charAt(0))}</span>`}</div>
+          <div><b>Gym logo</b><p class="muted" style="margin:2px 0 8px;font-size:13px">Shown in the apps, on the kiosk and entry screen, on receipts and as the app icon. A square PNG with a clear background looks best.</p>
+            <button type="button" class="btn btn-soft btn-sm" data-logo-up>${icon('camera')}${b.logo ? 'Change logo' : 'Upload logo'}</button>${b.logo ? `<button type="button" class="btn btn-ghost btn-sm" data-logo-rm>${icon('trash')}Remove</button>` : ''}</div></div>
         <div class="form-grid two">
           <label class="field"><span>Gym name</span><input class="input" name="name" value="${esc(b.name)}" maxlength="60" required></label>
           <label class="field"><span>Tagline</span><input class="input" name="tagline" value="${esc(b.tagline)}" maxlength="120"></label>
@@ -1734,6 +1738,24 @@
       row.querySelectorAll('[data-rm]').forEach((btn, i) => { btn.onclick = () => { const cur = readHours()[day]; cur.splice(i + 1, 1); redrawRow(day, cur); }; });
     });
     bindHours();
+    root.querySelector('[data-logo-up]')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      try {
+        const image = await pickLogo();
+        if (!image) return;
+        await busy(btn, async () => {
+          S.data.business = await api('/api/admin/logo', { method: 'PUT', body: { image } });
+          UI.setBusiness?.(S.data.business);
+          toast('Logo saved');
+          route();
+        });
+      } catch (err) { toast(err.message, 'bad'); }
+    });
+    root.querySelector('[data-logo-rm]')?.addEventListener('click', async () => {
+      if (!(await confirmSheet({ title: 'Remove the logo?', message: 'The first letter of the gym’s name is shown instead.', confirm: 'Remove', danger: true }))) return;
+      S.data.business = await api('/api/admin/logo', { method: 'DELETE' });
+      route();
+    });
     root.querySelectorAll('[data-swatch]').forEach((sw) => sw.addEventListener('click', () => {
       form.accent.value = sw.dataset.swatch;
       root.querySelectorAll('[data-swatch]').forEach((x) => x.setAttribute('aria-pressed', x === sw));
@@ -2143,6 +2165,33 @@
       html: `<input class="input" data-name value="${esc(byId(b.dataset.rename).name)}" maxlength="60"><div class="sheet-actions"><button class="btn btn-primary" data-ok>Save</button></div>`,
       onMount: (el, close) => el.querySelector('[data-ok]').addEventListener('click', async () => { await api(`/api/admin/devices/${b.dataset.rename}`, { method: 'PUT', body: { name: el.querySelector('[data-name]').value } }); close(); drawDevices(); }),
     })));
+  }
+
+  // A logo file, shrunk to fit 512×512 and kept as PNG so a clear background stays clear.
+  function pickLogo() {
+    return new Promise((resolve, reject) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.addEventListener('change', () => {
+        const file = input.files?.[0];
+        if (!file) return resolve(null);
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          const scale = Math.min(1, 512 / Math.max(img.naturalWidth, img.naturalHeight));
+          const c = document.createElement('canvas');
+          c.width = Math.max(1, Math.round(img.naturalWidth * scale));
+          c.height = Math.max(1, Math.round(img.naturalHeight * scale));
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          URL.revokeObjectURL(url);
+          resolve(c.toDataURL('image/png'));
+        };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('That file is not an image we can read. Try a PNG or JPG.')); };
+        img.src = url;
+      });
+      input.click();
+    });
   }
 
   // ---- the gate: members whose fee has run out can't open it -------------------------------

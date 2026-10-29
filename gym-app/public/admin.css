@@ -410,3 +410,11 @@ button.kpi { text-align: left; font: inherit; color: inherit; cursor: pointer; }
 #devices > .item { flex-wrap: wrap; }
 #devices > .item > .tx { flex: 1 1 260px; }
 #devices > .item > .acts { flex-wrap: wrap; justify-content: flex-end; flex: 1 1 100%; }
+.logo-row { display: flex; gap: 16px; align-items: center; margin-bottom: 14px; }
+.logo-box { width: 84px; height: 84px; flex: none; border-radius: 20px; display: grid; place-items: center; overflow: hidden; background: #fff; border: 1px dashed var(--line); }
+.logo-box img { width: 100%; height: 100%; object-fit: contain; padding: 6px; }
+.logo-box span { font-size: 34px; font-weight: 800; color: var(--accent); }
+.logo-row .btn + .btn { margin-left: 6px; }
+.receipt-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.receipt-head > div:last-child { display: grid; }
+.receipt-head span { font-size: 12.5px; color: var(--ink-3); }

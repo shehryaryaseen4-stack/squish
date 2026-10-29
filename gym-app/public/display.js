@@ -143,7 +143,7 @@
     document.title = `${gym.name} · Entry screen`;
     const p = nowParts();
     root.innerHTML = `<div class="ds">
-      <header class="ds-top"><div class="mark">${esc(gym.name.charAt(0))}</div><h1>${esc(gym.name)}<span>${dateLong(p.date)}</span></h1><div class="ds-clock" id="clock">${p.clock}</div></header>
+      <header class="ds-top">${UI.brandMark(gym, { cls: 'mark' })}<h1>${esc(gym.name)}<span>${dateLong(p.date)}</span></h1><div class="ds-clock" id="clock">${p.clock}</div></header>
       <main class="ds-main"><section class="spot idle" id="spot" aria-live="polite"></section>
         <aside class="side"><div class="stats"><div class="stat-box"><span>In the gym now</span><b id="inside">–</b></div><div class="stat-box"><span>Check-ins today</span><b id="today">–</b></div></div>
           <h3>Latest entries</h3><div class="feed" id="feed"></div></aside></main>
@@ -166,7 +166,7 @@
     try { gym = (await rawApi('/api/gym')).business; } catch { gym = { name: 'Gym', accent: '#f97316', timeZone: 'Asia/Karachi' }; }
     UI.setAccent(gym.accent);
     root.innerHTML = `<div class="ds" style="place-items:center;grid-template-rows:1fr"><div style="text-align:center;max-width:420px">
-      <div class="mark" style="width:72px;height:72px;border-radius:22px;display:grid;place-items:center;margin:0 auto 16px;font-size:30px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--accent),#222)">${esc(gym.name.charAt(0))}</div>
+      ${UI.brandMark(gym, { cls: 'mark', style: 'width:72px;height:72px;border-radius:22px;display:grid;place-items:center;margin:0 auto 16px;font-size:30px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--accent),#222)' })}
       <h1 style="font-size:28px">Start the entry screen</h1><p style="color:#9a9ab0;margin-top:6px">Enter the owner or front desk PIN once on this screen.</p>
       <form style="margin-top:22px;display:grid;gap:12px"><input class="input" type="password" inputmode="numeric" maxlength="8" placeholder="PIN" autofocus style="text-align:center;font-size:22px;letter-spacing:.3em"><button class="btn btn-primary btn-block">Start</button></form>
       <p style="margin-top:18px"><a class="link" href="${UI.url('/admin.html')}">← Dashboard</a></p></div></div>`;

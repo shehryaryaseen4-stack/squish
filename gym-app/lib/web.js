@@ -118,9 +118,14 @@ function sendError(res, err) {
 
 // The app icon and manifest are drawn from the business settings, so every
 // gym that installs the app gets its own name, colour and initial.
-function iconSvg(business, { maskable = false } = {}) {
+function iconSvg(business, { maskable = false, logo = null } = {}) {
   const letter = (business.name || 'S').trim().charAt(0).toUpperCase();
   const radius = maskable ? 0 : 112;
+  // With a logo: the logo on white, with room around it for round icon masks.
+  if (logo) {
+    const pad = maskable ? 96 : 56;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="${radius}" fill="#fff"/><image href="${logo}" x="${pad}" y="${pad}" width="${512 - pad * 2}" height="${512 - pad * 2}" preserveAspectRatio="xMidYMid meet"/></svg>`;
+  }
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${business.accent}"/><stop offset="1" stop-color="#111827"/></linearGradient></defs><rect width="512" height="512" rx="${radius}" fill="url(#g)"/><text x="256" y="256" dy=".35em" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-weight="700" font-size="${maskable ? 220 : 280}" fill="#fff">${letter.replace(/[<&>]/g, '')}</text></svg>`;
 }
 
@@ -139,6 +144,16 @@ function manifest(business, admin, prefix = '') {
       { src: `${prefix}/icon-maskable.svg`, sizes: 'any', type: 'image/svg+xml', purpose: 'maskable' },
     ],
   });
+}
+
+// The logo as a data URL, so the app icon (an SVG) can show it.
+function logoData(store, business) {
+  if (!business.logo) return null;
+  if (business.logo.startsWith('data:')) return business.logo;
+  const bytes = store.readPhoto('gym-logo.jpg');
+  if (!bytes) return null;
+  const type = bytes[0] === 0x89 ? 'image/png' : bytes[0] === 0x52 ? 'image/webp' : 'image/jpeg';
+  return `data:${type};base64,${bytes.toString('base64')}`;
 }
 
 /**
@@ -190,7 +205,7 @@ function gymHandler({ store, api, prefix = '', machines = true, machinePort = nu
         return send(res, 200, manifest(business, pathname.startsWith('/admin'), prefix), TYPES['.webmanifest'], { 'Cache-Control': 'no-cache' });
       }
       if (pathname === '/icon.svg' || pathname === '/icon-maskable.svg') {
-        return send(res, 200, iconSvg(business, { maskable: pathname.includes('maskable') }), TYPES['.svg'], { 'Cache-Control': 'no-cache' });
+        return send(res, 200, iconSvg(business, { maskable: pathname.includes('maskable'), logo: logoData(store, business) }), TYPES['.svg'], { 'Cache-Control': 'no-cache' });
       }
       if (prefix && pathname === '/config.js') {
         return send(res, 200, `window.APP_CONFIG = ${JSON.stringify({ apiBase: prefix, base: prefix, ...(machinePort ? { machinePort: Number(machinePort) } : {}) })};\n`, TYPES['.js'], { 'Cache-Control': 'no-cache' });

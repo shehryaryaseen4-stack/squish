@@ -19,7 +19,7 @@
   async function signIn() {
     try { gym = (await rawApi('/api/gym')).business; } catch { gym = { name: 'Gym', accent: '#f97316', timeZone: 'Asia/Karachi' }; }
     UI.setAccent(gym.accent);
-    root.innerHTML = `<div class="login"><div class="login-card"><div class="brand-mark">${esc(gym.name.charAt(0))}</div><h1>Start the kiosk</h1><p>Enter the owner or front desk PIN once on this device.</p>
+    root.innerHTML = `<div class="login"><div class="login-card">${UI.brandMark(gym)}<h1>Start the kiosk</h1><p>Enter the owner or front desk PIN once on this device.</p>
       <form style="margin-top:22px;display:grid;gap:12px"><input class="input" type="password" inputmode="numeric" maxlength="8" placeholder="PIN" autofocus style="text-align:center;font-size:22px;letter-spacing:.3em"><button class="btn btn-primary btn-block">Start</button></form>
       <p class="hint"><a class="link" href="${UI.url('/admin.html')}">← Dashboard</a></p></div></div>`;
     root.querySelector('form').addEventListener('submit', async (e) => {
@@ -36,7 +36,7 @@
   function main() {
     UI.setBusiness(gym);
     root.innerHTML = `<div class="kiosk">
-      <header class="k-top"><div class="brand-mark">${esc(gym.name.charAt(0))}</div><h1>${esc(gym.name)}<span>${dateLong(nowDate())}</span></h1><div class="k-clock"></div></header>
+      <header class="k-top">${UI.brandMark(gym)}<h1>${esc(gym.name)}<span>${dateLong(nowDate())}</span></h1><div class="k-clock"></div></header>
       <div class="k-main"><div class="k-entry" id="entry"></div><div class="k-side" id="side"></div></div></div>`;
     clock();
     entry();

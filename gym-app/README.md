@@ -10,6 +10,8 @@ A complete management app for a gym plus an app for its members, packaged as a p
 
 ## What's inside
 
+**Gym logo:** each gym uploads its logo in Settings → Gym (PNG or JPG, shrunk to 512 px, a clear background stays clear). It replaces the first-letter tile in the manager dashboard, the member app, the kiosk and the entry screen, heads the fee receipt, and becomes the app icon when the app is installed on a phone or computer.
+
 **Gym manager dashboard (`/admin`)**, for the owner and front desk on a phone, tablet or computer:
 
 - **Dashboard:** who is in the gym right now, today's check-ins, active members, memberships expiring this week, expired members, pending dues, members who stopped coming, birthdays, new enquiries, busiest hours, fees collected, expenses and profit, and a 6-month income vs expenses chart.
