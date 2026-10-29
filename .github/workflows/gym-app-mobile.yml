@@ -146,6 +146,27 @@ jobs:
           tag_name: app-latest
           files: gym-app/desktop/dist/gym-app-setup.exe
 
+  # One gym on a Windows laptop, no install: unzip and double-click "Start Gym.bat".
+  # https://github.com/<owner>/<repo>/releases/download/app-latest/GymApp-Windows.zip
+  windows-zip:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/build-windows-zip.sh dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-zip
+          path: gym-app/dist/GymApp-Windows.zip
+          if-no-files-found: error
+      - name: Publish to the "app-latest" release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-latest
+          files: gym-app/dist/GymApp-Windows.zip
+
   ios:
     needs: test
     if: github.event_name == 'workflow_dispatch' && inputs.ios
