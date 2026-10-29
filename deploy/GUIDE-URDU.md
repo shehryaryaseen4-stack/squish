@@ -165,3 +165,14 @@ Jab koi visitor doosri dafa file convert karta hai to popup poochta hai "How was
 3. Save karke `bash /opt/flipfree/deploy/update.sh` chalayein.
 
 Button khud "Write a review on Trustpilot" likhta hai. Trustpilot aur Google dono ki policy: review sirf khush logon se mangna mana hai, is liye popup har rating wale ko button dikhata hai. (Google Business Profile sirf un businesses ko milti hai jo customers se aamne saamne milte hain; sirf website ke liye nahi.)
+
+## Trustpilot reviews site pe dikhana (TrustBox)
+
+Footer me Trustpilot ke stars aur reviews ki ginti dikhti hai, jo Trustpilot khud update karta hai.
+
+1. Trustpilot Business dashboard me **Integrations → TrustBox** (ya "Widgets") kholein.
+2. Free plan me jo widget mile (jaise "Review Collector" ya "Micro TrustScore") us ka **code** copy karein.
+3. Code me se do lambi IDs nikalein: `data-businessunit-id="..."` aur `data-template-id="..."` (aur `data-style-height`).
+4. `nano /opt/flipfree/.env` me likhein:
+   `TRUSTPILOT_BUSINESS_ID=...` aur `TRUSTPILOT_TEMPLATE_ID=...` (aur chahein to `TRUSTPILOT_HEIGHT=24px`)
+5. Save karke `bash /opt/flipfree/deploy/update.sh` chalayein.

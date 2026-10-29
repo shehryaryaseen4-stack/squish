@@ -359,6 +359,22 @@ function topbar(full = false) {
   return topbarCache[key];
 }
 
+// Trustpilot TrustBox: the live star rating and review count, drawn by Trustpilot's own widget (it
+// updates by itself as reviews come in). Switched on with the two IDs from the widget code in the
+// Trustpilot dashboard (Integrations > TrustBox): TRUSTPILOT_BUSINESS_ID and TRUSTPILOT_TEMPLATE_ID.
+const TP_ID = /^[a-f0-9]{24}$/i.test(process.env.TRUSTPILOT_BUSINESS_ID || '') ? process.env.TRUSTPILOT_BUSINESS_ID : '';
+const TP_TEMPLATE = /^[a-f0-9]{24}$/i.test(process.env.TRUSTPILOT_TEMPLATE_ID || '') ? process.env.TRUSTPILOT_TEMPLATE_ID : '';
+const TRUSTBOX = !!(TP_ID && TP_TEMPLATE);
+const TP_HEIGHT = /^\d{2,3}px$/.test(process.env.TRUSTPILOT_HEIGHT || '') ? process.env.TRUSTPILOT_HEIGHT : '24px';
+function trustbox() {
+  if (!TRUSTBOX) return '';
+  let host = 'flipitfree.com';
+  try { host = new URL(process.env.BASE_URL || 'https://flipitfree.com').hostname.replace(/^www\./, ''); } catch { /* default */ }
+  return `<div class="footer-trust"><div class="trustpilot-widget" data-locale="en-US" data-template-id="${TP_TEMPLATE}" data-businessunit-id="${TP_ID}" data-style-height="${TP_HEIGHT}" data-style-width="100%" data-theme="dark">`
+    + `<a href="https://www.trustpilot.com/review/${esc(host)}" target="_blank" rel="noopener">See our reviews on Trustpilot</a></div></div>`
+    + '<script async src="https://widget.trustpilot.com/bootstrap/v5/tp.widget.bootstrap.min.js"></script>';
+}
+
 // Footer: brand and company links (one list), then five columns of about ten links each (converters, popular
 // conversions, PDF tools, image tools, video/audio and writing tools), so no column runs long.
 const FOOTER_IMAGE = ['/image-resizer', '/remove-background', '/crop-image', '/rotate-image', '/flip-image', '/passport-photo-maker', '/image-to-text', '/favicon-generator', '/compress-jpg', '/compress-png'];
@@ -380,7 +396,7 @@ function footer() {
     ${pdf}
     <div><h4>Image tools</h4><ul>${list(FOOTER_IMAGE)}</ul></div>
     <div><h4>Video &amp; more</h4><ul>${list(FOOTER_MORE)}<li>${link('/converters', 'All formats')}</li></ul></div>
-  </div><div class="footer-bottom">&copy; ${new Date().getFullYear()} ${SITE}. Files are deleted as soon as they are converted.</div></footer>`;
+  </div>${trustbox()}<div class="footer-bottom">&copy; ${new Date().getFullYear()} ${SITE}. Files are deleted as soon as they are converted.</div></footer>`;
 }
 
 // ------------------------------------------------------------------ hero --
@@ -2074,4 +2090,4 @@ const robots = (base) => `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: $
 module.exports = {
   megaMenu, PDF_TOOLS, resolvePdfTool, APPS, resolveApp, searchIndex,
   ACCOUNTS, authPage, accountPage, authDonePage, resolveFriendly, friendlies,
-  editorPage, PDF_EDITOR, PDF_AI, EDITOR_LANDINGS, homePage, resolveGuide, hubPage, notFoundPage, resolvePair, resolveCompress, resolveConverter, resolveInfo, ogSpec, sitemap, robots, allPaths, adsTxt, ADS_ENABLED: !!ADS_CLIENT };
+  editorPage, PDF_EDITOR, PDF_AI, TRUSTBOX, EDITOR_LANDINGS, homePage, resolveGuide, hubPage, notFoundPage, resolvePair, resolveCompress, resolveConverter, resolveInfo, ogSpec, sitemap, robots, allPaths, adsTxt, ADS_ENABLED: !!ADS_CLIENT };

@@ -235,6 +235,7 @@ and earning links from other sites.
 | `TWITTER_SITE` | unset | `twitter:site` handle on share cards. |
 | `SITE_UPDATED` | content file dates | Sitemap `lastmod` override (YYYY-MM-DD). |
 | `REVIEW_URL` (or `GOOGLE_REVIEW_URL`) | unset | Public review page for the "How was your experience?" popup shown the second time a visitor finishes a file, e.g. `https://www.trustpilot.com/evaluate/yourdomain.com`; the button names the site (Trustpilot, Google ...). Ratings and comments appear on the dashboard (`DATA_DIR/feedback.json`); every rating gets the same invitation, as review sites require. |
+| `TRUSTPILOT_BUSINESS_ID`, `TRUSTPILOT_TEMPLATE_ID`, `TRUSTPILOT_HEIGHT` | unset, unset, `24px` | Shows Trustpilot's own TrustBox widget (live stars and review count) in the footer of every page; the IDs come from the widget code in the Trustpilot dashboard (Integrations > TrustBox). The CSP then allows `widget.trustpilot.com`. |
 | `PDF_AI` | unset | `1` switches on the PDF intelligence tools (`/ai-pdf-summarizer`, `/translate-pdf`, `/pdf-to-markdown`); without it they have no page, link or API route. |
 | `ANTHROPIC_API_KEY` | unset | Turns on the AI tools (`/ai-pdf-summarizer` with chat, `/translate-pdf`), which use Claude through the Anthropic API. Without it their pages say the AI is not switched on yet. `/pdf-to-markdown` needs no key. |
 | `AI_MODEL` | `claude-opus-5-5` | Claude model for the AI tools. `claude-haiku-5-5` is far cheaper per request. |

@@ -61,6 +61,11 @@ const CSP = pages.ADS_ENABLED
     // the video trimmer and MP3 cutter preview the chosen file from a blob: URL
     'media-src': ["'self'", 'blob:'],
   };
+// The Trustpilot TrustBox (footer) loads its script and draws itself in a frame from Trustpilot.
+if (pages.TRUSTBOX && !pages.ADS_ENABLED) {
+  CSP['script-src'].push('https://widget.trustpilot.com');
+  CSP['frame-src'] = ["'self'", 'https://widget.trustpilot.com'];
+}
 app.use(helmet({
   // keep Express's "X-Powered-By: Express" header, so technology checkers (Wappalyzer, BuiltWith)
   // can see the site runs on Node.js and Express

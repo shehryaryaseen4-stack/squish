@@ -35,3 +35,14 @@ test('pages carry the review link only when it is a valid https URL, with the si
   assert.doesNotMatch(body({ REVIEW_URL: 'javascript:alert(1)' }), /data-review/);
   assert.doesNotMatch(body({}), /data-review/);
 });
+
+test('Trustpilot TrustBox: in the footer only with both valid IDs', () => {
+  const { execFileSync } = require('child_process');
+  const home = (env) => execFileSync(process.execPath, ['-e', "process.stdout.write(require('./pages').homePage('https://x'))"],
+    { cwd: path.join(__dirname, '..'), env: { ...process.env, TRUSTPILOT_BUSINESS_ID: '', TRUSTPILOT_TEMPLATE_ID: '', ...env } }).toString();
+  const on = home({ TRUSTPILOT_BUSINESS_ID: '5f1e2d3c4b5a69788796a5b4', TRUSTPILOT_TEMPLATE_ID: '56278e9abfbbba0bdcd568bc' });
+  assert.match(on, /class="trustpilot-widget"[^>]*data-template-id="56278e9abfbbba0bdcd568bc" data-businessunit-id="5f1e2d3c4b5a69788796a5b4"/);
+  assert.match(on, /<script async src="https:\/\/widget\.trustpilot\.com\/bootstrap\/v5\/tp\.widget\.bootstrap\.min\.js"><\/script>/);
+  assert.doesNotMatch(home({ TRUSTPILOT_BUSINESS_ID: '"><script>', TRUSTPILOT_TEMPLATE_ID: '56278e9abfbbba0bdcd568bc' }), /trustpilot-widget/);
+  assert.doesNotMatch(home({}), /trustpilot/);
+});
