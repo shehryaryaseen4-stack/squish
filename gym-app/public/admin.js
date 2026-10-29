@@ -2271,8 +2271,15 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
 
+  // On the gym's own laptop the dashboard is opened as "localhost"; machines and phones
+  // need the laptop's WiFi address instead, which the server tells us.
+  let lanIp = null;
+  const isLocal = (h) => h === 'localhost' || h.startsWith('127.') || h === '[::1]';
+  if (isLocal(location.hostname)) rawApi('/api/server-info').then((r) => { lanIp = r.ips?.find((ip) => /^(192\.168|10\.|172\.(1[6-9]|2\d|3[01]))/.test(ip)) || r.ips?.[0] || null; }).catch(() => {});
+
   function serverHost() {
     const u = new URL(UI.apiBase() || location.origin, location.origin);
+    if (isLocal(u.hostname) && lanIp) return { host: lanIp, port: u.port || 80, https: false, origin: `http://${lanIp}:${u.port || 80}` };
     // On the platform, machines use a plain-http port (most can't do https).
     const mp = window.APP_CONFIG?.machinePort;
     if (mp) return { host: u.hostname, port: mp, https: false, origin: `http://${u.hostname}:${mp}` };

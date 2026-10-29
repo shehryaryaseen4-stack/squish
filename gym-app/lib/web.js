@@ -5,6 +5,7 @@
 // photos and attendance machines for one gym.
 
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { HttpError } = require('./validate');
 
@@ -189,6 +190,12 @@ function gymHandler({ store, api, prefix = '', machines = true, machinePort = nu
         const file = store.videoFile(pathname.slice(8));
         if (!file) return send(res, 404, 'Not found', 'text/plain');
         return sendVideo(req, res, file);
+      }
+      // This computer's addresses on the local network, for a gym run from a laptop:
+      // the machine and phones need e.g. 192.168.1.5, not "localhost".
+      if (pathname === '/api/server-info' && req.method === 'GET') {
+        const ips = Object.values(os.networkInterfaces()).flat().filter((n) => n && n.family === 'IPv4' && !n.internal && !n.address.startsWith('169.254.')).map((n) => n.address);
+        return send(res, 200, JSON.stringify({ ips, port: Number(req.socket.localPort) }), undefined, { 'Cache-Control': 'no-store' });
       }
       if (pathname.startsWith('/api/')) {
         // An uploaded exercise video comes as the raw file.

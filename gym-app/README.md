@@ -173,6 +173,18 @@ The first start creates **demo data**: 100 members with 14 months of fees, visit
 | `OWNER_PIN` / `STAFF_PIN` | First PINs, used only when the data file doesn't exist yet |
 | `CORS_ORIGINS` | Extra comma-separated origins allowed to call the API |
 
+## Run a gym on a laptop, offline (gym WiFi only)
+
+For one gym without a website: the laptop is the server, and the dashboard, the members' phones and the fingerprint/face machine all connect to it over the gym's WiFi. No internet needed.
+
+1. On the laptop install [Node.js](https://nodejs.org) (LTS), and download this project (GitHub → Code → Download ZIP, or `git clone`).
+2. Double-click **`gym-app/start-gym.bat`**. It opens the dashboard (owner PIN 1234, front desk 0000; change them, and the gym name, in Settings) and prints the addresses to use. Allow it through the Windows firewall on private networks when asked. Keep the window open.
+3. **Members' phones** on the same WiFi open `http://<laptop IP>:3100` in the browser, or the Android app with that address.
+4. **Machine:** Settings → Fingerprint & face machines → Add machine shows the laptop's WiFi address and port to enter under COMM → Cloud Server Setting (HTTPS off).
+5. Optional: **`start-gym-on-boot.bat`** (run once) starts the server whenever the laptop starts.
+
+Keep the laptop's IP fixed (reserve it in the router's DHCP settings), set the laptop to never sleep while plugged in, and back up the `gym-app/data` folder (members, fees, photos) regularly. Phones can only reach the app inside the gym's WiFi.
+
 ## Put a gym online
 
 1. Deploy the `gym-app` folder with the `Dockerfile` to a host with a **persistent disk** (Railway, Fly.io, a VPS). Mount the disk at `/data`.

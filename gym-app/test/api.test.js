@@ -263,3 +263,15 @@ test('the owner decides what each staff login may do', async (t) => {
   assert.equal((await app.call('/api/admin/data', { token: bilal })).status, 401);
   assert.equal((await app.call('/api/admin/login', { method: 'POST', body: { pin: '5555' } })).status, 401);
 });
+
+test('a laptop server tells the dashboard its network addresses (for machines and phones)', async (t) => {
+  const { createServer } = require('../server');
+  const server = createServer({ seed: 'empty', reminders: false });
+  await new Promise((r) => server.listen(0, r));
+  t.after(() => new Promise((r) => server.close(r)));
+  const res = await fetch(`http://127.0.0.1:${server.address().port}/api/server-info`);
+  const info = await res.json();
+  assert.ok(Array.isArray(info.ips));
+  assert.ok(info.ips.every((ip) => /^\d+\.\d+\.\d+\.\d+$/.test(ip) && !ip.startsWith('127.')));
+  assert.equal(info.port, server.address().port);
+});

@@ -13,5 +13,9 @@
       "launchShowDuration": 600,
       "backgroundColor": "#f97316"
     }
+  },
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true
   }
 }
