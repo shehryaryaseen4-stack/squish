@@ -148,7 +148,7 @@ Then in GitHub → Settings → Secrets and variables → Actions → **Variable
    sudo ./install.sh yourdomain.com
    ```
    It asks for the owner panel email and password once (saved in `.env`), picks free ports (web on 127.0.0.1:3100 or the next free one; machines on 8081 or the next), checks the DNS, and sets up HTTPS. `DRY_RUN=1` prints what it would do. On servers run by a hosting panel (CyberPanel, aaPanel, HestiaCP, Plesk, cPanel) it stops and explains how to add the site in the panel instead.
-3. Update later with `git pull && docker compose up -d --build` in that folder; back up daily with `backup.sh` from cron.
+3. Update later with `sudo ./update.sh` in that folder: it lists the new changes and files, backs up, pulls and rebuilds. Back up daily with `backup.sh` from cron.
 
 ## Run one gym (development)
 

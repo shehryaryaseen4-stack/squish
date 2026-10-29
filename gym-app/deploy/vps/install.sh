@@ -132,5 +132,5 @@ if command -v ufw >/dev/null && ufw status | grep -q active; then run ufw allow 
 say "Done"
 echo "Website and owner panel:  https://$DOMAIN   (owner panel: https://$DOMAIN/owner)"
 echo "Attendance machines:      server $DOMAIN, port $MACHINE_PORT, HTTPS off"
-echo "Update later:             git pull && docker compose up -d --build   (in this folder)"
+echo "Update later:             sudo ./update.sh   (in this folder; shows what changed first)"
 echo "Daily backup:             add to crontab:  0 3 * * * $(pwd)/backup.sh"
