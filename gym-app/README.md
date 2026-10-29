@@ -135,6 +135,21 @@ Point the domain's DNS at the server first; Caddy gets the HTTPS certificate by 
 
 Then in GitHub → Settings → Secrets and variables → Actions → **Variables**, add `GYM_PLATFORM_URL` (e.g. `https://gymdesk.com`), `PRODUCT_NAME`, and `LICENSE_PUBLIC_KEY` (shown in owner panel → Settings) so the next build of the apps knows your website: the Android app then accepts a gym code, and the Windows app activates licences there.
 
+
+### On a server that already hosts other sites (e.g. Contabo with nginx or Apache)
+
+`deploy/vps` runs the app in Docker on a local port and adds a site for your domain to the server's existing nginx or Apache, with a free Let's Encrypt certificate. Other sites on the server are left alone.
+
+1. Buy a domain and add DNS A records for `yourdomain.com` and `www` pointing at the server's IP.
+2. On the server:
+   ```sh
+   git clone -b claude/laughing-albattani-un6m49 https://github.com/shehryaryaseen4-stack/squish.git /opt/gymapp
+   cd /opt/gymapp/gym-app/deploy/vps
+   sudo ./install.sh yourdomain.com
+   ```
+   It asks for the owner panel email and password once (saved in `.env`), picks free ports (web on 127.0.0.1:3100 or the next free one; machines on 8081 or the next), checks the DNS, and sets up HTTPS. `DRY_RUN=1` prints what it would do. On servers run by a hosting panel (CyberPanel, aaPanel, HestiaCP, Plesk, cPanel) it stops and explains how to add the site in the panel instead.
+3. Update later with `git pull && docker compose up -d --build` in that folder; back up daily with `backup.sh` from cron.
+
 ## Run one gym (development)
 
 ```bash
