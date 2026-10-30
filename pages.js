@@ -1068,8 +1068,8 @@ const photoSize = (x) => (x.w === 51 && x.h === 51 ? '2 x 2 in' : `${x.w} x ${x.
 const MAX_VIDEO_MB = Number(process.env.MAX_VIDEO_MB || 500);
 const SIG_FONTS = [['great-vibes', 'Great Vibes'], ['dancing-script', 'Dancing Script'], ['sacramento', 'Sacramento'], ['allura', 'Allura'],
   ['alex-brush', 'Alex Brush'], ['mr-dafoe', 'Mr Dafoe'], ['herr-von-muellerhoff', 'Herr Von Muellerhoff'], ['homemade-apple', 'Homemade Apple']];
-const dropBox = (accept, label, sub, note) => `<div class="pt-drop" data-drop>
-    <input type="file" accept="${accept}" data-input hidden>
+const dropBox = (accept, label, sub, note, multi = false) => `<div class="pt-drop" data-drop>
+    <input type="file" accept="${accept}" data-input hidden${multi ? ' multiple' : ''}>
     ${icon('upload', 'pt-drop-ico')}
     <button class="btn btn-brand btn-select" type="button" data-pick>${icon('upload')}${label}</button>
     <p class="pt-drop-sub">${sub}</p>
@@ -1091,9 +1091,12 @@ function toolBox(t) {
   if (t.app === 'resize') {
     const kb = t.kb || 100;
     return `${open()}
-  ${dropBox(IMG_ACCEPT, 'Select image', 'or drop an image here &middot; JPG, PNG, WEBP, GIF, BMP', 'Your image never leaves your device')}
+  ${dropBox(IMG_ACCEPT, 'Select images', 'or drop one or more images here &middot; JPG, PNG, WEBP, GIF, BMP', 'Your images never leave your device', true)}
   <div class="pt-work" data-work hidden>
-    ${fileBar('Choose another image')}
+    <div class="ie-strip" data-strip aria-label="Your images"></div>
+    <div class="pt-filebar">${icon('file')}<span class="pt-fname" data-fname></span><span class="pt-fmeta" data-fmeta></span>
+      <button type="button" class="pt-link" data-add-more>+ Add images</button><input type="file" accept="${IMG_ACCEPT}" data-add-input multiple hidden>
+      <button type="button" class="pt-link" data-again>Start over</button></div>
     <div class="rs-grid">
       <div class="rs-stagewrap"><canvas class="rs-stage" data-stage aria-label="Your image. When cropping, drag the box to choose the part to keep and drag a corner to resize it."></canvas>
         <p class="rs-hint" data-stage-hint hidden>Drag the box to choose the part to keep. Drag a corner to change its size and shape (hold Shift to keep the shape). <button type="button" class="pt-link" data-recenter>Centre</button></p></div>
@@ -1122,9 +1125,12 @@ function toolBox(t) {
   }
   if (t.app === 'imgedit') {
     return `${open(` data-mode="${t.mode || 'crop'}"`)}
-  ${dropBox(IMG_ACCEPT, 'Select image', 'or drop an image here &middot; JPG, PNG, WEBP, GIF, BMP', 'Your image never leaves your device')}
+  ${dropBox(IMG_ACCEPT, 'Select images', 'or drop one or more images here &middot; JPG, PNG, WEBP, GIF, BMP', 'Your images never leave your device', true)}
   <div class="pt-work" data-work hidden>
-    ${fileBar('Choose another image')}
+    <div class="ie-strip" data-strip aria-label="Your images"></div>
+    <div class="pt-filebar">${icon('file')}<span class="pt-fname" data-fname></span><span class="pt-fmeta" data-fmeta></span>
+      <button type="button" class="pt-link" data-add-more>+ Add images</button><input type="file" accept="${IMG_ACCEPT}" data-add-input multiple hidden>
+      <button type="button" class="pt-link" data-again>Start over</button></div>
     <div class="ie-tools">
       <label>Crop shape<select data-aspect><option value="free">Free</option><option value="orig">Original</option><option value="1:1">Square 1:1</option><option value="4:5">Portrait 4:5 (Instagram)</option><option value="9:16">Story 9:16</option><option value="16:9">Wide 16:9</option><option value="4:3">4:3</option><option value="3:2">3:2</option><option value="2:3">2:3</option></select></label>
       <span class="ie-btns"><button type="button" class="btn btn-ghost btn-sm" data-rot-l title="Rotate left">&#8634; Left</button><button type="button" class="btn btn-ghost btn-sm" data-rot-r title="Rotate right">&#8635; Right</button>
@@ -1135,7 +1141,10 @@ function toolBox(t) {
     <div class="ie-stage"><canvas data-canvas aria-label="Drag the box to move it, drag a corner to resize"></canvas></div>
     <div class="ie-tools"><label>Width (px)<input type="number" data-cw min="1"></label><label>Height (px)<input type="number" data-ch min="1"></label>
       ${fmtSelect()}<label>Corners after rotating<select data-bg><option value="clear">Transparent (PNG, WEBP)</option><option value="white">White</option></select></label></div>
-    <div class="pt-bar"><p class="pt-msg" data-msg role="status" aria-live="polite"></p><span class="ie-size" data-size-note></span><button type="button" class="btn btn-brand pt-go" data-go>${icon('download')}Download image</button></div>
+    <div class="pt-bar"><p class="pt-msg" data-msg role="status" aria-live="polite"></p><span class="ie-size" data-size-note></span>
+      <button type="button" class="btn btn-ghost" data-all-same hidden>Use these settings for all images</button>
+      <button type="button" class="btn btn-ghost" data-go>${icon('download')}Download this image</button>
+      <button type="button" class="btn btn-brand pt-go" data-go-all hidden>${icon('download')}Download all</button></div>
   </div>
   ${NOSCRIPT}
 </section>`;

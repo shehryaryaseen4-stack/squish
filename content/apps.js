@@ -257,6 +257,7 @@ module.exports = [
       ['Crop, rotate and flip in one place', '<p>Turn a sideways photo with <em>Left</em> and <em>Right</em>, straighten a tilted horizon with the angle slider, or mirror a selfie with <em>Flip horizontal</em>. The crop box always stays inside the picture, and the corners left after rotating by an angle can be transparent or white.</p>'],
     ],
     faq: [
+      ['Can I crop several images at once?', 'Yes. Select or drop several images together. Each one appears as a thumbnail above the editor; click one to edit it, or set it up once and click "Use these settings for all images". Then download one image, or all of them in a single ZIP.'],
       ['How do I crop a picture to a square?', 'Select the image, choose Square 1:1 as the crop shape, drag the box over the part you want and download.'],
       ['Can I crop to an exact size in pixels?', 'Yes. Type the width and height under the picture; the box keeps that size and you can move it.'],
       ['Does cropping reduce quality?', 'No. Cropping keeps the original pixels; only the part outside the box is removed. JPG files are saved at high quality.'],
@@ -280,6 +281,7 @@ module.exports = [
       ['Straighten a crooked photo', '<p>Use the angle slider to level a tilted horizon or a document photographed at an angle. Rotating by an angle leaves empty corners: crop them away with the box, or keep them transparent (PNG) or white. To scan documents straight, see <a href="/jpg-to-pdf">JPG to PDF</a> after rotating.</p>'],
     ],
     faq: [
+      ['Can I rotate several images at once?', 'Yes. Select or drop several images together. Each one appears as a thumbnail above the editor; click one to edit it, or set it up once and click "Use these settings for all images". Then download one image, or all of them in a single ZIP.'],
       ['How do I rotate a picture 90 degrees?', 'Select the image, click Right (clockwise) or Left (counterclockwise), then download it.'],
       ['Can I rotate by a custom angle?', 'Yes. Move the angle slider anywhere from -180 to 180 degrees.'],
       ['Does rotating lose quality?', 'Turning by 90 or 180 degrees keeps every pixel. Other angles need a small amount of smoothing.'],
@@ -303,6 +305,7 @@ module.exports = [
       ['Why selfies look reversed', '<p>The front camera shows you a mirror image while you take the photo, and some phones save it that way. Others save it un-mirrored, which looks wrong to you because you are used to your mirror image. Flip it here to get the version you prefer.</p>'],
     ],
     faq: [
+      ['Can I flip several images at once?', 'Yes. Select or drop several images together. Each one appears as a thumbnail above the editor; click one to edit it, or set it up once and click "Use these settings for all images". Then download one image, or all of them in a single ZIP.'],
       ['How do I mirror a picture?', 'Select the image, click Flip horizontal and download it.'],
       ['Can I flip a photo upside down?', 'Yes, click Flip vertical.'],
       ['Does flipping lose quality?', 'No. Flipping keeps every pixel.'],

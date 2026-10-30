@@ -274,29 +274,79 @@ function resize() {
 
 // ------------------------------------------------------- crop, rotate and flip --
 function imgedit() {
+  // Several images can be open at once (a strip of thumbnails); each keeps its own rotation, flips,
+  // crop shape and crop box, kept as fractions of the picture so "use these settings for all
+  // images" fits the same crop onto pictures of other sizes. Download one, or all in a ZIP.
   const stage = $('[data-canvas]'), ctx = stage.getContext('2d');
-  const st = { file: null, img: null, rot: 0, fh: false, fv: false, work: null, crop: null, aspect: 0, scale: 1 };
+  const st = { items: [], cur: -1, work: null, crop: null, aspect: 0, scale: 1 };
   const angle = $('[data-angle]'), aspSel = $('[data-aspect]'), fmt = $('[data-fmt]'), bg = $('[data-bg]');
+  const item = () => st.items[st.cur];
+  const aspectOf = (it, v) => (v === 'free' ? 0 : v === 'orig' ? dims(it.img)[0] / dims(it.img)[1] : v.split(':').reduce((p, q) => p / q));
 
-  // the picture with rotation and flips applied, at full size
-  function build() {
-    const [w, h] = dims(st.img);
-    const r = (st.rot * Math.PI) / 180, c = Math.abs(Math.cos(r)), s = Math.abs(Math.sin(r));
+  // a picture with its rotation and flips applied, at full size
+  function workOf(it) {
+    const [w, h] = dims(it.img);
+    const r = (it.rot * Math.PI) / 180, c = Math.abs(Math.cos(r)), s = Math.abs(Math.sin(r));
     const W = Math.round(w * c + h * s), H = Math.round(w * s + h * c);
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     const x = cv.getContext('2d');
-    x.translate(W / 2, H / 2); x.rotate(r); x.scale(st.fh ? -1 : 1, st.fv ? -1 : 1);
-    x.imageSmoothingQuality = 'high'; x.drawImage(st.img, -w / 2, -h / 2);
-    st.work = cv;
-    st.crop = fitAspect({ x: 0, y: 0, w: W, h: H });
+    x.translate(W / 2, H / 2); x.rotate(r); x.scale(it.fh ? -1 : 1, it.fv ? -1 : 1);
+    x.imageSmoothingQuality = 'high'; x.drawImage(it.img, -w / 2, -h / 2);
+    return cv;
+  }
+  // the crop box in pixels of the work canvas, from the fractions, kept to the crop shape
+  function cropOf(it, W, H) {
+    const a = aspectOf(it, it.aspectVal);
+    const rel = it.rel || { x: 0, y: 0, w: 1, h: 1 };
+    let w = rel.w * W, h = rel.h * H;
+    if (a) { if (!it.rel) { w = W; h = w / a; if (h > H) { h = H; w = h * a; } } else if (w / h > a) w = h * a; else h = w / a; }
+    w = Math.max(1, Math.min(w, W)); h = Math.max(1, Math.min(h, H));
+    const cx = (rel.x + rel.w / 2) * W, cy = (rel.y + rel.h / 2) * H;
+    return { x: Math.min(Math.max(0, cx - w / 2), W - w), y: Math.min(Math.max(0, cy - h / 2), H - h), w, h };
+  }
+  const keep = () => { const it = item(), W = st.work.width, H = st.work.height, c = st.crop; it.rel = { x: c.x / W, y: c.y / H, w: c.w / W, h: c.h / H }; };
+
+  function show(i) {
+    st.cur = i;
+    const it = item();
+    angle.value = it.rot; $('[data-angle-val]').textContent = `${it.rot}°`;
+    aspSel.value = it.aspectVal; st.aspect = aspectOf(it, it.aspectVal);
+    const [w, h] = dims(it.img);
+    $('[data-fname]').textContent = it.file.name; $('[data-fmeta]').textContent = `${w} x ${h} px · ${fmtSize(it.file.size)}${st.items.length > 1 ? ` · image ${i + 1} of ${st.items.length}` : ''}`;
+    build();
+    strip();
+  }
+  function build() {
+    const it = item();
+    st.work = workOf(it);
+    st.crop = cropOf(it, st.work.width, st.work.height);
     draw();
   }
-  function fitAspect(c) {
-    if (!st.aspect) return c;
-    const W = st.work.width, H = st.work.height;
-    let w = W, h = w / st.aspect; if (h > H) { h = H; w = h * st.aspect; }
-    return { x: (W - w) / 2, y: (H - h) / 2, w, h };
+  function strip() {
+    const many = st.items.length > 1;
+    $('[data-strip]').hidden = !many;
+    $('[data-all-same]').hidden = !many;
+    $('[data-go-all]').hidden = !many;
+    $('[data-go-all]').lastChild.textContent = `Download all (${st.items.length})`;
+    $('[data-go]').className = `btn ${many ? 'btn-ghost' : 'btn-brand pt-go'}`;
+    $('[data-go]').lastChild.textContent = many ? 'Download this image' : 'Download image';
+    if (!many) return;
+    $('[data-strip]').innerHTML = st.items.map((it, i) => `<button type="button" class="ie-thumb${i === st.cur ? ' is-on' : ''}" data-i="${i}" aria-label="Edit ${it.file.name.replace(/"/g, '')}"${i === st.cur ? ' aria-current="true"' : ''}><img src="${it.thumb}" alt=""><span class="ie-x" data-del="${i}" title="Remove">&times;</span></button>`).join('');
   }
+  $('[data-strip]').addEventListener('click', (e) => {
+    const del = e.target.closest('[data-del]');
+    if (del) {
+      const i = Number(del.dataset.del);
+      URL.revokeObjectURL(st.items[i].thumb);
+      st.items.splice(i, 1);
+      if (!st.items.length) { showWork(false); return; }
+      show(Math.min(st.cur > i ? st.cur - 1 : st.cur, st.items.length - 1));
+      return;
+    }
+    const b = e.target.closest('[data-i]');
+    if (b) show(Number(b.dataset.i));
+  });
+
   function draw() {
     const W = st.work.width, H = st.work.height;
     const maxW = Math.min(stage.parentElement.clientWidth || 800, 900), maxH = 560;
@@ -342,13 +392,14 @@ function imgedit() {
     } else {
       const s = drag.start, left = drag.ci % 2 === 0, top = drag.ci < 2;
       const ax = left ? s.x + s.w : s.x, ay = top ? s.y + s.h : s.y; // the fixed corner
-      let nx = Math.min(Math.max(0, x), W), ny = Math.min(Math.max(0, y), H);
+      const nx = Math.min(Math.max(0, x), W), ny = Math.min(Math.max(0, y), H);
       let w = Math.max(10, Math.abs(nx - ax)), h = Math.max(10, Math.abs(ny - ay));
       if (st.aspect) { if (w / h > st.aspect) w = h * st.aspect; else h = w / st.aspect; }
       w = Math.min(w, left ? ax : W - ax); h = Math.min(h, top ? ay : H - ay);
       if (st.aspect) { if (w / h > st.aspect) w = h * st.aspect; else h = w / st.aspect; }
       c.x = left ? ax - w : ax; c.y = top ? ay - h : ay; c.w = w; c.h = h;
     }
+    keep();
     draw();
   });
   const end = () => { drag = null; };
@@ -356,46 +407,91 @@ function imgedit() {
 
   // typed crop size (kept inside the picture, centred on the current box)
   const typed = () => {
-    let w = Math.min(Number($('[data-cw]').value) || 1, st.work.width), h = Math.min(Number($('[data-ch]').value) || 1, st.work.height);
+    const w = Math.min(Number($('[data-cw]').value) || 1, st.work.width);
+    let h = Math.min(Number($('[data-ch]').value) || 1, st.work.height);
     if (st.aspect) h = w / st.aspect;
     const c = st.crop, cx = c.x + c.w / 2, cy = c.y + c.h / 2;
     st.crop = { x: Math.min(Math.max(0, cx - w / 2), st.work.width - w), y: Math.min(Math.max(0, cy - h / 2), st.work.height - h), w, h };
-    draw();
+    keep(); draw();
   };
   $('[data-cw]').addEventListener('change', typed); $('[data-ch]').addEventListener('change', typed);
 
-  aspSel.addEventListener('change', () => {
-    const v = aspSel.value; st.aspect = v === 'free' ? 0 : v === 'orig' ? dims(st.img)[0] / dims(st.img)[1] : v.split(':').reduce((a, b) => a / b);
-    st.crop = fitAspect({ x: 0, y: 0, w: st.work.width, h: st.work.height }); draw();
-  });
-  const setRot = (deg) => { st.rot = ((deg % 360) + 540) % 360 - 180; angle.value = st.rot; $('[data-angle-val]').textContent = `${st.rot}°`; build(); };
-  $('[data-rot-l]').addEventListener('click', () => setRot(st.rot - 90));
-  $('[data-rot-r]').addEventListener('click', () => setRot(st.rot + 90));
+  aspSel.addEventListener('change', () => { const it = item(); it.aspectVal = aspSel.value; it.rel = null; st.aspect = aspectOf(it, it.aspectVal); build(); });
+  const setRot = (deg) => { const it = item(); it.rot = ((deg % 360) + 540) % 360 - 180; it.rel = null; angle.value = it.rot; $('[data-angle-val]').textContent = `${it.rot}°`; build(); };
+  $('[data-rot-l]').addEventListener('click', () => setRot(item().rot - 90));
+  $('[data-rot-r]').addEventListener('click', () => setRot(item().rot + 90));
   angle.addEventListener('input', () => setRot(Number(angle.value)));
-  $('[data-flip-h]').addEventListener('click', () => { st.fh = !st.fh; build(); });
-  $('[data-flip-v]').addEventListener('click', () => { st.fv = !st.fv; build(); });
-  $('[data-reset]').addEventListener('click', () => { st.fh = st.fv = false; aspSel.value = 'free'; st.aspect = 0; setRot(0); });
+  $('[data-flip-h]').addEventListener('click', () => { const it = item(); it.fh = !it.fh; build(); });
+  $('[data-flip-v]').addEventListener('click', () => { const it = item(); it.fv = !it.fv; build(); });
+  $('[data-reset]').addEventListener('click', () => { const it = item(); Object.assign(it, { fh: false, fv: false, aspectVal: 'free', rel: null }); aspSel.value = 'free'; st.aspect = 0; setRot(0); });
   window.addEventListener('resize', () => { if (st.work) draw(); });
 
-  dropZone(async (file) => {
-    say('');
-    try { st.img = await loadImage(file); } catch (e) { say(e.message, true); return; }
-    st.file = file; st.fh = st.fv = false; st.rot = 0; angle.value = 0; $('[data-angle-val]').textContent = '0°';
-    const [w, h] = dims(st.img);
-    $('[data-fname]').textContent = file.name; $('[data-fmeta]').textContent = `${w} x ${h} px · ${fmtSize(file.size)}`;
-    showWork(true); build();
+  // the same rotation, flips, crop shape and crop position (as a share of each picture) everywhere
+  $('[data-all-same]').addEventListener('click', () => {
+    const src = item();
+    for (const it of st.items) if (it !== src) Object.assign(it, { rot: src.rot, fh: src.fh, fv: src.fv, aspectVal: src.aspectVal, rel: src.rel ? { ...src.rel } : null });
+    say(`The same settings are now on all ${st.items.length} images. Click a picture to check or adjust it.`);
   });
 
-  $('[data-go]').addEventListener('click', async () => {
-    if (!st.work) return;
-    const c = st.crop, type = fmt.value === 'same' ? (EXT_OF[st.file.type] ? st.file.type : 'image/png') : MIME[fmt.value];
+  async function add(files) {
+    const list = [...files].filter((f) => /^image\//.test(f.type) || /\.(heic|heif)$/i.test(f.name));
+    if (!list.length) return;
+    say(list.length > 1 ? `Opening ${list.length} images...` : '');
+    const first = st.items.length;
+    for (const file of list) {
+      try {
+        const img = await loadImage(file);
+        st.items.push({ file, img, thumb: URL.createObjectURL(file), rot: 0, fh: false, fv: false, aspectVal: 'free', rel: null });
+      } catch (e) { say(`${file.name}: ${e.message}`, true); }
+    }
+    if (st.items.length > first) { showWork(true); show(first); if (list.length > 1) say(''); }
+  }
+  const input = $('[data-input]'), drop = $('[data-drop]');
+  $('[data-pick]').addEventListener('click', () => input.click());
+  input.addEventListener('change', () => { add(input.files); input.value = ''; });
+  drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('is-over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('is-over'));
+  drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('is-over'); add(e.dataTransfer.files); });
+  const more = $('[data-add-input]');
+  $('[data-add-more]').addEventListener('click', () => more.click());
+  more.addEventListener('change', () => { add(more.files); more.value = ''; });
+  $$('[data-again]').forEach((b) => b.addEventListener('click', () => { st.items.forEach((it) => URL.revokeObjectURL(it.thumb)); st.items = []; st.cur = -1; }));
+
+  // one picture, cropped, as a file
+  async function render(it) {
+    const work = it === item() ? st.work : workOf(it);
+    const c = it === item() ? st.crop : cropOf(it, work.width, work.height);
+    const type = fmt.value === 'same' ? (EXT_OF[it.file.type] ? it.file.type : 'image/png') : MIME[fmt.value];
     const out = document.createElement('canvas'); out.width = Math.round(c.w); out.height = Math.round(c.h);
     const x = out.getContext('2d');
     if (type === 'image/jpeg' || bg.value === 'white') { x.fillStyle = '#fff'; x.fillRect(0, 0, out.width, out.height); }
-    x.drawImage(st.work, Math.round(c.x), Math.round(c.y), out.width, out.height, 0, 0, out.width, out.height);
+    x.drawImage(work, Math.round(c.x), Math.round(c.y), out.width, out.height, 0, 0, out.width, out.height);
     const blob = await toBlob(out, type, 0.92);
-    save(blob, `${baseName(st.file)}-edited.${EXT_OF[blob.type] || 'png'}`);
-    say(`Saved: ${out.width} x ${out.height} px, ${fmtSize(blob.size)}.`); beacon('Edit image');
+    return { blob, name: `${baseName(it.file)}-edited.${EXT_OF[blob.type] || 'png'}`, w: out.width, h: out.height };
+  }
+  $('[data-go]').addEventListener('click', async () => {
+    if (!st.work) return;
+    const r = await render(item());
+    save(r.blob, r.name);
+    say(`Saved: ${r.w} x ${r.h} px, ${fmtSize(r.blob.size)}.`); beacon('Edit image');
+  });
+  $('[data-go-all]').addEventListener('click', async () => {
+    if (!st.items.length) return;
+    const b = $('[data-go-all]'); b.disabled = true;
+    const files = [], used = new Set();
+    let total = 0;
+    for (const [i, it] of st.items.entries()) {
+      say(`Preparing image ${i + 1} of ${st.items.length}...`);
+      const r = await render(it);
+      let name = r.name, n = 1;
+      while (used.has(name)) name = r.name.replace(/(\.[^.]+)$/, `-${++n}$1`);
+      used.add(name);
+      files.push([name, await bytes(r.blob)]);
+      total += r.blob.size;
+    }
+    save(zip(files), 'edited-images.zip');
+    b.disabled = false;
+    say(`Saved ${files.length} images in one ZIP (${fmtSize(total)}).`); beacon('Edit image');
   });
 }
 
