@@ -25,7 +25,7 @@ module.exports = [
       ['Is this PDF to Word converter free?', 'Yes. It is completely free, with no sign-up, no email address, no watermark and no limit on how many files you convert in a day within fair use.'],
       ['Can I edit the Word file after converting?', 'Yes. The result is a normal DOCX file with editable text that opens in Microsoft Word, Google Docs, WPS Office and LibreOffice.'],
       ['Will the formatting stay the same?', 'Text, headings, bold, italic, lists and images come across. Complex layouts with columns, tables drawn as lines or text placed over pictures may be arranged differently, because Word flows text instead of fixing it to positions.'],
-      ['Can I convert a scanned PDF to Word?', 'Yes. Choose OCR when you convert: the text is read from the page and becomes editable in Word, in the same place, while the design, colours and pictures stay as they were. It is free.'],
+      ['Can I convert a scanned PDF to Word?', 'Yes. Choose OCR when you convert: the text is read from the page and becomes editable in Word, in the same place, while the design, colors and pictures stay as they were. It is free.'],
       ['Can I convert PDF to Word on my phone?', 'Yes. The converter works in the browser on Android and iPhone; the Word file is saved to your downloads.'],
       ['Are my PDF files safe?', 'Files are converted on our server and deleted as soon as the conversion finishes. We never keep, read or share them.'],
     ],
@@ -58,11 +58,11 @@ module.exports = [
     title: 'Excel to PDF Converter - Free XLSX, XLS to PDF',
     desc: 'Convert Excel to PDF for free: XLSX, XLS and CSV spreadsheets to PDF with tables, borders and charts kept. Many files at once, no sign-up.',
     h1: 'Excel to PDF Converter',
-    intro: 'Turn Excel spreadsheets (XLSX, XLS) and CSV files into PDF for free. Tables, borders, colours and charts are kept, ready to print, email or attach to a report.',
+    intro: 'Turn Excel spreadsheets (XLSX, XLS) and CSV files into PDF for free. Tables, borders, colors and charts are kept, ready to print, email or attach to a report.',
     sections: [
       ['How to convert Excel to PDF', '<ol><li>Drop your Excel files (XLSX, XLS, ODS or CSV) into the box above.</li><li>PDF is already selected. Click <strong>Convert</strong>.</li><li>Download the PDFs one by one, or all together as a ZIP.</li></ol>'],
       ['Get the page layout right', '<p>Each worksheet is printed to PDF with the page settings saved in the file. If a wide sheet is split over several pages, set <strong>Page Layout &rarr; Orientation: Landscape</strong> and <strong>Fit to 1 page wide</strong> in Excel before converting. Set a <strong>Print Area</strong> to convert only part of a sheet.</p>'],
-      ['What is kept', '<p>Values, number formats, fonts, cell colours, borders, merged cells, images and most charts are kept. Formulas are converted to their results, which is usually what you want in a PDF. For invoices and price lists that need to look polished, try the <a href="/invoice-generator">invoice generator</a>.</p>'],
+      ['What is kept', '<p>Values, number formats, fonts, cell colors, borders, merged cells, images and most charts are kept. Formulas are converted to their results, which is usually what you want in a PDF. For invoices and price lists that need to look polished, try the <a href="/invoice-generator">invoice generator</a>.</p>'],
     ],
     faq: [
       ['Is Excel to PDF free?', 'Yes, free with no sign-up and no watermark.'],
@@ -78,7 +78,7 @@ module.exports = [
     title: 'PowerPoint to PDF Converter - Free PPTX to PDF',
     desc: 'Convert PowerPoint to PDF for free: PPTX and PPT slides to PDF, one slide per page, with images and fonts kept. No sign-up, no watermark.',
     h1: 'PowerPoint to PDF Converter',
-    intro: 'Convert PowerPoint presentations (PPTX, PPT) to PDF for free. Every slide becomes a page with its pictures, colours and fonts, ready to share, print or upload where PowerPoint files are not accepted.',
+    intro: 'Convert PowerPoint presentations (PPTX, PPT) to PDF for free. Every slide becomes a page with its pictures, colors and fonts, ready to share, print or upload where PowerPoint files are not accepted.',
     sections: [
       ['How to convert PowerPoint to PDF', '<ol><li>Drop your presentations (PPTX, PPT, PPSX or ODP) into the box above.</li><li>PDF is already selected. Click <strong>Convert</strong>.</li><li>Download each PDF, or all together as a ZIP.</li></ol>'],
       ['Why share slides as PDF', '<p>A PDF opens on every phone and computer without PowerPoint, keeps your fonts and layout, and is usually smaller. Teachers and universities often ask for assignments as PDF, and handouts print more reliably from a PDF.</p>'],

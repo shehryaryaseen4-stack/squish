@@ -13,15 +13,15 @@ module.exports = {
   // ------------------------------------------------------------------ images --
   'webp>gif': {
     why: 'GIF is still the format that chat apps, forums, email newsletters and older content systems accept everywhere. Turning a WebP image into a GIF lets you post it in places that refuse WebP uploads.',
-    keep: 'Keep the WebP whenever the image goes on a website: it is much smaller than a GIF and shows millions of colours instead of 256.',
+    keep: 'Keep the WebP whenever the image goes on a website: it is much smaller than a GIF and shows millions of colors instead of 256.',
     tips: [
-      'Set Quality to 100 for the full 256-colour palette; lower values use fewer colours and make smaller files.',
+      'Set Quality to 100 for the full 256-color palette; lower values use fewer colors and make smaller files.',
       'Use Resize to shrink large images, since GIF files grow quickly with size.',
       'Simple graphics such as stickers, icons and logos look best as GIF; photos may show banding.',
     ],
     problems: [
       ['My animated WebP became a still GIF.', 'Only the first frame of an animated WebP is converted. To share an animation as GIF, convert the original video with MP4 to GIF instead.'],
-      ['Colours look grainy or banded.', 'GIF can only store 256 colours. Raise Quality to 100, or use PNG if the picture does not need to be a GIF.'],
+      ['Colors look grainy or banded.', 'GIF can only store 256 colors. Raise Quality to 100, or use PNG if the picture does not need to be a GIF.'],
     ],
     faq: [
       ['Does WebP to GIF keep transparency?', 'Yes, but GIF transparency is on or off for each pixel, so soft, semi-transparent edges become hard edges.'],
@@ -31,19 +31,19 @@ module.exports = {
 
   'png>gif': {
     why: 'GIF is accepted by almost every forum, email client and messenger, including old ones. Converting a PNG logo, icon or simple drawing to GIF is useful when an upload form or template only allows GIF.',
-    keep: 'Keep the PNG for anything that needs smooth colours, soft shadows or semi-transparent edges, and as your editable master copy.',
+    keep: 'Keep the PNG for anything that needs smooth colors, soft shadows or semi-transparent edges, and as your editable master copy.',
     tips: [
-      'Flat graphics with few colours, such as logos, buttons and diagrams, convert to GIF with almost no visible change.',
-      'Quality 100 uses the full 256 colours; lower values give smaller files with fewer colours.',
+      'Flat graphics with few colors, such as logos, buttons and diagrams, convert to GIF with almost no visible change.',
+      'Quality 100 uses the full 256 colors; lower values give smaller files with fewer colors.',
       'Transparent backgrounds stay transparent.',
     ],
     problems: [
       ['The edges look jagged on a dark background.', 'GIF transparency is on or off, so anti-aliased edges lose their soft blending. Place the GIF on a background close to the one it was designed for.'],
-      ['Photos look banded.', 'GIF is limited to 256 colours. Keep photos as PNG, JPG or WebP.'],
+      ['Photos look banded.', 'GIF is limited to 256 colors. Keep photos as PNG, JPG or WebP.'],
     ],
     faq: [
       ['Can I make an animated GIF from several PNGs?', 'Not with this tool: each PNG becomes its own still GIF. To make an animation, start from a video and use MP4 to GIF.'],
-      ['Is GIF smaller than PNG?', 'For simple graphics with few colours, often yes. For detailed images PNG is usually smaller and looks better.'],
+      ['Is GIF smaller than PNG?', 'For simple graphics with few colors, often yes. For detailed images PNG is usually smaller and looks better.'],
     ],
   },
 
@@ -51,16 +51,16 @@ module.exports = {
     why: 'PNG opens in every image editor and keeps sharp edges and transparency. Converting a GIF to PNG gives you a clean still image to edit, put in a document or use as a thumbnail.',
     keep: 'Keep the GIF if it is animated and you want the animation: PNG stores a single picture.',
     tips: [
-      'Quality 100 gives a lossless PNG with exactly the GIF colours.',
+      'Quality 100 gives a lossless PNG with exactly the GIF colors.',
       'Transparent parts of the GIF stay transparent in the PNG.',
       'Use Resize to make a smaller preview image from a large GIF.',
     ],
     problems: [
       ['Only one picture came out of my animated GIF.', 'PNG is a still format, so the first frame of the animation is converted.'],
-      ['The PNG is larger than the GIF.', 'This is normal for simple GIFs. Lower the Quality a little to reduce the number of colours and the file size.'],
+      ['The PNG is larger than the GIF.', 'This is normal for simple GIFs. Lower the Quality a little to reduce the number of colors and the file size.'],
     ],
     faq: [
-      ['Does GIF to PNG lose quality?', 'No. GIF has at most 256 colours and PNG can store them all exactly, so at Quality 100 the PNG looks identical to the GIF frame.'],
+      ['Does GIF to PNG lose quality?', 'No. GIF has at most 256 colors and PNG can store them all exactly, so at Quality 100 the PNG looks identical to the GIF frame.'],
       ['Can I get every frame of a GIF as PNG?', 'Not here: the first frame is converted. Most GIF animations start on a representative frame, which works well as a thumbnail.'],
     ],
   },
@@ -85,14 +85,14 @@ module.exports = {
 
   'jpg>gif': {
     why: 'Some forums, older email templates and signature tools only accept GIF images. Converting a JPG to GIF makes the picture usable there.',
-    keep: 'Keep the JPG for photos: it shows millions of colours, while GIF is limited to 256 and makes larger files for photos.',
+    keep: 'Keep the JPG for photos: it shows millions of colors, while GIF is limited to 256 and makes larger files for photos.',
     tips: [
       'Use Resize to make the image smaller first; GIF files of large photos get big quickly.',
-      'Quality 100 uses the full 256-colour palette and gives the smoothest result.',
-      'Graphics with few colours, such as banners and logos saved as JPG, convert well.',
+      'Quality 100 uses the full 256-color palette and gives the smoothest result.',
+      'Graphics with few colors, such as banners and logos saved as JPG, convert well.',
     ],
     problems: [
-      ['The photo looks blotchy.', 'GIF can only use 256 colours, which shows in skies and skin tones. Keep the JPG, or use PNG if you need a lossless format.'],
+      ['The photo looks blotchy.', 'GIF can only use 256 colors, which shows in skies and skin tones. Keep the JPG, or use PNG if you need a lossless format.'],
       ['The GIF is much bigger than the JPG.', 'GIF compression is not made for photos. Reduce the size with Resize.'],
     ],
     faq: [
@@ -106,7 +106,7 @@ module.exports = {
     keep: 'Keep the JPG as your original picture. ICO files are small icons and are not useful for anything else.',
     tips: [
       'The ICO holds 16, 32, 48, 64, 128 and 256 pixel versions, so it looks sharp in browser tabs, on the desktop and in the taskbar.',
-      'Images that are not square are cropped to a square from the centre, so put the important part in the middle.',
+      'Images that are not square are cropped to a square from the center, so put the important part in the middle.',
       'Simple, bold designs read better at 16 pixels than detailed photos.',
     ],
     problems: [
@@ -130,7 +130,7 @@ module.exports = {
     ],
     problems: [
       ['The file will not convert.', 'Make sure it is a real HEIC photo from an iPhone or iPad. Files renamed to .heic from another format cannot be read.'],
-      ['Colours look slightly different.', 'Some iPhone photos use a wide colour range. Most screens show the WebP the same, but a few colours can look a little less vivid.'],
+      ['Colors look slightly different.', 'Some iPhone photos use a wide color range. Most screens show the WebP the same, but a few colors can look a little less vivid.'],
     ],
     faq: [
       ['Is WebP better than JPG for iPhone photos on a website?', 'For websites, yes: WebP is usually 25 to 35 percent smaller at the same quality, so pages load faster.'],
@@ -249,15 +249,15 @@ module.exports = {
 
   'tiff>png': {
     why: 'TIFF is common for scans and professional photos, but browsers and many apps do not show it. PNG keeps the image lossless and opens everywhere, so it is the natural choice for sharing a TIFF without losing detail.',
-    keep: 'Keep the TIFF for print workflows and archives, especially if it has layers or extra colour depth.',
+    keep: 'Keep the TIFF for print workflows and archives, especially if it has layers or extra color depth.',
     tips: [
-      'Set Quality to 100 for a lossless, full-colour PNG.',
+      'Set Quality to 100 for a lossless, full-color PNG.',
       'Use Resize to make a lighter copy for the web.',
       'Transparency is kept if the TIFF has it.',
     ],
     problems: [
       ['Only one page came out.', 'For multi-page TIFF files the first page is converted.'],
-      ['The PNG is very large.', 'Lossless PNG of a big scan is large. Use TIFF to JPG for photos, or lower Quality to reduce colours.'],
+      ['The PNG is very large.', 'Lossless PNG of a big scan is large. Use TIFF to JPG for photos, or lower Quality to reduce colors.'],
     ],
     faq: [
       ['Is PNG lossless like TIFF?', 'Yes, at Quality 100 the PNG stores every pixel exactly.'],
@@ -365,7 +365,7 @@ module.exports = {
     ],
     problems: [
       ['The PNG does not match what I see in Photoshop.', 'Save the PSD with Maximize Compatibility turned on, so the full preview is stored in the file, then convert again.'],
-      ['The PNG is large.', 'Use Resize, or lower Quality to reduce the number of colours.'],
+      ['The PNG is large.', 'Use Resize, or lower Quality to reduce the number of colors.'],
     ],
     faq: [
       ['Does PSD to PNG keep transparency?', 'Yes. Transparent pixels stay transparent in the PNG.'],
@@ -397,7 +397,7 @@ module.exports = {
     keep: 'Keep the DOCX for anything that needs formatting, images, tables or page layout; plain text cannot store any of them.',
     tips: [
       'The text is saved in UTF-8, so accents and non-Latin scripts are kept.',
-      'Paragraph breaks are kept; bold, fonts, colours and images are removed.',
+      'Paragraph breaks are kept; bold, fonts, colors and images are removed.',
       'Tables become plain lines of text.',
     ],
     problems: [
@@ -450,7 +450,7 @@ module.exports = {
     why: 'RTF is a simple document format that WordPad, TextEdit and old programs create. PDF is better for sending and printing, because it looks the same everywhere and cannot be edited by accident.',
     keep: 'Keep the RTF if you need to edit the text again; the PDF is the version to send, print or upload to a portal.',
     tips: [
-      'Bold, italics, fonts, colours and simple tables are kept.',
+      'Bold, italics, fonts, colors and simple tables are kept.',
       'The PDF uses the page size set in the RTF, usually A4 or Letter.',
       'Text in the PDF stays searchable.',
     ],
@@ -524,7 +524,7 @@ module.exports = {
     tips: [
       'You get one HTML file with its styles, pictures and fonts inside, so it opens correctly on any computer or phone, with no other files needed.',
       'Each PDF page becomes a page of the same size, with the text as real headings, paragraphs, lists, tables and links in the PDF\'s own fonts.',
-      'Choose OCR for scanned PDFs: their text is then recognised and becomes real text too.',
+      'Choose OCR for scanned PDFs: their text is then recognized and becomes real text too.',
     ],
     problems: [
       ['A page says it is a scanned picture.', 'Its text is a picture. Convert again and choose OCR to read it.'],
@@ -657,7 +657,7 @@ module.exports = {
       ['Math or diagrams are not rendered.', 'Special extensions such as math formulas or Mermaid diagrams are shown as plain text.'],
     ],
     faq: [
-      ['Which Markdown flavour is supported?', 'Standard Markdown with common extensions such as tables and fenced code blocks, like most README files use.'],
+      ['Which Markdown flavor is supported?', 'Standard Markdown with common extensions such as tables and fenced code blocks, like most README files use.'],
       ['Can I get a Word file instead?', 'Yes, use Markdown to DOCX for an editable document.'],
     ],
   },
@@ -672,7 +672,7 @@ module.exports = {
     ],
     problems: [
       ['Images are missing.', 'Local image files are not uploaded with the Markdown. Insert them in Word after converting.'],
-      ['Code blocks have plain formatting.', 'Code is set in a fixed-width style without colour highlighting.'],
+      ['Code blocks have plain formatting.', 'Code is set in a fixed-width style without color highlighting.'],
     ],
     faq: [
       ['Can I convert DOCX back to Markdown?', 'Yes, choose DOCX as input and Markdown as output on the Word converter page.'],
@@ -944,7 +944,7 @@ module.exports = {
     ],
     problems: [
       ['The GIF is very large.', 'GIF size grows with length. Trim the clip to the few seconds you need.'],
-      ['Colours look grainy.', 'GIF is limited to 256 colours per frame. Simple screen recordings look better than colourful scenes.'],
+      ['Colors look grainy.', 'GIF is limited to 256 colors per frame. Simple screen recordings look better than colorful scenes.'],
     ],
     faq: [
       ['Can I make a GIF from an iPhone video?', 'Yes. iPhone videos are MOV files; upload them here and download the GIF.'],
@@ -1147,7 +1147,7 @@ module.exports = {
     ],
     faq: [
       ['Is OGG better than MP3?', 'Vorbis is efficient and royalty-free, but MP3 plays on more devices.'],
-      ['Why do games use OGG?', 'It is free to use without licences and loops cleanly, which suits game music.'],
+      ['Why do games use OGG?', 'It is free to use without licenses and loops cleanly, which suits game music.'],
     ],
   },
 
@@ -1267,7 +1267,7 @@ module.exports = {
     tips: [
       'The letter shapes are not changed; the font data is only compressed.',
       'For current browsers WOFF2 is smaller still; WOFF is a good fallback.',
-      'Check that the font licence allows web use.',
+      'Check that the font license allows web use.',
     ],
     problems: [
       ['The font does not show on my site.', 'Check the path in your @font-face rule, and that your server sends the file. Fonts from another domain need CORS headers.'],
@@ -1285,14 +1285,14 @@ module.exports = {
     tips: [
       'The font is unpacked without changing any letter shapes.',
       'If the WOFF contains an OpenType (CFF) font, choose OTF as the output instead; you will be told if that is the case.',
-      'Make sure the font licence allows desktop use.',
+      'Make sure the font license allows desktop use.',
     ],
     problems: [
       ['It says to choose OTF instead.', 'This WOFF holds OpenType outlines, which unpack to an OTF file. Convert it with WOFF to OTF.'],
       ['Some letters are missing.', 'Web fonts are often subsets with only the characters a site needs.'],
     ],
     faq: [
-      ['Is converting WOFF to TTF legal?', 'The conversion just unpacks the file; whether you may use the font depends on its licence.'],
+      ['Is converting WOFF to TTF legal?', 'The conversion just unpacks the file; whether you may use the font depends on its license.'],
       ['Will the TTF look the same?', 'Yes. The outlines are exactly the same.'],
     ],
   },
@@ -1303,7 +1303,7 @@ module.exports = {
     tips: [
       'Letter shapes and OpenType features are not changed.',
       'WOFF2 is typically 30 percent smaller than WOFF and much smaller than OTF.',
-      'Check the font licence allows web use.',
+      'Check the font license allows web use.',
     ],
     problems: [
       ['The font does not load on my site.', 'Check the @font-face path and format("woff2"), and add CORS headers if the font is on another domain.'],

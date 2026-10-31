@@ -19,14 +19,14 @@ const LANDINGS = [
     desc: 'Free resume builder with 30 resume templates: modern, classic, simple, creative and ATS-friendly. Edit online, or start blank, and download your CV as PDF.',
     kicker: 'Free resume builder', h1: 'Resume Builder',
     lede: 'Pick one of 30 professional resume templates, click any text to replace it with your own, and download a clean PDF. Or start from a blank resume, or edit the resume you already have.',
-    panel: ['30 free resume templates', 'Modern, classic, simple, creative and ATS-friendly designs, plus a matching cover letter. Click one to open it; every word, colour and line can be changed.'],
+    panel: ['30 free resume templates', 'Modern, classic, simple, creative and ATS-friendly designs, plus a matching cover letter. Click one to open it; every word, color and line can be changed.'],
     sections: [
-      ['How to make a resume online', `<ol><li><strong>Pick a layout.</strong> The ${T('resume-modern', 'Modern resume')} has a coloured sidebar for contact details and skills; the ${T('resume-classic', 'Classic resume')} is a single clean column that suits banks, government jobs and academic posts.</li><li><strong>Replace the sample text.</strong> Click your name, job title, experience and education and type over them. Change fonts, sizes and colours from the bar above the page.</li><li><strong>Add or remove sections.</strong> Duplicate a job entry with Ctrl+D, delete what you do not need, and drag a guide line out of the ruler to keep everything aligned.</li><li><strong>Download your resume PDF.</strong> It opens the same on every computer and phone, which is what recruiters expect.</li></ol>`],
+      ['How to make a resume online', `<ol><li><strong>Pick a layout.</strong> The ${T('resume-modern', 'Modern resume')} has a colored sidebar for contact details and skills; the ${T('resume-classic', 'Classic resume')} is a single clean column that suits banks, government jobs and academic posts.</li><li><strong>Replace the sample text.</strong> Click your name, job title, experience and education and type over them. Change fonts, sizes and colors from the bar above the page.</li><li><strong>Add or remove sections.</strong> Duplicate a job entry with Ctrl+D, delete what you do not need, and drag a guide line out of the ruler to keep everything aligned.</li><li><strong>Download your resume PDF.</strong> It opens the same on every computer and phone, which is what recruiters expect.</li></ol>`],
       ['What makes a good resume', '<p>Keep it to one page if you have less than ten years of experience, and two at most after that. Start with a two-line summary of who you are and what you want, then list jobs from newest to oldest with numbers wherever you can: "cut delivery time by 30%" says more than "responsible for delivery". Put the skills that match the job advert near the top, and use the same words the advert uses.</p><p>Applicant tracking systems (ATS) read text, not pictures, so this resume builder keeps your words as real text in the PDF. Use a standard font such as Helvetica, Roboto or Open Sans, avoid putting key details inside images, and save the file as <em>firstname-lastname-resume.pdf</em>.</p>'],
       ['Resume, CV or biodata?', '<p>A resume is a short summary of your work history, usually one or two pages, used for most private jobs. A CV (curriculum vitae) is longer and also lists publications, research and awards; it is common for academic jobs and in the UK, Europe, Pakistan and India. Biodata adds personal details such as date of birth and is still asked for in some government forms. All three can be made from the same templates: add or remove sections until it matches what the employer asked for.</p>'],
       ['Resume templates for every job', '<p>Start from a resume already filled in for your field, then replace the details: <a href="/software-engineer-resume">software engineer</a>, <a href="/nurse-resume">nurse</a>, <a href="/teacher-resume">teacher</a>, <a href="/accountant-resume">accountant</a>, <a href="/civil-engineer-resume">engineer</a>, <a href="/sales-resume">sales</a>, <a href="/marketing-resume">marketing</a>, <a href="/graphic-designer-resume">graphic designer</a>, <a href="/data-analyst-resume">data analyst</a>, <a href="/manager-resume">manager</a> and <a href="/fresher-resume">freshers with no experience</a>. Or browse by style: <a href="/modern-resume-template">modern</a>, <a href="/professional-resume-template">professional</a>, <a href="/simple-resume-template">simple</a>, <a href="/creative-resume-template">creative</a> and <a href="/ats-resume-template">ATS-friendly</a>.</p>'],
       ['Which resume format should you use?', '<p>Most people should use the <strong>reverse-chronological</strong> format, newest job first: every template here follows it. Career changers can move Skills above Experience; students and fresh graduates can put Education first. Read the step-by-step <a href="/guides/how-to-write-a-resume">guide to writing a resume</a> for what to put in each section.</p>'],
-      ['Write a cover letter that matches', `<p>Most employers read the cover letter first. Open the ${T('cover-letter', 'Cover letter template')}, use the same font and colour as your resume, and write three short paragraphs: why this job, what you have done that proves you can do it, and a polite request for an interview. See the ${'<a href="/cover-letter-maker">cover letter maker</a>'} for more tips.</p>`],
+      ['Write a cover letter that matches', `<p>Most employers read the cover letter first. Open the ${T('cover-letter', 'Cover letter template')}, use the same font and color as your resume, and write three short paragraphs: why this job, what you have done that proves you can do it, and a polite request for an interview. See the ${'<a href="/cover-letter-maker">cover letter maker</a>'} for more tips.</p>`],
     ],
     faq: [
       ['Is this resume maker really free?', 'Yes. Making and downloading your resume is free, with no watermark and no trial. You do not need to create an account.'],
@@ -50,13 +50,13 @@ const LANDINGS = [
     panel: ['Start your cover letter', 'The cover letter matches the resume templates, so your application looks like one set.'],
     sections: [
       ['How to write a cover letter', `<p>Open the ${T('cover-letter', 'Cover letter template')} and replace the sample text with your own. A strong cover letter has three parts:</p><ol><li><strong>Opening.</strong> Name the job and where you saw it, and say in one sentence why you want it.</li><li><strong>Proof.</strong> Pick two or three achievements from your resume that match what the employer needs and explain them briefly, with numbers.</li><li><strong>Close.</strong> Thank the reader, say you would welcome an interview, and sign off with your name and phone number.</li></ol>`],
-      ['Cover letter tips', '<p>Address the letter to a person if you can find a name; "Dear Hiring Manager" is fine if you cannot. Keep it under one page, around 250 to 400 words. Do not repeat your whole resume: the letter should explain why you and this job fit together. Use the same font and colour as your resume so they look like one application, and save the file as <em>firstname-lastname-cover-letter.pdf</em>.</p>'],
+      ['Cover letter tips', '<p>Address the letter to a person if you can find a name; "Dear Hiring Manager" is fine if you cannot. Keep it under one page, around 250 to 400 words. Do not repeat your whole resume: the letter should explain why you and this job fit together. Use the same font and color as your resume so they look like one application, and save the file as <em>firstname-lastname-cover-letter.pdf</em>.</p>'],
       ['Sign your letter', '<p>Use Sign to draw your signature with a mouse or finger, or type it in a handwriting font, and place it above your printed name. The signature is saved inside the PDF.</p>'],
     ],
     faq: [
       ['Is the cover letter template free?', 'Yes. Writing, editing and downloading your cover letter is free, without a watermark or an account.'],
       ['Can I use it for any job?', 'Yes. The template is a standard business letter layout that works for private jobs, government applications, internships and university admissions.'],
-      ['Can I make the matching resume too?', 'Yes. Use the resume maker; the templates share fonts and colours so your resume and cover letter look like a set.'],
+      ['Can I make the matching resume too?', 'Yes. Use the resume maker; the templates share fonts and colors so your resume and cover letter look like a set.'],
       ['How long should a cover letter be?', 'Three or four short paragraphs, under one page. Hiring managers usually read it in less than a minute.'],
     ],
   },
@@ -87,7 +87,7 @@ const LANDINGS = [
     panel: ['Start your receipt', 'A compact receipt template, plus invoices and quotations.'],
     sections: [
       ['How to make a receipt', `<p>Open the ${T('receipt', 'Payment receipt template')} and fill in your business name, the receipt number and date, who paid, what they paid for and the amount. Add how they paid (cash, card, bank transfer) and download the PDF. It is A5 sized, so two fit on one A4 sheet when printed.</p>`],
-      ['Types of receipts you can make', '<p><strong>Cash receipt:</strong> proof that money was received in cash. <strong>Rent receipt:</strong> add the property address and the month the rent covers; tenants often need it for tax or allowance claims. <strong>Sales receipt:</strong> list the items sold with prices. <strong>Donation receipt:</strong> show the donor, the amount and your organisation\'s details.</p>'],
+      ['Types of receipts you can make', '<p><strong>Cash receipt:</strong> proof that money was received in cash. <strong>Rent receipt:</strong> add the property address and the month the rent covers; tenants often need it for tax or allowance claims. <strong>Sales receipt:</strong> list the items sold with prices. <strong>Donation receipt:</strong> show the donor, the amount and your organization\'s details.</p>'],
       ['Receipt or invoice?', '<p>An invoice asks for payment; a receipt confirms that payment has been made. Send an <a href="/invoice-generator">invoice</a> first, then a receipt when the money arrives.</p>'],
     ],
     faq: [
@@ -99,14 +99,14 @@ const LANDINGS = [
   {
     slug: 'letterhead-maker', kind: 'template', cat: 'business', short: 'Letterhead maker',
     title: 'Free Letterhead Maker - Company Letterhead PDF',
-    desc: 'Design a company letterhead online for free. Add your logo, address and colours, write your letter and download it as a PDF. No sign-up.',
+    desc: 'Design a company letterhead online for free. Add your logo, address and colors, write your letter and download it as a PDF. No sign-up.',
     kicker: 'Free letterhead design', h1: 'Letterhead Maker',
-    lede: 'Make your letters look official. Add your logo, company details and brand colour to a letterhead template and download it as a PDF.',
+    lede: 'Make your letters look official. Add your logo, company details and brand color to a letterhead template and download it as a PDF.',
     panel: ['Start your letterhead', 'A company letterhead, an office memo and a report cover.'],
     sections: [
-      ['How to design a letterhead', `<p>Open the ${T('letterhead', 'Company letterhead')}, add your logo with Image and replace the company name, address, phone, email and website. Change the accent colour to your brand colour. Save it as your blank letterhead, then open it again whenever you write a letter, type the letter in the body and download it.</p>`],
-      ['What to put on a letterhead', '<p>Your logo and company name at the top; your full address, phone number, email and website at the top or bottom. Many businesses also add a registration, tax or licence number. Keep it light: the letter is the important part.</p>'],
-      ['Memos and reports', `<p>For internal notes use the ${T('memo', 'Office memo')}; for documents and proposals use the ${T('report-cover', 'Report cover')}. Both can carry the same logo and colours.</p>`],
+      ['How to design a letterhead', `<p>Open the ${T('letterhead', 'Company letterhead')}, add your logo with Image and replace the company name, address, phone, email and website. Change the accent color to your brand color. Save it as your blank letterhead, then open it again whenever you write a letter, type the letter in the body and download it.</p>`],
+      ['What to put on a letterhead', '<p>Your logo and company name at the top; your full address, phone number, email and website at the top or bottom. Many businesses also add a registration, tax or license number. Keep it light: the letter is the important part.</p>'],
+      ['Memos and reports', `<p>For internal notes use the ${T('memo', 'Office memo')}; for documents and proposals use the ${T('report-cover', 'Report cover')}. Both can carry the same logo and colors.</p>`],
     ],
     faq: [
       ['Is the letterhead maker free?', 'Yes. Design, edit and download your letterhead free of charge, without a watermark.'],
@@ -130,7 +130,7 @@ const LANDINGS = [
       ['Is the certificate maker free?', 'Yes. Make and download certificates for free without a watermark.'],
       ['Can I print the certificate?', 'Yes. The certificates are A4 landscape. Print them on card or certificate paper for the best result.'],
       ['Can I make certificates for a whole class?', 'Yes. Duplicate the page for each person and change the name; it all downloads as one PDF.'],
-      ['Can I change the colours and fonts?', 'Yes. Every border, colour and font can be changed, and there are more than 150 fonts including elegant script fonts for names.'],
+      ['Can I change the colors and fonts?', 'Yes. Every border, color and font can be changed, and there are more than 150 fonts including elegant script fonts for names.'],
     ],
   },
   {
@@ -141,7 +141,7 @@ const LANDINGS = [
     lede: 'Design a flyer for your event, shop or service. Start from a template, add your own photos and text, and download a PDF to print or share.',
     panel: ['Choose a flyer or poster', 'Event flyers, sale posters and menus, ready to edit.'],
     sections: [
-      ['How to make a flyer', `<p>Start with the ${T('event-flyer', 'Event flyer')} or the ${T('sale-poster', 'Sale poster')}. Replace the headline with one short, bold line, add the date, place and price, and put your phone number, website or social media at the bottom. Add your own photo with Image, change the colours to match your brand, and download the PDF.</p>`],
+      ['How to make a flyer', `<p>Start with the ${T('event-flyer', 'Event flyer')} or the ${T('sale-poster', 'Sale poster')}. Replace the headline with one short, bold line, add the date, place and price, and put your phone number, website or social media at the bottom. Add your own photo with Image, change the colors to match your brand, and download the PDF.</p>`],
       ['Flyer design tips', '<p>People look at a flyer for about three seconds, so one big headline, one picture and one clear action ("Call now", "Visit us", "Book your seat") work best. Use no more than two fonts, keep strong contrast between text and background, and leave space around the edges so nothing is cut off when printed.</p>'],
       ['Print or share', '<p>The PDF prints sharply at A4. To post it on WhatsApp, Instagram or Facebook, convert the PDF to an image with our <a href="/pdf-to-jpg">PDF to JPG converter</a>.</p>'],
     ],
@@ -174,15 +174,15 @@ const LANDINGS = [
     desc: 'Make invitation cards online for free: birthday, wedding, party and event invitations, plus thank-you cards. Edit a template and download as PDF.',
     kicker: 'Free invitation cards', h1: 'Invitation Card Maker',
     lede: 'Design an invitation for a birthday, wedding, dinner or event. Edit the card, add your details and download it to print or send.',
-    panel: ['Choose a card', 'Party invitations and thank-you cards, ready to personalise.'],
+    panel: ['Choose a card', 'Party invitations and thank-you cards, ready to personalize.'],
     sections: [
-      ['How to make an invitation card', `<p>Open the ${T('invitation', 'Party invitation')}, write who is invited and what for, then the date, time and address. Add a photo or change the colours to match the occasion, and download the PDF. Send it by WhatsApp or email, or print it on card.</p>`],
+      ['How to make an invitation card', `<p>Open the ${T('invitation', 'Party invitation')}, write who is invited and what for, then the date, time and address. Add a photo or change the colors to match the occasion, and download the PDF. Send it by WhatsApp or email, or print it on card.</p>`],
       ['What to write on an invitation', '<p>Include the host\'s name, the occasion, the date and time, the full address (with a map link if sending online), any dress code, and how to reply (RSVP) with a phone number and a reply-by date.</p>'],
       ['Say thank you afterwards', `<p>After the event, send the ${T('thank-you', 'Thank-you card')} to guests: change the message and add a photo from the day.</p>`],
     ],
     faq: [
       ['Is the invitation maker free?', 'Yes. Design and download invitation cards for free, with no watermark.'],
-      ['Can I make a wedding or birthday invitation?', 'Yes. Change the title, text, colours and fonts of the party invitation to suit a wedding, birthday, engagement, Eid dinner or any event.'],
+      ['Can I make a wedding or birthday invitation?', 'Yes. Change the title, text, colors and fonts of the party invitation to suit a wedding, birthday, engagement, Eid dinner or any event.'],
       ['Can I send the invitation on WhatsApp?', 'Yes. Send the PDF directly, or convert it to a JPG image with our PDF to JPG converter for a picture message.'],
     ],
   },
@@ -212,7 +212,7 @@ const LANDINGS = [
     panel: ['Choose a planner', 'Weekly planner, to-do checklist, meeting agenda and lined notes.'],
     sections: [
       ['Planners you can make', `<ul><li>${T('weekly-planner', 'Weekly planner')}: one landscape page with a box for each day and space for goals.</li><li>${T('todo-list', 'To-do checklist')}: tick-box lines for daily or project tasks.</li><li>${T('meeting-agenda', 'Meeting agenda')}: topics, times and owners in a table, for team meetings.</li><li>${T('lined-notes', 'Lined notes')}: a clean ruled page for notes and study.</li></ul>`],
-      ['Fill it in on screen or print it', '<p>You can type straight into the planner here and tick boxes with the check tool, or download a blank copy and print a stack for the month. Add your own headings, change the colours and duplicate pages to make a whole planner booklet.</p>'],
+      ['Fill it in on screen or print it', '<p>You can type straight into the planner here and tick boxes with the check tool, or download a blank copy and print a stack for the month. Add your own headings, change the colors and duplicate pages to make a whole planner booklet.</p>'],
     ],
     faq: [
       ['Are the planners free?', 'Yes. Edit, download and print planners for free.'],
@@ -243,11 +243,11 @@ const LANDINGS = [
   {
     slug: 'add-text-to-pdf', kind: 'tool', tool: 'text', short: 'Add text to PDF',
     title: 'Add Text to PDF Online Free - Type on a PDF',
-    desc: 'Add text to a PDF online for free. Type anywhere on the page, choose from 150+ fonts, sizes and colours, and download the PDF. No sign-up.',
+    desc: 'Add text to a PDF online for free. Type anywhere on the page, choose from 150+ fonts, sizes and colors, and download the PDF. No sign-up.',
     kicker: 'Type on any PDF', h1: 'Add Text to PDF',
-    lede: 'Type anywhere on a PDF: notes, answers, addresses or corrections. Pick a font, size and colour, and download the updated file.',
+    lede: 'Type anywhere on a PDF: notes, answers, addresses or corrections. Pick a font, size and color, and download the updated file.',
     sections: [
-      ['How to add text to a PDF', '<ol><li>Open your PDF.</li><li>Choose <strong>Text</strong> and click where you want to write.</li><li>Type, then change the font, size, colour, bold, italic or alignment in the bar above the page.</li><li>Drag the text box to move it; use the Design panel for an exact position.</li><li>Download the PDF.</li></ol>'],
+      ['How to add text to a PDF', '<ol><li>Open your PDF.</li><li>Choose <strong>Text</strong> and click where you want to write.</li><li>Type, then change the font, size, color, bold, italic or alignment in the bar above the page.</li><li>Drag the text box to move it; use the Design panel for an exact position.</li><li>Download the PDF.</li></ol>'],
       ['Change the text that is already there', '<p>To change existing words instead of adding new ones, choose <strong>Edit text</strong> and click a line in the PDF; it becomes editable so you can retype it. For scanned pages, which are pictures of text, cover the old words with Whiteout and type the new ones on top.</p>'],
       ['Write in Urdu, Arabic and more', '<p>More than 150 fonts are available, including Noto Naskh Arabic and Noto Sans Arabic for Urdu and Arabic. Letters are joined correctly in the downloaded PDF.</p>'],
     ],
@@ -277,16 +277,16 @@ const LANDINGS = [
   {
     slug: 'highlight-pdf', kind: 'tool', tool: 'highlight', short: 'Highlight PDF',
     title: 'Highlight PDF Online Free - Highlight Text in a PDF',
-    desc: 'Highlight text in a PDF online for free. Mark important lines in yellow, green or any colour, add notes, and download the highlighted PDF.',
+    desc: 'Highlight text in a PDF online for free. Mark important lines in yellow, green or any color, add notes, and download the highlighted PDF.',
     kicker: 'Mark what matters', h1: 'Highlight PDF',
-    lede: 'Highlight important lines in study notes, contracts or reports. Choose a colour, drag over the text, and download the marked-up PDF.',
+    lede: 'Highlight important lines in study notes, contracts or reports. Choose a color, drag over the text, and download the marked-up PDF.',
     sections: [
-      ['How to highlight a PDF', '<ol><li>Open your PDF.</li><li>Choose <strong>Highlight</strong> and pick a colour.</li><li>Drag across the text you want to mark. Repeat for every line.</li><li>Add comments next to the highlights with Text, or circle things with Shapes.</li><li>Download the PDF.</li></ol>'],
-      ['Study and review tips', '<p>Use one colour per meaning, for example yellow for key points, green for definitions and pink for questions. Highlight less than you think: a page that is all yellow shows nothing. When reviewing a contract, highlight dates, amounts and obligations, and add a note beside anything to ask about.</p>'],
+      ['How to highlight a PDF', '<ol><li>Open your PDF.</li><li>Choose <strong>Highlight</strong> and pick a color.</li><li>Drag across the text you want to mark. Repeat for every line.</li><li>Add comments next to the highlights with Text, or circle things with Shapes.</li><li>Download the PDF.</li></ol>'],
+      ['Study and review tips', '<p>Use one color per meaning, for example yellow for key points, green for definitions and pink for questions. Highlight less than you think: a page that is all yellow shows nothing. When reviewing a contract, highlight dates, amounts and obligations, and add a note beside anything to ask about.</p>'],
     ],
     faq: [
       ['Can I highlight a PDF for free?', 'Yes. Highlighting and downloading are free, with no watermark.'],
-      ['Can I change the highlight colour?', 'Yes. Pick any colour and change the opacity in the bar above the page.'],
+      ['Can I change the highlight color?', 'Yes. Pick any color and change the opacity in the bar above the page.'],
       ['Can I remove a highlight?', 'Yes. Click the highlight and press Delete, or undo with Ctrl+Z.'],
     ],
   },
@@ -297,7 +297,7 @@ const LANDINGS = [
     kicker: 'Cover and correct', h1: 'Whiteout PDF',
     lede: 'Cover a mistake, an old address or anything you do not want to show. Draw a white box over it, type the correction on top, and download the PDF.',
     sections: [
-      ['How to white out a PDF', '<ol><li>Open your PDF.</li><li>Choose <strong>Whiteout</strong> and drag a box over the text or picture to cover.</li><li>Choose <strong>Text</strong> and type the correct details on the white area.</li><li>Download the PDF.</li></ol><p>The box is white by default; pick another colour if your page has a coloured background.</p>'],
+      ['How to white out a PDF', '<ol><li>Open your PDF.</li><li>Choose <strong>Whiteout</strong> and drag a box over the text or picture to cover.</li><li>Choose <strong>Text</strong> and type the correct details on the white area.</li><li>Download the PDF.</li></ol><p>The box is white by default; pick another color if your page has a colored background.</p>'],
       ['Whiteout is not redaction', '<p>Whiteout hides content visually, like correction tape on paper. The original text underneath can still be found by someone who copies text out of the PDF or opens it in a technical tool. Do not use it to remove passwords, ID numbers, bank details or other private data before sharing. For that, print the page and scan it again, or use a dedicated redaction tool.</p>'],
     ],
     faq: [
@@ -313,7 +313,7 @@ const LANDINGS = [
     kicker: 'Insert pictures', h1: 'Add Image to PDF',
     lede: 'Put a photo, logo, stamp or screenshot into your PDF. Place it anywhere, resize it, crop it into a circle, and download.',
     sections: [
-      ['How to add an image to a PDF', '<ol><li>Open your PDF.</li><li>Click <strong>Image</strong> and choose a PNG, JPG or WebP file.</li><li>Click on the page to place it, then drag the corners to resize; the proportions stay the same. Hold Shift to stretch it freely, or Ctrl to resize from the centre.</li><li>Use the Image settings to show it as a circle or add a border.</li><li>Download the PDF.</li></ol>'],
+      ['How to add an image to a PDF', '<ol><li>Open your PDF.</li><li>Click <strong>Image</strong> and choose a PNG, JPG or WebP file.</li><li>Click on the page to place it, then drag the corners to resize; the proportions stay the same. Hold Shift to stretch it freely, or Ctrl to resize from the center.</li><li>Use the Image settings to show it as a circle or add a border.</li><li>Download the PDF.</li></ol>'],
       ['Common uses', '<p>Add a passport photo to an application form, a company logo to a letter or invoice, a stamp next to a signature, a QR code to a flyer, or a screenshot to a report. To add an image as a whole new page, use Image page in the Pages panel.</p>'],
       ['Replace an image that is already in the PDF', '<p>Choose <strong>Edit image</strong> and click a picture in the PDF to move, resize, replace or remove it.</p>'],
     ],
@@ -330,7 +330,7 @@ const LANDINGS = [
     kicker: 'Number your pages', h1: 'Add Page Numbers to PDF',
     lede: 'Add page numbers to a report, thesis or document in seconds. Choose where they go and how they look, then download.',
     sections: [
-      ['How to add page numbers', '<ol><li>Open your PDF.</li><li>Click <strong>Download</strong>.</li><li>Tick <strong>Add page numbers</strong>, then choose the position (bottom centre, bottom right, bottom left, top centre or top right) and the format: "1", "1 / 10" or "Page 1 of 10".</li><li>Download the numbered PDF.</li></ol>'],
+      ['How to add page numbers', '<ol><li>Open your PDF.</li><li>Click <strong>Download</strong>.</li><li>Tick <strong>Add page numbers</strong>, then choose the position (bottom center, bottom right, bottom left, top center or top right) and the format: "1", "1 / 10" or "Page 1 of 10".</li><li>Download the numbered PDF.</li></ol>'],
       ['Before you number', '<p>Put the pages in the right order first: in the Pages panel you can drag pages to reorder them, delete blank ones, and rotate any that are sideways. If you need to merge several files into one document before numbering, add them with Merge PDF.</p>'],
     ],
     faq: [
@@ -359,7 +359,7 @@ const LANDINGS = [
     slug: 'delete-pdf-pages', kind: 'tool', short: 'Delete PDF pages',
     title: 'Delete Pages from PDF Online Free - Remove PDF Pages',
     desc: 'Remove pages from a PDF online for free. Delete, reorder, rotate or duplicate pages and download the new PDF. Your file stays on your device.',
-    kicker: 'Organise your pages', h1: 'Delete PDF Pages',
+    kicker: 'Organize your pages', h1: 'Delete PDF Pages',
     lede: 'Remove blank, extra or private pages from a PDF. You can also reorder, rotate and duplicate pages before downloading.',
     sections: [
       ['How to delete pages from a PDF', '<ol><li>Open your PDF. Every page appears in the Pages panel on the left.</li><li>Point at a page and click the bin icon to delete it.</li><li>Drag pages up or down to change the order, and use the rotate buttons for sideways pages.</li><li>Download the PDF with only the pages you kept.</li></ol>'],

@@ -67,7 +67,7 @@ module.exports = {
 <li>Each file can be up to {{MAX_MB}} MB; PDF to Word handles up to 150 pages at once.</li></ul>`,
     uses: ['Edit a contract, CV or form you only have as a PDF.', 'Turn phone photos of documents into one PDF to email or upload.', 'Share a Word or Excel file that must look the same on every device.', 'Make a scanned PDF searchable and its text copyable.'],
     faq: [
-      ['Will my PDF look the same in Word?', 'Very close: text, fonts, colours, pictures, tables, columns and headers are rebuilt as editable Word content. Unusual fonts that cannot be embedded are replaced by a similar common font, and you are told when that happens.'],
+      ['Will my PDF look the same in Word?', 'Very close: text, fonts, colors, pictures, tables, columns and headers are rebuilt as editable Word content. Unusual fonts that cannot be embedded are replaced by a similar common font, and you are told when that happens.'],
       ['Can I convert a scanned PDF?', 'Yes. Choose OCR and the scanned pages are read with Tesseract, the open-source text recognition engine, before conversion.'],
       ['Is there a page limit?', 'Up to 150 pages for PDF to Word and PDF to HTML, and the upload limit shown in the box for other conversions.'],
     ],
@@ -220,11 +220,11 @@ module.exports = {
       ['Choose the format.', 'WOFF2 for websites, TTF or OTF for computers.'],
       ['Convert and download.', 'Click Convert and download the font.'],
     ] },
-    settings: '<ul><li>Check the font licence before converting or using it on a website.</li><li>Each file can be up to {{MAX_MB}} MB.</li></ul>',
+    settings: '<ul><li>Check the font license before converting or using it on a website.</li><li>Each file can be up to {{MAX_MB}} MB.</li></ul>',
     uses: ['Serve a font on a website as WOFF2 for faster pages.', 'Install a web font on your computer for a design mock-up.'],
     faq: [
       ['Which font format should I use on a website?', 'WOFF2: it is supported by every current browser and is the smallest.'],
-      ['Is converting a font legal?', 'It depends on the font licence. Many free fonts allow it; commercial fonts often do not. Check the licence first.'],
+      ['Is converting a font legal?', 'It depends on the font license. Many free fonts allow it; commercial fonts often do not. Check the license first.'],
     ],
     guides: [],
   },
@@ -247,7 +247,7 @@ module.exports = {
     uses: ['Send an invoice or report as a PDF.', 'Import a contact list or price list into another system as CSV.', 'Open an old .xls file in a current version of Excel.'],
     faq: [
       ['How do I fit my spreadsheet on one PDF page?', 'Set "fit to one page wide" in the page setup of Excel or LibreOffice and save, then convert. Our Excel to PDF guide shows how.'],
-      ['Does CSV keep formulas and formatting?', 'No. CSV holds only values. Keep the XLSX for formulas, colours and several sheets.'],
+      ['Does CSV keep formulas and formatting?', 'No. CSV holds only values. Keep the XLSX for formulas, colors and several sheets.'],
     ],
     guides: ['convert-excel-to-pdf'],
   },

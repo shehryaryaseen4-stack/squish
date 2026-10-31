@@ -62,8 +62,8 @@ const FORMATS = [
   {
     id: 'gif', name: 'GIF', fullName: 'Graphics Interchange Format', category: 'image', alsoIn: ['video'],
     mimeType: 'image/gif', browser: 'NL', apiFormat: 'gif',
-    traits: { sizeRank: 2, alpha: true, compression: 'Lossless, 256 colours', animation: true, year: 1987, developer: 'CompuServe', bestFor: 'Short animations and simple graphics' },
-    description: 'GIF dates from 1987 and is best known for short looping animations. Each frame is limited to 256 colours and transparency is on or off only, so photographs often look banded. It is still handy for simple graphics and animations that need to work everywhere.',
+    traits: { sizeRank: 2, alpha: true, compression: 'Lossless, 256 colors', animation: true, year: 1987, developer: 'CompuServe', bestFor: 'Short animations and simple graphics' },
+    description: 'GIF dates from 1987 and is best known for short looping animations. Each frame is limited to 256 colors and transparency is on or off only, so photographs often look banded. It is still handy for simple graphics and animations that need to work everywhere.',
   },
   {
     id: 'bmp', name: 'BMP', fullName: 'Bitmap', category: 'image',

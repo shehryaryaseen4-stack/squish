@@ -171,7 +171,7 @@ const CONVERSION_RULES = [
 
   // ---- PDF to Word rebuilt from the PDF's content (engines/pdfx); before the ebook rule, which reflows text
   { id: 'pdf-to-word', status: 'live', engine: 'pdf2docx', requires: ['libreoffice'], handler: 'pdfword', from: ['pdf'], to: ['docx', 'doc', 'odt', 'rtf'], quality: 'good',
-    notes: 'Text, fonts, colours, tables, pictures and shapes stay in place and can be edited. Choose OCR for scanned PDFs.' },
+    notes: 'Text, fonts, colors, tables, pictures and shapes stay in place and can be edited. Choose OCR for scanned PDFs.' },
 
   // ---- ebooks (Calibre)
   { id: 'ebook-live', status: 'live', engine: 'calibre', handler: 'ebook', from: EBOOK_LIVE_IN, to: EBOOK_LIVE_OUT, quality: 'good',
@@ -249,7 +249,7 @@ const CONVERSION_RULES = [
     notes: 'Heavy: needs async jobs, a dedicated worker pool, timeouts and size limits.' },
   { id: 'video-to-audio', status: 'planned', engine: 'ffmpeg', from: VIDEO_IN, to: AUDIO, notes: 'Extracts the audio track.' },
   { id: 'video-to-gif', status: 'planned', engine: 'ffmpeg', from: VIDEO_IN, to: ['gif'], quality: 'limited',
-    notes: 'GIF is limited to 256 colours; long clips make very large files.' },
+    notes: 'GIF is limited to 256 colors; long clips make very large files.' },
   { id: 'gif-to-video', status: 'planned', engine: 'ffmpeg', from: ['gif'], to: ['mp4', 'webm', 'mov', 'avi', 'mkv'] },
 
   // ---- extended catalog (CloudConvert-style coverage). Pairs already defined above keep

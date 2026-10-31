@@ -34,7 +34,7 @@ module.exports = [
 </ul>
 <p>When in doubt, convert at 90, open the PNG and WebP side by side at 100 percent zoom and compare. If you cannot see a difference, try 80.</p>`],
       ['Resize first: the biggest saving of all', `<p>A 4000 pixel wide PNG shown in an 800 pixel wide column wastes most of its bytes. Choose <strong>Max 1920px</strong> for full-width images, or <strong>Max 1280px</strong> or <strong>Max 800px</strong> for images inside an article. Images are never enlarged, only made smaller when they are bigger than the size you pick.</p>`],
-      ['Transparency is kept', `<p>WebP supports transparent and semi-transparent pixels, so logos and cut-out product photos keep their transparent background and can sit on any colour, just like the PNG.</p>`],
+      ['Transparency is kept', `<p>WebP supports transparent and semi-transparent pixels, so logos and cut-out product photos keep their transparent background and can sit on any color, just like the PNG.</p>`],
       ['When to keep the PNG', `<ul>
 <li>As your <strong>master copy</strong> for future editing. Always convert from the original PNG, not from a WebP you made earlier.</li>
 <li>For <strong>print shops and older desktop software</strong>, which do not always open WebP.</li>
@@ -112,7 +112,7 @@ module.exports = [
 </ul>`],
       ['Tips for scanned documents', `<ul>
 <li>Scan at 150 or 200 dpi, not 600. For forms and IDs that is plenty.</li>
-<li>Scan in greyscale instead of colour when colour is not needed.</li>
+<li>Scan in grayscale instead of color when color is not needed.</li>
 <li>Crop away empty borders before saving.</li>
 </ul>`],
     ],
@@ -186,7 +186,7 @@ module.exports = [
       ['When you are done', `<p>Edit the document in Word, then turn it back into a PDF with <a href="/docx-to-pdf">Word to PDF</a> so it looks the same for everyone.</p>`],
     ],
     faq: [
-      ['Can I convert a scanned PDF to editable Word?', 'Yes. Choose OCR when you convert: the text is read from the page and becomes editable in Word, in the same place, while the design, colours and pictures stay as they were. It is free.'],
+      ['Can I convert a scanned PDF to editable Word?', 'Yes. Choose OCR when you convert: the text is read from the page and becomes editable in Word, in the same place, while the design, colors and pictures stay as they were. It is free.'],
       ['Is PDF to Word conversion free?', 'Yes, free with no sign-up and no watermark.'],
       ['Why does my converted Word file look different?', 'PDFs fix every line on the page, while Word flows text. Paragraphs and text are kept, but tables, columns and spacing may need tidying.'],
     ],
@@ -247,7 +247,7 @@ module.exports = [
       ['3. Compress by a sensible amount', `<p>Each compressor has a <strong>Reduce size by</strong> setting under <strong>Options</strong> (50 percent by default). It finds the best quality that reaches that size, and only shrinks the pixel dimensions when quality alone is not enough.</p>
 <ul>
 <li><a href="/compress-jpg">Compress JPG</a>: 50 to 70 percent smaller is usually invisible on photos straight from a camera.</li>
-<li><a href="/compress-png">Compress PNG</a>: reduces the number of colours; 30 to 60 percent keeps graphics clean.</li>
+<li><a href="/compress-png">Compress PNG</a>: reduces the number of colors; 30 to 60 percent keeps graphics clean.</li>
 <li><a href="/compress-webp">Compress WebP</a>: 30 to 50 percent, since WebP is already efficient.</li>
 </ul>
 <p>The list shows the original and the new size of every file. All compressors handle many files at once and give you a ZIP. Camera data such as GPS location is removed too, which also saves a few kilobytes.</p>`],
@@ -320,7 +320,7 @@ module.exports = [
     intro: 'The favicon is the small icon in the browser tab, bookmarks and search results. A clear favicon makes your site look finished and easier to find among open tabs. Here is how to make one.',
     sections: [
       ['1. Prepare a square image', `<ul>
-<li>Use a <strong>square</strong> image, at least 256 by 256 pixels. Images that are not square are cropped from the centre.</li>
+<li>Use a <strong>square</strong> image, at least 256 by 256 pixels. Images that are not square are cropped from the center.</li>
 <li>Use a <strong>simple</strong> design: a letter, a symbol or the mark from your logo. Full logos with text become unreadable at 16 pixels.</li>
 <li>Use a <strong>PNG with a transparent background</strong> so the icon looks good in light and dark browser themes.</li>
 </ul>
@@ -360,7 +360,7 @@ module.exports = [
 </ol>
 <p>The MP4 is prepared for fast start, so it begins playing online before it has fully downloaded.</p>`],
       ['Does it lose quality?', `<p>The video is re-encoded at high quality, so on a phone, laptop or TV it looks the same. The resolution and frame rate stay as recorded. The MP4 may be somewhat larger than the HEVC original, because H.264 is less efficient; that is the cost of playing everywhere.</p>
-<p>Videos recorded in HDR (shown as HDR or Dolby Vision on the iPhone) are converted to standard video, and their colours can look a little flatter. To avoid this for new recordings, turn off <strong>HDR Video</strong> in <strong>Settings, Camera, Record Video</strong>.</p>`],
+<p>Videos recorded in HDR (shown as HDR or Dolby Vision on the iPhone) are converted to standard video, and their colors can look a little flatter. To avoid this for new recordings, turn off <strong>HDR Video</strong> in <strong>Settings, Camera, Record Video</strong>.</p>`],
       ['Other useful conversions', `<ul>
 <li>Need only the sound? <a href="/mov-to-mp3">MOV to MP3</a>.</li>
 <li>Want a short looping clip for a chat or document? <a href="/mov-to-gif">MOV to GIF</a>.</li>
@@ -545,7 +545,7 @@ module.exports = [
     sections: [
       ['1. A font is missing', `<p>When a PDF uses a font that cannot be included in the new file, a similar common font is used instead. Letters then have slightly different widths, so a line can break earlier or later. Our <a href="/pdf-to-word">PDF to Word</a> converter embeds the PDF's fonts in the Word file when it is allowed to and tells you when a font had to be replaced.</p>
 <p><strong>Fix:</strong> install the original font on your computer, or change the text to a common font.</p>`],
-      ['2. The PDF is a scan', `<p>A scanned PDF is a picture of each page with no text inside, so there is nothing to edit. Choose <strong>OCR</strong> when converting, or make the PDF searchable first with <a href="/ocr-pdf">OCR PDF</a>. Recognised text is very good on clean scans and weaker on photos taken at an angle or in poor light.</p>`],
+      ['2. The PDF is a scan', `<p>A scanned PDF is a picture of each page with no text inside, so there is nothing to edit. Choose <strong>OCR</strong> when converting, or make the PDF searchable first with <a href="/ocr-pdf">OCR PDF</a>. Recognized text is very good on clean scans and weaker on photos taken at an angle or in poor light.</p>`],
       ['3. Columns, text boxes and designed layouts', `<p>Resumes, brochures and magazines place text in columns and boxes. A good converter reads them in the order a person would and rebuilds columns as columns, but very complex designs can still need small adjustments in Word.</p>`],
       ['4. Tables without lines', `<p>Ruled tables (with visible borders) become real Word tables. Tables made only of aligned text have no lines to detect, so they come out as text with tab stops.</p>`],
       ['5. Word to PDF: the document changed before it became a PDF', `<p>If a Word file looks different as a PDF, it usually also looks different on another computer: a font is missing there too, or the document uses "track changes" or comments. Accept the changes and use common fonts, then convert again with <a href="/word-to-pdf">Word to PDF</a>.</p>`],
@@ -643,7 +643,7 @@ module.exports = [
 <li>Download the result. The size is shown before you save, so you can check it is under the limit.</li>
 </ol>
 <p>For the most common limit there is a ready-made page: <a href="/resize-image-to-50kb">resize image to 50 KB</a>. The photo never leaves your device.</p>`],
-      ['How it gets under the limit', `<p>The resizer first lowers the JPG quality step by step, which removes detail the eye barely notices. If that is not enough, it also reduces the width and height until the file fits. Photos stay recognisable well below 50 KB at passport-photo sizes.</p>`],
+      ['How it gets under the limit', `<p>The resizer first lowers the JPG quality step by step, which removes detail the eye barely notices. If that is not enough, it also reduces the width and height until the file fits. Photos stay recognizable well below 50 KB at passport-photo sizes.</p>`],
       ['When the form also asks for pixels', `<p>Some forms want both, for example 200 &times; 230 pixels and under 50 KB. Resize by <strong>Width and height</strong> first and download, then open that file again and resize it by <strong>File size (KB)</strong>. To change the shape of the photo, crop it first with <a href="/crop-image">Crop Image</a>; for official photo sizes use the <a href="/passport-photo-maker">Passport Photo Maker</a>.</p>`],
       ['Tips', `<ul>
 <li>Start from the original photo, not a screenshot of it.</li>
@@ -699,6 +699,182 @@ module.exports = [
       ['What size is a UK passport photo?', '35 mm wide by 45 mm high, with the head 29 to 34 mm from chin to crown.'],
       ['What size is the digital UK passport photo?', 'At least 600 pixels wide and 750 pixels tall. The Passport Photo Maker produces 700 by 900 pixels.'],
       ['Can I print a UK passport photo at home?', 'Print the 6x4 inch sheet on photo paper at a shop or kiosk for the best result; the sheet holds several photos to cut out.'],
+    ],
+  },
+  // ---------------------------------------------------------------- United States --
+  {
+    slug: 'us-passport-photo-size',
+    title: 'US Passport Photo Size (2x2) and Rules: Make One at Home',
+    h1: 'US passport photo size and how to make one at home',
+    desc: 'US passport photo size (2 x 2 inches), head size, the 600 x 600 digital photo, the rules on glasses and background, and how to make and print one at home.',
+    date: '2026-11-01',
+    tools: ['/us-passport-photo', '/passport-photo-maker', '/crop-image'],
+    intro: 'A US passport photo is 2 inches by 2 inches, square, with your head taking up about half of it. You can take it at home with a phone, then make a digital photo for an online renewal and a 4x6 sheet to print at a drugstore for well under the price of a photo studio.',
+    sections: [
+      ['The size', `<ul>
+<li><strong>Printed photo:</strong> 2 x 2 inches (51 x 51 mm).</li>
+<li><strong>Head:</strong> 1 to 1 3/8 inches (25 to 35 mm) from the bottom of the chin to the top of the head.</li>
+<li><strong>Digital photo:</strong> square, at least 600 x 600 pixels. The US Passport Photo maker makes it 600 x 600.</li>
+</ul>`],
+      ['The main rules', `<ul>
+<li>A plain white or off-white background, with no shadows, pattern or objects.</li>
+<li>No glasses. They are allowed only if you cannot remove them for medical reasons, with a signed note from your doctor.</li>
+<li>Face the camera with both eyes open and a neutral expression or a natural smile.</li>
+<li>Taken in the last 6 months, in color, in focus, and not edited or filtered.</li>
+<li>No hats or head coverings, except for religious or medical reasons with a signed statement.</li>
+</ul>
+<p>Rules change from time to time, so check the current requirements on travel.state.gov before you apply.</p>`],
+      ['Make it at home', `<ol>
+<li>Stand in front of a plain white wall, facing a window, and ask someone to take the photo from about 4 feet away at eye level. Take your glasses off.</li>
+<li>Open the <a href="/us-passport-photo">US Passport Photo maker</a>, where United States is already chosen.</li>
+<li>Move and zoom the photo until your chin and the top of your head sit on the guide lines.</li>
+<li>Download the <strong>digital photo</strong> for an online application, or the <strong>4x6 inch sheet</strong>.</li>
+<li>Order the sheet as a normal 4x6 print at CVS, Walgreens, Walmart or another photo counter, then cut out the 2x2 photos along the lines.</li>
+</ol>
+<p>The photo is cropped in your browser and never uploaded.</p>`],
+      ['Common reasons photos are rejected', `<ul>
+<li>Shadows on the face or on the wall behind the head.</li>
+<li>Glasses, or glare that hides the eyes.</li>
+<li>Head too small or too big in the frame.</li>
+<li>A selfie taken at arm's length, which distorts the face.</li>
+<li>A gray or colored background instead of white or off-white.</li>
+</ul>`],
+    ],
+    faq: [
+      ['What size is a US passport photo?', '2 x 2 inches (51 x 51 mm), with the head 1 to 1 3/8 inches from chin to the top of the head.'],
+      ['What size is a digital US passport photo?', 'A square photo of at least 600 x 600 pixels. The US Passport Photo maker makes a 600 x 600 pixel JPG.'],
+      ['Can I smile in a US passport photo?', 'A natural smile is fine, as long as both eyes are open. A wide grin or a funny face can get the photo rejected.'],
+      ['Can I print a passport photo at home?', 'It is best to order the 4x6 sheet as a normal photo print at a drugstore or photo counter: it is cheap and printed on proper photo paper. Then cut out the 2x2 photos.'],
+    ],
+  },
+  {
+    slug: 'reduce-pdf-size-for-uscis',
+    title: 'Reduce PDF Size for USCIS Online Filing (12MB Limit)',
+    h1: 'How to make your files fit USCIS online filing',
+    desc: 'USCIS online filing takes PDF, JPG or JPEG files up to 12MB each. How to shrink big PDFs, turn phone photos into PDF, split long files and remove passwords.',
+    date: '2026-11-01',
+    tools: ['/compress-pdf', '/jpg-to-pdf', '/heic-to-pdf', '/split-pdf', '/unlock-pdf'],
+    intro: 'When you file a form online with USCIS, every piece of evidence you upload has to be a PDF, JPG or JPEG file of 12MB or less. Scans from a phone or a copier often go over that limit. Here is how to get each file under it without making the pages hard to read.',
+    sections: [
+      ['What USCIS accepts', `<ul>
+<li><strong>File types:</strong> PDF, JPG or JPEG. Some forms also accept TIF or TIFF.</li>
+<li><strong>Size:</strong> no larger than 12MB per file.</li>
+<li><strong>No passwords:</strong> files must not be encrypted or password-protected.</li>
+<li><strong>File names:</strong> keep them simple: English letters, numbers, spaces, hyphens, underscores and periods.</li>
+</ul>
+<p>These limits come from USCIS's online filing pages and can change, so always follow what the upload screen for your form says.</p>`],
+      ['A PDF is over 12MB', `<p>Large PDFs are almost always scans: each page is a big photo. Open <a href="/compress-pdf">Compress PDF</a> and choose <strong>Recommended</strong>. That keeps text sharp enough to read and usually cuts scanned files by more than half. If the file is still too big, try <strong>Strong</strong>, then open the result and zoom in to check that names, dates and numbers are still clear.</p>`],
+      ['A very long document', `<p>If one document is too large even after compressing, split it. Use <a href="/split-pdf">Split PDF</a> to save it in parts (for example pages 1 to 20 and 21 to 40) and upload each part, with names like <em>tax-return-part-1.pdf</em> and <em>tax-return-part-2.pdf</em>.</p>`],
+      ['Photos of documents from a phone', `<p>iPhone photos are often HEIC files, which USCIS does not take. Turn them into one PDF with <a href="/heic-to-pdf">HEIC to PDF</a>, or use <a href="/jpg-to-pdf">JPG to PDF</a> for JPG photos. Put the pages of one document in a single PDF in the right order, rather than uploading each page as a separate photo.</p>`],
+      ['A PDF with a password', `<p>Bank statements and pay stubs downloaded from a website sometimes open with a password. If you know the password, <a href="/unlock-pdf">Unlock PDF</a> saves a copy without it, which you can then upload.</p>`],
+      ['Before you upload', `<ul>
+<li>Open every file and check that each page is readable, upright and complete.</li>
+<li>Translate documents that are not in English, as USCIS requires a certified English translation.</li>
+<li>Keep the original, full-quality files in case you are asked for them later.</li>
+</ul>`],
+    ],
+    faq: [
+      ['What is the file size limit for USCIS online filing?', 'USCIS says each uploaded file must be no larger than 12MB, in PDF, JPG or JPEG format (some forms also take TIF or TIFF). Check the upload screen for your form, as limits can change.'],
+      ['Will compressing a PDF make it unreadable?', 'Not with the Recommended setting, which is made for documents. Always open the compressed file and zoom in to check small print before uploading.'],
+      ['Are my immigration documents kept on your server?', 'No. Files are used only to make the result and are deleted as soon as it is finished. Merge, Split and Organize PDF run in your browser and do not upload the file at all.'],
+    ],
+  },
+  {
+    slug: 'upload-documents-to-irs',
+    title: 'IRS Document Upload Tool: File Types, Size Limit and Fixes',
+    h1: 'How to get your files ready for the IRS Document Upload Tool',
+    desc: 'The IRS Document Upload Tool takes JPEG, PNG or PDF files up to 15MB, and PDFs up to 120 pages. How to convert phone photos and shrink or split big files.',
+    date: '2026-11-01',
+    tools: ['/heic-to-jpg', '/jpg-to-pdf', '/compress-pdf', '/split-pdf', '/merge-pdf'],
+    intro: 'If an IRS notice or letter asks you to send documents, the IRS Document Upload Tool lets you send them online. It is picky about file types and sizes, so a phone photo or a long scanned PDF may be refused. Here is how to fix that.',
+    sections: [
+      ['What the tool accepts', `<ul>
+<li><strong>File types:</strong> JPEG, PNG or PDF.</li>
+<li><strong>Size:</strong> up to 15MB per file.</li>
+<li><strong>PDF length:</strong> up to 120 pages per PDF.</li>
+</ul>
+<p>The tool is for answering an IRS notice or letter; tax returns are not sent through it. Check the IRS page for the current rules before you upload.</p>`],
+      ['iPhone photos (HEIC)', `<p>iPhones save photos as HEIC by default, which the tool does not accept. Convert them with <a href="/heic-to-jpg">HEIC to JPG</a>, or put several pages into one file with <a href="/jpg-to-pdf">JPG to PDF</a>.</p>`],
+      ['A file over 15MB', `<p>Use <a href="/compress-pdf">Compress PDF</a> with <strong>Recommended</strong>; scanned statements and receipts usually shrink a lot and stay readable. For a large photo, <a href="/compress-jpg">Compress JPG</a> does the same.</p>`],
+      ['A PDF over 120 pages', `<p>Split it with <a href="/split-pdf">Split PDF</a> into parts of 120 pages or fewer and upload each part.</p>`],
+      ['Many receipts', `<p>Rather than uploading dozens of separate photos, combine them into one tidy PDF with <a href="/jpg-to-pdf">JPG to PDF</a> or <a href="/merge-pdf">Merge PDF</a>, in the order the letter asks for.</p>`],
+    ],
+    faq: [
+      ['What file types does the IRS Document Upload Tool accept?', 'JPEG, PNG and PDF, up to 15MB per file, with PDFs up to 120 pages each, according to the IRS.'],
+      ['Can I upload iPhone photos to the IRS?', 'Not as HEIC files. Convert them to JPG or PDF first; HEIC to JPG does this for free.'],
+      ['Can I file my tax return with the Document Upload Tool?', 'No. The IRS says the tool is for responding to a notice or letter, not for sending tax returns.'],
+    ],
+  },
+  {
+    slug: 'college-application-documents',
+    title: 'Upload Documents for College Applications: PDF Tips',
+    h1: 'How to prepare documents for college applications',
+    desc: 'Get transcripts, essays, portfolios and recommendation files ready for the Common App and college portals: convert to PDF, combine scans and fit upload limits.',
+    date: '2026-11-01',
+    tools: ['/docx-to-pdf', '/jpg-to-pdf', '/merge-pdf', '/compress-pdf'],
+    intro: 'College portals, including the Common App and each school\'s own applicant portal, usually want PDF files under a size limit, and the limit is not the same everywhere. A few minutes of preparation means your transcript or essay uploads first time and looks the way you meant.',
+    sections: [
+      ['Save documents as PDF', `<p>A PDF looks the same on every computer, so the admissions reader sees exactly your layout and fonts. Turn a Word essay or resume into PDF with <a href="/docx-to-pdf">Word to PDF</a>. Google Docs users can download as PDF directly.</p>`],
+      ['Scanned transcripts and certificates', `<p>Photos of paper documents from a phone can be combined into one PDF with <a href="/jpg-to-pdf">JPG to PDF</a> (or <a href="/heic-to-pdf">HEIC to PDF</a> for iPhone photos). Take each photo straight on, in good light, with the whole page in the frame.</p>`],
+      ['One file instead of many', `<p>Many upload fields take a single file. Combine a multi-page transcript, or several certificates, with <a href="/merge-pdf">Merge PDF</a>, and put them in a sensible order.</p>`],
+      ['Fit the upload limit', `<p>Check the limit shown next to the upload button, as it differs between portals and fields. If your file is too big, <a href="/compress-pdf">Compress PDF</a> with <strong>Recommended</strong> usually fixes it without making text blurry.</p>`],
+      ['Name files clearly', `<p>Use names like <em>Lastname-Firstname-Transcript.pdf</em>. It helps you keep track, and some portals show the file name to the people reading your application.</p>`],
+    ],
+    faq: [
+      ['What file format should I use for college applications?', 'PDF is the safest choice: it keeps your layout and is accepted almost everywhere. Use the format the portal asks for if it says otherwise.'],
+      ['What is the Common App file size limit?', 'Look at the upload field itself, which shows the limit; some colleges set their own limits in their supplements. If a file is too large, compress it.'],
+      ['Will compressing my essay PDF change how it looks?', 'Text-only PDFs are already small and barely change. Compression mainly shrinks scans and photos.'],
+    ],
+  },
+  {
+    slug: 'convert-iphone-photos-for-printing',
+    title: 'Convert iPhone HEIC Photos to JPG for Printing and Uploads',
+    h1: 'How to convert iPhone photos (HEIC) to JPG for printing and uploads',
+    desc: 'Photo printing sites, school portals and job applications often refuse iPhone HEIC photos. Convert HEIC to JPG or PDF for free on any computer or phone.',
+    date: '2026-11-01',
+    tools: ['/heic-to-jpg', '/heic-to-pdf', '/image-resizer', '/compress-jpg'],
+    intro: 'iPhones save photos as HEIC to use less space. That works fine on the phone, but many websites, upload forms and Windows apps do not understand HEIC. Converting the photos to JPG, the format everything accepts, fixes it in a minute.',
+    sections: [
+      ['Convert HEIC to JPG', `<ol>
+<li>Copy the photos to your computer, or open this site on your phone.</li>
+<li>Open <a href="/heic-to-jpg">HEIC to JPG</a> and select the photos; you can add many at once.</li>
+<li>Download them one by one, or all together as a ZIP.</li>
+</ol>
+<p>The photos are turned upright automatically, and location and camera details are removed, which is safer when sharing.</p>`],
+      ['For printing', `<p>For prints, keep the JPG at full size and high quality, so a 4x6 or 5x7 print stays sharp. Most online print services and in-store kiosks accept JPG.</p>`],
+      ['For an upload form with a size limit', `<p>Forms often have a size limit such as 2MB or 500KB. After converting, use the <a href="/image-resizer">Image Resizer</a> to make the photo smaller than the limit, or <a href="/compress-jpg">Compress JPG</a>.</p>`],
+      ['Several photos as one document', `<p>For receipts, IDs or pages of a document, <a href="/heic-to-pdf">HEIC to PDF</a> puts all the photos into one PDF, which most forms prefer.</p>`],
+      ['Stop the iPhone saving HEIC', `<p>On the iPhone go to <strong>Settings &gt; Camera &gt; Formats</strong> and choose <strong>Most Compatible</strong>. New photos are then saved as JPG, though they take more space.</p>`],
+    ],
+    faq: [
+      ['Does converting HEIC to JPG lose quality?', 'At the default quality the difference is very hard to see. Choose a higher quality if the photos are for large prints.'],
+      ['Why will a website not accept my iPhone photo?', 'It is probably a HEIC file. Convert it to JPG and upload that instead.'],
+      ['Can I convert HEIC on my phone?', 'Yes. Open the HEIC to JPG page in your phone\'s browser, select the photos and download the JPGs.'],
+    ],
+  },
+  {
+    slug: 'resume-file-format-for-job-applications',
+    title: 'Resume File Format for Job Applications: PDF or Word?',
+    h1: 'PDF or Word: which resume format to upload to job sites',
+    desc: 'Should you upload your resume as PDF or DOCX to Indeed, LinkedIn or Workday? When each works best, how to convert, and how to fix a file that is too big.',
+    date: '2026-11-01',
+    tools: ['/docx-to-pdf', '/pdf-to-word', '/compress-pdf', '/merge-pdf'],
+    intro: 'Most job sites and company career portals accept both PDF and Word (DOCX) resumes. Which one to send depends on what the application asks for and how the resume will be read: by a person, or first by an applicant tracking system (ATS) that pulls out your details.',
+    sections: [
+      ['When to use PDF', `<p>A PDF looks exactly the same on every device, so your layout, fonts and spacing are kept. It is the best choice when you email a resume to a person or upload it where the format is not specified. Convert with <a href="/docx-to-pdf">Word to PDF</a>.</p>`],
+      ['When to use Word (DOCX)', `<p>Send a DOCX when the posting or the recruiter asks for one: some recruiters like to add notes or reformat resumes. If you only have a PDF, <a href="/pdf-to-word">PDF to Word</a> turns it back into an editable document.</p>`],
+      ['Make it easy for an ATS to read', `<ul>
+<li>Use a simple layout: one column, standard headings such as Experience, Education and Skills.</li>
+<li>Keep the text as real text, not a picture. A resume saved from a design app as an image cannot be read.</li>
+<li>Avoid putting your contact details only in the header or a text box.</li>
+</ul>`],
+      ['A file that is too large', `<p>A resume with photos or a scanned page can go over a portal's size limit. <a href="/compress-pdf">Compress PDF</a> makes it smaller while keeping the text sharp.</p>`],
+      ['Resume plus certificates', `<p>If an application has one upload field for everything, combine your resume, cover letter and certificates into one file with <a href="/merge-pdf">Merge PDF</a>, resume first.</p>`],
+    ],
+    faq: [
+      ['Is PDF or Word better for a resume?', 'PDF keeps your layout exactly, so it is the safe default. Send Word (DOCX) when the job posting or recruiter asks for it.'],
+      ['Can applicant tracking systems read PDFs?', 'Most can, as long as the PDF contains real text and a simple layout. A PDF made from a scan or a picture is much harder for them to read.'],
+      ['How do I edit a resume I only have as a PDF?', 'Convert it with PDF to Word, make your changes, then save it as PDF again with Word to PDF.'],
     ],
   },
 ];

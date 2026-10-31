@@ -61,7 +61,7 @@ module.exports = {
   png: {
     desc: 'Free PNG converter: convert PNG to JPG, WebP, PDF, ICO, GIF and more, or turn other images into PNG. Batch convert, download as ZIP. No sign-up.',
     about: [
-      'PNG (Portable Network Graphics) is a lossless image format: saving a picture as PNG never lowers its quality, and it supports transparency. That makes it the best choice for screenshots, logos, icons, diagrams and anything with sharp text or flat colours.',
+      'PNG (Portable Network Graphics) is a lossless image format: saving a picture as PNG never lowers its quality, and it supports transparency. That makes it the best choice for screenshots, logos, icons, diagrams and anything with sharp text or flat colors.',
       'The trade-off is size. A photo saved as PNG is often three to ten times bigger than the same photo as JPG or WebP. So people usually convert PNG to JPG or WebP to share photos or speed up a website, and convert other images to PNG when they need transparency or lossless quality for editing.',
     ],
     open: 'Every phone, computer and browser opens PNG files: double-click it on Windows (Photos) or Mac (Preview), or tap it in your phone gallery.',
@@ -172,7 +172,7 @@ module.exports = {
   prc: {
     desc: 'Convert PRC ebooks (Mobipocket) to EPUB, PDF, MOBI, TXT or DOCX online, free. Read old Palm and Kindle books on any device. No sign-up.',
     about: [
-      'PRC is an old ebook file from Mobipocket, used on Palm handhelds and early Kindles. Inside it is usually the same as a MOBI file, just with a different ending. Most reading apps today do not recognise .prc files.',
+      'PRC is an old ebook file from Mobipocket, used on Palm handhelds and early Kindles. Inside it is usually the same as a MOBI file, just with a different ending. Most reading apps today do not recognize .prc files.',
       'Converting a PRC to EPUB lets you read it on any phone, tablet or ebook reader, including Kindle through Send to Kindle. PDF and TXT are handy for printing or reading on a computer. Conversions use Calibre.',
     ],
     open: 'Calibre (free) opens PRC files on a computer. For a phone or Kindle, convert the PRC to EPUB on this page first.',

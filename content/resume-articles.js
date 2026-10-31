@@ -37,10 +37,10 @@ module.exports = [
     desc: 'Resume format for freshers, students and graduates with no work experience: what to write, examples of projects and internships, and free templates.',
     date: '2026-10-11',
     tools: ['/fresher-resume', '/resume-maker', '/cv-maker'],
-    intro: 'Everyone starts with no experience. Employers hiring freshers know that; they look for potential: what you studied, what you built or organised, and whether you write clearly. Here is how to show it on one page.',
+    intro: 'Everyone starts with no experience. Employers hiring freshers know that; they look for potential: what you studied, what you built or organized, and whether you write clearly. Here is how to show it on one page.',
     sections: [
       ['The fresher resume format', '<ol><li>Name and contact details</li><li>Profile: two lines on your degree and the job you want</li><li>Education (first, because it is your strongest section)</li><li>Internships, projects or part-time work</li><li>Activities and achievements</li><li>Skills and languages</li></ol><p>Open the <a href="/fresher-resume">fresher resume templates</a>; they already follow this order.</p>'],
-      ['Turn student life into experience', '<p>Internships, final-year projects, society roles, event organising, tutoring, volunteering, freelancing and part-time jobs all count. Write them like jobs: what you did and one result. <em>"Organised a careers fair for 400 students with 12 companies."</em></p>'],
+      ['Turn student life into experience', '<p>Internships, final-year projects, society roles, event organizing, tutoring, volunteering, freelancing and part-time jobs all count. Write them like jobs: what you did and one result. <em>"Organized a careers fair for 400 students with 12 companies."</em></p>'],
       ['Skills freshers can honestly list', '<p>MS Excel, Word and PowerPoint; languages; programming or design tools you used in projects; report writing; presentations; teamwork. Only list what you can talk about in an interview.</p>'],
       ['Mistakes to avoid', '<ul><li>Long career objectives: keep the profile to two lines.</li><li>Unprofessional email addresses.</li><li>Spelling mistakes: read it twice.</li><li>Two pages: one is enough.</li></ul>'],
     ],
@@ -67,7 +67,7 @@ module.exports = [
     faq: [
       ['Is a PDF resume ATS-friendly?', 'Yes, as long as the text is real, selectable text and not a scanned image.'],
       ['Do ATS systems read two-column resumes?', 'Most modern ones do. Older systems can mix up columns, so use a one-column design for big-company online forms.'],
-      ['Can I use colour?', 'Yes. Colour does not affect an ATS; the layout and text do.'],
+      ['Can I use color?', 'Yes. Color does not affect an ATS; the layout and text do.'],
     ],
   },
   {
@@ -99,8 +99,8 @@ module.exports = [
     tools: ['/cv-maker', '/resume-maker', '/civil-engineer-resume'],
     intro: 'Employers in Pakistan and the Gulf read CVs a little differently from those in the US or UK. They often expect a photo and personal details, and they care about visa status and notice period. This is the format that works.',
     sections: [
-      ['The sections, in order', '<ol><li>Name, job title, phone (with country code), email, city</li><li>Photo (passport style) in the corner</li><li>Profile: two or three lines</li><li>Work experience, newest first</li><li>Education and certifications</li><li>Skills and languages (English, Urdu, Arabic and level)</li><li>Personal details: nationality, date of birth, visa status, notice period, driving licence</li><li>References: available on request</li></ol>'],
-      ['Gulf-specific tips', '<ul><li>State your visa status (residence visa, visit visa, transferable) and notice period clearly.</li><li>Mention Gulf experience and any local licence (DHA, MOH, Saudi Council of Engineers, SCFHS).</li><li>Write salaries only if asked.</li><li>Arabic is a plus: list it with your level.</li></ul>'],
+      ['The sections, in order', '<ol><li>Name, job title, phone (with country code), email, city</li><li>Photo (passport style) in the corner</li><li>Profile: two or three lines</li><li>Work experience, newest first</li><li>Education and certifications</li><li>Skills and languages (English, Urdu, Arabic and level)</li><li>Personal details: nationality, date of birth, visa status, notice period, driving license</li><li>References: available on request</li></ol>'],
+      ['Gulf-specific tips', '<ul><li>State your visa status (residence visa, visit visa, transferable) and notice period clearly.</li><li>Mention Gulf experience and any local license (DHA, MOH, Saudi Council of Engineers, SCFHS).</li><li>Write salaries only if asked.</li><li>Arabic is a plus: list it with your level.</li></ul>'],
       ['Pakistan-specific tips', '<ul><li>Government jobs often ask for CNIC, domicile and father\'s name: add them under personal details.</li><li>Add your degree marks or CGPA for early-career roles.</li><li>Many companies accept a PDF CV by email: name it with your full name.</li></ul>'],
     ],
     faq: [

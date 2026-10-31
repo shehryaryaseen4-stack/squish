@@ -22,7 +22,7 @@ module.exports = {
       'Transparent areas stay transparent, so you can place the WebP on any background.',
     ],
     problems: [
-      ['The WebP is not much smaller than the PNG.', 'PNGs that are already optimised and have few colours compress well on their own. Lower the Quality a little, or keep the PNG.'],
+      ['The WebP is not much smaller than the PNG.', 'PNGs that are already optimized and have few colors compress well on their own. Lower the Quality a little, or keep the PNG.'],
       ['An old program will not open the WebP.', 'All current browsers support WebP, but some older image editors do not. Convert it back with WebP to PNG when you need to edit it there.'],
     ],
     faq: [
@@ -54,8 +54,8 @@ module.exports = {
     why: 'Many images saved from websites are WebP files, and some programs, older versions of Photoshop, Office and many upload forms still refuse them. PNG opens everywhere, keeps transparency and is the safest choice when you want to edit the image or reuse it in a document.',
     keep: 'If the image will only be used on a web page, keep the WebP: it is smaller and every current browser shows it.',
     tips: [
-      'Set Quality to 100 for a lossless, full-colour PNG. That is the best choice for photos and for editing.',
-      'Lower Quality values reduce the number of colours, which makes small files and is ideal for logos, icons and simple graphics.',
+      'Set Quality to 100 for a lossless, full-color PNG. That is the best choice for photos and for editing.',
+      'Lower Quality values reduce the number of colors, which makes small files and is ideal for logos, icons and simple graphics.',
       'Transparent backgrounds are kept.',
     ],
     problems: [
@@ -91,7 +91,7 @@ module.exports = {
     keep: 'Keep PNG for logos, icons, line art and anything with text or a transparent background: JPG blurs sharp edges slightly and cannot store transparency.',
     tips: [
       'Quality 80 to 90 is a good choice for screenshots with text; 70 to 80 for photos.',
-      'Transparent areas become white. If you need another background colour, add it in an editor before converting.',
+      'Transparent areas become white. If you need another background color, add it in an editor before converting.',
       'Use Max dimension to make large images fit size limits on job portals, exam forms and social media.',
     ],
     problems: [
@@ -108,14 +108,14 @@ module.exports = {
     why: 'People convert JPG to PNG when a website, app or design tool asks for PNG, when they want to edit a picture without adding more compression each time they save, or before cutting out a background to make it transparent.',
     keep: 'For ordinary photos JPG is the better format: the PNG will be much larger and will not look any sharper, because the detail lost when the JPG was made cannot be brought back.',
     tips: [
-      'Set Quality to 100 for an exact, full-colour copy of the photo. Lower values reduce the number of colours to make the file smaller.',
+      'Set Quality to 100 for an exact, full-color copy of the photo. Lower values reduce the number of colors to make the file smaller.',
       'PNG does not add transparency by itself. Remove the background in an image editor after converting.',
       'Phone photos are turned upright automatically.',
       IMG_PRIVACY,
     ],
     problems: [
       ['The PNG is several times bigger than the JPG.', 'That is expected: PNG stores every pixel without loss. Use a lower Quality or a smaller Max dimension, or keep the JPG.'],
-      ['Gradients in the sky look banded.', 'Below Quality 100 the colours are reduced to a palette. Convert again at Quality 100.'],
+      ['Gradients in the sky look banded.', 'Below Quality 100 the colors are reduced to a palette. Convert again at Quality 100.'],
     ],
     faq: [
       ['Does converting JPG to PNG improve quality?', 'No. PNG keeps the image exactly as it is now, so no more quality is lost, but it cannot undo the compression already in the JPG.'],
@@ -146,13 +146,13 @@ module.exports = {
     why: 'Convert HEIC to PNG when you need a lossless copy of an iPhone photo for editing, design work or a program that only accepts PNG. PNG keeps every pixel, so repeated edits do not add compression damage.',
     keep: 'For sharing and uploading, HEIC to JPG is the better choice: a PNG of a 12 megapixel photo can be 15 MB or more.',
     tips: [
-      'Choose Quality 100 for a full-colour, lossless PNG. Lower values use fewer colours and give smaller files.',
+      'Choose Quality 100 for a full-color, lossless PNG. Lower values use fewer colors and give smaller files.',
       'Use Max dimension, for example 2000 pixels, if you do not need the full camera resolution.',
       IMG_PRIVACY,
     ],
     problems: [
       ['The PNG is huge.', 'Photos are large without lossy compression. Lower Max dimension, or use HEIC to JPG instead.'],
-      ['Gradients look banded.', 'Convert again at Quality 100 to keep all colours.'],
+      ['Gradients look banded.', 'Convert again at Quality 100 to keep all colors.'],
     ],
     faq: [
       ['Is PNG better than JPG for iPhone photos?', 'Only for editing or when a program requires PNG. For sharing, JPG looks the same and is much smaller.'],
@@ -182,9 +182,9 @@ module.exports = {
     why: 'Convert AVIF to PNG when you need to edit an image saved from the web, keep its transparent background, or use it in a program that does not read AVIF yet.',
     keep: 'For publishing on the web keep the AVIF: it is many times smaller than the PNG and every current browser shows it.',
     tips: [
-      'Quality 100 gives a lossless, full-colour PNG, best for editing.',
+      'Quality 100 gives a lossless, full-color PNG, best for editing.',
       'Transparency in the AVIF is kept.',
-      'Lower Quality values reduce colours for smaller files, which suits icons and graphics.',
+      'Lower Quality values reduce colors for smaller files, which suits icons and graphics.',
     ],
     problems: [
       ['The PNG is very large.', 'PNG is lossless; AVIF is one of the most efficient lossy formats. Lower Quality or Max dimension, or use AVIF to JPG.'],
@@ -197,7 +197,7 @@ module.exports = {
   },
 
   'gif>webp': {
-    why: 'Animated GIFs are old and inefficient: they are limited to 256 colours and are often several megabytes. The same animation as WebP is usually much smaller and can show more colours, so it loads faster on websites and in chats that support WebP.',
+    why: 'Animated GIFs are old and inefficient: they are limited to 256 colors and are often several megabytes. The same animation as WebP is usually much smaller and can show more colors, so it loads faster on websites and in chats that support WebP.',
     keep: 'Keep the GIF for places that only accept GIF, such as some forums, older email programs and a few messaging apps.',
     tips: [
       'Animation is kept: every frame and the timing are carried over to the WebP.',
@@ -205,7 +205,7 @@ module.exports = {
       'Use Max dimension to shrink oversized GIFs for faster loading.',
     ],
     problems: [
-      ['The WebP is not much smaller.', 'Short GIFs with few colours are already compact. Lower the Quality or the Max dimension.'],
+      ['The WebP is not much smaller.', 'Short GIFs with few colors are already compact. Lower the Quality or the Max dimension.'],
       ['The app I post to shows only a still picture.', 'Some apps do not play animated WebP. Keep the GIF for those, or convert the GIF to MP4, which nearly every app plays.'],
     ],
     faq: [
@@ -238,7 +238,7 @@ module.exports = {
     tips: [
       'Start from a square PNG of at least 256 by 256 pixels with a transparent background.',
       'The ICO contains 16, 32, 48, 64, 128 and 256 pixel versions in one file.',
-      'Images that are not square are cropped to a square from the centre.',
+      'Images that are not square are cropped to a square from the center.',
       'Simple, bold shapes read best at 16 pixels; fine detail and small text disappear.',
     ],
     problems: [
@@ -261,7 +261,7 @@ module.exports = {
     ],
     problems: [
       ['Only one page was converted.', 'A JPG holds one image, so only the first page of a multi-page TIFF is used. For whole scanned documents, use TIFF to PDF.'],
-      ['Colours look different.', 'TIFFs from print work may use CMYK colours; they are converted to the sRGB colours screens use, which can shift some tones.'],
+      ['Colors look different.', 'TIFFs from print work may use CMYK colors; they are converted to the sRGB colors screens use, which can shift some tones.'],
     ],
     faq: [
       ['Why is my TIFF so large?', 'TIFF usually stores images with little or no compression so nothing is lost. JPG compresses the same picture many times smaller.'],
@@ -391,7 +391,7 @@ module.exports = {
       ['The layout looks different from the PDF.', 'PDF stores exact positions, while Word flows text. The text is all there; adjust spacing, columns and tables in Word.'],
     ],
     faq: [
-      ['Can I convert a scanned PDF to Word?', 'Yes. Choose OCR when you convert: the text is read from the page and becomes editable in Word, in the same place, while the design, colours and pictures stay as they were. It is free.'],
+      ['Can I convert a scanned PDF to Word?', 'Yes. Choose OCR when you convert: the text is read from the page and becomes editable in Word, in the same place, while the design, colors and pictures stay as they were. It is free.'],
       ['Is my PDF kept after converting?', 'No. It is deleted from the server as soon as the Word file is ready.'],
     ],
   },
@@ -524,7 +524,7 @@ module.exports = {
 
   'xlsx>csv': {
     why: 'CSV is the universal format for importing data into databases, accounting software, email tools, Google Contacts and online shops. Converting an Excel sheet to CSV is often the required first step.',
-    keep: 'Keep the XLSX: the CSV contains only values, without formatting, formulas, colours, charts or extra sheets.',
+    keep: 'Keep the XLSX: the CSV contains only values, without formatting, formulas, colors, charts or extra sheets.',
     tips: [
       'Only the first sheet is exported. Move the sheet you need to the first position before converting.',
       'Formulas are saved as their current values.',
@@ -551,7 +551,7 @@ module.exports = {
     ],
     problems: [
       ['The conversion says there is no audio.', 'The video has no sound track, for example a screen recording made without audio.'],
-      ['The MP3 is quiet.', 'The volume is kept as in the video. Use a free audio editor to normalise the volume afterwards.'],
+      ['The MP3 is quiet.', 'The volume is kept as in the video. Use a free audio editor to normalize the volume afterwards.'],
     ],
     faq: [
       ['Can I convert videos from YouTube?', 'Only files you have on your device and the right to use. This site converts uploaded files; it does not download from other websites.'],
@@ -569,7 +569,7 @@ module.exports = {
     ],
     problems: [
       ['The file is over the size limit.', 'Long 4K videos are large. Trim the video on your phone, or record at 1080p for clips you want to share.'],
-      ['An HDR video looks washed out.', 'iPhone HDR (Dolby Vision) videos are saved as standard 8-bit video, which can make colours look flatter. Turn off HDR Video in Settings, Camera, Record Video for clips you plan to convert.'],
+      ['An HDR video looks washed out.', 'iPhone HDR (Dolby Vision) videos are saved as standard 8-bit video, which can make colors look flatter. Turn off HDR Video in Settings, Camera, Record Video for clips you plan to convert.'],
     ],
     faq: [
       ['Is MP4 the same quality as MOV?', 'The video is re-encoded at a high-quality setting, so it looks the same in normal viewing while often being smaller.'],
@@ -637,11 +637,11 @@ module.exports = {
     tips: [
       'The GIF is limited to 480 pixels wide and 12 frames per second to keep it small enough to share.',
       'Use clips of 2 to 6 seconds: every second adds to the file size.',
-      'Colours are optimised per clip, so screen recordings and cartoons look especially clean.',
+      'Colors are optimized per clip, so screen recordings and cartoons look especially clean.',
     ],
     problems: [
       ['The GIF is several megabytes.', 'Trim the video to the important part before converting. Busy scenes with lots of movement make larger GIFs.'],
-      ['The colours are grainy.', 'GIF can show only 256 colours. For smooth colour, share the short MP4 or use MP4 to WebP.'],
+      ['The colors are grainy.', 'GIF can show only 256 colors. For smooth color, share the short MP4 or use MP4 to WebP.'],
     ],
     faq: [
       ['Does the GIF have sound?', 'No. The GIF format cannot hold audio.'],
@@ -801,7 +801,7 @@ module.exports = {
     tips: [
       'The letter shapes are not changed, only packed more tightly.',
       'Reference the WOFF2 in your CSS with @font-face and format("woff2").',
-      'Check the font licence allows use on the web before publishing it.',
+      'Check the font license allows use on the web before publishing it.',
     ],
     problems: [
       ['The font does not show on my site.', 'Check the path in @font-face, and that your server sends the file. Fonts loaded from another domain need CORS headers.'],
@@ -819,14 +819,14 @@ module.exports = {
     tips: [
       'The font is unpacked without changing any letter shapes.',
       'Double-click the TTF to install it on Windows or macOS.',
-      'Make sure the font licence allows desktop use.',
+      'Make sure the font license allows desktop use.',
     ],
     problems: [
       ['The installed font name is odd.', 'Web fonts are sometimes renamed or split into subsets. Download the full desktop version from the font maker if available.'],
       ['Some characters are missing.', 'Web fonts are often subsets containing only the letters a site needs, such as Latin only.'],
     ],
     faq: [
-      ['Is converting WOFF2 to TTF legal?', 'The conversion itself is just unpacking; whether you may use the font depends on its licence. Free fonts such as those on Google Fonts allow it.'],
+      ['Is converting WOFF2 to TTF legal?', 'The conversion itself is just unpacking; whether you may use the font depends on its license. Free fonts such as those on Google Fonts allow it.'],
       ['Will the TTF look the same?', 'Yes. The outlines inside are exactly the same.'],
     ],
   },

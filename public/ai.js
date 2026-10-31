@@ -383,7 +383,7 @@ function translate() {
       if (j.status === 'done') {
         go.disabled = false; progress('');
         const a = $('[data-dl]'); a.href = `/api/jobs/${id}/file`; a.download = j.name || 'translated.pdf';
-        $('[data-done-text]').textContent = `Translated into ${lang}, with the original layout, pictures and colours.${j.note ? ` ${j.note}` : ''}`;
+        $('[data-done-text]').textContent = `Translated into ${lang}, with the original layout, pictures and colors.${j.note ? ` ${j.note}` : ''}`;
         show('done'); beacon('Translate PDF');
         a.click();
         return;

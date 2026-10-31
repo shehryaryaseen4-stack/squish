@@ -158,7 +158,7 @@ module.exports = {
   ],
   '/remove-background': [
     'Put product photos on the pure white background Amazon asks for.',
-    'Make a professional LinkedIn profile photo on a plain colour.',
+    'Make a professional LinkedIn profile photo on a plain color.',
     'Cut out a logo, a pet or a person for a sticker, a meme or a Canva design.',
   ],
   '/compress-video': [

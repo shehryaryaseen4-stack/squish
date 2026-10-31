@@ -42,17 +42,17 @@ module.exports = [
   job({
     slug: 'nurse-resume', short: 'Nurse resume', chip: 'Nurse', feature: byPerson(PERSON.nurse),
     title: 'Nurse Resume Template - Free Nursing CV, Download PDF',
-    desc: 'Free nurse resume and nursing CV templates for staff nurses and RNs. Add your licence, wards and skills, then download your resume as a PDF.',
+    desc: 'Free nurse resume and nursing CV templates for staff nurses and RNs. Add your license, wards and skills, then download your resume as a PDF.',
     h1: 'Nurse Resume Template',
     lede: 'Resume and CV templates for registered nurses, staff nurses and nursing students, filled in with real ward experience. Make it yours in a few minutes and download a PDF.',
     sections: [
-      ['How to write a nursing resume', '<p>Start with your licence or registration number (PNC, NMC, DHA, SCFHS or your state licence) right under your name: hospitals check it first. For each job, give the hospital, the ward or unit, how many beds or patients you cared for, and one or two results, such as training new nurses or a safety improvement. Add your certifications (BLS, ACLS, PALS) in their own section.</p>'],
+      ['How to write a nursing resume', '<p>Start with your license or registration number (PNC, NMC, DHA, SCFHS or your state license) right under your name: hospitals check it first. For each job, give the hospital, the ward or unit, how many beds or patients you cared for, and one or two results, such as training new nurses or a safety improvement. Add your certifications (BLS, ACLS, PALS) in their own section.</p>'],
       ['Nursing skills to include', skillsList(['Patient assessment', 'Medication administration', 'IV cannulation', 'Wound care', 'Infection control', 'Electronic health records', 'Critical care / ICU', 'Patient education', 'BLS, ACLS certified'])],
-      ['Applying abroad: UK, Gulf, Saudi Arabia', '<p>Gulf and Saudi hospitals usually expect a photo, nationality and date of availability, plus your DataFlow or licence status. UK NHS applications focus on NMC registration and band-level experience. Keep one master CV and adjust the top section for each country.</p>'],
+      ['Applying abroad: UK, Gulf, Saudi Arabia', '<p>Gulf and Saudi hospitals usually expect a photo, nationality and date of availability, plus your DataFlow or license status. UK NHS applications focus on NMC registration and band-level experience. Keep one master CV and adjust the top section for each country.</p>'],
     ],
     faq: [
-      ['What should a nurse put on a resume?', 'Your licence number, nursing education, each hospital and ward with dates, patient load, clinical skills, certifications such as BLS and ACLS, and languages.'],
-      ['Can I make a nursing CV for Saudi Arabia or the UAE here?', 'Yes. Add a photo with Image, and your nationality, licence and availability at the top. Download it as a PDF to send to the hospital or agency.'],
+      ['What should a nurse put on a resume?', 'Your license number, nursing education, each hospital and ward with dates, patient load, clinical skills, certifications such as BLS and ACLS, and languages.'],
+      ['Can I make a nursing CV for Saudi Arabia or the UAE here?', 'Yes. Add a photo with Image, and your nationality, license and availability at the top. Download it as a PDF to send to the hospital or agency.'],
       ['Is it free?', 'Yes. Edit and download as many versions as you need, with no watermark and no sign-up.'],
     ],
   }),
@@ -80,7 +80,7 @@ module.exports = [
     h1: 'Civil Engineer Resume Template',
     lede: 'Resume and CV templates for civil, site and project engineers, filled in with real project examples. Add your own projects and download a professional PDF.',
     sections: [
-      ['How to write an engineering resume', '<p>Engineering managers look for the size of the projects you worked on, your role and the result. Give numbers: storeys, kilometres, budget, team size. Mention the software you use (AutoCAD, Revit, ETABS, Primavera) and your professional registration (PEC, Society of Engineers UAE, Saudi Council of Engineers).</p>'],
+      ['How to write an engineering resume', '<p>Engineering managers look for the size of the projects you worked on, your role and the result. Give numbers: storeys, kilometers, budget, team size. Mention the software you use (AutoCAD, Revit, ETABS, Primavera) and your professional registration (PEC, Society of Engineers UAE, Saudi Council of Engineers).</p>'],
       ['Engineering skills to include', skillsList(['AutoCAD, Revit, Civil 3D', 'ETABS, SAP2000, STAAD', 'Primavera P6, MS Project', 'Quantity surveying, BOQ', 'Site supervision', 'Quality control', 'HSE and site safety', 'Contract management', 'Structural design'])],
       ['For Gulf and overseas jobs', '<p>Add your registration and its number, your visa status and notice period. A separate Projects list with the name, value and your role on each project is common for senior engineers.</p>'],
     ],
@@ -133,7 +133,7 @@ module.exports = [
       ['Marketing skills to include', skillsList(['Digital strategy', 'Google Ads, Meta Ads', 'SEO and content marketing', 'Social media management', 'Email marketing', 'Google Analytics (GA4)', 'Copywriting', 'Brand management', 'Marketing automation'])],
     ],
     faq: [
-      ['Should a marketing resume be creative?', 'A little colour is fine for marketing; the Creative and Modern designs suit most roles. For corporate or banking marketing, a classic design is safer.'],
+      ['Should a marketing resume be creative?', 'A little color is fine for marketing; the Creative and Modern designs suit most roles. For corporate or banking marketing, a classic design is safer.'],
       ['How do I show results without exact numbers?', 'Use percentages and ranges, for example "grew Instagram followers from 2,000 to 15,000".'],
       ['Is it free?', 'Yes. Edit and download as a PDF without a watermark.'],
     ],
@@ -145,11 +145,11 @@ module.exports = [
     h1: 'Graphic Designer Resume Template',
     lede: 'Creative resume templates for graphic designers, UI/UX and product designers. Add your portfolio link, tools and best projects, and download a PDF.',
     sections: [
-      ['Your resume is a design sample', '<p>For designers, the resume itself shows your taste. Pick a layout, then adjust colours and fonts to match your personal brand, and keep plenty of white space. Put your portfolio link (Behance, Dribbble or your own site) next to your name: it is the first thing a studio will click.</p>'],
+      ['Your resume is a design sample', '<p>For designers, the resume itself shows your taste. Pick a layout, then adjust colors and fonts to match your personal brand, and keep plenty of white space. Put your portfolio link (Behance, Dribbble or your own site) next to your name: it is the first thing a studio will click.</p>'],
       ['Design skills to include', skillsList(['Adobe Illustrator, Photoshop', 'InDesign', 'Figma, Sketch, Adobe XD', 'Brand identity', 'Typography', 'UI and UX design', 'Packaging design', 'Motion graphics', 'Print production'])],
     ],
     faq: [
-      ['Can I change the colours and fonts?', 'Yes. Every colour, font and shape can be changed, and more than 150 fonts are available.'],
+      ['Can I change the colors and fonts?', 'Yes. Every color, font and shape can be changed, and more than 150 fonts are available.'],
       ['Should I add images of my work?', 'Keep the resume itself to text and a link; send your portfolio separately. A small logo or icon is fine.'],
       ['Is it free?', 'Yes, with no watermark.'],
     ],
@@ -177,7 +177,7 @@ module.exports = [
     h1: 'Manager Resume Template',
     lede: 'Resume templates for operations managers, project managers and team leads, with real leadership results. Replace the sample text and download a professional PDF.',
     sections: [
-      ['How to write a manager resume', '<p>Senior employers want scope and results: how many people you led, the budget you owned and what improved under you. <em>"Run a distribution centre with 250 staff; cut shipping errors by 40 percent."</em> Two pages are fine for managers with long careers, as long as the first half page sells you.</p>'],
+      ['How to write a manager resume', '<p>Senior employers want scope and results: how many people you led, the budget you owned and what improved under you. <em>"Run a distribution center with 250 staff; cut shipping errors by 40 percent."</em> Two pages are fine for managers with long careers, as long as the first half page sells you.</p>'],
       ['Management skills to include', skillsList(['Team leadership', 'Budgeting and P&L', 'Project management (PMP)', 'Lean, Six Sigma', 'Process improvement', 'Stakeholder management', 'Hiring and training', 'KPIs and reporting', 'Vendor management'])],
     ],
     faq: [
@@ -194,11 +194,11 @@ module.exports = [
     h1: 'Resume Templates for Freshers',
     lede: 'No work experience yet? These resume templates for students and fresh graduates put your education, internships, projects and activities first. Edit one and download a PDF.',
     sections: [
-      ['What to write with no experience', '<ol><li><strong>Profile:</strong> two lines on what you studied and the job you want.</li><li><strong>Education first:</strong> degree, university, year and your CGPA or grade if it is good.</li><li><strong>Internships and projects:</strong> what you did and one result each, even for short internships.</li><li><strong>Activities:</strong> societies, events you organised, volunteering, sports: they show teamwork and leadership.</li><li><strong>Skills:</strong> MS Office, languages and anything from the job advert you can really do.</li></ol>'],
+      ['What to write with no experience', '<ol><li><strong>Profile:</strong> two lines on what you studied and the job you want.</li><li><strong>Education first:</strong> degree, university, year and your CGPA or grade if it is good.</li><li><strong>Internships and projects:</strong> what you did and one result each, even for short internships.</li><li><strong>Activities:</strong> societies, events you organized, volunteering, sports: they show teamwork and leadership.</li><li><strong>Skills:</strong> MS Office, languages and anything from the job advert you can really do.</li></ol>'],
       ['Freshers: common mistakes', '<p>Do not pad the page with long objectives or hobbies; one page is perfect. Use a professional email address (firstname.lastname@...). Check spelling twice and send a PDF so the layout stays the same on the recruiter\'s computer.</p>'],
     ],
     faq: [
-      ['How do I make a resume with no experience?', 'Lead with education, then internships, projects and activities. Use action words such as organised, built, led and improved, and keep it to one page.'],
+      ['How do I make a resume with no experience?', 'Lead with education, then internships, projects and activities. Use action words such as organized, built, led and improved, and keep it to one page.'],
       ['Should a fresher add CGPA?', 'Yes if it is 3.0 out of 4 (or 70 percent) or higher; otherwise leave it out and highlight projects.'],
       ['Is this resume builder free for students?', 'Yes, completely free, with no sign-up and no watermark.'],
     ],
@@ -236,19 +236,19 @@ module.exports = [
     ],
     faq: [
       ['Are PDF resumes ATS-friendly?', 'Yes, if the PDF contains real text, as these do. Avoid scanned or image-only PDFs.'],
-      ['Can a colourful resume pass ATS?', 'Often yes, if it is one or two clear columns with real text. When in doubt, use one of the ATS designs.'],
+      ['Can a colorful resume pass ATS?', 'Often yes, if it is one or two clear columns with real text. When in doubt, use one of the ATS designs.'],
       ['Is it free?', 'Yes, with no watermark.'],
     ],
   },
   {
     slug: 'modern-resume-template', kind: 'resume', cat: 'resume', only: 'resume', style: 'modern', short: 'Modern resume template',
     title: 'Modern Resume Templates - Free, Editable, PDF Download',
-    desc: 'Free modern resume templates with clean layouts, sidebars and colour accents. Edit online in minutes and download your modern resume as a PDF.',
+    desc: 'Free modern resume templates with clean layouts, sidebars and color accents. Edit online in minutes and download your modern resume as a PDF.',
     kicker: 'Clean and current', h1: 'Modern Resume Templates',
-    lede: 'Clean, current resume designs with sidebars, colour accents and clear headings. Pick one, change the colours to your taste, and download a PDF.',
+    lede: 'Clean, current resume designs with sidebars, color accents and clear headings. Pick one, change the colors to your taste, and download a PDF.',
     panel: ['Modern resume templates', 'Modern designs first, then every other style.'],
     sections: [
-      ['Make a modern resume your own', '<p>Change the accent colour to match the company or your personal brand: click a coloured shape and pick a new colour. Swap fonts from the bar above the page. Keep to two fonts and one accent colour so it still looks professional.</p>'],
+      ['Make a modern resume your own', '<p>Change the accent color to match the company or your personal brand: click a colored shape and pick a new color. Swap fonts from the bar above the page. Keep to two fonts and one accent color so it still looks professional.</p>'],
       ['When to choose a modern design', '<p>Modern designs suit tech, marketing, design, startups and most private companies. For banks, law firms and government jobs, a <a href="/professional-resume-template">professional classic design</a> is safer.</p>'],
     ],
     faq: [
@@ -266,7 +266,7 @@ module.exports = [
     panel: ['Professional resume templates', 'Classic designs first, then every other style.'],
     sections: [
       ['Why classic still works', '<p>Traditional employers read hundreds of resumes and trust a familiar layout: name at the top, clear headings, a serif or clean sans-serif font and no distractions. That lets your experience do the talking.</p>'],
-      ['Tips for a professional look', '<ul><li>Use one font family and black or dark grey text.</li><li>Align dates on the right so they are easy to scan.</li><li>Keep margins of at least 40 points.</li><li>Use the same tense: past for old jobs, present for your current one.</li></ul>'],
+      ['Tips for a professional look', '<ul><li>Use one font family and black or dark gray text.</li><li>Align dates on the right so they are easy to scan.</li><li>Keep margins of at least 40 points.</li><li>Use the same tense: past for old jobs, present for your current one.</li></ul>'],
     ],
     faq: [
       ['Which template is best for government jobs?', 'A classic or ATS design. Add your personal details if the job advert asks for them.'],
@@ -292,14 +292,14 @@ module.exports = [
   },
   {
     slug: 'creative-resume-template', kind: 'resume', cat: 'resume', only: 'resume', style: 'creative', short: 'Creative resume template',
-    title: 'Creative Resume Templates - Free, Colourful, PDF Download',
-    desc: 'Free creative resume templates with colour, skill bars and bold layouts that stand out. Edit online and download your creative resume as PDF.',
+    title: 'Creative Resume Templates - Free, Colorful, PDF Download',
+    desc: 'Free creative resume templates with color, skill bars and bold layouts that stand out. Edit online and download your creative resume as PDF.',
     kicker: 'Stand out', h1: 'Creative Resume Templates',
-    lede: 'Colourful resume designs with skill bars, initials badges and bold headings, for jobs where personality counts. Pick one, change the colours and download a PDF.',
+    lede: 'Colorful resume designs with skill bars, initials badges and bold headings, for jobs where personality counts. Pick one, change the colors and download a PDF.',
     panel: ['Creative resume templates', 'Creative designs first, then every other style.'],
     sections: [
       ['Who should use a creative resume', '<p>Designers, marketers, social media managers, teachers, content creators and startup roles. If you apply to a bank or a large corporation through an online form, a <a href="/ats-resume-template">simple ATS design</a> is the safer choice.</p>'],
-      ['Change the colours', '<p>Click any coloured shape or line and pick a new colour from the bar above the page. Skill bars are rectangles: drag the end of the coloured bar to show your level.</p>'],
+      ['Change the colors', '<p>Click any colored shape or line and pick a new color from the bar above the page. Skill bars are rectangles: drag the end of the colored bar to show your level.</p>'],
     ],
     faq: [
       ['Do creative resumes work with ATS?', 'The text is real text, so most systems read it, but bold layouts can confuse old systems. Keep a simple version too.'],

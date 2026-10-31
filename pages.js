@@ -226,7 +226,7 @@ const ICON_PATHS = {
 for (const [k, v] of Object.entries(PDFT.icons)) ICON_PATHS[`t-${k}`] = v;
 const icon = (name, cls = 'ico') => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[name] || ICON_PATHS.file}</svg>`;
 
-// File-type icon: a coloured page with the extension on it (colour = category), drawn in CSS.
+// File-type icon: a colored page with the extension on it (color = category), drawn in CSS.
 //   size 'xs' (no text, for picker buttons), 'sm', 'md', 'lg'
 const ficon = (id, size = 'sm') => {
   const f = registry.getFormat(id);
@@ -234,7 +234,7 @@ const ficon = (id, size = 'sm') => {
 };
 
 // Category file icons as one SVG sprite per page (see topbar()); each use is a tiny <use>.
-// A page with a folded corner in the category colour and a white symbol that says what it is.
+// A page with a folded corner in the category color and a white symbol that says what it is.
 const PAGE = '<path d="M3 1h12l6 6v19a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1z" fill="currentColor"/><path d="M15 1v5a1 1 0 0 0 1 1h5z" fill="#fff" opacity=".45"/>';
 const GLYPHS = {
   image: '<circle cx="8.5" cy="12" r="1.8" fill="#fff"/><path d="M5 22l4.5-5 3 3 3.5-4.5L19 22z" fill="#fff"/>',
@@ -253,7 +253,7 @@ const GLYPHS = {
 };
 const SPRITE = `<svg width="0" height="0" style="position:absolute" aria-hidden="true">${Object.entries(GLYPHS).map(([k, g]) =>
   `<symbol id="fi-${k}" viewBox="0 0 24 28">${PAGE}${g}</symbol>`).join('')}</svg>`;
-// Small category icon (pickers, menus): coloured by .fi-<category>.
+// Small category icon (pickers, menus): colored by .fi-<category>.
 const fsvg = (cat) => `<svg class="fsvg fi-${cat}" aria-hidden="true"><use href="#fi-${cat}"/></svg>`;
 const fsvgFor = (id) => fsvg(registry.getFormat(id).category);
 
@@ -402,7 +402,7 @@ function footer() {
 }
 
 // ------------------------------------------------------------------ hero --
-// CloudConvert-style hero: centred title, text, then "convert [X] to [Y]" + Select File.
+// CloudConvert-style hero: centered title, text, then "convert [X] to [Y]" + Select File.
 // crumbs: [[name, path], ...] rendered as a visible breadcrumb trail (matches the JSON-LD).
 function breadcrumbs(crumbs) {
   if (!crumbs || crumbs.length < 2) return '';
@@ -579,16 +579,16 @@ function pairNotes(from, to) {
     else n.push(`${from.name} and ${to.name} produce files of broadly similar size, so the main reasons to convert are compatibility and workflow.`);
   }
   if (to.slug === 'jpg') n.push('JPG cannot store transparency, so any transparent areas are filled with white.');
-  if (to.slug === 'gif') n.push('GIF is limited to 256 colours per frame, so smooth gradients and photographs can look banded.');
+  if (to.slug === 'gif') n.push('GIF is limited to 256 colors per frame, so smooth gradients and photographs can look banded.');
   if (to.slug === 'webp') n.push('WebP is supported by current versions of all major browsers.');
   if (to.slug === 'avif') n.push('AVIF often gives the smallest files, but older browsers and some apps cannot open it, and it takes longer to create.');
   if (to.slug === 'tiff') n.push('TIFF is aimed at print and archiving; most websites need JPG, PNG or WebP instead.');
-  if (to.slug === 'png') n.push('PNG keeps transparency and sharp edges. To keep files small, the number of colours is reduced to match your Quality setting.');
+  if (to.slug === 'png') n.push('PNG keeps transparency and sharp edges. To keep files small, the number of colors is reduced to match your Quality setting.');
   if (to.slug === 'ico') n.push('The result is a multi-size .ico containing 16, 32, 48, 64, 128 and 256 pixel versions. Images that are not square are cropped to a square.');
   if (from.slug === 'gif' && ['png', 'jpg', 'avif', 'tiff', 'ico'].includes(to.slug)) n.push('Animated GIFs are converted to a single still frame.');
   if (from.slug === 'gif' && to.slug === 'webp') n.push('Animation is preserved when converting an animated GIF to WebP.');
   if (from.slug === 'webp' && to.slug !== 'webp') n.push('If the WebP file is animated, only its first frame is converted.');
-  if (from.slug === 'svg') n.push('SVG is a vector format, so it is rasterised (drawn as pixels) at the size declared inside the file.');
+  if (from.slug === 'svg') n.push('SVG is a vector format, so it is rasterized (drawn as pixels) at the size declared inside the file.');
   if (from.slug === 'bmp') n.push('BMP files are often uncompressed, so the converted file is frequently dramatically smaller.');
   if (from.slug === 'jfif') n.push('JFIF files contain ordinary JPEG data, so they are read directly without any extra loss.');
   return n;
@@ -631,7 +631,7 @@ function conversionLists(slug, dir) {
 }
 
 const FEATURES = () => [
-  ['layers', `${FORMAT_COUNT}+ formats`, `${LIVE_COUNT.toLocaleString('en-US')} conversions work today across ${listWords(LIVE_CAT_NAMES)} files. The rest of the catalogue is marked and being added.`],
+  ['layers', `${FORMAT_COUNT}+ formats`, `${LIVE_COUNT.toLocaleString('en-US')} conversions work today across ${listWords(LIVE_CAT_NAMES)} files. The rest of the catalog is marked and being added.`],
   ['shield', 'Data security', 'Files are used only to make your conversion and are deleted as soon as it is finished. Nothing is kept, shared or looked at.'],
   ['star', 'High-quality conversions', 'Built on trusted open-source engines: libvips, FFmpeg, LibreOffice, Pandoc, Calibre, Ghostscript and Inkscape.'],
   ['gift', 'Free, no sign-up', 'No account, no watermark, no email. Convert many files at once and download them together as a ZIP.'],
@@ -1104,7 +1104,7 @@ function toolBox(t) {
       <button type="button" class="pt-link" data-again>Start over</button></div>
     <div class="rs-grid">
       <div class="rs-stagewrap"><canvas class="rs-stage" data-stage aria-label="Your image. When cropping, drag the box to choose the part to keep and drag a corner to resize it."></canvas>
-        <p class="rs-hint" data-stage-hint hidden>Drag the box to choose the part to keep. Drag a corner to change its size and shape (hold Shift to keep the shape). <button type="button" class="pt-link" data-recenter>Centre</button></p></div>
+        <p class="rs-hint" data-stage-hint hidden>Drag the box to choose the part to keep. Drag a corner to change its size and shape (hold Shift to keep the shape). <button type="button" class="pt-link" data-recenter>Center</button></p></div>
       <form class="pt-opts" autocomplete="off" onsubmit="return false">
         <fieldset class="pt-radios"><legend>Resize by</legend>
           <label><input type="radio" name="mode" value="kb"${t.mode === 'px' ? '' : ' checked'}> File size (KB)</label>
@@ -1160,7 +1160,7 @@ function toolBox(t) {
   <div data-src-box="image">${dropBox('image/*,.svg', 'Select image or logo', 'or drop it here &middot; PNG, SVG, JPG or WEBP, ideally square', 'Made in your browser, nothing is uploaded')}
     <p class="fv-fname" data-fname></p>
     <div class="pt-opts fv-opts"><label>Fit<select data-fit><option value="contain">Whole image</option><option value="cover">Fill the square</option></select></label>
-      <label>Background<select data-fill><option value="none">Transparent</option><option value="color">Colour</option></select></label><label>Colour<input type="color" data-bgc2 value="#ffffff"></label></div></div>
+      <label>Background<select data-fill><option value="none">Transparent</option><option value="color">Color</option></select></label><label>Color<input type="color" data-bgc2 value="#ffffff"></label></div></div>
   <div data-src-box="text" hidden><div class="pt-opts fv-opts">
     <label>Letters<input type="text" data-text maxlength="3" value="F"></label>
     <label>Font<select data-font><option value="system-ui, sans-serif">Sans</option><option value="Georgia, serif">Serif</option><option value="ui-monospace, monospace">Mono</option><option value="'Brush Script MT', cursive">Script</option></select></label>
@@ -1188,7 +1188,7 @@ function toolBox(t) {
       <div class="pt-opts bg-opts"><fieldset class="pt-radios"><legend>Background</legend>
         <label><input type="radio" name="bg" value="transparent" checked> Transparent (PNG)</label>
         <label><input type="radio" name="bg" value="white"> White</label>
-        <label><input type="radio" name="bg" value="color"> Colour <input type="color" data-color value="#2563eb"></label></fieldset>
+        <label><input type="radio" name="bg" value="color"> Color <input type="color" data-color value="#2563eb"></label></fieldset>
         <button type="button" class="btn btn-ghost btn-sm" data-orig>Hold to see the original</button>
         <button type="button" class="btn btn-brand" data-dl>${icon('download')}Download</button></div>
     </div>
@@ -1281,7 +1281,7 @@ function toolBox(t) {
       <label>Experience<select data-f="level">${lv.map(([v, n]) => `<option value="${v}"${v === 'mid' ? ' selected' : ''}>${n}</option>`).join('')}</select></label></div></fieldset>
     <fieldset><legend>2. About you</legend><div class="cl-grid">${g('name', 'Full name', 'Jane Smith')}${g('email', 'Email', 'jane@email.com', 'email')}${g('phone', 'Phone', '(555) 123-4567')}${g('city', 'City, country', 'Austin, TX')}${g('link', 'LinkedIn or website (optional)', 'linkedin.com/in/janesmith')}</div></fieldset>
     <fieldset><legend>3. Skills</legend><div class="ar-skills" data-skills><p class="ar-hint">Type a job title above to see the skills employers look for.</p></div>
-      ${g('extraSkills', 'More skills (comma separated, optional)', 'Spanish, Excel, forklift licence')}</fieldset>
+      ${g('extraSkills', 'More skills (comma separated, optional)', 'Spanish, Excel, forklift license')}</fieldset>
     <details class="ar-more"><summary>4. Work history and education (optional: leave empty and edit them in the resume later)</summary>
       ${[1, 2, 3].map((n) => `<div class="cl-grid">${g(`j${n}title`, `Job ${n} title`, n === 1 ? 'Most recent job' : '')}${g(`j${n}company`, 'Company, city', 'Acme Inc., Austin')}${g(`j${n}dates`, 'Dates', n === 1 ? '2022 - Present' : '2019 - 2022')}</div>`).join('')}
       <div class="cl-grid">${g('degree', 'Degree or diploma', 'BSc Nursing')}${g('school', 'School or university', 'University of Texas')}${g('eduYears', 'Year', '2020')}</div>
@@ -1376,7 +1376,7 @@ function appBox(t) {
   </div>
   <div class="ocr-out" data-out hidden>
     <div class="ocr-out-bar"><strong data-out-title>Text</strong><span class="ocr-btns"><button type="button" class="btn btn-ghost btn-sm" data-copy>Copy text</button><a class="btn btn-brand btn-sm" data-dl href="#" download>${icon('download')}Download TXT</a><button type="button" class="pt-link" data-again>New file</button></span></div>
-    <textarea class="ocr-text" data-text rows="14" spellcheck="false" aria-label="Recognised text"></textarea>
+    <textarea class="ocr-text" data-text rows="14" spellcheck="false" aria-label="Recognized text"></textarea>
   </div>
   <div class="pt-done" data-done hidden>
     <span class="pt-done-ico" aria-hidden="true">&#10003;</span>
@@ -1690,7 +1690,7 @@ const EDITOR_FAQ = [
   ['Can I type in Urdu or Arabic?', 'Yes. Type Urdu, Arabic or Hebrew and choose Noto Naskh Arabic or Noto Sans Arabic (Urdu & more in the font list); the letters are joined correctly in the downloaded PDF. Chinese, Japanese and Hindi are not supported yet.'],
   ['How do I edit a PDF without Adobe Acrobat?', 'Open the PDF here in any browser, on Windows, Mac, Linux, Android or iPhone. You can change text, add images, sign and rearrange pages without installing Acrobat or any other program.'],
   ['Can I edit a PDF on my phone?', 'Yes. The editor works in mobile browsers such as Chrome and Safari. Tap to add text, draw your signature with your finger and download the PDF to your phone.'],
-  ['Can I make a resume, invoice or certificate?', 'Yes. Start from one of more than 20 ready-made templates: resumes, cover letters, invoices, quotations, receipts, letterheads, certificates, flyers, menus, invitations, business cards and planners. Every word and colour can be changed.'],
+  ['Can I make a resume, invoice or certificate?', 'Yes. Start from one of more than 20 ready-made templates: resumes, cover letters, invoices, quotations, receipts, letterheads, certificates, flyers, menus, invitations, business cards and planners. Every word and color can be changed.'],
   ['Can I edit a scanned PDF?', 'A scanned PDF is a picture of the page, so its words cannot be retyped directly. Cover them with Whiteout and type new text on top, or add text, signatures and images anywhere on the page.'],
   ['Does it have layers like Figma?', 'Yes. The Layers panel lists everything on the page. Drag layers to change their order, hide or lock them, and use Bring to front or Send to back. You can also set exact position, size and rotation, align objects to the page, and turn on rulers.'],
 ];
@@ -1750,7 +1750,7 @@ function editorPage(base, slug) {
     <ul class="feat">
       <li><strong>Change existing text</strong>Click a line in the PDF and retype it.</li>
       <li><strong>Replace images</strong>Swap, move, resize or remove the pictures already in the PDF.</li>
-      <li><strong>Add text</strong>150+ fonts, size, colour, bold, italic, underline and alignment, also in Urdu.</li>
+      <li><strong>Add text</strong>150+ fonts, size, color, bold, italic, underline and alignment, also in Urdu.</li>
       <li><strong>Layers and arrange</strong>Reorder by dragging, hide, lock, bring to front or send to back.</li>
       <li><strong>Precise layout</strong>Rulers, snapping guides, exact position, size and rotation, align to page.</li>
       <li><strong>Sign</strong>Draw or type your signature and place it anywhere.</li>
@@ -1959,7 +1959,7 @@ const INFO_PAGES = {
         <li><strong>Vectors, fonts and archives:</strong> Inkscape, WOFF2, libarchive, 7-Zip</li>
       </ul>
       <h2>What we are adding</h2>
-      <p>Our catalogue lists ${FORMAT_COUNT} formats across ${CATS.length} categories. Conversions that are not ready yet are clearly marked <span class="soon-tag">soon</span>; we only switch one on once it really works.</p>
+      <p>Our catalog lists ${FORMAT_COUNT} formats across ${CATS.length} categories. Conversions that are not ready yet are clearly marked <span class="soon-tag">soon</span>; we only switch one on once it really works.</p>
       <h2>Contact</h2>
       <p>Questions or suggestions? ${CONTACT_EMAIL ? `Email ${mailLink} or see our ${link('/contact', 'contact page')}` : link('/contact', 'Get in touch')}.</p></section>`,
   },
@@ -1972,14 +1972,14 @@ const INFO_PAGES = {
       <h2>Data we process</h2>
       <p>Like every website, our server receives your IP address and basic request information (browser type, the page requested). We use your IP address only to apply a rate limit that protects the service from abuse; it is held in memory for up to 15 minutes.</p>
       <h2>Visitor statistics</h2>
-      <p>To see how the site is used, we count page visits ourselves, without cookies and without any outside analytics company. For each visit we record the page, the website you came from (for example a search engine), your country and whether you use a phone, tablet or computer, plus which conversions were made. Your IP address is not stored: it is mixed with your browser type and a random value that changes every day into a short code, so we can count each visitor once a day but cannot recognise you on another day or find out who you are.</p>
+      <p>To see how the site is used, we count page visits ourselves, without cookies and without any outside analytics company. For each visit we record the page, the website you came from (for example a search engine), your country and whether you use a phone, tablet or computer, plus which conversions were made. Your IP address is not stored: it is mixed with your browser type and a random value that changes every day into a short code, so we can count each visitor once a day but cannot recognize you on another day or find out who you are.</p>
 ${ACCOUNTS ? `      <h2>Your account</h2>
       <p>You need a free account to download PDFs from the ${link('/edit-pdf', 'PDF editor')}; the converters work without one. For an account we keep your email address, your name if you signed in with Google, your password in scrambled (hashed) form so nobody can read it, when you joined and last signed in, the country your connection comes from, and how many PDFs you downloaded from the editor. We use this only to run your account and to understand how the site is used. The only emails we send are the codes that confirm your address or reset your password; they are delivered by our email delivery provider. We never sell it or share it, and we do not send marketing email without asking you first.</p>
       <p>If you choose Continue with Google, Google tells us your email address and name; we receive nothing else from your Google account. You can delete your account at any time on your ${link('/account', 'account page')}, which removes everything we hold about you.</p>
 ` : ''}      <h2>Cookies and local storage</h2>
       <p>${ACCOUNTS ? `When you sign in, ${SITE} sets one cookie that keeps you signed in. It is needed for the account to work and is not used for tracking. Without an account, ${SITE} sets no cookies of its own.` : `${SITE} itself sets no cookies and stores nothing in your browser.`}</p>
       <h2>Advertising</h2>
-      <p>If advertising is shown, it is provided by Google AdSense. Google and its partners may use cookies to show ads based on your visits to this and other websites. Visitors in the European Economic Area, the UK and Switzerland are asked for their consent through Google's consent message before personalised ads are shown. You can opt out of personalised advertising at <a href="https://adssettings.google.com/" rel="noopener">Google Ads Settings</a>. See <a href="https://policies.google.com/technologies/partner-sites" rel="noopener">how Google uses information from sites that use its services</a>.</p>
+      <p>If advertising is shown, it is provided by Google AdSense. Google and its partners may use cookies to show ads based on your visits to this and other websites. Visitors in the European Economic Area, the UK and Switzerland are asked for their consent through Google's consent message before personalized ads are shown. You can opt out of personalized advertising at <a href="https://adssettings.google.com/" rel="noopener">Google Ads Settings</a>. See <a href="https://policies.google.com/technologies/partner-sites" rel="noopener">how Google uses information from sites that use its services</a>.</p>
       <h2>Third-party services</h2>
       <p>Fonts are served from this site; no third-party scripts are loaded unless advertising is enabled.</p>
       <h2>Your rights</h2>
