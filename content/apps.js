@@ -217,7 +217,7 @@ module.exports = [
       ['Is my photo uploaded?', 'No. The image is resized in your browser and never sent to our server.'],
       ['Is there a watermark or a limit?', 'No watermark, no sign-up and no limit on how many images you resize.'],
     ],
-    see: ['/compress-jpg', '/crop-image', '/passport-photo-maker', '/heic-to-jpg', '/remove-background'],
+    see: ['/resize-image-to-50kb', '/resize-image-to-100kb', '/resize-image-to-200kb', '/compress-jpg', '/crop-image', '/passport-photo-maker', '/heic-to-jpg', '/remove-background'],
   },
   ...[[20, 'signature or a small form photo'], [50, 'online application forms'], [100, 'job portals and exam forms'], [200, 'email and website uploads']].map(([kb, use]) => ({
     slug: `resize-image-to-${kb}kb`, howto: `How to resize an image to ${kb} KB`, name: `Resize Image to ${kb} KB`, app: 'resize', kb, menu: false, browser: true,
@@ -387,7 +387,7 @@ module.exports = [
       ['Which formats are supported?', 'MP4, MOV, M4V, WEBM, MKV, AVI, WMV, FLV, 3GP and most others. The result is always MP4 (H.264 and AAC).'],
       ['Are my videos kept?', 'No. The upload is deleted when the work is done, and the compressed video 15 minutes later.'],
     ],
-    see: ['/trim-video', '/mov-to-mp4', '/mp4-to-mp3', '/mp4-to-gif', '/compress-pdf'],
+    see: ['/compress-video-for-discord', '/compress-video-for-email', '/trim-video', '/mov-to-mp4', '/mp4-to-mp3', '/mp4-to-gif', '/compress-pdf'],
   },
   ...[[10, 'discord', 'Discord', 'Discord limits files to 10 MB on free accounts, so videos from your phone or a game recording often will not send. Pick the clip, keep "under 10 MB" and download an MP4 that uploads and plays right inside Discord.'],
     [25, 'email', 'Email', 'Gmail and Yahoo accept attachments up to 25 MB and Outlook up to 20 MB; bigger videos are turned into a Drive link or bounce. Compress the video to fit and attach it like any other file.']].map(([mb, slug, where, intro]) => ({

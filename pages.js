@@ -26,6 +26,7 @@ const registry = require('./registry');
 const seo = require('./seo');
 const brand = require('./brand');
 const GUIDES = { ...require('./content/guides'), ...require('./content/guides-more') };
+const CATEGORY_CONTENT = require('./content/categories');
 // Resume guides only exist alongside the Resume Builder (part of the PDF editor).
 const ARTICLES = [...require('./content/articles'), ...(process.env.PDF_EDITOR === '1' ? require('./content/resume-articles') : [])];
 const KEYWORDS = require('./content/keywords');
@@ -664,6 +665,9 @@ const ogKey = (urlPath) => (urlPath === '/' ? 'home' : urlPath.slice(1).replace(
 const PRIVACY_SERVER = '<strong>How this works:</strong> your file is uploaded over HTTPS and converted on this server with open-source engines (libvips for images, FFmpeg for audio and video, LibreOffice and Pandoc for documents, Calibre for ebooks, Ghostscript and Inkscape for PDF and vector files). Images are processed in memory; other files use a private temporary folder that is deleted as soon as the conversion finishes.';
 function baseFields(base, urlPath, title, desc, extra) {
   const url = base + urlPath;
+  // Search results show about 60 characters: a long page title drops the " | site" ending rather
+  // than have the words that matter cut off.
+  if (title.length > 65 && title.endsWith(` | ${SITE}`)) title = title.slice(0, -(` | ${SITE}`).length);
   return {
     TITLE: esc(title), META_DESC: esc(desc), ROBOTS: 'index, follow, max-image-preview:large, max-snippet:-1', URL: url,
     CANONICAL_TAG: `<link rel="canonical" href="${url}">`,
@@ -1566,12 +1570,28 @@ function categoryPage(catId, base) {
   const liveSection = livePairs.length
     ? `<section class="conv-section"><h2>Available right now</h2>${chips(livePairs.map((x) => [x.route, pairLabel(x.from, x.to), true]))}</section>` : '';
   const crumbs = [['Home', '/'], ['Converters', '/converters'], [c.converterName, p]];
-  const faq = live ? FAQ_COMMON : FAQ_CATALOG;
+  // Landing-page content (content/categories.js): what the category is for, its most-used tools,
+  // how-to, settings and limits, uses, its own FAQs and guides, around the converter itself.
+  const cc = live && CATEGORY_CONTENT[catId];
+  if (!knownPaths) knownPaths = new Set(allPaths());
+  const faq = live ? [...(cc ? cc.faq : []), ...FAQ_COMMON] : FAQ_CATALOG;
+  let guide = '', guideTail = '';
+  if (cc) {
+    const tasks = cc.tasks.filter(([h]) => knownPaths.has(h));
+    const guides = cc.guides.map((g) => ARTICLE_BY_SLUG.get(g)).filter(Boolean);
+    guide = `<section class="notes prose-block"><h2>About the ${esc(c.converterName.toLowerCase())}</h2>${liveLinks(cc.intro)}</section>`
+      + (tasks.length ? `<section class="hub-section"><h2>Popular ${esc(c.name.toLowerCase())} tools</h2><ul class="pt-grid">${tasks
+        .map(([h, label, line]) => `<li><a class="pt-card" href="${h}"><span class="pt-tile">${icon(c.icon)}</span><strong>${esc(label)}</strong><span>${esc(line)}</span></a></li>`).join('')}</ul></section>` : '')
+      + `<section class="howto"><h2>${esc(cc.howto.h)}</h2><ol class="steps">${cc.howto.steps.map(([a, d]) => `<li><strong>${esc(a)}</strong> ${esc(d)}</li>`).join('')}</ol></section>`;
+    guideTail = `<section class="notes prose-block"><h2>Settings and limits</h2>${liveLinks(cc.settings.replace(/\{\{MAX_MB\}\}/g, MAX_MB))}</section>`
+      + `<section class="notes prose-block"><h2>What people use the ${esc(c.converterName.toLowerCase())} for</h2><ul>${cc.uses.map((u) => `<li>${esc(u)}</li>`).join('')}</ul></section>`
+      + (guides.length ? `<section class="related-tools"><h2>Guides</h2>${chips(guides.map((a) => [articlePath(a.slug), esc(a.h1), true]))}</section>` : '');
+  }
   const fields = baseFields(base, p, title, desc, {
     JSONLD: live ? graph(base, p, c.converterName, desc, faq, crumbs, { features: TOOL_FEATURES }) : '{}',
     HERO: hero({ h1: c.converterName, crumbs, intro: `${esc(c.description)}${live ? '' : ' These conversions are on our roadmap and coming soon.'}`, widget, withSelect: liveIns.length > 0 }),
     TOOL: liveIns.length ? anyTool(liveIns) : '',
-    CONTENT: conversionMap(ins) + fmtGrid + liveSection + faqHtml(faq),
+    CONTENT: guide + conversionMap(ins) + fmtGrid + liveSection + guideTail + faqHtml(faq),
   });
   return renderPage(PAGE_TPL, live ? fields : noindex(fields));
 }
@@ -1957,7 +1977,7 @@ ${ACCOUNTS ? `      <h2>Your account</h2>
   },
   terms: {
     title: `Terms of Use | ${SITE}`, h1: 'Terms of Use',
-    desc: `The terms for using the free ${SITE} online file converter.`,
+    desc: `The terms for using ${SITE}: free file conversion and PDF tools, what you may upload, how files are handled and deleted, and our limits of liability.`,
     body: () => `<section class="prose"><p class="muted">Last updated: ${LEGAL_UPDATED}</p>
       <h2>Using the service</h2>
       <p>${SITE} is free to use. You may convert files that you own or have the right to convert. Do not upload unlawful content or use the service to infringe anyone's rights.</p>

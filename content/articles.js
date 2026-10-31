@@ -442,4 +442,263 @@ module.exports = [
       ['Why does my EPUB not convert?', 'It is most likely DRM-protected, which prevents conversion.'],
     ],
   },
+  {
+    slug: 'convert-jpg-images-to-one-pdf',
+    title: 'How to Convert JPG Images into One PDF (Free)',
+    h1: 'How to convert JPG images into one PDF',
+    desc: 'Put several JPG photos or scans into a single PDF, in the right order, small enough to email or upload. Step by step, free, with tips for documents and receipts.',
+    date: '2026-10-31',
+    tools: ['/jpg-to-pdf', '/merge-pdf', '/compress-jpg'],
+    intro: 'Application forms, landlords and accountants often ask for "one PDF", while your phone gives you a pile of photos. Here is how to turn them into a single tidy PDF in a couple of minutes.',
+    sections: [
+      ['Step by step', `<ol>
+<li>Open <a href="/jpg-to-pdf">JPG to PDF</a> and drop in all the photos at once, or click <strong>Select File</strong> and pick them together.</li>
+<li>Check the list: the PDF follows its order. Remove a photo with the &times; button, and add more with <strong>Add more files</strong>.</li>
+<li>Click <strong>Convert</strong>, then <strong>Download all</strong> and choose <strong>One PDF</strong>. Each photo becomes one page.</li>
+</ol>
+<p>Prefer separate files? Choose the other option and every photo becomes its own PDF, downloaded together in a ZIP.</p>`],
+      ['Get the order right', `<p>Name your photos in order before you start (01, 02, 03...) or add them one at a time in the order you want. If you already have several PDFs, put them in any order you like with <a href="/merge-pdf">Merge PDF</a>, which lets you drag files up and down.</p>`],
+      ['Keep the PDF small', `<p>A single phone photo can be 3 to 5 MB, so ten of them make a PDF that is too big for most upload forms. Shrink the photos first with <a href="/compress-jpg">Compress JPG</a>: choose how much smaller each one should be and set <strong>Resize</strong> to Max 1920px. A page of text photographed at that size is still easy to read and usually well under 500 KB.</p>`],
+      ['Tips for documents and receipts', `<ul>
+<li>Photograph pages flat, straight on and in daylight, without flash.</li>
+<li>Crop away the table or floor around the page with <a href="/crop-image">Crop Image</a>; you can crop many photos at once.</li>
+<li>Turn sideways photos upright before converting. Phone photos are turned upright automatically when the camera recorded which way up they were.</li>
+<li>If the text must be searchable, run the finished PDF through <a href="/ocr-pdf">OCR PDF</a>.</li>
+</ul>`],
+    ],
+    faq: [
+      ['Can I put several JPGs into one PDF?', 'Yes. Add them all in JPG to PDF, convert, then choose One PDF when you download. Each photo becomes a page, in the order of the list.'],
+      ['Does the PDF lose quality?', 'The photos are placed in the PDF as they are. To make the PDF smaller, compress the photos first.'],
+      ['Can I add PNG or HEIC photos too?', 'Yes: use Image to PDF, which takes PNG, HEIC, WebP and other formats as well.'],
+    ],
+  },
+
+  {
+    slug: 'merge-pdf-files',
+    title: 'How to Merge PDF Files into One (Free, No Upload)',
+    h1: 'How to merge PDF files into one',
+    desc: 'Combine several PDFs into a single file in the order you want, free and without uploading them: step by step, plus how to reorder, remove and split pages.',
+    date: '2026-10-31',
+    tools: ['/merge-pdf', '/split-pdf', '/organize-pdf'],
+    intro: 'A job application with a CV, cover letter and certificates; a month of bank statements; scanned pages that came out as separate files. One PDF is easier to send, upload and print. Here is how to make it.',
+    sections: [
+      ['Step by step', `<ol>
+<li>Open <a href="/merge-pdf">Merge PDF</a> and select your PDFs, or drop them into the box. Hold Ctrl (Cmd on a Mac) to pick several at once.</li>
+<li>Drag the files into the order you want, or use the arrows. The first file comes first in the merged PDF.</li>
+<li>Click <strong>Merge PDF</strong>. The combined file downloads straight away.</li>
+</ol>`],
+      ['Your files stay on your device', `<p>Merging happens in your browser with open-source code, so the PDFs are never uploaded. That makes it quick even on a slow connection, and suitable for documents you would rather not send anywhere.</p>`],
+      ['Change single pages after merging', `<ul>
+<li>Move, rotate or delete individual pages with <a href="/organize-pdf">Organize PDF</a>.</li>
+<li>Take some pages out into a new file with <a href="/split-pdf">Split PDF</a>.</li>
+<li>If the merged file is too big to email, make it smaller with <a href="/compress-pdf">Compress PDF</a>.</li>
+</ul>`],
+      ['When merging does not work', `<p>A PDF protected with a password must be unlocked first with <a href="/unlock-pdf">Unlock PDF</a> (you need the password). Damaged PDFs can often be fixed with <a href="/repair-pdf">Repair PDF</a> and merged afterwards.</p>`],
+    ],
+    faq: [
+      ['How many PDFs can I merge?', 'As many as you like, each up to the size limit shown. Very large sets depend on the memory of your device.'],
+      ['Are my PDFs uploaded?', 'No. They are merged in your browser and never leave your device.'],
+      ['Can I merge PDFs on my phone?', 'Yes, in any current mobile browser. Use the arrows to change the order.'],
+    ],
+  },
+
+  {
+    slug: 'convert-excel-to-pdf',
+    title: 'How to Convert Excel to PDF and Fit It on One Page',
+    h1: 'How to convert Excel spreadsheets to PDF',
+    desc: 'Convert an Excel spreadsheet to PDF that prints and reads well: fit columns on one page, choose landscape, set the print area and avoid empty or cut-off pages.',
+    date: '2026-10-31',
+    tools: ['/excel-to-pdf', '/word-to-pdf'],
+    intro: 'A spreadsheet that looks fine on screen can turn into a PDF with columns spilling onto extra pages. Almost always the fix is in the page setup, made once before converting.',
+    sections: [
+      ['Step by step', `<ol>
+<li>Open the spreadsheet in Excel, LibreOffice or Google Sheets and set the page up as described below. Save it as XLSX.</li>
+<li>Open <a href="/excel-to-pdf">Excel to PDF</a> and drop the file in.</li>
+<li>Click <strong>Convert</strong> and download the PDF.</li>
+</ol>
+<p>The converter uses the print settings saved in the file: print area, orientation, scaling and margins.</p>`],
+      ['Fit all columns on one page', `<p>In Excel: <strong>Page Layout &rarr; Width: 1 page, Height: Automatic</strong>. In LibreOffice Calc: <strong>Format &rarr; Page Style &rarr; Sheet &rarr; Fit width to 1 page</strong>. The sheet is scaled down so every column fits across, and long tables continue onto the next page.</p>
+<p>Wide tables read better in <strong>landscape</strong>: Page Layout &rarr; Orientation &rarr; Landscape.</p>`],
+      ['Print only what you need', `<p>Select the cells to include and choose <strong>Page Layout &rarr; Print Area &rarr; Set Print Area</strong>. Empty rows and columns outside it, which often cause blank pages, are then left out.</p>`],
+      ['Several sheets', `<p>Every visible sheet is included in the PDF, one after the other. Hide the sheets you do not want before saving, or move them into a separate file.</p>`],
+      ['Make it easy to read', `<ul>
+<li>Repeat the header row on every page: Page Layout &rarr; Print Titles &rarr; Rows to repeat at top.</li>
+<li>Turn on gridlines for printing if the table has no borders.</li>
+<li>Use a common font such as Calibri or Arial; it is replaced by a metric-compatible one if missing, so columns keep their width.</li>
+</ul>`],
+    ],
+    faq: [
+      ['Why does my Excel PDF have extra pages?', 'Columns that do not fit across one page continue on another. Set the page to 1 page wide, or use landscape, then convert again.'],
+      ['Can I convert only one sheet?', 'Hide the other sheets before saving, or copy the sheet into a new workbook.'],
+      ['Are formulas kept in the PDF?', 'A PDF shows the calculated values, not the formulas. Keep the XLSX for editing.'],
+    ],
+  },
+
+  {
+    slug: 'why-pdf-looks-different-after-conversion',
+    title: 'Why Does a PDF Look Different After Conversion?',
+    h1: 'Why does a PDF look different after conversion?',
+    desc: 'Fonts, line breaks, tables or pictures moved after converting a PDF to Word or Word to PDF? The real reasons and how to get a result that looks like the original.',
+    date: '2026-10-31',
+    tools: ['/pdf-to-word', '/word-to-pdf', '/ocr-pdf'],
+    intro: 'A PDF records where every letter sits on the page. A Word document records paragraphs that flow. Converting between the two means translating one model into the other, and a few things can shift on the way. Knowing why makes them easy to fix.',
+    sections: [
+      ['1. A font is missing', `<p>When a PDF uses a font that cannot be included in the new file, a similar common font is used instead. Letters then have slightly different widths, so a line can break earlier or later. Our <a href="/pdf-to-word">PDF to Word</a> converter embeds the PDF's fonts in the Word file when it is allowed to and tells you when a font had to be replaced.</p>
+<p><strong>Fix:</strong> install the original font on your computer, or change the text to a common font.</p>`],
+      ['2. The PDF is a scan', `<p>A scanned PDF is a picture of each page with no text inside, so there is nothing to edit. Choose <strong>OCR</strong> when converting, or make the PDF searchable first with <a href="/ocr-pdf">OCR PDF</a>. Recognised text is very good on clean scans and weaker on photos taken at an angle or in poor light.</p>`],
+      ['3. Columns, text boxes and designed layouts', `<p>Resumes, brochures and magazines place text in columns and boxes. A good converter reads them in the order a person would and rebuilds columns as columns, but very complex designs can still need small adjustments in Word.</p>`],
+      ['4. Tables without lines', `<p>Ruled tables (with visible borders) become real Word tables. Tables made only of aligned text have no lines to detect, so they come out as text with tab stops.</p>`],
+      ['5. Word to PDF: the document changed before it became a PDF', `<p>If a Word file looks different as a PDF, it usually also looks different on another computer: a font is missing there too, or the document uses "track changes" or comments. Accept the changes and use common fonts, then convert again with <a href="/word-to-pdf">Word to PDF</a>.</p>`],
+      ['Checklist for the best result', `<ul>
+<li>Start from the original PDF, not a printed and scanned copy.</li>
+<li>Use OCR only for scanned pages.</li>
+<li>Check unusual fonts after converting.</li>
+<li>For a copy that only needs to look right, keep the PDF; convert to Word only to edit.</li>
+</ul>`],
+    ],
+    faq: [
+      ['Why did my fonts change in Word?', 'The font could not be embedded or is not installed on your computer, so a similar font is shown. Install the font or pick a common one.'],
+      ['Why can I not edit the text of my PDF?', 'It is probably a scan: a picture with no text. Convert it with OCR.'],
+      ['Is converting PDF to Word ever exact?', 'For normal documents it is very close. Complex designs may need small adjustments, because PDF and Word store layout differently.'],
+    ],
+  },
+
+  {
+    slug: 'file-format-vs-codec',
+    title: 'File Format vs Codec: What Is the Difference?',
+    h1: 'What is the difference between a file format and a codec?',
+    desc: 'MP4, MKV and MOV are containers; H.264, HEVC, VP9 and AAC are codecs. What each means, why a video will not play, and which combination works everywhere.',
+    date: '2026-10-31',
+    tools: ['/mov-to-mp4', '/mkv-to-mp4', '/mp4-to-mp3'],
+    intro: 'Two videos can both end in .mp4 and still behave differently: one plays on your TV, the other does not. The file extension names the container; what decides whether a device can play it is the codec inside.',
+    sections: [
+      ['The container (file format)', `<p>MP4, MOV, MKV, WebM and AVI are <strong>containers</strong>: boxes that hold a video stream, one or more audio streams, subtitles and information such as the length and title. The container decides which streams can go in it and how they are stored together, which is why the file extension is the container's name.</p>`],
+      ['The codec', `<p>A <strong>codec</strong> is the method used to compress the picture or the sound. Common video codecs are H.264 (also called AVC), H.265 (HEVC), VP9 and AV1. Common audio codecs are AAC, MP3 and Opus. A device must know the codec to play the file, whatever the container is.</p>`],
+      ['Why a video will not play', `<ul>
+<li><strong>The codec is not supported:</strong> iPhones record in HEVC, which some Windows PCs and older TVs cannot decode.</li>
+<li><strong>The container is not supported:</strong> many phones and TVs do not open MKV, even when the codec inside is fine.</li>
+<li><strong>The audio is the problem:</strong> picture but no sound often means an audio codec the player lacks.</li>
+</ul>`],
+      ['The combination that plays everywhere', `<p><strong>MP4 with H.264 video and AAC audio</strong> works on practically every phone, computer, browser, smart TV and editing program. That is what our converters make: <a href="/mov-to-mp4">MOV to MP4</a> and <a href="/mkv-to-mp4">MKV to MP4</a> re-encode the video to H.264 and the sound to AAC.</p>
+<p>For websites, WebM with VP9 and Opus is a good, smaller alternative. For audio only, convert to MP3 or M4A, for example with <a href="/mp4-to-mp3">MP4 to MP3</a>.</p>`],
+      ['Does converting lose quality?', `<p>Re-encoding with a lossy codec always discards a little detail. The settings used here keep the picture visually the same for normal viewing. Converting to a "better" codec cannot add back detail the original did not have.</p>`],
+    ],
+    faq: [
+      ['Is MP4 a codec?', 'No. MP4 is a container. The video inside is usually H.264 or H.265 and the audio AAC.'],
+      ['Why does my MKV not play on my TV?', 'Many TVs do not open the MKV container. Convert it to MP4 with H.264 and AAC.'],
+      ['What is the best video format?', 'For sharing, MP4 with H.264 and AAC. For the smallest files on the web, WebM with VP9 or AV1.'],
+    ],
+  },
+
+  {
+    slug: 'best-image-format-for-website',
+    title: 'Best Image Format for a Website: A Practical Guide',
+    h1: 'How to choose the right image format for a website',
+    desc: 'Which image format to use on a website for photos, logos, icons and animations: WebP, AVIF, JPG, PNG or SVG, the right pixel size, and a quick checklist.',
+    date: '2026-10-31',
+    tools: ['/jpg-to-webp', '/png-to-webp', '/image-resizer'],
+    intro: 'Images are usually the heaviest part of a web page, and the format you choose decides how fast it loads. The rule of thumb is simple: pick the format by what the image shows, then make it no bigger than the size it is displayed at.',
+    sections: [
+      ['Choose by what the image shows', `<table><thead><tr><th>Image</th><th>Best format</th><th>Why</th></tr></thead><tbody>
+<tr><td>Photos</td><td>WebP or AVIF (JPG as fallback)</td><td>25 to 50 percent smaller than JPG at the same look</td></tr>
+<tr><td>Logos and icons</td><td>SVG</td><td>Sharp on every screen, often a few KB</td></tr>
+<tr><td>Screenshots, graphics with text</td><td>WebP at high quality, or PNG</td><td>Keeps sharp edges and small letters</td></tr>
+<tr><td>Anything with transparency</td><td>WebP or PNG</td><td>Both keep transparent backgrounds</td></tr>
+<tr><td>Short animations</td><td>MP4 or WebM video instead of GIF</td><td>Often ten times smaller than a GIF</td></tr>
+</tbody></table>
+<p>For a detailed comparison of the three common formats, see <a href="/guides/jpg-vs-png-vs-webp">JPG vs PNG vs WebP</a>.</p>`],
+      ['Size matters more than format', `<p>A 4000 pixel photo shown 800 pixels wide wastes most of its bytes in any format. Resize images to about the largest size they appear at, or twice that for sharp phone screens: 1600 to 1920 pixels for full-width images, 800 to 1200 for images in an article. Use the <a href="/image-resizer">Image Resizer</a> or the Resize option of any converter.</p>`],
+      ['Converting your existing images', `<ul>
+<li>Photos: <a href="/jpg-to-webp">JPG to WebP</a> at Quality 75.</li>
+<li>Graphics and screenshots: <a href="/png-to-webp">PNG to WebP</a> at Quality 85 or more; transparency is kept.</li>
+<li>Keep your original files as masters and always convert from them, not from an earlier compressed copy.</li>
+</ul>`],
+      ['Quick checklist', `<ul>
+<li>Right format for the content (table above).</li>
+<li>No wider than needed.</li>
+<li>Descriptive alt text on every meaningful image.</li>
+<li>Width and height set in the HTML, so the page does not jump while images load.</li>
+<li>Images below the first screen loaded lazily (<code>loading="lazy"</code>).</li>
+</ul>`],
+    ],
+    faq: [
+      ['Is WebP supported by all browsers?', 'Yes, every current browser supports WebP. AVIF is supported by current Chrome, Edge, Firefox and Safari.'],
+      ['Should I still use JPG?', 'JPG is fine and universally supported, but WebP or AVIF make the same photo noticeably smaller, which speeds up the page.'],
+      ['What size should website images be?', 'About the largest size they are shown at, or up to twice that for sharp phone screens: commonly 1600 to 1920 pixels wide for full-width images.'],
+    ],
+  },
+
+  {
+    slug: 'resize-image-to-kb',
+    title: 'How to Resize an Image to 50 KB, 100 KB or Any Size',
+    h1: 'How to resize an image to a specific size in KB',
+    desc: 'Make a photo, signature or scan smaller than an upload limit such as 20 KB, 50 KB or 100 KB for online forms and job portals, without making it unreadable.',
+    date: '2026-10-31',
+    tools: ['/image-resizer', '/resize-image-to-50kb', '/compress-jpg'],
+    intro: 'Online applications, exam forms and job portals often accept photos only below a size such as 50 KB, and signatures below 20 KB. Here is how to hit the limit and keep the picture clear.',
+    sections: [
+      ['Step by step', `<ol>
+<li>Open the <a href="/image-resizer">Image Resizer</a> and choose your photo.</li>
+<li>Under <strong>Resize by</strong>, choose <strong>File size (KB)</strong> and enter the limit, for example 50, or click one of the ready sizes.</li>
+<li>Download the result. The size is shown before you save, so you can check it is under the limit.</li>
+</ol>
+<p>For the most common limit there is a ready-made page: <a href="/resize-image-to-50kb">resize image to 50 KB</a>. The photo never leaves your device.</p>`],
+      ['How it gets under the limit', `<p>The resizer first lowers the JPG quality step by step, which removes detail the eye barely notices. If that is not enough, it also reduces the width and height until the file fits. Photos stay recognisable well below 50 KB at passport-photo sizes.</p>`],
+      ['When the form also asks for pixels', `<p>Some forms want both, for example 200 &times; 230 pixels and under 50 KB. Resize by <strong>Width and height</strong> first and download, then open that file again and resize it by <strong>File size (KB)</strong>. To change the shape of the photo, crop it first with <a href="/crop-image">Crop Image</a>; for official photo sizes use the <a href="/passport-photo-maker">Passport Photo Maker</a>.</p>`],
+      ['Tips', `<ul>
+<li>Start from the original photo, not a screenshot of it.</li>
+<li>Crop away the background: fewer pixels means more detail in the same KB.</li>
+<li>Signatures: scan or photograph on white paper, crop tightly and save as JPG.</li>
+<li>Several photos? <a href="/compress-jpg">Compress JPG</a> makes a whole batch smaller by a chosen percentage.</li>
+</ul>`],
+    ],
+    faq: [
+      ['How do I reduce a photo to 50 KB?', 'Open the Image Resizer, choose File size (KB), enter 50 and download. The result is under 50 KB.'],
+      ['Will my photo become blurry?', 'Slightly less sharp at very small sizes, but faces and text stay clear at the sizes forms usually ask for.'],
+      ['Is my photo uploaded?', 'No. It is resized in your browser.'],
+    ],
+  },
+
+  {
+    slug: 'uk-passport-photo-size',
+    title: 'UK Passport Photo Size and Rules: Make One at Home',
+    h1: 'UK passport photo size and how to make one at home',
+    desc: 'UK passport photo size (35 x 45 mm), head size, the digital photo for online applications, the main rules, and how to make a printed or digital photo at home.',
+    date: '2026-10-31',
+    tools: ['/passport-photo-maker', '/crop-image'],
+    intro: 'A UK passport photo is 35 mm wide and 45 mm high, the same size as most European passport and visa photos. You can take it at home with a phone and make both the digital version for an online application and a printable sheet.',
+    sections: [
+      ['The size', `<ul>
+<li><strong>Printed photo:</strong> 35 mm wide by 45 mm high.</li>
+<li><strong>Head:</strong> from the chin to the top of the head, between 29 mm and 34 mm.</li>
+<li><strong>Digital photo for online applications:</strong> at least 600 pixels wide and 750 pixels tall. The Passport Photo Maker makes it 700 by 900 pixels.</li>
+</ul>`],
+      ['The main rules', `<ul>
+<li>A plain, light-coloured background with no pattern, objects or shadows.</li>
+<li>Face the camera with a neutral expression, mouth closed and eyes open and visible.</li>
+<li>Even light, with no shadows on your face or behind you, and no red eye.</li>
+<li>Nothing covering your face; head coverings only for religious or medical reasons.</li>
+<li>A recent photo, in focus, in colour and not edited.</li>
+</ul>
+<p>Rules change from time to time, so check the current requirements on GOV.UK before you apply.</p>`],
+      ['Make it at home', `<ol>
+<li>Stand in front of a plain light wall, facing a window, and ask someone to take the photo from about 1.5 metres at eye level.</li>
+<li>Open the <a href="/passport-photo-maker">Passport Photo Maker</a> and choose <strong>United Kingdom</strong>.</li>
+<li>Move and zoom the photo until your chin and the top of your head sit on the guide lines.</li>
+<li>Download the <strong>digital photo</strong> for an online application, or the <strong>4x6 inch (6x4) sheet</strong> to print at a shop or photo kiosk, then cut along the lines.</li>
+</ol>
+<p>The photo is cropped in your browser and never uploaded.</p>`],
+      ['Common reasons photos are rejected', `<ul>
+<li>Shadows behind the head or on one side of the face.</li>
+<li>Head too small or too big in the frame.</li>
+<li>Glare on glasses, or hair covering the eyes.</li>
+<li>Photo taken at arm's length, which distorts the face.</li>
+</ul>`],
+    ],
+    faq: [
+      ['What size is a UK passport photo?', '35 mm wide by 45 mm high, with the head 29 to 34 mm from chin to crown.'],
+      ['What size is the digital UK passport photo?', 'At least 600 pixels wide and 750 pixels tall. The Passport Photo Maker produces 700 by 900 pixels.'],
+      ['Can I print a UK passport photo at home?', 'Print the 6x4 inch sheet on photo paper at a shop or kiosk for the best result; the sheet holds several photos to cut out.'],
+    ],
+  },
 ];

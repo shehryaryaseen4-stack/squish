@@ -11,7 +11,7 @@ const SCHENGEN = [32, 36]; // 35 x 45 mm with the face 70-80% of the photo (ICAO
 module.exports = [
   ['Most used', [
     S('us', 'United States', 'Passport & visa', 51, 51, [25, 35], [600, 600]),
-    S('uk', 'United Kingdom', 'Passport & visa', 35, 45, [29, 34]),
+    S('uk', 'United Kingdom', 'Passport & visa', 35, 45, [29, 34], [700, 900]), // GOV.UK online: at least 600 x 750 px
     S('schengen', 'Schengen visa (EU)', 'Visa', 35, 45, SCHENGEN),
     S('ca', 'Canada', 'Passport', 50, 70, [31, 36]),
     S('in', 'India', 'Passport, OCI & visa', 51, 51, [25, 35], [600, 600]),
