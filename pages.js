@@ -1321,7 +1321,7 @@ function toolBox(t) {
 function appBox(t) {
   if (TOOLS_JS.has(t.app)) return toolBox(t);
   if (t.app === 'passport') {
-    return `<section class="app app-passport" id="app" data-app="passport">
+    return `<section class="app app-passport" id="app" data-app="passport"${t.country ? ` data-country="${t.country}"` : ''}>
   <div class="pt-drop" data-drop>
     <input type="file" accept="image/*,.heic,.heif" data-input hidden>
     ${icon('upload', 'pt-drop-ico')}
@@ -1333,7 +1333,7 @@ function appBox(t) {
     <div class="pp-stage"><canvas class="pp-canvas" data-canvas width="600" height="600" aria-label="Drag to move the photo, scroll or pinch to zoom"></canvas><p class="pp-hint">Drag to move &middot; scroll, pinch or use the slider to zoom. Top of head on the upper line, chin on the lower line.</p></div>
     <form class="pp-opts" autocomplete="off" onsubmit="return false">
       <label>Country and document<select data-size>${PASSPORT_SPECS.map(([group, list]) => `<optgroup label="${esc(group)}">${list
-        .map((x) => `<option value="${x.id}" data-w="${x.w}" data-h="${x.h}" data-hmin="${x.head[0]}" data-hmax="${x.head[1]}"${x.px ? ` data-px="${x.px.join('x')}"` : ''}>${esc(x.country)} \u2013 ${esc(x.doc)} (${photoSize(x)})</option>`).join('')}</optgroup>`).join('')}
+        .map((x) => `<option value="${x.id}"${x.id === t.country ? ' selected' : ''} data-w="${x.w}" data-h="${x.h}" data-hmin="${x.head[0]}" data-hmax="${x.head[1]}"${x.px ? ` data-px="${x.px.join('x')}"` : ''}>${esc(x.country)} \u2013 ${esc(x.doc)} (${photoSize(x)})</option>`).join('')}</optgroup>`).join('')}
         <optgroup label="Other"><option value="custom">Custom size (any country)</option></optgroup></select></label>
       <div class="pp-custom" data-custom hidden><label>Width (mm)<input type="number" data-cw min="20" max="100" step="1" value="35"></label><label>Height (mm)<input type="number" data-ch min="20" max="100" step="1" value="45"></label></div>
       <p class="pp-spec" data-spec aria-live="polite"></p>
@@ -1973,6 +1973,7 @@ ${ACCOUNTS ? `      <h2>Your account</h2>
       <h2>Third-party services</h2>
       <p>Fonts are served from this site; no third-party scripts are loaded unless advertising is enabled.</p>
       <h2>Your rights</h2>
+      <p>If you are in the UK or the European Economic Area, the UK GDPR or the GDPR gives you the right to ask what personal data we hold about you, to have it corrected or deleted, and to object to its use. In the UK you can also complain to the Information Commissioner's Office (<a href="https://ico.org.uk/" rel="noopener">ico.org.uk</a>).</p>
       <p>${ACCOUNTS ? 'We do not store your files. If you have an account, you can delete it and all its data yourself, or ask us to show, correct or delete what we hold' : 'Because we do not store your files or create accounts, we hold no personal data about you beyond the short-lived rate-limit record and the anonymous visit counts described above'}. For any privacy question, ${contactLine}.</p></section>`,
   },
   terms: {

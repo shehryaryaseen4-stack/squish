@@ -665,7 +665,7 @@ module.exports = [
     h1: 'UK passport photo size and how to make one at home',
     desc: 'UK passport photo size (35 x 45 mm), head size, the digital photo for online applications, the main rules, and how to make a printed or digital photo at home.',
     date: '2026-10-31',
-    tools: ['/passport-photo-maker', '/crop-image'],
+    tools: ['/uk-passport-photo', '/passport-photo-maker', '/crop-image'],
     intro: 'A UK passport photo is 35 mm wide and 45 mm high, the same size as most European passport and visa photos. You can take it at home with a phone and make both the digital version for an online application and a printable sheet.',
     sections: [
       ['The size', `<ul>
@@ -683,7 +683,7 @@ module.exports = [
 <p>Rules change from time to time, so check the current requirements on GOV.UK before you apply.</p>`],
       ['Make it at home', `<ol>
 <li>Stand in front of a plain light wall, facing a window, and ask someone to take the photo from about 1.5 metres at eye level.</li>
-<li>Open the <a href="/passport-photo-maker">Passport Photo Maker</a> and choose <strong>United Kingdom</strong>.</li>
+<li>Open the <a href="/uk-passport-photo">UK Passport Photo maker</a>, where United Kingdom is already chosen.</li>
 <li>Move and zoom the photo until your chin and the top of your head sit on the guide lines.</li>
 <li>Download the <strong>digital photo</strong> for an online application, or the <strong>4x6 inch (6x4) sheet</strong> to print at a shop or photo kiosk, then cut along the lines.</li>
 </ol>

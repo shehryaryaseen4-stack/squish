@@ -176,7 +176,8 @@ function passport() {
     save(await jpg(sheet), `passport-photo-${p.name}-4x6-print.jpg`);
     say(`Saved a 4x6 inch sheet with ${cols * rows} photos. Print it as a regular 4x6 photo, without cropping or resizing.`); beacon('Passport sheet');
   });
-  try { const last = localStorage.getItem('flipit-passport-size'); if (last && sizeSel.querySelector(`option[value="${last}"]`)) sizeSel.value = last; } catch { /* private mode */ }
+  // a country page (e.g. /uk-passport-photo) starts on its country; otherwise the last choice
+  if (!box.dataset.country) try { const last = localStorage.getItem('flipit-passport-size'); if (last && sizeSel.querySelector(`option[value="${last}"]`)) sizeSel.value = last; } catch { /* private mode */ }
   setSize();
 }
 
