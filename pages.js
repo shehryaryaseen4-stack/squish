@@ -27,6 +27,7 @@ const seo = require('./seo');
 const brand = require('./brand');
 const GUIDES = { ...require('./content/guides'), ...require('./content/guides-more') };
 const CATEGORY_CONTENT = require('./content/categories');
+const FORMAT_GUIDES = require('./content/format-guides');
 // Resume guides only exist alongside the Resume Builder (part of the PDF editor).
 const ARTICLES = [...require('./content/articles'), ...(process.env.PDF_EDITOR === '1' ? require('./content/resume-articles') : [])];
 const KEYWORDS = require('./content/keywords');
@@ -1526,7 +1527,9 @@ function formatPage(slug, base) {
   const outs = outputsFor(slug, ANY);
   const ins = inputsFor(slug, ANY);
   const title = `${f.label} Converter - Convert ${f.label} Files Online | ${SITE}`;
-  const desc = `Convert ${f.label} (${f.full}) files to and from ${outs.length + ins.length > 0 ? `${[...new Set([...outs, ...ins])].length} other formats` : 'other formats'}. Free, no sign-up.`;
+  // Hand-written content (content/format-guides.js) for the format pages people find in search.
+  const fg = live && FORMAT_GUIDES[slug];
+  const desc = (fg && fg.desc) || `Convert ${f.label} (${f.full}) files to and from ${outs.length + ins.length > 0 ? `${[...new Set([...outs, ...ins])].length} other formats` : 'other formats'}. Free, no sign-up.`;
   const widget = convertRow(anyInputPicker(ALL_INPUTS, fmt.input ? slug : null), fmt.input ? outputPicker(slug, null) : emptyToPicker());
   const liveOuts = outputsFor(slug);
   const canCompress = COMPRESSIBLE.includes(slug);
@@ -1538,7 +1541,14 @@ function formatPage(slug, base) {
     ins.length ? `<section class="conv-section"><h2>Convert to ${f.label} from&hellip;</h2>${conversionLists(slug, 'in')}</section>` : '',
   ].join('');
   const crumbs = [['Home', '/'], ['Converters', '/converters'], [`${f.label} Converter`, p]];
-  const faq = live ? FAQ_COMMON : FAQ_CATALOG;
+  const faq = live ? [...(fg ? fg.faq : []), ...FAQ_COMMON] : FAQ_CATALOG;
+  const guides = fg && fg.guides ? fg.guides.map((g) => ARTICLE_BY_SLUG.get(g)).filter(Boolean) : [];
+  const about = fg ? `<section class="guide prose format-guide">
+    <h2>What is ${fg.an ? 'an' : 'a'} ${f.label} file?</h2>${fg.about.map((x) => `<p>${x}</p>`).join('')}
+    <h2>How to open ${fg.an ? 'an' : 'a'} ${f.label} file</h2><p>${fg.open}</p>
+    <h2>Why people convert ${f.label} files</h2><ul>${fg.uses.map((x) => `<li>${x}</li>`).join('')}</ul>
+    ${fg.limits ? `<h2>Good to know</h2><ul>${fg.limits.map((x) => `<li>${x}</li>`).join('')}</ul>` : ''}
+  </section>${guides.length ? `<section class="related-tools"><h2>Guides</h2>${chips(guides.map((a) => [articlePath(a.slug), esc(a.h1), true]))}</section>` : ''}` : '';
   const fields = baseFields(base, p, title, desc, {
     JSONLD: live ? graph(base, p, `${f.label} Converter`, desc, faq, crumbs, { features: TOOL_FEATURES }) : '{}',
     HERO: hero({ h1: `${f.label} Converter`, crumbs,
@@ -1547,7 +1557,7 @@ function formatPage(slug, base) {
     TOOL: liveOuts.length
       ? toolHtml({ inputs: [slug], outputs: liveOuts, dropTitle: `Drop your ${f.label} files here`, dropSub: `or click to choose ${f.label} files` })
       : '',
-    CONTENT: conversionMap(ALL_INPUTS) + sections + faqHtml(faq),
+    CONTENT: about + conversionMap(ALL_INPUTS) + sections + faqHtml(faq),
     RELATED: canCompress ? `<section class="related"><h2>Related tools</h2>${chips([[compressPath(slug), `Compress ${f.label}`, true]])}</section>` : '',
   });
   return renderPage(PAGE_TPL, !live ? noindex(fields) : formatIndexable(slug) ? fields : notIndexed(fields));
