@@ -41,6 +41,10 @@ test('a short MP4 gives one full-size JPG per second, named by time', { skip, ti
   const meta = await require('sharp')(jpg).metadata();
   assert.equal(meta.format, 'jpeg');
   assert.equal(meta.width, 320);
+  // the page's Quality and Resize options are used
+  const small = await media.convertMedia({ buffer: fs.readFileSync(file), inputExt: 'mp4', to: fmt('jpg'), quality: 75, maxDim: 100 });
+  const sz = await require('sharp')(await (await JSZip.loadAsync(small.buffer)).file(list[0]).async('nodebuffer')).metadata();
+  assert.deepEqual([sz.width, sz.height], [100, 75]);
 });
 
 test('a long video gives FRAME_MAX evenly spaced pictures; a 1-frame clip a single picture', { skip, timeout: 120000 }, async () => {

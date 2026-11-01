@@ -10,7 +10,11 @@ const path = require('path');
 const { job, run, listFiles, collect, UserError } = require('./cli');
 
 const FRAME_MAX = 60;
-const FRAME_ARGS = { jpg: ['-q:v', '2'], png: [] };
+const FRAME_ARGS = {
+  // Quality 1-100 (the page's slider, 75 by default) -> MJPEG qscale 2 (best) to 14.
+  jpg: (quality) => ['-q:v', String(Math.max(2, Math.round(2 + (100 - (quality || 90)) / 8)))],
+  png: () => [],
+};
 
 // Length of a media file in seconds (0 when FFmpeg cannot tell, as with some SWF files).
 async function durationOf(file) {
@@ -20,17 +24,19 @@ async function durationOf(file) {
     return Number.isFinite(d) && d > 0 ? d : 0;
   } catch { return 0; }
 }
+// "Resize" on the page: fit inside maxDim x maxDim, never enlarged.
+const fit = (d) => (d > 0 ? `,scale=w='min(iw\\,${d})':h='min(ih\\,${d})':force_original_aspect_ratio=decrease` : '');
 const stamp = (t) => `${Math.floor(t / 60)}m${String(Math.floor(t % 60)).padStart(2, '0')}s`;
 
 // Still pictures from a video: frame-001-0m00s.jpg, frame-002-0m01s.jpg ...
-async function videoFrames(dir, input, ext) {
+async function videoFrames(dir, input, ext, { quality, maxDim } = {}) {
   const dur = await durationOf(input);
   const fps = dur > FRAME_MAX ? FRAME_MAX / dur : 1;
   const outDir = path.join(dir, 'frames');
   await fs.mkdir(outDir);
   try {
     await run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-nostdin', '-y', '-i', input,
-      '-map', '0:v:0', '-vf', `fps=${fps.toFixed(6)}`, '-frames:v', String(FRAME_MAX), ...FRAME_ARGS[ext],
+      '-map', '0:v:0', '-vf', `fps=${fps.toFixed(6)}${fit(maxDim)}`, '-frames:v', String(FRAME_MAX), ...FRAME_ARGS[ext](quality),
       path.join(outDir, `f-%04d.${ext}`)]);
   } catch (e) {
     if (/matches no streams|does not contain any stream|Output file .* does not contain/i.test(e.stderr || '')) {
@@ -113,13 +119,13 @@ const VIDEO = {
 const RECIPES = { ...AUDIO, ...VIDEO };
 const OUTPUTS = Object.keys(RECIPES);
 
-async function convertMedia({ buffer, inputExt, to }) {
+async function convertMedia({ buffer, inputExt, to, quality, maxDim }) {
   const target = to.id;
   if (FRAME_ARGS[target]) {
     return job(async (dir) => {
       const input = path.join(dir, `input.${inputExt}`);
       await fs.writeFile(input, buffer);
-      return videoFrames(dir, input, target);
+      return videoFrames(dir, input, target, { quality, maxDim });
     });
   }
   const recipe = RECIPES[target];
