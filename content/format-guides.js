@@ -12,15 +12,16 @@
 module.exports = {
   swf: {
     an: true,
-    desc: 'Convert SWF (Shockwave Flash) files to MP4, GIF, MP3 and more, free. Watch old Flash videos again without Flash Player. No sign-up.',
+    desc: 'Convert SWF (Shockwave Flash) files to MP4, JPG, GIF, MP3 and more, free. Watch old Flash videos again without Flash Player. No sign-up.',
     about: [
       'SWF (Shockwave Flash) was the file format of Adobe Flash. For about fifteen years it carried web animations, games, video players and banner ads. Adobe ended Flash Player at the end of 2020, and every current browser has removed it, so an SWF file you download today usually will not open anywhere.',
-      'An SWF file can hold two very different things. Some SWF files are simply a video (often FLV video with MP3 sound) wrapped for Flash. Others are interactive programs written in ActionScript, such as games, menus and animations that react to clicks. This converter works with the first kind: it reads the video and sound frames and saves them as a normal MP4, GIF, MP3 or another format that plays on any phone or computer.',
+      'An SWF file can hold two very different things. Some SWF files are simply a video (often FLV video with MP3 sound) wrapped for Flash. Others are interactive programs written in ActionScript, such as games, menus and animations that react to clicks. This converter works with the first kind: it reads the video and sound frames and saves them as a normal MP4, GIF, MP3 or another format that plays on any phone or computer, or as JPG and PNG pictures.',
     ],
     open: 'To watch an SWF without Flash Player, convert it to MP4 here and open the MP4 in any video player, browser or phone. For interactive Flash games and animations, the free Ruffle emulator (ruffle.rs) or the Flashpoint archive project can play many of them on modern computers.',
     uses: [
       'Turn an old Flash video or animated intro from a 2000s website backup into an MP4 you can watch and share.',
       'Save the soundtrack of an SWF as MP3 or WAV.',
+      'Save still pictures from a Flash video as JPG or PNG.',
       'Make a GIF or WebP from a short Flash animation for a blog or chat.',
       'Rescue Flash videos from old e-learning courses, CDs and school projects.',
     ],
@@ -32,9 +33,10 @@ module.exports = {
       ['How do I open an SWF file without Flash Player?', 'Convert it to MP4 on this page and play the MP4 in any video player or browser. For Flash games and interactive animations, use the free Ruffle emulator, which runs many SWF files on modern computers.'],
       ['Can I convert an SWF game to MP4?', 'No. A game is a program, not a video, so there is nothing fixed to convert. This converter handles SWF files that contain video and sound. To play an old Flash game, try Ruffle or the Flashpoint archive.'],
       ['How do I convert SWF to MP4?', 'Click Select File, choose your SWF, keep MP4 as the output and wait for the converted file to appear in the list. Download it with the button next to it. You can add several SWF files at once.'],
+      ['How do I convert SWF to JPG?', 'Choose JPG (or PNG) as the output. You get a full-size picture for every second of the Flash video, downloaded as a ZIP. Interactive Flash games have no video frames and cannot be converted to pictures.'],
       ['Is it safe to open SWF files?', 'Flash Player had many security problems, which is one reason it was retired. Converting an SWF to MP4 here does not run the file on your computer; the video frames are read on the server and the file is deleted afterwards.'],
     ],
-    guides: ['file-format-vs-codec'],
+    guides: ['save-pictures-from-video', 'file-format-vs-codec'],
   },
 
   lz: {

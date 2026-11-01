@@ -631,6 +631,61 @@ module.exports = {
     ],
   },
 
+  'mp4>jpg': {
+    why: 'Sometimes you need a picture, not a video: a thumbnail for YouTube or a blog, a still of a moment you filmed, slides from a recorded lecture, or frames to compare side by side. Converting MP4 to JPG saves still pictures from the video at full size, so you do not have to pause and take blurry screenshots.',
+    keep: 'Keep the MP4: the pictures are single moments and do not include sound or motion. If you want a short moving clip instead, convert MP4 to GIF.',
+    tips: [
+      'A clip up to a minute long gives one picture per second; a longer video gives 60 pictures spread evenly from start to end.',
+      'Each file name includes the time, such as frame-012-0m11s.jpg, so you can find the moment in the video.',
+      'For a single exact moment, trim the video to a few seconds around it first with Trim Video, then convert.',
+      'Choose MP4 to PNG instead when you will edit the pictures or they show small text: PNG keeps every pixel.',
+    ],
+    problems: [
+      ['A picture is blurry.', 'Fast movement is blurred in the video itself. Trim the video to the moment you need and convert again to get every second of it, then pick the sharpest picture.'],
+      ['I need more pictures from a long video.', 'Long videos give 60 evenly spaced pictures. Cut the part you need with Trim Video and convert that shorter clip to get one picture per second.'],
+    ],
+    faq: [
+      ['How do I get a still picture from a video?', 'Upload the MP4, keep JPG as the output and download the ZIP of pictures. Pick the one you need; the file names show where in the video each one is.'],
+      ['Does it work for long videos?', 'Yes. A long video gives 60 pictures evenly spread over its length. Files up to the size limit shown on the page can be uploaded.'],
+    ],
+  },
+
+  'swf>jpg': {
+    why: 'Flash Player is gone, so an old SWF video can no longer be opened in a browser. Converting SWF to JPG saves still pictures from the video part of the file, so you can see what it contained and reuse the images, without installing anything.',
+    keep: 'Keep the SWF if it is interactive (a game, a menu, a quiz): those need the Ruffle emulator to play, and they have no video frames to save as pictures. To watch an SWF video with sound, convert SWF to MP4 instead.',
+    tips: [
+      'One picture is saved for each second of the video; longer videos give 60 evenly spaced pictures.',
+      'Choose SWF to PNG for lossless pictures, for example of text or line drawings.',
+      'The file names include the time in the video, such as frame-005-0m04s.jpg.',
+    ],
+    problems: [
+      ['The SWF does not convert.', 'It is probably an interactive Flash file or an animation drawn only with vector shapes. These have no video frames to read. Try playing it with Ruffle (ruffle.rs) instead.'],
+      ['The pictures are small.', 'Many Flash videos were made at small sizes such as 320 x 240 pixels for the web of the time. The pictures are saved at the size stored in the file.'],
+    ],
+    faq: [
+      ['Can I convert SWF to JPG without Flash Player?', 'Yes. The file is read on our server with FFmpeg, so you do not need Flash Player or any software on your computer.'],
+      ['Can I convert a Flash game to JPG?', 'No. A Flash game is a program, not a video, so there are no fixed frames to save. Play it with Ruffle or the Flashpoint archive instead.'],
+    ],
+  },
+
+  'mov>jpg': {
+    why: 'iPhones and Mac screen recordings save video as MOV. Converting MOV to JPG gives you full-size still pictures from the video, for example a shot of a moment you filmed but did not photograph, or the slides of a recorded presentation.',
+    keep: 'Keep the MOV for the moving video and sound. To share the whole video with Windows or Android users, convert MOV to MP4 instead.',
+    tips: [
+      'Short clips give one picture per second, so trim a long video to the moment you want first with Trim Video.',
+      'Pictures from a 4K iPhone video are 3840 x 2160 pixels: big enough to print.',
+      'Each file name shows the time in the video, such as frame-003-0m02s.jpg.',
+    ],
+    problems: [
+      ['The video was filmed upright but a picture is sideways.', 'The rotation stored by the phone is applied automatically. If a picture still looks wrong, rotate it with Rotate Image.'],
+      ['The moment I want falls between two pictures.', 'Pictures are saved one second apart, starting at the beginning of the video. Use Trim Video to make the clip start exactly at the moment you want, then convert it: the first picture is taken at that moment.'],
+    ],
+    faq: [
+      ['Can I save a photo from an iPhone video?', 'Yes. Convert the MOV to JPG and you get a full-size picture for every second of the clip, as a ZIP.'],
+      ['Do I need a Mac to convert MOV to JPG?', 'No. It works in any browser on Windows, Mac, Android and iPhone.'],
+    ],
+  },
+
   'mp4>gif': {
     why: 'A GIF plays automatically and loops everywhere: in chats, forums, emails, documentation and READMEs where a video would not start by itself. Short clips, reactions and screen demos are the classic use.',
     keep: 'Keep the MP4 for anything longer than a few seconds or with sound. GIFs have no audio and get big quickly.',

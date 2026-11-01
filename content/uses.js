@@ -4,6 +4,12 @@
 // school platform, the email limit, the paper size). Each line is a real task the tool does; keep
 // claims plain and checkable (no "compliant" or "approved by" wording).
 module.exports = {
+  '/mp4-to-jpg': [
+    'Pick a still from your video for a YouTube, Vimeo or blog thumbnail.',
+    'Save the slides of a recorded Zoom or Teams lecture as pictures.',
+    'Get a photo of a moment you filmed on your phone but did not photograph.',
+    'Make frames for a storyboard, a flip book or a side-by-side comparison.',
+  ],
   '/pdf-to-docx': [
     'Update a resume or CV you only have as a PDF before applying on LinkedIn, Indeed or a company careers site.',
     'Change dates, names or amounts in a lease, offer letter or contract that was sent to you as a PDF.',

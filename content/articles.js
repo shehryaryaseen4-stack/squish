@@ -701,6 +701,36 @@ module.exports = [
       ['Can I print a UK passport photo at home?', 'Print the 6x4 inch sheet on photo paper at a shop or kiosk for the best result; the sheet holds several photos to cut out.'],
     ],
   },
+  {
+    slug: 'save-pictures-from-video',
+    title: 'How to Save a Picture From a Video (MP4, MOV, SWF)',
+    h1: 'How to save a picture from a video',
+    desc: 'Get full-size still pictures from an MP4, MOV, WebM or SWF video for free: online in your browser, with VLC on a computer, or on a phone. Better than a screenshot.',
+    date: '2026-11-01',
+    tools: ['/video-to-jpg', '/mp4-to-jpg', '/mov-to-jpg', '/swf-to-jpg', '/mp4-to-png', '/trim-video'],
+    intro: 'A screenshot of a paused video is often blurry, includes the player controls and is only as big as your screen. Saving the frames from the video file itself gives you clean, full-size pictures. Here are three ways to do it.',
+    sections: [
+      ['1. Online, in any browser', `<ol>
+<li>Open <a href="/video-to-jpg">Video to JPG</a> and drop your video (MP4, MOV, WebM, MKV, AVI, SWF and more).</li>
+<li>Keep <strong>JPG</strong>, or choose <strong>PNG</strong> for lossless pictures, and convert.</li>
+<li>Download the ZIP. A clip up to a minute long gives one picture per second; a longer video gives 60 pictures spread evenly. Each file name shows the time, such as <em>frame-012-0m11s.jpg</em>.</li>
+</ol>
+<p>Each picture is the full size of the video: 1920 x 1080 for a 1080p video, 3840 x 2160 for 4K. It works on phones too.</p>`],
+      ['Get one exact moment', `<p>To get the pictures around one moment of a long video, first cut a few seconds around it with <a href="/trim-video">Trim Video</a>, then convert that short clip. You get one picture per second of it and can keep the sharpest.</p>`],
+      ['2. With VLC on a computer', `<p>The free VLC player can save the frame you are watching: pause the video at the right moment and choose <strong>Video &gt; Take Snapshot</strong>. The picture is saved in your Pictures folder at the video's full size. This is handy for one or two pictures; for many, the online method is faster.</p>`],
+      ['3. On a phone', `<p>Pausing and taking a screenshot works in a hurry, but you get the size of your screen and sometimes the player buttons. For a clean, full-size picture, open <a href="/video-to-jpg">Video to JPG</a> in your phone's browser and upload the video from your gallery. iPhone videos are MOV files and work directly; see <a href="/mov-to-jpg">MOV to JPG</a>.</p>`],
+      ['JPG or PNG?', `<ul>
+<li><strong>JPG:</strong> much smaller files, best for sharing, thumbnails and viewing.</li>
+<li><strong>PNG:</strong> lossless, best for editing and for frames with text, such as slides from a recorded lecture.</li>
+</ul>`],
+      ['Old Flash (SWF) videos', `<p>An SWF that contains video can be turned into pictures with <a href="/swf-to-jpg">SWF to JPG</a>. Interactive Flash games and animations made only of vector shapes have no video frames, so they cannot be saved as pictures this way.</p>`],
+    ],
+    faq: [
+      ['How do I get a high-quality picture from a video?', 'Save the frame from the video file instead of taking a screenshot. Video to JPG gives full-size pictures; choose PNG for the best quality.'],
+      ['How many pictures does Video to JPG make?', 'One per second for clips up to a minute, or 60 evenly spaced pictures for longer videos, all in one ZIP.'],
+      ['Can I make a YouTube thumbnail from my video?', 'Yes. Save the pictures, pick the best one, and resize or crop it to 1280 x 720 with the Image Resizer or Crop Image if needed.'],
+    ],
+  },
   // ---------------------------------------------------------------- United States --
   {
     slug: 'us-passport-photo-size',

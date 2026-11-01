@@ -2,10 +2,55 @@
 // Audio and video conversion with FFmpeg.
 // Each output format has a fixed, widely compatible codec choice; inputs are whatever FFmpeg
 // can demux. Animated GIF/WebP outputs are scaled down and frame-limited to keep them sane.
+// Video -> JPG/PNG saves still pictures (frames): one per second for clips up to a minute, or
+// FRAME_MAX evenly spaced over a longer video, as a ZIP (a single picture when there is one).
 
 const fs = require('fs/promises');
 const path = require('path');
-const { job, run, UserError } = require('./cli');
+const { job, run, listFiles, collect, UserError } = require('./cli');
+
+const FRAME_MAX = 60;
+const FRAME_ARGS = { jpg: ['-q:v', '2'], png: [] };
+
+// Length of a media file in seconds (0 when FFmpeg cannot tell, as with some SWF files).
+async function durationOf(file) {
+  try {
+    const { stdout } = await run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file], { timeoutMs: 30000 });
+    const d = parseFloat(String(stdout).trim());
+    return Number.isFinite(d) && d > 0 ? d : 0;
+  } catch { return 0; }
+}
+const stamp = (t) => `${Math.floor(t / 60)}m${String(Math.floor(t % 60)).padStart(2, '0')}s`;
+
+// Still pictures from a video: frame-001-0m00s.jpg, frame-002-0m01s.jpg ...
+async function videoFrames(dir, input, ext) {
+  const dur = await durationOf(input);
+  const fps = dur > FRAME_MAX ? FRAME_MAX / dur : 1;
+  const outDir = path.join(dir, 'frames');
+  await fs.mkdir(outDir);
+  try {
+    await run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-nostdin', '-y', '-i', input,
+      '-map', '0:v:0', '-vf', `fps=${fps.toFixed(6)}`, '-frames:v', String(FRAME_MAX), ...FRAME_ARGS[ext],
+      path.join(outDir, `f-%04d.${ext}`)]);
+  } catch (e) {
+    if (/matches no streams|does not contain any stream|Output file .* does not contain/i.test(e.stderr || '')) {
+      throw new UserError('This file has no video pictures to save. Interactive SWF games and animations cannot be turned into pictures.');
+    }
+    if (/Invalid data found|could not find codec|Unknown format/i.test(e.stderr || '')) {
+      throw new UserError('This file could not be read. It may be damaged or use a codec FFmpeg does not support.', 415);
+    }
+    throw e;
+  }
+  const files = await listFiles(outDir);
+  if (!files.length) throw new UserError('No pictures could be read from this video. Interactive SWF games and animations cannot be turned into pictures.');
+  const named = [];
+  for (const [i, f] of files.entries()) {
+    const to = path.join(outDir, `frame-${String(i + 1).padStart(3, '0')}-${stamp(i / fps)}.${ext}`);
+    await fs.rename(f, to);
+    named.push(to);
+  }
+  return collect(named, ext, outDir);
+}
 
 const EVEN = 'scale=trunc(iw/2)*2:trunc(ih/2)*2'; // H.264 and friends need even dimensions
 const X264 = ['-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p', '-vf', EVEN];
@@ -70,6 +115,13 @@ const OUTPUTS = Object.keys(RECIPES);
 
 async function convertMedia({ buffer, inputExt, to }) {
   const target = to.id;
+  if (FRAME_ARGS[target]) {
+    return job(async (dir) => {
+      const input = path.join(dir, `input.${inputExt}`);
+      await fs.writeFile(input, buffer);
+      return videoFrames(dir, input, target);
+    });
+  }
   const recipe = RECIPES[target];
   if (!recipe) throw new UserError(`Converting to ${to.label} is not supported yet.`);
   return job(async (dir) => {
@@ -96,4 +148,4 @@ async function convertMedia({ buffer, inputExt, to }) {
   });
 }
 
-module.exports = { convertMedia, OUTPUTS, AUDIO_OUTPUTS: Object.keys(AUDIO), VIDEO_OUTPUTS: Object.keys(VIDEO) };
+module.exports = { convertMedia, FRAME_MAX, OUTPUTS, AUDIO_OUTPUTS: Object.keys(AUDIO), VIDEO_OUTPUTS: Object.keys(VIDEO) };

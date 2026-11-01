@@ -32,6 +32,28 @@ module.exports = [
     see: ['/pdf-to-docx', '/word-to-pdf', '/pdf-to-image', '/edit-pdf', '/pdf-to-txt'],
   },
   {
+    slug: 'video-to-jpg', inputs: ['mp4', 'mov', 'webm', 'mkv', 'avi', 'wmv', 'flv', 'm4v', '3gp', 'swf', 'mpeg', 'mpg'], outputs: ['jpg', 'png'],
+    title: 'Video to JPG Converter - Save Pictures From a Video',
+    desc: 'Convert video to JPG free: save full-size still pictures from MP4, MOV, WebM, AVI or SWF videos, one per second, as a ZIP. No sign-up, no watermark.',
+    h1: 'Video to JPG Converter',
+    intro: 'Save still pictures from any video for free. Drop an MP4, MOV, WebM, AVI, MKV or SWF file and get full-size JPG pictures, one for every second of a short clip, downloaded together as a ZIP. No sign-up, no watermark.',
+    sections: [
+      ['How to save pictures from a video', '<ol><li>Drop your video into the box above, or click to choose it.</li><li>JPG is already selected; choose PNG for lossless pictures. Click <strong>Convert</strong>.</li><li>Download the ZIP and open it to see the pictures. Each file name shows its time in the video.</li></ol>'],
+      ['How many pictures you get', '<p>A video up to a minute long gives one picture per second. A longer video gives 60 pictures spread evenly from start to end. To get every second of one part of a long video, cut that part first with <a href="/trim-video">Trim Video</a> and convert the shorter clip.</p>'],
+      ['Picture quality', '<p>Every picture has the full width and height of the video: a 1080p video gives 1920 x 1080 pictures and a 4K video 3840 x 2160. JPG files are small and good for sharing; PNG keeps every pixel and is better for editing and for frames with text.</p>'],
+      ['Old Flash (SWF) videos', '<p>SWF files that contain video are converted like any other video. Interactive Flash games and animations drawn only with vector shapes have no video frames, so they cannot be turned into pictures. See our <a href="/swf-converter">SWF converter</a> for other options.</p>'],
+    ],
+    faq: [
+      ['How do I turn a video into pictures?', 'Upload the video here, keep JPG selected and download the ZIP. It contains one picture per second for clips up to a minute, or 60 evenly spaced pictures for longer videos.'],
+      ['Can I get a single frame from a video?', 'Trim the video to a second or two around the moment with Trim Video, then convert it: you get just one or two pictures.'],
+      ['Which video formats work?', 'MP4, MOV, WebM, MKV, AVI, WMV, FLV, M4V, 3GP, MPEG and SWF videos, among others.'],
+      ['Is the sound kept?', 'No. Pictures have no sound. To keep the sound, convert the video to MP3 instead.'],
+      ['Can I do this on my phone?', 'Yes. It works in the browser on iPhone and Android; the ZIP is saved to your downloads or Files app.'],
+      ['Are my videos stored?', 'No. The video is used only to make the pictures and is deleted as soon as they are ready.'],
+    ],
+    see: ['/mp4-to-jpg', '/mov-to-jpg', '/mp4-to-png', '/swf-to-jpg', '/mp4-to-gif', '/trim-video'],
+  },
+  {
     slug: 'word-to-pdf', inputs: ['docx', 'doc', 'odt', 'rtf', 'dotx', 'dot', 'docm'], outputs: ['pdf'],
     title: 'Word to PDF Converter - Free, Keeps Formatting',
     desc: 'Convert Word to PDF for free: DOC and DOCX files to PDF with fonts, tables and images kept. Many files at once, no sign-up, no watermark.',

@@ -132,13 +132,14 @@ module.exports = {
 
   video: {
     intro: `<p>A video file is a container (MP4, MOV, MKV, WebM, AVI) holding video and audio streams encoded with a codec. When a video will not play, upload or edit, the answer is usually to convert it to MP4 with H.264 video and AAC audio, which works on practically every phone, browser, TV and editor.</p>
-<p>This video converter uses FFmpeg to change the container and re-encode the streams when needed, and can turn videos into GIFs or extract their sound.</p>`,
+<p>This video converter uses FFmpeg to change the container and re-encode the streams when needed, and can turn videos into GIFs, save still pictures (JPG or PNG) from them, or extract their sound.</p>`,
     tasks: [
       ['/mov-to-mp4', 'MOV to MP4', 'iPhone videos for Windows and Android.'],
       ['/mkv-to-mp4', 'MKV to MP4', 'Play MKV files on phones and TVs.'],
       ['/webm-to-mp4', 'WebM to MP4', 'Screen recordings for any player.'],
       ['/avi-to-mp4', 'AVI to MP4', 'Old videos in a modern format.'],
       ['/mp4-to-mp3', 'MP4 to MP3', 'Keep only the sound.'],
+      ['/video-to-jpg', 'Video to JPG', 'Save still pictures from a video.'],
       ['/compress-video', 'Compress Video', 'Smaller videos for email and messaging.'],
       ['/trim-video', 'Trim Video', 'Cut the part you need.'],
     ],
@@ -150,10 +151,11 @@ module.exports = {
     settings: `<ul><li>MP4 is made with H.264 video and AAC audio, the most compatible combination.</li>
 <li>WebM is made with VP9 video and Opus audio.</li>
 <li>Each file can be up to {{MAX_MB}} MB here; use Compress Video for large files.</li></ul>`,
-    uses: ['Play iPhone videos on Windows or upload them where MOV is refused.', 'Watch MKV films on a phone or smart TV.', 'Make a screen recording small enough to share.', 'Pull the audio out of a video.'],
+    uses: ['Play iPhone videos on Windows or upload them where MOV is refused.', 'Watch MKV films on a phone or smart TV.', 'Make a screen recording small enough to share.', 'Pull the audio out of a video.', 'Save still pictures from a video for a thumbnail or slides.'],
     faq: [
       ['Why will my video not play?', 'Usually the player does not support the codec inside the file. Converting to MP4 with H.264 and AAC fixes this on almost every device.'],
       ['Does converting a video lose quality?', 'Re-encoding is lossy, but the settings used here keep the picture visually the same for normal viewing.'],
+      ['Can I get pictures from a video?', 'Yes. Convert the video to JPG or PNG to get full-size still pictures, one per second for clips up to a minute, as a ZIP.'],
       ['What is the difference between a format and a codec?', 'The format (MP4, MKV) is the box; the codec (H.264, VP9, AAC) is how the picture and sound inside are compressed. Our guide explains it in detail.'],
     ],
     guides: ['convert-iphone-video-to-mp4', 'file-format-vs-codec', 'extract-audio-from-video'],

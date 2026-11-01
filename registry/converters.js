@@ -123,6 +123,8 @@ const CONVERSION_RULES = [
     notes: 'Extracts the audio track.' },
   { id: 'media-video-to-animation', status: 'live', engine: 'ffmpeg', handler: 'media', from: VIDEO_LIVE, to: ['gif', 'webp'], quality: 'limited',
     notes: 'Animated output is scaled to at most 480px wide at 12 frames per second to keep files small.' },
+  { id: 'media-video-to-image', status: 'live', engine: 'ffmpeg', handler: 'media', from: VIDEO_LIVE, to: ['jpg', 'png'], quality: 'good',
+    notes: 'Saves still pictures at full size: one per second for clips up to a minute, or 60 evenly spaced pictures from a longer video, downloaded as a ZIP.' },
   { id: 'media-gif-to-video', status: 'live', engine: 'ffmpeg', handler: 'media', from: ['gif'], to: VIDEO_LIVE },
   { id: 'media-audio', status: 'live', engine: 'ffmpeg', handler: 'media', from: AUDIO_LIVE, to: AUDIO_LIVE },
 
