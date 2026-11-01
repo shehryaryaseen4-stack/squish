@@ -309,6 +309,7 @@ function dashboard({ users, daily, path, store, stats, range = 'today', accounts
     ${card('First pages people see', 'The page each visit started on: your entrances from Google and other sites.', rank(S.landings, { label: pageLabel, empty: 'No visits yet.' }))}
     ${card('What people convert', 'Conversions and compressions, by file type.', rank(S.pairs, { empty: 'No conversions yet.' }))}
     ${card('Countries', 'Where your visitors are.', rank(S.countries, { label: countryLabel, empty: 'No visitors yet.' }))}
+    ${card('US visitors by state', 'Where your United States visitors are. Needs "Add visitor location headers" on in Cloudflare (Rules, Settings).', rank(S.regions || {}, { empty: 'No US visitors yet.' }))}
     <div class="ad-stack">
       ${card('Devices', 'What people use to open the site.', devices)}
       ${card('What people did', '', `<ul class="ad-did">${did}</ul>`)}

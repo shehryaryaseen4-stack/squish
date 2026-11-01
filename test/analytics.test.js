@@ -49,7 +49,7 @@ test('visits, conversions and PDF downloads reach the dashboard', async () => {
   assert.strictEqual((await hit({ p: '/png-to-webp', r: 'https://www.google.com/' }, { 'cf-ipcountry': 'PK', 'cf-connecting-ip': '1.1.1.1' })).status, 204);
   await hit({ p: '/edit-pdf', r: `${B}/png-to-webp` }, { 'cf-ipcountry': 'PK', 'cf-connecting-ip': '1.1.1.1' });
   await hit({ e: 'pdf', p: '/edit-pdf' }, { 'cf-connecting-ip': '1.1.1.1' });
-  await hit({ p: '/', r: '' }, { 'cf-ipcountry': 'US', 'cf-connecting-ip': '2.2.2.2' });
+  await hit({ p: '/', r: '' }, { 'cf-ipcountry': 'US', 'cf-region': 'California', 'cf-connecting-ip': '2.2.2.2' });
   await hit({ p: '/', r: '' }, { 'user-agent': 'Googlebot/2.1', 'cf-connecting-ip': '3.3.3.3' }); // ignored
   await hit({ p: '/', r: '' }, { 'cf-connecting-ip': '4.4.4.4', Origin: 'https://evil.example' }); // ignored
   const png = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#f00' } }).png().toBuffer();
@@ -72,6 +72,7 @@ test('visits, conversions and PDF downloads reach the dashboard', async () => {
   assert.strictEqual(tile('PDF downloads'), '1', 'one PDF download');
   assert.strictEqual(tile('Used a tool'), '2', 'two people used a tool');
   assert.match(html, /<b>2 people<\/b> visited today so far/);
+  assert.match(html, /US visitors by state[^]*?California/, 'US state from cf-region');
   assert.match(html, /class="ad-src">[^]*?Google</);
   assert.match(html, /Converted PNG \u2192 WEBP/);
   assert.match(html, />PNG to WEBP</);

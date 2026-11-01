@@ -8,7 +8,7 @@
 //
 // Stored per day (DATA_DIR/analytics.json, 120 days kept): views, visitors, per-hour views and
 // visitors, and counts by page, landing page, source, referring site, country, device,
-// conversion pair and event. Plus the last 500 notable events (arrivals, conversions, PDF
+// conversion pair and event, and US visitors by state (Cloudflare's visitor location headers). Plus the last 500 notable events (arrivals, conversions, PDF
 // downloads, failures, and the pages viewed after arriving) for the visitor journeys.
 
 const fs = require('fs');
@@ -80,6 +80,8 @@ function deviceOf(ua) {
   if (/Mobi|iPhone|iPod|Android|Opera Mini|IEMobile/i.test(ua)) return 'Mobile';
   return 'Desktop';
 }
+// US state of a visitor, from Cloudflare's "Add visitor location headers" (cf-region): '' when off.
+const regionOf = (req) => String(req.get('cf-region') || '').replace(/[^A-Za-z .'-]/g, '').trim().slice(0, 40);
 const countryOf = (req) => String(req.get('cf-ipcountry') || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2).replace(/^(XX|T1)$/, '');
 
 // Where a visit came from: utm_source wins, then the referring site, else Direct.
@@ -113,7 +115,7 @@ const cleanPath = (p) => {
 // ----------------------------------------------------------------- counting --
 function bucket(day) {
   const d = load();
-  return (d.days[day] ||= { views: 0, visitors: 0, actors: 0, hours: Array.from({ length: 24 }, () => [0, 0]), pages: {}, landings: {}, sources: {}, refs: {}, countries: {}, devices: {}, pairs: {}, events: {} });
+  return (d.days[day] ||= { views: 0, visitors: 0, actors: 0, hours: Array.from({ length: 24 }, () => [0, 0]), pages: {}, landings: {}, sources: {}, refs: {}, countries: {}, regions: {}, devices: {}, pairs: {}, events: {} });
 }
 function bump(map, key, n = 1) {
   if (!key) return;
@@ -148,7 +150,10 @@ function pageview(req, body, host) {
   bump(b.pages, p);
   const first = seen(day, hour, v, b);
   const cc = countryOf(req), dev = deviceOf(ua);
-  if (first) { bump(b.countries, cc || '??'); bump(b.devices, dev); }
+  if (first) {
+    bump(b.countries, cc || '??'); bump(b.devices, dev);
+    if (cc === 'US') bump((b.regions ||= {}), regionOf(req) || '(unknown)');
+  }
   // An arrival from outside (or typed in / bookmarked) is a new visit: count its source and landing page.
   if (!internal) {
     const src = sourceOf(refHost, body.u);
@@ -210,14 +215,14 @@ function summary(range) {
   const [from, to] = RANGES[range] || RANGES.today;
   const days = [];
   for (let i = from; i >= to; i--) days.push(store.dayOf(Date.now() - i * 864e5));
-  const sum = { views: 0, visitors: 0, actors: 0, hours: Array.from({ length: 24 }, () => [0, 0]), byDay: [], pages: {}, landings: {}, sources: {}, refs: {}, countries: {}, devices: {}, pairs: {}, events: {} };
+  const sum = { views: 0, visitors: 0, actors: 0, hours: Array.from({ length: 24 }, () => [0, 0]), byDay: [], pages: {}, landings: {}, sources: {}, refs: {}, countries: {}, regions: {}, devices: {}, pairs: {}, events: {} };
   for (const day of days) {
     const b = d.days[day];
     sum.byDay.push([day, b ? b.visitors : 0, b ? b.views : 0, b ? Object.values(b.events).reduce((a, n) => a + n, 0) : 0]);
     if (!b) continue;
     sum.views += b.views; sum.visitors += b.visitors; sum.actors += b.actors || 0;
     b.hours.forEach(([vw, vs], h) => { sum.hours[h][0] += vw; sum.hours[h][1] += vs; });
-    for (const k of ['pages', 'landings', 'sources', 'refs', 'countries', 'devices', 'pairs', 'events']) for (const [key, n] of Object.entries(b[k] || {})) sum[k][key] = (sum[k][key] || 0) + n;
+    for (const k of ['pages', 'landings', 'sources', 'refs', 'countries', 'regions', 'devices', 'pairs', 'events']) for (const [key, n] of Object.entries(b[k] || {})) sum[k][key] = (sum[k][key] || 0) + n;
   }
   const since = Date.parse(`${days[0]}T00:00:00Z`) - 14 * 36e5; // day starts in local time: allow for the time zone
   const until = to ? Date.parse(`${days[days.length - 1]}T23:59:59Z`) + 14 * 36e5 : Infinity;
