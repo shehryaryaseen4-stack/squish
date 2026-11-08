@@ -335,7 +335,11 @@ function topbar(full = false) {
   const toolsMenu = full
     ? `<details class="nav-menu" name="ff-menu" data-menu><summary class="nav-item">Tools<span class="caret" aria-hidden="true"></span></summary>${mega}</details>`
     : `<details class="nav-menu" name="ff-menu" data-menu data-lazy="/menu.html?v=${megaVersion}"><summary class="nav-item">Tools<span class="caret" aria-hidden="true"></span></summary><div class="dropdown mega-wait"><ul><li><a href="/converters">All formats and converters</a></li></ul></div></details>`;
-  const compress = ALL_COMPRESSORS.map((c) =>
+  // Video compressor first: it is an app (/compress-video), not a format compressor, so it was missing here.
+  const videoApps = [['compress-video', 'Compress Video'], ['compress-video-for-discord', 'Compress Video for Discord'], ['compress-video-for-email', 'Compress Video for Email']]
+    .filter(([slug]) => APP_BY_SLUG.has(slug))
+    .map(([slug, text]) => `<li><a href="/${slug}">${icon(registry.getCategory('video').icon)}${text}</a></li>`).join('');
+  const compress = videoApps + ALL_COMPRESSORS.map((c) =>
     `<li><a href="${c.route}">${icon('compress')}Compress ${F(c.from).label}${c.status === 'live' ? '' : ' <span class="soon-tag">soon</span>'}</a></li>`).join('');
   // Image tools in their own menu: they were only inside Tools > More tools, where people missed them.
   const imageList = ['/passport-photo-maker', '/crop-image', '/image-resizer', '/remove-background', '/rotate-image', '/flip-image', '/compress-jpg', '/image-to-text', '/favicon-generator']
