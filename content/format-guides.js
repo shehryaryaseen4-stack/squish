@@ -211,4 +211,206 @@ module.exports = {
       ['What is inside a DEB file?', 'A DEB contains a small file with the format version, a control archive with the package description and install scripts, and a data archive with the program\'s files.'],
     ],
   },
+  xz: {
+    an: true,
+    desc: 'Open XZ files online: extract .xz and .tar.xz archives or convert them to ZIP so Windows and Mac can open them. Free, no software, no sign-up.',
+    about: [
+      'XZ is a compressed file format from the Linux world. It uses the LZMA2 method, which makes files smaller than ZIP or GZIP, so it is popular for software downloads, source code and backups. Most often you get a TAR archive compressed with XZ, named something like project-2.1.tar.xz, which holds many files and folders.',
+      'Windows and macOS cannot always open XZ files on their own. Converting the file to ZIP here gives you an archive that opens with a double-click on any computer, with every file and folder inside kept exactly as it was.',
+    ],
+    open: 'To view what is inside an XZ file without installing anything, convert it to ZIP on this page and open the ZIP. On Linux, run tar -xf file.tar.xz, or xz -d file.xz for a single file. On Windows, 7-Zip also opens XZ files.',
+    uses: [
+      'Open a .tar.xz source code or software download on a Windows PC or Mac.',
+      'See the files inside an XZ archive before you unpack it on a server.',
+      'Repack an XZ archive as ZIP to send it to someone, or as 7Z or TAR.GZ for another tool.',
+    ],
+    faq: [
+      ['How do I open an XZ file on Windows?', 'Convert it to ZIP on this page and double-click the ZIP in File Explorer. Or install 7-Zip, which can open XZ files.'],
+      ['Can I view XZ files online?', 'Yes. Upload the XZ file here and convert it to ZIP: you get every file inside, with the same names and folders, and no software to install.'],
+      ['What is the difference between .xz and .tar.xz?', 'A .xz file is one compressed file. A .tar.xz is a TAR archive of many files and folders, compressed with XZ. Both are handled here, and the folder structure is kept.'],
+    ],
+  },
+
+  zip: {
+    desc: 'Free ZIP converter: convert ZIP archives to 7Z, TAR, TAR.GZ or TAR.XZ, or turn RAR, 7Z, TAR and other archives into ZIP. Names in any language kept.',
+    about: [
+      'ZIP is the most widely supported archive format: Windows, macOS, Linux, Android and iPhone all open it without extra software. An archive bundles many files and folders into one file and usually makes it smaller, which is handy for emailing and uploading.',
+      'People convert to ZIP when they receive an archive their computer cannot open, such as RAR, 7Z, TAR.GZ or XZ. They convert ZIP to 7Z or TAR.XZ when they want a smaller file, or to TAR.GZ for Linux servers and software projects.',
+    ],
+    open: 'Double-click a ZIP file in Windows File Explorer or the Mac Finder to open it. On iPhone, tap it in the Files app; on Android, open it in Files by Google or your file manager.',
+    uses: [
+      'Turn a RAR or 7Z download into ZIP so it opens on any computer.',
+      'Make a smaller archive by converting ZIP to 7Z or TAR.XZ.',
+      'Convert ZIP to TAR.GZ for a Linux server or a software project.',
+      'Fix archives from other countries whose file names show as strange characters: names in any language are kept.',
+    ],
+    faq: [
+      ['How do I convert RAR to ZIP?', 'Open the RAR to ZIP converter, or drop the RAR file here and choose ZIP. The files inside are unpacked and packed again as ZIP, with the same names and folders.'],
+      ['Does converting an archive change the files inside?', 'No. Archive formats are lossless, so every file comes out exactly as it went in.'],
+      ['Can you open password-protected ZIP files?', 'No. Encrypted archives cannot be converted without the password, and this tool does not try to break passwords.'],
+    ],
+  },
+
+  csv: {
+    desc: 'Free CSV converter: convert CSV files to Excel (XLSX, XLS), ODS, PDF or HTML, or save spreadsheets as CSV. Many files at once, no sign-up, no watermark.',
+    about: [
+      'CSV (comma-separated values) is a plain text file where each line is a row and commas separate the columns. Almost every program can export or import CSV, from banks and online stores to databases and email tools, which makes it the common language for tables of data.',
+      'CSV has no formatting, formulas or multiple sheets. Converting it to Excel (XLSX) gives you a real spreadsheet you can format, sort and add formulas to; converting it to PDF gives a printable table.',
+    ],
+    open: 'Excel, Google Sheets, Apple Numbers and LibreOffice Calc all open CSV files. If the columns come out wrong in Excel, convert the CSV to XLSX here first and open that instead.',
+    uses: [
+      'Turn a bank statement or online store export (CSV) into an Excel spreadsheet.',
+      'Make a printable PDF table from a CSV file.',
+      'Convert an Excel sheet to CSV to import contacts or products into another app.',
+    ],
+    faq: [
+      ['How do I convert CSV to Excel?', 'Drop the CSV file here and choose XLSX. You get an Excel file with each value in its own cell, ready to format and add formulas.'],
+      ['Why does my CSV look wrong in Excel?', 'Excel sometimes guesses the wrong separator or text encoding, so everything lands in one column or accented letters break. Converting the CSV to XLSX here avoids that.'],
+      ['Can a CSV file have several sheets?', 'No. A CSV holds one table. When an Excel file with several sheets is converted to CSV, only the first sheet is kept.'],
+    ],
+  },
+
+  ai: {
+    an: true,
+    desc: 'Convert AI (Adobe Illustrator) files to SVG, PDF, PNG, JPG or EPS free, without Illustrator. Open and view AI files online. No sign-up, no watermark.',
+    about: [
+      'AI is the file format of Adobe Illustrator, the design app used for logos, icons and print artwork. AI files store vector graphics: shapes and lines that stay sharp at any size.',
+      'Without Illustrator, an AI file is hard to open or use. Converting it to SVG gives you a vector file for websites and free design tools such as Inkscape and Figma; PDF and EPS suit printers; PNG and JPG give pictures you can use anywhere.',
+    ],
+    open: 'Without Illustrator, convert the AI file to PDF or PNG here to view it. Inkscape (free) can also open most AI files. Illustrator saves AI files with PDF compatibility by default, which is what makes them readable outside Illustrator.',
+    uses: [
+      'View a logo a designer sent as an AI file, without buying Illustrator.',
+      'Turn AI artwork into SVG for a website or for editing in Inkscape or Figma.',
+      'Make a PNG of a logo with a transparent background for social media or documents.',
+      'Send print-ready PDF or EPS files to a print shop.',
+    ],
+    limits: [
+      'AI files saved without PDF compatibility (an option in Illustrator\'s save dialog) contain no readable artwork outside Illustrator. Ask the designer to save the file again with "Create PDF Compatible File" ticked.',
+    ],
+    faq: [
+      ['How do I open an AI file without Illustrator?', 'Convert it to PDF or PNG on this page and open the result in any viewer. To edit it, convert it to SVG and open that in Inkscape or Figma.'],
+      ['Will my AI file stay a vector?', 'Yes, when you convert it to SVG, PDF, EPS, EMF or WMF. PNG, JPG and WebP are pictures made of pixels.'],
+      ['Why is the converted file blank?', 'The AI file was probably saved without PDF compatibility. Ask for it to be saved again with "Create PDF Compatible File" ticked.'],
+    ],
+  },
+
+  dot: {
+    desc: 'Convert DOT (Word 97-2003 template) files to DOCX, DOC, PDF or DOTX free. Open old Word templates in any app. No sign-up, no watermark.',
+    about: [
+      'DOT is the template format of Microsoft Word 97 to 2003. A template is a starting document, such as a letterhead, a form or a report layout, that you copy each time you begin a new document. Word 2007 replaced DOT with DOTX.',
+      'Old DOT templates still turn up from company archives, schools and government websites. Converting a DOT to DOCX gives you a normal document to fill in; converting it to DOTX makes it a modern Word template; PDF is for printing or reading.',
+    ],
+    open: 'Microsoft Word and LibreOffice Writer open DOT files. Google Docs and many phone apps do not, so convert the DOT to DOCX here first.',
+    uses: [
+      'Fill in an old letterhead or form template in a current version of Word or Google Docs.',
+      'Upgrade a DOT template to DOTX for Microsoft 365.',
+      'Print a template or share it as a PDF.',
+    ],
+    faq: [
+      ['What is the difference between DOT and DOTX?', 'DOT is the older Word 97-2003 template format; DOTX is the newer template format used since Word 2007. Both are templates, not ordinary documents.'],
+      ['How do I edit a DOT file in Google Docs?', 'Convert it to DOCX here, then upload the DOCX to Google Drive and open it with Google Docs.'],
+      ['Will the layout of the template be kept?', 'Text, styles, tables, headers and pictures are kept. Fields and form controls from very old templates may need checking after conversion.'],
+    ],
+  },
+
+  mts: {
+    an: true,
+    desc: 'Convert MTS (AVCHD) camcorder videos to MP4, MOV or JPG free. Play Sony and Panasonic camcorder videos on any device. No sign-up.',
+    about: [
+      'MTS is the video file of the AVCHD format, used by Sony, Panasonic and Canon HD camcorders and some cameras. The videos are high quality but come in a file type many phones, editing apps and websites do not accept, often split into several files on the memory card.',
+      'Converting MTS to MP4 makes the video play on every phone, computer, TV and website, and upload to YouTube or social media without trouble. You can also save the sound as MP3 or still pictures as JPG.',
+    ],
+    open: 'VLC (free) plays MTS files on Windows, Mac and Linux. For phones, editing apps and sharing, convert the MTS to MP4 on this page.',
+    uses: [
+      'Play old camcorder videos of family events on a phone or smart TV.',
+      'Upload camcorder footage to YouTube, Facebook or WhatsApp as MP4.',
+      'Edit camcorder clips in video apps that only accept MP4 or MOV.',
+      'Save still pictures from camcorder video as JPG.',
+    ],
+    faq: [
+      ['How do I convert MTS to MP4?', 'Drop the MTS file here, keep MP4 as the output and download the result. The video is re-encoded to H.264 with AAC sound, which plays everywhere.'],
+      ['Where are the MTS files on my camcorder card?', 'In a folder named PRIVATE/AVCHD/BDMV/STREAM on the memory card. Copy the .MTS files from there.'],
+      ['My recording is split into several MTS files. Why?', 'Camcorders split long recordings into files of about 2 to 4 GB. Convert each part, or join them in a video editor afterwards.'],
+    ],
+  },
+
+  mod: {
+    desc: 'Convert MOD camcorder videos (JVC, Panasonic, Canon) to MP4, MOV or JPG free. Play old camcorder footage on any device. No sign-up.',
+    about: [
+      'MOD is a video file made by standard-definition camcorders from JVC, Panasonic and Canon that recorded to hard drives or SD cards. Inside is MPEG-2 video, the same kind used on DVDs, but with a file ending most players and apps do not recognize.',
+      'Converting MOD to MP4 lets you watch and share these family videos on phones, computers and TVs, and upload them to YouTube or social media.',
+    ],
+    open: 'VLC (free) plays MOD files on any computer. For phones, sharing and editing, convert the MOD to MP4 here.',
+    uses: [
+      'Watch old camcorder videos on a phone, laptop or smart TV.',
+      'Share family videos on WhatsApp, Facebook or YouTube as MP4.',
+      'Convert MOD to MOV for editing on a Mac.',
+    ],
+    faq: [
+      ['How do I convert MOD to MP4?', 'Drop the MOD file here, keep MP4 and download the result. It plays on every modern device.'],
+      ['Where are the MOD files on my camcorder?', 'Usually in a folder such as SD_VIDEO on the camcorder\'s hard drive or SD card, in subfolders named PRG001 and so on.'],
+      ['Can I rename MOD to MPG?', 'Often yes, because both hold MPEG-2 video, but converting to MP4 is the most reliable way to make the video play everywhere.'],
+    ],
+  },
+
+  djvu: {
+    desc: 'Convert DjVu files to PDF, JPG, PNG, TIFF or TXT free. Open scanned DjVu books on any device without a special reader. No sign-up.',
+    about: [
+      'DjVu is a format for scanned documents, especially books, magazines and old papers. It compresses scanned pages much more than PDF while keeping text readable, which is why many digital libraries share books as DjVu.',
+      'Few apps open DjVu files, and phones and tablets usually cannot. Converting DjVu to PDF makes the book readable on any device; JPG and PNG give one picture per page; TXT gives the text when the file has a text layer.',
+    ],
+    open: 'Free readers such as SumatraPDF (Windows) and Okular (Linux) open DjVu files. On a phone, tablet or Mac, convert the DjVu to PDF here and open the PDF.',
+    uses: [
+      'Read a scanned DjVu book on a Kindle, iPad or phone as a PDF.',
+      'Print pages of a DjVu document.',
+      'Save pages as JPG or PNG pictures, or as TIFF for archiving.',
+      'Copy the text from a DjVu file that has a text layer.',
+    ],
+    faq: [
+      ['How do I open a DjVu file on a Mac or iPhone?', 'Convert it to PDF on this page, then open the PDF in Preview, Books or Files.'],
+      ['Why is the TXT file empty?', 'The DjVu is only pictures of pages, with no text layer. Convert it to PDF and use our Image to Text (OCR) tool on the pages you need.'],
+      ['Will the PDF be much bigger than the DjVu?', 'Usually yes, because DjVu compresses scans very well. Use Compress PDF afterwards to make it smaller.'],
+    ],
+  },
+
+  ico: {
+    an: true,
+    desc: 'Free ICO converter: convert ICO icons to PNG or JPG, or make an ICO favicon from PNG, JPG or SVG. Transparent backgrounds kept. No sign-up.',
+    about: [
+      'ICO is the icon format of Windows. One ICO file can hold the same icon at several sizes, such as 16, 32 and 48 pixels, and supports transparency. Websites use an ICO file as their favicon, the small icon in the browser tab.',
+      'People convert ICO to PNG to use or edit an icon in normal image apps, and convert PNG, JPG or SVG to ICO to make a favicon or a Windows icon.',
+    ],
+    open: 'Windows shows ICO files in File Explorer and the Photos app; browsers open them too. Most image editors prefer PNG, so convert the ICO to PNG here to edit it.',
+    uses: [
+      'Make a favicon for a website from a logo (PNG or SVG to ICO).',
+      'Extract an icon from an ICO file as a PNG with a transparent background.',
+      'Make a custom icon for a Windows folder or shortcut.',
+    ],
+    faq: [
+      ['How do I convert PNG to ICO?', 'Open PNG to ICO, or drop the PNG here and choose ICO. Use a square image; our Favicon Generator also makes all the favicon sizes a website needs.'],
+      ['Is transparency kept?', 'Yes. Transparent areas stay transparent when converting between ICO and PNG.'],
+      ['What size should an ICO favicon be?', 'Browsers use 16 x 16 and 32 x 32 pixels in tabs; start from a square image of at least 64 x 64 pixels so the small sizes look clean.'],
+    ],
+    guides: ['make-a-favicon'],
+  },
+
+  eps: {
+    an: true,
+    desc: 'Free EPS converter: convert EPS files to PDF, SVG, PNG or JPG, or make EPS from SVG, PDF and AI. Open EPS files without Illustrator. No sign-up.',
+    about: [
+      'EPS (Encapsulated PostScript) is an older vector format still common in printing and logo files. Like AI and SVG, it stores shapes that stay sharp at any size, so print shops and stock image sites often ask for or supply EPS files.',
+      'Most apps cannot open EPS directly. Converting it to PDF or PNG lets you view it anywhere; SVG keeps it as a vector for websites and free design tools; and converting SVG or PDF to EPS gives a print shop the file it asks for.',
+    ],
+    open: 'Without Illustrator, convert the EPS to PDF or PNG here to view it. Inkscape (free) can open and edit EPS files too.',
+    uses: [
+      'View a logo or stock graphic supplied as EPS.',
+      'Turn EPS artwork into SVG for a website or into PNG for documents and social media.',
+      'Make an EPS from an SVG or PDF logo for a print shop.',
+    ],
+    faq: [
+      ['How do I open an EPS file without Illustrator?', 'Convert it to PDF or PNG on this page and open the result in any viewer. Inkscape also opens EPS files for editing.'],
+      ['Does EPS to PNG keep transparency?', 'Yes. Areas without artwork stay transparent in the PNG.'],
+      ['Is EPS still used?', 'Yes, mostly in printing and stock graphics, though PDF and SVG have replaced it for many uses.'],
+    ],
+  },
 };
