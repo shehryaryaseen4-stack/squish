@@ -58,16 +58,16 @@ test('imports members with their old numbers, fees and expiry', async (t) => {
   ];
 
   const dry = (await call('/api/admin/members/import', 'POST', { rows, dryRun: true }, owner)).body;
-  assert.equal(dry.created, 3);
+  assert.equal(dry.created, 4, 'a member without a phone comes in too');
   assert.equal(dry.fees, 2);
-  assert.equal(dry.errors.length, 2);
-  assert.deepEqual(dry.errors.map((e) => e.line), [5, 7]);
+  assert.equal(dry.errors.length, 1);
+  assert.deepEqual(dry.errors.map((e) => e.line), [7]);
   assert.equal(dry.skipped[0].line, 6);
   assert.equal((await call('/api/admin/members?status=all', 'GET', null, owner)).body.length, before, 'a check changes nothing');
 
   const r = (await call('/api/admin/members/import', 'POST', { rows }, owner)).body;
-  assert.equal(r.created, 3);
-  assert.deepEqual(r.pins.map((p) => p.memberNo), [5001, 5002, 5003]);
+  assert.equal(r.created, 4);
+  assert.deepEqual(r.pins.map((p) => p.memberNo), [5001, 5002, 5003, 5004]);
   assert.ok(r.pins.every((p) => /^\d{4}$/.test(p.pin)));
   const list = (await call('/api/admin/members?status=all', 'GET', null, owner)).body;
   const imran = list.find((m) => m.memberNo === 5001);
@@ -79,16 +79,21 @@ test('imports members with their old numbers, fees and expiry', async (t) => {
   assert.equal(sana.plan.months, 3);
   assert.equal(sana.expiry, '2026-12-14');
   assert.equal(list.find((m) => m.memberNo === 5003).status, 'unpaid');
+  assert.equal(list.find((m) => m.memberNo === 5004).phone, '');
+  // Two members without a number are not "the same phone".
+  assert.equal((await call('/api/admin/members', 'POST', { name: 'Also No Phone', gender: 'male', joinDate: '2026-10-19' }, owner)).status, 200);
 
-  // New members added by hand continue after the imported numbers.
+  // New members added by hand get the next free number…
   const added = (await call('/api/admin/members', 'POST', { name: 'After Import', phone: '03111234599', gender: 'male', joinDate: '2026-10-19' }, owner)).body;
   assert.ok(added.member, JSON.stringify(added));
-  assert.equal(added.member.memberNo, 5004);
+  // …and keep the short numbers, skipping the imported ones.
+  assert.ok(added.member.memberNo < 5000, `new member got ${added.member.memberNo}`);
+  assert.ok(!list.some((m) => m.memberNo === added.member.memberNo));
 
   // The same file again: everyone is already here, no fee is added twice.
   const again = (await call('/api/admin/members/import', 'POST', { rows, existing: 'update' }, owner)).body;
   assert.equal(again.created, 0);
-  assert.equal(again.updated, 3);
+  assert.equal(again.updated, 4, 'the member without a phone is found by member number');
   const imranAgain = (await call('/api/admin/members?status=all', 'GET', null, owner)).body.find((m) => m.memberNo === 5001);
   assert.equal(imranAgain.balance, 500);
 
@@ -99,4 +104,18 @@ test('imports members with their old numbers, fees and expiry', async (t) => {
   assert.equal((await call('/api/admin/members/import', 'POST', { rows: [{ name: 'X', phone: '03111234600' }] }, viewer)).status, 403);
   const desk = (await call('/api/admin/login', 'POST', { pin: '0000' })).body.token;
   assert.equal((await call('/api/admin/members/import', 'POST', { rows: [{ name: 'Desk Add', phone: '03111234601' }] }, desk)).body.created, 1);
+});
+
+test('new member numbers skip numbers already taken by imported members', async (t) => {
+  const { createServer } = require('../server');
+  const server = createServer({ seed: 'empty', reminders: false });
+  await new Promise((r) => server.listen(0, r));
+  t.after(() => new Promise((r) => server.close(r)));
+  const url = `http://127.0.0.1:${server.address().port}`;
+  const call = async (p, method, body, token) => (await fetch(url + p, { method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: body ? JSON.stringify(body) : undefined })).json();
+  const owner = (await call('/api/admin/login', 'POST', { pin: '1234' })).token;
+  await call('/api/admin/members/import', 'POST', { rows: [{ memberNo: '1001', name: 'Old One' }, { memberNo: '1002', name: 'Old Two' }, { memberNo: '581064', name: 'Machine Id' }] }, owner);
+  const a = (await call('/api/admin/members', 'POST', { name: 'New A', gender: 'male', joinDate: '2026-11-08' }, owner)).member;
+  const b = (await call('/api/admin/members', 'POST', { name: 'New B', gender: 'male', joinDate: '2026-11-08' }, owner)).member;
+  assert.deepEqual([a.memberNo, b.memberNo], [1003, 1004]);
 });

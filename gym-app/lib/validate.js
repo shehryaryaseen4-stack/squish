@@ -24,8 +24,9 @@ function num(v, { min = 0, max = 1e9, field = 'Value', int = true } = {}) {
   return n;
 }
 
-function phone(v) {
-  const s = str(v, { max: 24, required: true, field: 'Phone' }).replace(/[\s()-]/g, '');
+function phone(v, { required = true } = {}) {
+  const s = str(v, { max: 24, required, field: 'Phone' }).replace(/[\s()-]/g, '');
+  if (!s && !required) return '';
   if (!/^\+?\d{7,15}$/.test(s)) fail('Enter a valid phone number');
   return s;
 }
@@ -125,7 +126,8 @@ const collections = {
 function member(b) {
   return {
     name: str(b.name, { max: 60, required: true, field: 'Name' }),
-    phone: phone(b.phone),
+    // Members from an old list may have no number yet; it can be added later.
+    phone: phone(b.phone, { required: false }),
     gender: ['male', 'female', 'other'].includes(b.gender) ? b.gender : 'male',
     dob: isoDate(b.dob, 'Date of birth', { required: false }),
     address: str(b.address, { max: 200 }),

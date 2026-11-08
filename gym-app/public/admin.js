@@ -599,7 +599,7 @@
           const sample = rows.slice(0, 5).map((r) => importRow(r, cols, dayFirst));
           const shown = Sheet.FIELDS.filter(([k]) => cols[k] != null).slice(0, 7);
           mapEl.innerHTML = `<p style="margin:0 0 10px"><b>${rows.length} row${rows.length === 1 ? '' : 's'}</b> found. Check that each item comes from the right column.</p>
-            <div class="form-grid two">${Sheet.FIELDS.map(([k, label]) => `<label class="field"><span>${esc(label)}${k === 'name' || k === 'phone' ? ' *' : ''}</span><select class="select" data-col="${k}">${options(k)}</select></label>`).join('')}
+            <div class="form-grid two">${Sheet.FIELDS.map(([k, label]) => `<label class="field"><span>${esc(label)}${k === 'name' ? ' *' : ''}</span><select class="select" data-col="${k}">${options(k)}</select></label>`).join('')}
               <label class="field"><span>Dates are written</span><select class="select" data-dayfirst><option value="1" ${dayFirst ? 'selected' : ''}>Day first (31/12/2026)</option><option value="0" ${dayFirst ? '' : 'selected'}>Month first (12/31/2026)</option></select></label>
               <label class="field"><span>A member already here (same phone)</span><select class="select" data-existing><option value="skip">Leave them as they are</option>${can('members.edit') ? '<option value="update">Update their details</option>' : ''}</select></label></div>
             <h3 style="margin:16px 0 8px;font-size:15px">Preview</h3>
@@ -619,7 +619,7 @@
           const dry = mapEl.querySelector('[data-dry]');
           const go = mapEl.querySelector('[data-go]');
           dry.addEventListener('click', () => busy(dry, async () => {
-            if (cols.name == null || cols.phone == null) return toast('Choose the Name and Phone columns', 'bad');
+            if (cols.name == null) return toast('Choose the Name column', 'bad');
             try {
               checked = await api('/api/admin/members/import', { method: 'POST', body: body(true) });
               const n = checked.created + checked.updated;

@@ -188,7 +188,8 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
     const d = db();
     const t = today();
     const result = { created: 0, updated: 0, skipped: [], errors: [], fees: 0, pins: [] };
-    const byPhone = new Map(d.members.filter((x) => !x.left).map((x) => [normalPhone(x.phone), x]));
+    const byPhone = new Map(d.members.filter((x) => !x.left && x.phone).map((x) => [normalPhone(x.phone), x]));
+    const byNo = new Map(d.members.filter((x) => !x.left).map((x) => [x.memberNo, x]));
     const usedNos = new Set(d.members.map((x) => x.memberNo));
     const seenInFile = new Set();
     const plan = [];
@@ -205,9 +206,12 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
           joinDate: r.joinDate || r.paidOn || t,
         });
         const key = normalPhone(data.phone);
-        if (seenInFile.has(key)) { result.skipped.push({ line, name: data.name, reason: 'Same phone as an earlier row' }); return; }
-        seenInFile.add(key);
-        const found = byPhone.get(key);
+        // Rows without a number are never the same person as another row.
+        if (key && seenInFile.has(key)) { result.skipped.push({ line, name: data.name, reason: 'Same phone as an earlier row' }); return; }
+        if (key) seenInFile.add(key);
+        // The same person: same phone, or (with no phone to go by) the same member number.
+        const rowNo = Number(String(r.memberNo ?? '').replace(/\D/g, '')) || null;
+        const found = (key && byPhone.get(key)) || (!key && rowNo && byNo.get(rowNo)) || null;
         if (found && existing !== 'update') { result.skipped.push({ line, name: data.name, reason: `Already a member (#${found.memberNo})` }); return; }
         let no = Number(String(r.memberNo ?? '').replace(/\D/g, '')) || null;
         if (no && (no > 9999999 || (usedNos.has(no) && found?.memberNo !== no))) no = null;
@@ -259,10 +263,17 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
         result.fees++;
       }
     }
-    const maxNo = Math.max(0, ...d.members.map((x) => x.memberNo));
-    if (d.memberSeq <= maxNo) d.memberSeq = maxNo + 1;
     store.save();
     return result;
+  }
+
+  // The next free member number. Imported numbers (often long machine IDs) are skipped,
+  // so new members keep getting short ones: 1001, 1002…
+  function nextMemberNo() {
+    const d = db();
+    const used = new Set(d.members.map((x) => x.memberNo));
+    while (used.has(d.memberSeq)) d.memberSeq++;
+    return d.memberSeq++;
   }
 
   // Where a renewal should start: the day after the current period, or today if it lapsed.
@@ -1018,9 +1029,10 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
       need('members.add');
       if (body.payment && body.payment.planId) need('fees.collect');
       const data = v.member(body);
-      if (d.members.some((x) => !x.left && normalPhone(x.phone) === normalPhone(data.phone))) fail('A member with this phone number already exists', 409);
+      if (data.phone && d.members.some((x) => !x.left && normalPhone(x.phone) === normalPhone(data.phone))) fail('A member with this phone number already exists', 409);
       const pin = randomPin();
-      const member = { id: newId('mem'), memberNo: d.memberSeq++, ...data, pin: hashPin(pin), freezes: [], left: false, createdAt: stamp() };
+      const seqBefore = d.memberSeq;
+      const member = { id: newId('mem'), memberNo: nextMemberNo(), ...data, pin: hashPin(pin), freezes: [], left: false, createdAt: stamp() };
       d.members.push(member);
       let payment = null;
       if (body.payment && body.payment.planId) {
@@ -1028,7 +1040,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
           payment = createPayment({ ...body.payment, memberId: member.id });
         } catch (e) {
           d.members.pop();
-          d.memberSeq--;
+          d.memberSeq = seqBefore;
           throw e;
         }
       }
@@ -1050,7 +1062,7 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
       else need('members.edit');
       if (m === 'PUT' && !action) {
         const data = v.member(body);
-        if (d.members.some((x) => x.id !== member.id && !x.left && normalPhone(x.phone) === normalPhone(data.phone))) fail('Another member already uses this phone number', 409);
+        if (data.phone && d.members.some((x) => x.id !== member.id && !x.left && normalPhone(x.phone) === normalPhone(data.phone))) fail('Another member already uses this phone number', 409);
         const renamed = member.name !== data.name;
         Object.assign(member, data);
         if (renamed) enrollment.syncMember(member);
