@@ -37,14 +37,19 @@ function color(v) {
   return s.toLowerCase();
 }
 
+const DAY_NAMES = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
+
 function hours(v) {
   if (!v || typeof v !== 'object') fail('Opening hours are required');
   const out = {};
   for (const day of DAYS) {
     const ranges = Array.isArray(v[day]) ? v[day] : [];
     out[day] = ranges.slice(0, 4).map((r) => {
-      if (!Array.isArray(r) || !isTime(r[0]) || !isTime(r[1]) || r[0] >= r[1]) fail(`Check the opening hours for ${day}`);
-      return [r[0], r[1]];
+      if (!Array.isArray(r) || !isTime(r[0]) || !isTime(r[1])) fail(`Check the opening hours for ${DAY_NAMES[day] || day}`);
+      // Closing at midnight (12:00 AM) means the end of the day.
+      const end = r[1] === '00:00' ? '23:59' : r[1];
+      if (r[0] >= end) fail(`${DAY_NAMES[day] || day}: closing time must be after opening time (for midnight choose 12:00 AM; noon is 12:00 PM)`);
+      return [r[0], end];
     });
   }
   return out;
