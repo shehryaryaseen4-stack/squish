@@ -46,11 +46,36 @@ powershell -NoProfile -Command "$ips = Get-NetIPAddress -AddressFamily IPv4 -Err
 echo   First time: owner PIN 1234, front desk PIN 0000 (change them in Settings).
 echo   If Windows asks about the firewall, tick "Private networks" and press Allow.
 echo.
-if /i not "%~1"=="nobrowser" start "" "http://localhost:3100/admin"
+if /i not "%~1"=="nobrowser" start "" /min cmd /c ""%~dp0app\browser.bat" wait"
 "%~dp0node\node.exe" "%~dp0app\server.js"
 echo.
 echo  The gym app stopped. Press a key to close this window.
 pause >nul
+BAT
+
+crlf > "$APP/app/browser.bat" <<'BAT'
+@echo off
+rem Opens the dashboard in Google Chrome or the new Microsoft Edge. The old Edge that
+rem comes with Windows 10 can't run the app and shows a blank page, so it is the last resort.
+rem "browser.bat wait" waits a few seconds first, for the app to start.
+rem No ( ) blocks here: the folder name may contain brackets.
+set "URL=http://localhost:3100/admin"
+if /i "%~1"=="wait" timeout /t 3 /nobreak >nul
+set "B=%ProgramFiles%\Google\Chrome\Application\chrome.exe"
+if exist "%B%" goto go
+set "B=%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
+if exist "%B%" goto go
+set "B=%LocalAppData%\Google\Chrome\Application\chrome.exe"
+if exist "%B%" goto go
+set "B=%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"
+if exist "%B%" goto go
+set "B=%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"
+if exist "%B%" goto go
+start "" "%URL%"
+exit /b
+:go
+start "" "%B%" "%URL%"
+exit /b
 BAT
 
 crlf > "$APP/Open Gym.bat" <<'BAT'
@@ -70,7 +95,7 @@ if not errorlevel 1 goto open
 set /a tries+=1
 if %tries% lss 40 goto wait
 :open
-start "" "http://localhost:3100/admin"
+call "%~dp0app\browser.bat"
 exit /b
 :running
 powershell -NoProfile -Command "try { Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 http://localhost:3100/api/gym | Out-Null; exit 0 } catch { exit 1 }" >nul 2>nul
@@ -143,7 +168,8 @@ FIRST TIME
 EVERY DAY
   Double-click "Gym Dashboard" on the desktop. It starts the app if needed
   (a small "Gym app - keep open" window on the taskbar: don't close it) and
-  opens the dashboard in the browser.
+  opens the dashboard in Google Chrome (or the new Edge).
+  Windows 10's old Edge shows a blank page: install Google Chrome.
 
 START BY HAND
   Double-click "Start Gym.bat". A black window opens: keep it open.
