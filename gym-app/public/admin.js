@@ -1631,7 +1631,7 @@
     const range = (d, i, r) => `<div class="range" data-range><input class="input" type="time" value="${r[0]}" aria-label="${DAY_LABELS[d]} opens"><span class="muted">to</span><input class="input" type="time" value="${r[1]}" aria-label="${DAY_LABELS[d]} closes">${i > 0 ? `<button type="button" class="icon-btn" data-rm aria-label="Remove break">${icon('x')}</button>` : ''}</div>`;
     const hoursRow = (d) => {
       const h = b.hours[d] || [];
-      return `<div class="hours-row" data-day="${d}"><b>${DAY_LABELS[d]}</b><span class="switch"><input type="checkbox" data-open ${h.length ? 'checked' : ''} aria-label="Open on ${DAY_LABELS[d]}"><span></span></span>
+      return `<div class="hours-row" data-day="${d}"><b>${DAY_LABELS[d]}</b><label class="switch"><input type="checkbox" data-open ${h.length ? 'checked' : ''} aria-label="Open on ${DAY_LABELS[d]}"><span></span></label>
         <div class="ranges">${h.length ? h.map((r, i) => range(d, i, r)).join('') + (h.length < 3 ? '<button type="button" class="link" data-addrange style="justify-self:start">+ Add a break</button>' : '') : '<span class="closed">Closed</span>'}</div></div>`;
     };
     shell('settings', 'Settings', '', `
