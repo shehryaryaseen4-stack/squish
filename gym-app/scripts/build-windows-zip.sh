@@ -21,6 +21,7 @@ unzip -q -j "$WORK/node.zip" "node-$NODE-win-x64/node.exe" "node-$NODE-win-x64/L
 APP="$WORK/GymApp"
 mkdir -p "$APP/node" "$APP/app"
 cp "$WORK/node/node.exe" "$APP/node/"
+cp "$ROOT/scripts/windows/gym.ico" "$APP/gym.ico"
 cp "$WORK/node/LICENSE" "$APP/node/LICENSE-nodejs.txt"
 cp -r "$ROOT/server.js" "$ROOT/package.json" "$ROOT/lib" "$ROOT/public" "$ROOT/seed" "$APP/app/"
 
@@ -45,11 +46,67 @@ powershell -NoProfile -Command "$ips = Get-NetIPAddress -AddressFamily IPv4 -Err
 echo   First time: owner PIN 1234, front desk PIN 0000 (change them in Settings).
 echo   If Windows asks about the firewall, tick "Private networks" and press Allow.
 echo.
-start "" "http://localhost:3100/admin"
+if /i not "%~1"=="nobrowser" start "" "http://localhost:3100/admin"
 "%~dp0node\node.exe" "%~dp0app\server.js"
 echo.
 echo  The gym app stopped. Press a key to close this window.
 pause >nul
+BAT
+
+crlf > "$APP/Open Gym.bat" <<'BAT'
+@echo off
+rem What the "Gym Dashboard" icon runs: starts the gym app if it isn't running
+rem (in a small window on the taskbar), then opens the dashboard in the browser.
+rem No ( ) blocks here: the folder name may itself contain brackets, e.g. "GymApp (1)".
+cd /d "%~dp0"
+call :running
+if not errorlevel 1 goto open
+start "Gym app - keep open" /min "%~dp0Start Gym.bat" nobrowser
+set /a tries=0
+:wait
+timeout /t 1 /nobreak >nul
+call :running
+if not errorlevel 1 goto open
+set /a tries+=1
+if %tries% lss 40 goto wait
+:open
+start "" "http://localhost:3100/admin"
+exit /b
+:running
+powershell -NoProfile -Command "try { Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 http://localhost:3100/api/gym | Out-Null; exit 0 } catch { exit 1 }" >nul 2>nul
+exit /b %errorlevel%
+BAT
+
+crlf > "$APP/Setup - run once.bat" <<'BAT'
+@echo off
+rem One-time setup: lets Windows run these files, puts a "Gym Dashboard" icon on the
+rem desktop, and (if you want) starts the gym app whenever this computer starts.
+title Gym app setup
+cd /d "%~dp0"
+echo.
+echo  Setting up the gym app in: "%~dp0"
+echo.
+powershell -NoProfile -Command "Get-ChildItem -LiteralPath '%~dp0' -Recurse | Unblock-File" >nul 2>nul
+echo  [1/3] Files unblocked.
+powershell -NoProfile -Command "$f='%~dp0'; $d=[Environment]::GetFolderPath('Desktop'); $s=(New-Object -ComObject WScript.Shell).CreateShortcut((Join-Path $d 'Gym Dashboard.lnk')); $s.TargetPath=(Join-Path $f 'Open Gym.bat'); $s.WorkingDirectory=$f; $s.IconLocation=(Join-Path $f 'gym.ico'); $s.WindowStyle=7; $s.Description='Open the gym dashboard'; $s.Save()"
+if errorlevel 1 goto noicon
+echo  [2/3] "Gym Dashboard" icon added to the desktop.
+goto boot
+:noicon
+echo  [2/3] Could not make the desktop icon. Right-click "Open Gym.bat", Send to, Desktop.
+:boot
+echo.
+choice /c YN /m "  Start the gym app by itself when this computer starts"
+if errorlevel 2 goto done
+set "STARTUP=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
+> "%STARTUP%\gym-app.bat" echo @echo off
+>> "%STARTUP%\gym-app.bat" echo start "Gym app - keep open" /min "%~dp0Start Gym.bat" nobrowser
+echo  [3/3] The gym app will start with Windows.
+:done
+echo.
+echo  Done. From now on just double-click "Gym Dashboard" on the desktop.
+echo.
+pause
 BAT
 
 crlf > "$APP/Start Gym when PC starts.bat" <<'BAT'
@@ -57,7 +114,8 @@ crlf > "$APP/Start Gym when PC starts.bat" <<'BAT'
 rem Run once: the gym app then starts by itself whenever this computer starts.
 rem To undo: Win+R, type shell:startup, delete "gym-app.bat".
 set "STARTUP=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
-(echo @echo off& echo start "Gym app" /min "%~dp0Start Gym.bat") > "%STARTUP%\gym-app.bat"
+> "%STARTUP%\gym-app.bat" echo @echo off
+>> "%STARTUP%\gym-app.bat" echo start "Gym app - keep open" /min "%~dp0Start Gym.bat" nobrowser
 echo Done. The gym app will start when this computer starts.
 pause
 BAT
@@ -78,7 +136,16 @@ crlf > "$APP/README.txt" <<'TXT'
 GYM APP - for one gym on this computer (no internet needed)
 ============================================================
 
-START
+FIRST TIME
+  Double-click "Setup - run once.bat". It puts a "Gym Dashboard" icon on the
+  desktop (and can start the app with Windows).
+
+EVERY DAY
+  Double-click "Gym Dashboard" on the desktop. It starts the app if needed
+  (a small "Gym app - keep open" window on the taskbar: don't close it) and
+  opens the dashboard in the browser.
+
+START BY HAND
   Double-click "Start Gym.bat". A black window opens: keep it open.
   The dashboard opens in the browser. First time: owner PIN 1234,
   front desk PIN 0000. Change them, the gym name and the logo in Settings.
@@ -101,7 +168,9 @@ KEEP IT WORKING
     whole GymApp folder.
 
 URDU
-  "Start Gym.bat" par double-click karein. Kaali window band na karein.
+  Pehli dafa "Setup - run once.bat" chalayein. Phir roz desktop par
+  "Gym Dashboard" par double-click karein. Taskbar par "Gym app" wali
+  chhoti window band na karein.
   Members ke phone gym ki WiFi par oopar wala address kholein.
   Data "data" folder mein hai, "Backup data.bat" se backup lein.
 TXT
