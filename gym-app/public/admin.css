@@ -418,3 +418,32 @@ button.kpi { text-align: left; font: inherit; color: inherit; cursor: pointer; }
 .receipt-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
 .receipt-head > div:last-child { display: grid; }
 .receipt-head span { font-size: 12.5px; color: var(--ink-3); }
+
+/* Goal picker made of radio buttons */
+.seg label { display: inline-flex; }
+.seg label input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label span { display: inline-flex; align-items: center; height: 36px; padding: 0 14px; border-radius: 10px; font-weight: 700; font-size: 13.5px; color: var(--ink-3); cursor: pointer; white-space: nowrap; }
+.seg label input:checked + span { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
+.seg label input:focus-visible + span { outline: 2.5px solid var(--accent); outline-offset: 1px; }
+
+/* Body, calories and protein for each goal */
+.outlook { display: grid; gap: 12px; }
+.ol-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.ol-facts > div { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); }
+.ol-facts small { color: var(--ink-3); font-size: 12px; font-weight: 600; }
+.ol-facts b { font-size: 18px; }
+.ol-facts span { font-size: 12.5px; justify-self: start; }
+.ol-goals { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.ol-goal { display: grid; gap: 6px; align-content: start; text-align: left; padding: 12px 14px; border-radius: 14px; border: 2px solid var(--line); background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
+.ol-goal:disabled { cursor: default; }
+.ol-goal.on { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent); }
+.ol-goal > b { font-size: 15px; }
+.ol-goal.on > b::after { content: " ✓"; color: var(--accent); }
+.ol-row { display: flex; justify-content: space-between; gap: 8px; font-size: 13.5px; }
+.ol-row span { color: var(--ink-3); }
+.ol-change { display: grid; gap: 2px; margin-top: 4px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); font-size: 13px; }
+.ol-change span { display: flex; justify-content: space-between; }
+.ol-change.down b { color: var(--good); }
+.ol-change.up b { color: var(--accent); }
+.ol-note { margin: 0; font-size: 12.5px; color: var(--ink-3); }
+.ol-foot { font-size: 12.5px; margin: 0; }

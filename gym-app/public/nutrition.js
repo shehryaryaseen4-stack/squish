@@ -219,7 +219,32 @@
     };
   }
 
-  const api = { met, burn, dayBurn, plan, bmi, isAsian, FOODS };
+  // About 7,700 kcal of eating less (or more) is one kg of body weight.
+  const KCAL_PER_KG = 7700;
+  const GOALS = [['lose', 'Lose weight'], ['fit', 'Stay fit'], ['gain', 'Gain weight / muscle']];
+
+  /**
+   * The same body under each goal: what to eat, how much protein, and how the
+   * weight should move in a week, a month and three months. For the gym's staff
+   * when they set a member up.
+   */
+  function outlook(body, trainingDays = 3, { asian = false } = {}) {
+    const base = plan({ ...body, goal: 'fit' }, trainingDays, 0, { asian });
+    const goals = GOALS.map(([id, label]) => {
+      const p = id === 'fit' ? base : plan({ ...body, goal: id }, trainingDays, 0, { asian });
+      const perWeek = Math.round((((p.target - p.maintain) * 7) / KCAL_PER_KG) * 20) / 20;
+      const after = (weeks) => Math.round(perWeek * weeks * 10) / 10;
+      return {
+        id, label, goal: p.goal, changed: p.changed,
+        eat: p.target, protein: p.protein, carbs: p.carbs, fat: p.fat,
+        difference: p.target - p.maintain,
+        perWeek, month: after(4.3), threeMonths: after(13),
+      };
+    });
+    return { bmi: base.bmi, burn: base.maintain, bmr: base.bmr, water: base.water, goals };
+  }
+
+  const api = { met, burn, dayBurn, plan, bmi, outlook, isAsian, FOODS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Nutrition = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -718,23 +718,129 @@
     return Object.fromEntries(new FormData(form).entries());
   }
 
+  // ---- body, calories and protein (what the member's app shows, for the desk) ----------
+
+  const BODY_GOALS = [['lose', 'Lose weight'], ['fit', 'Stay fit'], ['gain', 'Gain weight']];
+  const ageFrom = (dob) => {
+    if (!dob) return '';
+    const [y, mo, d] = dob.split('-').map(Number);
+    const [ty, tm, td] = today().split('-').map(Number);
+    return ty - y - (tm < mo || (tm === mo && td < d) ? 1 : 0);
+  };
+  const signedKg = (kg) => (kg > 0 ? `+${kg} kg` : kg < 0 ? `−${Math.abs(kg)} kg` : 'same weight');
+
+  function bodyFields(b = {}, dob = '') {
+    return `<label class="field"><span>Weight (kg)</span><input class="input" name="bWeight" type="number" inputmode="decimal" min="25" max="300" value="${esc(b.weight || '')}" placeholder="e.g. 78"></label>
+      <label class="field"><span>Height (cm)</span><input class="input" name="bHeight" type="number" inputmode="numeric" min="100" max="250" value="${esc(b.height || '')}" placeholder="e.g. 172"><small>5 ft 8 in = 173 cm · 1 inch = 2.54 cm</small></label>
+      <label class="field"><span>Age</span><input class="input" name="bAge" type="number" inputmode="numeric" min="10" max="100" value="${esc(b.age || ageFrom(dob) || '')}"></label>
+      <label class="field"><span>Workouts a week</span><select class="select" name="bDays">${[2, 3, 4, 5, 6].map((n) => `<option value="${n}" ${(b.days || 3) === n ? 'selected' : ''}>${n} days</option>`).join('')}</select></label>
+      <label class="field"><span>Food</span><select class="select" name="bDiet">${[['nonveg', 'Eats meat'], ['egg', 'Eggs, no meat'], ['veg', 'Vegetarian']].map(([v, l]) => `<option value="${v}" ${(b.diet || 'nonveg') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <div class="field span"><span>Goal</span><div class="seg" role="radiogroup" aria-label="Goal">${BODY_GOALS.map(([v, l]) => `<label><input type="radio" name="bGoal" value="${v}" ${(b.goal || 'fit') === v ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div></div>
+      <div class="span" data-outlook></div>`;
+  }
+
+  // What the form says about the body, or null while weight, height or age is missing.
+  function readBody(f, gender) {
+    const weight = Number(f.bWeight.value);
+    const height = Number(f.bHeight.value);
+    const age = Number(f.bAge.value);
+    if (!(weight >= 25 && weight <= 300 && height >= 100 && height <= 250 && age >= 10 && age <= 100)) return null;
+    return { weight, height, age, gender: gender === 'female' ? 'female' : 'male', goal: f.bGoal.value || 'fit', days: Number(f.bDays.value) || 3, diet: f.bDiet.value };
+  }
+
+  function outlookHtml(b) {
+    if (!b || !window.Nutrition) return '';
+    const o = Nutrition.outlook(b, b.days || 3, { asian: Nutrition.isAsian(S.data?.business?.locale) });
+    const r = o.bmi;
+    const tone = { under: 'badge-warn', normal: 'badge-good', over: 'badge-warn', obese: 'badge-bad' }[r?.category];
+    return `<div class="outlook">
+      <div class="ol-facts">
+        ${r ? `<div><small>BMI</small><b>${r.value}</b><span class="badge ${tone}">${esc(r.teen ? 'Under 18' : r.label)}</span></div>
+        <div><small>Healthy weight for ${b.height} cm</small><b>${r.healthy.min}–${r.healthy.max} kg</b>${r.gap && !r.teen ? `<span class="muted">${r.gap < 0 ? 'lose' : 'gain'} ${Math.abs(r.gap)} kg</span>` : '<span class="muted">in range</span>'}</div>` : ''}
+        <div><small>Body burns a day</small><b>${o.burn.toLocaleString()} kcal</b><span class="muted">with ${b.days || 3} workouts a week</span></div>
+        <div><small>Water</small><b>${o.water} L</b><span class="muted">a day</span></div>
+      </div>
+      <div class="ol-goals">${o.goals.map((g) => `<button type="button" class="ol-goal ${g.id === b.goal ? 'on' : ''}" data-pick-goal="${g.id}">
+        <b>${esc(g.label)}</b>
+        <div class="ol-row"><span>Eat a day</span><b>${g.eat.toLocaleString()} kcal</b></div>
+        <div class="ol-row"><span>${g.difference < 0 ? 'Less than it burns' : g.difference > 0 ? 'More than it burns' : 'Same as it burns'}</span><b>${g.difference ? `${g.difference > 0 ? '+' : '−'}${Math.abs(g.difference)} kcal` : '—'}</b></div>
+        <div class="ol-row"><span>Protein a day</span><b>${g.protein} g</b></div>
+        <div class="ol-row"><span>Carbs · fat</span><b>${g.carbs} g · ${g.fat} g</b></div>
+        <div class="ol-change ${g.perWeek < 0 ? 'down' : g.perWeek > 0 ? 'up' : ''}"><span>Each week <b>${signedKg(g.perWeek)}</b></span><span>1 month <b>${signedKg(g.month)}</b></span><span>3 months <b>${signedKg(g.threeMonths)}</b></span></div>
+        ${g.changed ? `<p class="ol-note">${esc(g.changed)}</p>` : ''}
+      </button>`).join('')}</div>
+      <p class="muted ol-foot">Estimates for someone who eats this every day and works out as planned. Weigh in every week: if the weight isn't moving after 2–3 weeks, change calories by 150–200.</p>
+    </div>`;
+  }
+
+  // Live: the numbers change as staff type, and tapping a goal picks it.
+  function wireBody(f, gender) {
+    const box = f.querySelector('[data-outlook]');
+    const draw = () => {
+      const b = readBody(f, gender());
+      box.innerHTML = b ? outlookHtml(b) : '<p class="muted" style="font-size:13.5px">Enter weight, height and age to see daily calories, protein and how the weight will change for each goal.</p>';
+      box.querySelectorAll('[data-pick-goal]').forEach((x) => x.addEventListener('click', () => {
+        f.querySelector(`[name="bGoal"][value="${x.dataset.pickGoal}"]`).checked = true;
+        draw();
+      }));
+    };
+    ['bWeight', 'bHeight', 'bAge'].forEach((n) => f[n].addEventListener('input', draw));
+    ['bDays', 'bDiet'].forEach((n) => f[n].addEventListener('change', draw));
+    f.querySelectorAll('[name="bGoal"]').forEach((x) => x.addEventListener('change', draw));
+    if (f.gender) f.gender.addEventListener('change', draw);
+    if (f.dob) f.dob.addEventListener('change', () => { if (!f.bAge.value) { f.bAge.value = ageFrom(f.dob.value); draw(); } });
+    draw();
+  }
+
+  function bodySheet(m, onSaved) {
+    sheet({
+      title: `${m.name}: body & diet`,
+      wide: true,
+      html: `<form class="form-grid two" novalidate>${bodyFields(m.body || {}, m.dob)}</form>
+        <div class="sheet-actions"><button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" data-ok>${icon('check')}Save</button></div>`,
+      onMount: (el, close) => {
+        const f = el.querySelector('form');
+        wireBody(f, () => m.gender);
+        const ok = el.querySelector('[data-ok]');
+        ok.addEventListener('click', () => busy(ok, async () => {
+          const b = readBody(f, m.gender);
+          if (!b) return toast('Enter weight, height and age', 'bad');
+          try {
+            await api(`/api/admin/members/${m.id}/body`, { method: 'PUT', body: b });
+            close();
+            toast('Saved. The member sees this plan in their app.');
+            onSaved?.();
+          } catch (e) { toast(e.message, 'bad'); }
+        }));
+      },
+    });
+  }
+
   function addMemberSheet(prefill = {}) {
     sheet({
       title: 'New member',
       wide: true,
       html: `<form class="form-grid two" novalidate>${memberFields(prefill)}
         <div class="span" style="margin-top:6px"><label class="toggle-row"><span><b>Collect the first fee now</b></span><span class="switch"><input type="checkbox" name="withFee" checked><span></span></span></label></div>
-        <div class="form-grid two span" data-fee>${feeFields({ admission: S.data.business.admissionFee })}</div></form>
+        <div class="form-grid two span" data-fee>${feeFields({ admission: S.data.business.admissionFee })}</div>
+        <div class="span" style="margin-top:6px"><label class="toggle-row"><span><b>Body, calories &amp; protein</b><br><span class="muted" style="font-size:13px;font-weight:500">Weight, height and goal: daily calories and protein, and how the weight will change</span></span><span class="switch"><input type="checkbox" name="withBody"><span></span></span></label></div>
+        <div class="form-grid two span" data-body hidden>${bodyFields({}, prefill.dob)}</div></form>
         <div class="sheet-actions"><button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" data-ok>${icon('userPlus')}Add member</button></div>`,
       onMount: (el, close) => {
         const f = el.querySelector('form');
         wireFee(f);
         f.joinDate.addEventListener('change', () => { f.periodStart.value = f.joinDate.value; f.periodStart.dispatchEvent(new Event('input')); });
         f.withFee.addEventListener('change', () => { el.querySelector('[data-fee]').hidden = !f.withFee.checked; });
+        f.withBody.addEventListener('change', () => { el.querySelector('[data-body]').hidden = !f.withBody.checked; });
+        wireBody(f, () => f.gender.value);
         const ok = el.querySelector('[data-ok]');
         ok.addEventListener('click', () => busy(ok, async () => {
           const d = formData(f);
           const body = { ...d, payment: f.withFee.checked ? { planId: d.planId, periodStart: d.periodStart, admissionFee: d.admissionFee, discount: d.discount, paid: d.paid, method: d.method, date: d.date, note: d.note } : null };
+          if (f.withBody.checked) {
+            body.body = readBody(f, f.gender.value);
+            if (!body.body) return toast('Enter weight, height and age, or switch off "Body, calories & protein"', 'bad');
+          }
           try {
             const r = await api('/api/admin/members', { method: 'POST', body });
             close();
@@ -1073,6 +1179,8 @@
         }).join('')}</div>${d.payments.length > 3 ? `<button class="btn btn-ghost btn-sm" style="margin-top:12px" data-allreceipts>Show all ${d.payments.length} receipts</button>` : ''}` : emptyLine('No payments yet.')}
       </section>
 
+      <section class="card panel section-gap"><div class="panel-head"><h2>Body, calories &amp; protein</h2><div data-need="members.edit"><button class="btn btn-soft btn-sm" data-body-edit>${icon('edit')}${m.body ? 'Update' : 'Add weight & height'}</button></div></div>
+        <div data-body-out>${m.body ? `${outlookHtml({ ...m.body, gender: m.gender === 'female' ? 'female' : 'male' })}<p class="muted" style="font-size:12.5px;margin-top:8px">${m.body.updatedBy === 'staff' ? 'Set at the desk' : 'Set by the member in the app'}${m.body.updatedAt ? ` on ${dateShort(m.body.updatedAt.slice(0, 10))}` : ''} · ${m.body.weight} kg · ${m.body.height} cm · ${m.body.age} years</p>` : emptyLine('No weight and height yet. Add them to see daily calories, protein and how the weight will change.')}</div></section>
       <section class="card panel section-gap"><div class="panel-head"><h2>Workout plan</h2><div style="display:flex;gap:6px" data-need="members.edit"><button class="btn btn-ghost btn-sm" data-wpreset>${icon('star')}Ready plans</button><button class="btn btn-soft btn-sm" data-wday>${icon('edit')}Edit a day</button></div></div>
         <div data-plan><div class="skel" style="height:70px"></div></div></section>
 
@@ -1162,6 +1270,9 @@
       location.hash = '#/members';
     });
     memberPageCalBind(id, d, m);
+    root.querySelector('[data-body-edit]')?.addEventListener('click', () => bodySheet(m, reload));
+    // On the member page the goal cards only show; the goal is changed with Update.
+    root.querySelectorAll('[data-body-out] [data-pick-goal]').forEach((x) => { x.disabled = true; });
     root.querySelector('[data-photo]').addEventListener('click', () => can('members.edit') && photoSheet(m, `/api/admin/members/${id}/photo`, reload));
     // Workout plan: trainers can see and set it; the member sees it in their app.
     const savePlan = async (plan) => { await api(`/api/admin/members/${id}/plan`, { method: 'PUT', body: plan }); reload(); };
@@ -1195,6 +1306,9 @@
       history.replaceState(null, '', `#/member/${id}?cal=${b.dataset.cal}`);
       root.querySelector('[data-calendar]').outerHTML = calendar(d.attendance, b.dataset.cal, m.joinDate);
       memberPageCalBind(id, d, m);
+    root.querySelector('[data-body-edit]')?.addEventListener('click', () => bodySheet(m, reload));
+    // On the member page the goal cards only show; the goal is changed with Update.
+    root.querySelectorAll('[data-body-out] [data-pick-goal]').forEach((x) => { x.disabled = true; });
     }));
   }
 

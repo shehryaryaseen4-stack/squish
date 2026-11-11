@@ -269,6 +269,18 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
 
   // The next free member number. Imported numbers (often long machine IDs) are skipped,
   // so new members keep getting short ones: 1001, 1002…
+  // Staff set weight, height and goal; what the member told the app coach (days, focus,
+  // injuries) is kept. A new weight is also saved as today's weigh-in.
+  function setBodyByStaff(member, input) {
+    const gender = member.gender === 'female' ? 'female' : 'male';
+    member.body = { ...v.body({ ...(member.body || {}), ...input, gender }), updatedAt: stamp(), updatedBy: 'staff' };
+    const date = today();
+    const last = (member.weighIns || []).slice(-1)[0];
+    if (!last || last.kg !== member.body.weight) {
+      member.weighIns = [...(member.weighIns || []).filter((x) => x.d !== date), { d: date, kg: member.body.weight }].sort((a, b) => a.d.localeCompare(b.d)).slice(-200);
+    }
+  }
+
   function nextMemberNo() {
     const d = db();
     const used = new Set(d.members.map((x) => x.memberNo));
@@ -1033,6 +1045,8 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
       const pin = randomPin();
       const seqBefore = d.memberSeq;
       const member = { id: newId('mem'), memberNo: nextMemberNo(), ...data, pin: hashPin(pin), freezes: [], left: false, createdAt: stamp() };
+      // Weight, height and goal from the desk: the member's app starts from the same diet plan.
+      if (body.body && (body.body.weight || body.body.height)) setBodyByStaff(member, body.body);
       d.members.push(member);
       let payment = null;
       if (body.payment && body.payment.planId) {
@@ -1120,6 +1134,11 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
           store.save();
           return { commands: cmds.map((c) => c.id), online: publicDevice(device).online };
         }
+      }
+      if (m === 'PUT' && action === 'body') {
+        setBodyByStaff(member, body);
+        store.save();
+        return { body: member.body, weighIns: member.weighIns };
       }
       if (m === 'PUT' && action === 'plan') {
         member.workoutPlan = { ...v.workoutPlan(body), updatedAt: stamp(), updatedBy: 'trainer' };
