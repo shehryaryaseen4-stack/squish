@@ -28,15 +28,21 @@
   // Pages of this gym. On the multi-gym platform a gym lives under /g/<gym>.
   const url = (p) => `${(window.APP_CONFIG || {}).base || ''}${p}`;
 
-  async function api(path, { method = 'GET', body, token } = {}) {
+  // timeout (ms): give up and treat it as offline. Away from the gym's WiFi the
+  // laptop's address may hang for a long time instead of failing.
+  async function api(path, { method = 'GET', body, token, timeout } = {}) {
     const headers = {};
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     if (token) headers.Authorization = `Bearer ${token}`;
     let res;
+    const ctrl = timeout && typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), timeout) : null;
     try {
-      res = await fetch(`${apiBase()}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+      res = await fetch(`${apiBase()}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: ctrl?.signal });
     } catch {
       throw Object.assign(new Error('You seem to be offline. Check your connection and try again.'), { status: 0 });
+    } finally {
+      if (timer) clearTimeout(timer);
     }
     const data = await res.json().catch(() => ({}));
     if (res.status === 402 && data.locked) showLocked(data);

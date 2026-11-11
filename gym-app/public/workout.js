@@ -13,7 +13,7 @@
   let videos = {};
   async function library() {
     if (lib) return lib;
-    const [res, vids] = await Promise.all([fetch(`${BASE}exercises/library.json`), UI.api('/api/exercise-videos').catch(() => ({}))]);
+    const [res, vids] = await Promise.all([fetch(`${BASE}exercises/library.json`), UI.api('/api/exercise-videos', { timeout: 5000 }).catch(() => ({}))]);
     if (!res.ok) throw new Error('Could not load the exercise library');
     lib = await res.json();
     lib.byId = Object.fromEntries(lib.exercises.map((e) => [e.id, e]));

@@ -13,8 +13,27 @@
 
   const api = (path, opts = {}) => rawApi(path, { ...opts, token: state.token }).catch((e) => {
     if (e.status === 401 && state.token) { logout(true); }
+    if (e.status === 0 && opts.method && opts.method !== 'GET') e.message = 'You are away from the gym. Connect to the gym’s WiFi to save this.';
     throw e;
   });
+
+  // Offline: what the app last got from the gym is kept on the phone, so the member
+  // can open their card, plan, diet and fees at home. Saving still needs the gym.
+  async function cachedGet(path, get) {
+    const key = `cache:${path}`;
+    const kept = store.get(key, null);
+    try {
+      const data = await get({ timeout: kept ? 6000 : 15000 });
+      store.set(key, { at: Date.now(), data });
+      if (state.offlineSince) { state.offlineSince = null; offlineBanner(); }
+      return data;
+    } catch (e) {
+      if (e.status !== 0 || !kept) throw e;
+      state.offlineSince = Math.min(state.offlineSince || Infinity, kept.at);
+      offlineBanner();
+      return kept.data;
+    }
+  }
 
   function nowHere() {
     const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
@@ -175,13 +194,15 @@
     state.token = null;
     state.me = null;
     store.remove('memberToken');
+    // The member's saved data goes too: the next person on this phone mustn't see it.
+    try { Object.keys(localStorage).filter((k) => k.includes('cache:/api/member/')).forEach((k) => localStorage.removeItem(k)); } catch { /* ignore */ }
     if (expired) toast('Please sign in again', 'bad');
     location.hash = '#/';
     route();
   }
 
   async function me(force) {
-    if (!state.me || force) state.me = await api('/api/member/me');
+    if (!state.me || force) state.me = await cachedGet('/api/member/me', (o) => api('/api/member/me', o));
     return state.me;
   }
 
@@ -236,7 +257,7 @@
     const draw = async () => {
       listEl.innerHTML = Array.from({ length: 3 }, () => '<div class="skel" style="height:140px;border-radius:22px"></div>').join('');
       const current = date;
-      const [list, mine] = await Promise.all([rawApi(`/api/classes?date=${date}`), state.token ? me(true).catch(() => null) : null]);
+      const [list, mine] = await Promise.all([cachedGet(`/api/classes?date=${date}`, (o) => rawApi(`/api/classes?date=${date}`, o)), state.token ? me(true).catch(() => null) : null]);
       if (current !== date) return;
       if (!list.length) { listEl.innerHTML = emptyState('calendar', 'No classes', `Nothing scheduled on ${dateLong(date)}.`); return; }
       const staff = (id) => state.gym.staff.find((x) => x.id === id);
@@ -1042,13 +1063,15 @@
 
   function offlineBanner() {
     let bar = document.querySelector('.offline-bar');
-    if (navigator.onLine) { bar?.remove(); return; }
+    const away = state.offlineSince;
+    if (navigator.onLine && !away) { bar?.remove(); return; }
     if (!bar) {
       bar = document.createElement('div');
       bar.className = 'offline-bar';
-      bar.textContent = "You're offline. Connect to see your latest data.";
       document.body.prepend(bar);
     }
+    const when = away ? new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(away)) : '';
+    bar.textContent = away ? `Offline: showing your data from ${when}. On the gym's WiFi it updates by itself.` : "You're offline. Connect to see your latest data.";
   }
 
   let booted = false;
@@ -1057,7 +1080,7 @@
     // A device set up as the entrance TV opens straight into the entry screen.
     try { if (window.APP_CONFIG?.native && localStorage.getItem('deviceRole') === 'display') { location.href = 'display.html'; return; } } catch { /* ignore */ }
     try {
-      state.gym = await rawApi('/api/gym');
+      state.gym = await cachedGet('/api/gym', (o) => rawApi('/api/gym', o));
     } catch (e) {
       if (window.APP_CONFIG?.native && !window.APP_CONFIG.apiBase) {
         // An address that worked before is kept: the gym's laptop may just be off.
