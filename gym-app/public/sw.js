@@ -1,7 +1,7 @@
 // App shell cache: screens open instantly and still load on a bad connection.
 // API calls always go to the network so slots and bookings are never stale.
 // Paths are relative to where the worker lives: "/" or "/g/<gym>/" on the platform.
-const CACHE = 'gym-shell-v12';
+const CACHE = 'gym-shell-v13';
 const BASE = new URL(self.registration.scope).pathname;
 const SHELL = ['', 'index.html', 'modern.js', 'oldbrowser.js', 'base.css', 'gym.css', 'app.css', 'config.js', 'icons.js', 'common.js', 'app.js', 'nutrition.js', 'coach.js', 'supplements.js', 'foods.js', 'workout.js', 'icon.svg'].map((p) => BASE + p);
 

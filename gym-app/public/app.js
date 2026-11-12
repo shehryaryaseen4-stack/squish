@@ -533,7 +533,7 @@
     const b = m.body || {};
     const last = (k) => [...(d.measurements || [])].reverse().find((x) => x[k])?.[k];
     const age = b.age || (m.dob ? Math.floor((Date.parse(today()) - Date.parse(m.dob)) / (365.25 * 864e5)) : '');
-    const chips = (name, list, cur, multi) => `<div class="choice-row" role="${multi ? 'group' : 'radiogroup'}">${list.map(([v, l]) => `<label class="choice-chip"><input type="${multi ? 'checkbox' : 'radio'}" name="${name}" value="${v}" ${(multi ? (cur || []).includes(v) : v === cur) ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>`;
+    const chips = (name, list, cur, multi) => `<div class="choice-row${list.length === 3 && list.every(([, l]) => l.length <= 12) ? ' three' : ''}" role="${multi ? 'group' : 'radiogroup'}">${list.map(([v, l]) => `<label class="choice-chip"><input type="${multi ? 'checkbox' : 'radio'}" name="${name}" value="${v}" ${(multi ? (cur || []).includes(v) : v === cur) ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>`;
     box.innerHTML = `<div class="card box"><h2 style="font-size:19px">${coach ? 'Tell your coach about you' : 'About you'}</h2><p class="muted" style="margin:4px 0 16px">${coach ? 'Your plan, starting weights and diet are made from these answers. You can change them any time.' : 'Used to work out your calories and protein. Only you and your gym can see it.'}</p>
       <form class="form" style="padding:0" novalidate>
         <div class="two-col"><label class="field"><span>Weight (kg)</span><input class="input" name="weight" type="number" inputmode="decimal" min="25" max="300" value="${esc(b.weight || last('weight') || '')}" required></label>
@@ -544,7 +544,7 @@
         <div class="field"><span>Your goal</span>${chips('goal', GOALS, b.goal || 'fit')}<p class="goal-hint" data-goalhint hidden></p></div>
         <div class="field"><span>What you want most</span>${chips('focus', Object.entries(Coach.FOCUS).map(([k, x]) => [k, x.label]), b.focus || 'balanced')}</div>
         <div class="field"><span>How long have you been training?</span>${chips('experience', EXPERIENCE, b.experience || 'new')}</div>
-        <div class="two-col"><label class="field"><span>Days a week you can come</span><select class="select" name="days">${[2, 3, 4, 5, 6].map((n) => `<option value="${n}" ${Number(b.days || 3) === n ? 'selected' : ''}>${n} days</option>`).join('')}</select></label>
+        <div class="two-col"><label class="field"><span>Days a week</span><select class="select" name="days">${[2, 3, 4, 5, 6].map((n) => `<option value="${n}" ${Number(b.days || 3) === n ? 'selected' : ''}>${n} days</option>`).join('')}</select></label>
           <label class="field"><span>Time per workout</span><select class="select" name="minutes">${[[45, '45 min'], [60, '1 hour'], [90, '1.5 hours']].map(([n, l]) => `<option value="${n}" ${Number(b.minutes || 60) === n ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
         <div class="field"><span>Any pain or injury? (we'll avoid risky moves)</span>${chips('injuries', INJURIES, b.injuries, true)}</div>
         <div class="field"><span>What you eat</span>${chips('diet', DIETS, b.diet || 'nonveg')}</div>
