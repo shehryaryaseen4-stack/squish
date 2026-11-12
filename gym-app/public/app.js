@@ -668,7 +668,8 @@
     const m = d.member;
     render(`<div class="page-title"><h1>BMI & your body</h1><p>Your body mass index, a healthy weight for your height, and the plan that fits you.</p></div>${fitTabs('bmi')}<div id="bmi" class="pad" style="margin-top:14px"></div>`);
     const box = document.getElementById('bmi');
-    if (!m.body || params.get('edit')) return bodyForm(box, d, { coach: true, onSaved: () => { location.hash = '#/bmi'; } });
+    // Already on #/bmi, setting the same hash wouldn't redraw: show the result directly.
+    if (!m.body || params.get('edit')) return bodyForm(box, d, { coach: true, onSaved: () => { if (location.hash === '#/bmi') bmiView(new URLSearchParams()); else location.hash = '#/bmi'; } });
     const b = m.body;
     const asian = asianBmi();
     const r = Nutrition.bmi(b, { asian });
