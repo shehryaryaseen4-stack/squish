@@ -565,6 +565,18 @@ function converterSummary(c) {
     backendRequired: c.backendRequired, notes: c.notes, group: c.group };
 }
 
+// Breadcrumb trail down to a format: Home > Image Converter > PNG Converter. Every conversion and
+// compressor page links up to its format and category pages this way (internal links that also
+// show search engines how the site is organised). A format whose page is its category's page
+// (PDF) appears once.
+function formatTrail(f) {
+  const cat = getCategory(f.category);
+  const trail = [['Home', '/']];
+  if (cat && cat.id !== f.id) trail.push([cat.converterName, `/${cat.id}-converter`]);
+  trail.push([`${f.label} Converter`, `/${f.id}-converter`]);
+  return trail;
+}
+
 /**
  * Page metadata for a conversion: title, description, headings, breadcrumbs, keywords
  * and how it is processed. Wording for image conversions matches the existing pages.
@@ -586,7 +598,7 @@ function getConverterMetadata(from, to, opts = {}) {
       ? `Convert ${f.label} to ${t.label} online. Adjust quality and size, convert many files at once and download them as a ZIP. Free, no sign-up.`
       : `Convert ${f.label} to ${t.label} online. Upload your file, choose your options and download the result. Free, no sign-up.`,
     h1, schemaName: h1,
-    breadcrumbs: [['Home', '/'], ['Converters', '/converters'], [`${f.label} to ${t.label}`, c.route]],
+    breadcrumbs: [...formatTrail(f), [`${f.label} to ${t.label}`, c.route]],
     keywords: [`${f.label} to ${t.label}`, `convert ${f.label} to ${t.label}`, `${f.name} to ${t.name} converter`, `${f.extension} to ${t.extension}`],
     converter: converterSummary(c),
   };
@@ -605,7 +617,7 @@ function getCompressMetadata(format, opts = {}) {
     title: `Compress ${f.label} - Free Online ${f.label} Compressor | ${site}`,
     description: `Reduce the file size of ${f.label} ${noun} online. Choose how much smaller, compress many files at once and download them as a ZIP. Free, no sign-up.`,
     h1: `Compress ${f.label} ${image ? 'Images' : 'Files'} Online`, schemaName: `${f.label} Compressor`,
-    breadcrumbs: [['Home', '/'], ['Converters', '/converters'], [`Compress ${f.label}`, c.route]],
+    breadcrumbs: [...formatTrail(f), [`Compress ${f.label}`, c.route]],
     keywords: [`compress ${f.label}`, `${f.label} compressor`, `reduce ${f.label} size`],
     converter: converterSummary(c),
   };
@@ -624,7 +636,7 @@ function getStats() {
 module.exports = {
   STATUS_RANK,
   // categories
-  getCategories, getCategory,
+  getCategories, getCategory, formatTrail,
   // formats
   getFormats, getFormat, getFormatByExtension, getFormatByFilename, getFormatByMimeType, getFormatsByMimeType,
   getFormatByApiFormat, getFormatsByCategory, getInputFormats, getOutputFormats, searchFormats,

@@ -383,8 +383,8 @@ function trustbox() {
 
 // Footer: brand and company links (one list), then five columns of about ten links each (converters, popular
 // conversions, PDF tools, image tools, video/audio and writing tools), so no column runs long.
-const FOOTER_IMAGE = ['/image-resizer', '/remove-background', '/crop-image', '/rotate-image', '/flip-image', '/passport-photo-maker', '/image-to-text', '/favicon-generator', '/compress-jpg', '/compress-png'];
-const FOOTER_MORE = ['/compress-video', '/trim-video', '/mp3-cutter', '/ringtone-maker', '/word-counter', '/signature-generator', '/cover-letter-generator', '/invoice-generator'];
+const FOOTER_IMAGE = ['/image-resizer', '/resize-image-to-50kb', '/us-passport-photo', '/remove-background', '/crop-image', '/rotate-image', '/flip-image', '/passport-photo-maker', '/image-to-text', '/favicon-generator', '/compress-jpg', '/compress-png'];
+const FOOTER_MORE = ['/compress-video', '/compress-video-for-discord', '/video-to-jpg', '/trim-video', '/mp3-cutter', '/ringtone-maker', '/word-counter', '/signature-generator', '/cover-letter-generator', '/invoice-generator'];
 function footer() {
   const pop = [...friendlies().slice(0, 4).map((x) => `<li>${link(`/${x.slug}`, esc(x.h1.replace(/ Converter$/, '')))}</li>`),
     ...POPULAR.slice(0, 8).map(([f, t]) => `<li>${link(pairPath(f, t), pairLabel(f, t))}</li>`)].join('');
@@ -1545,7 +1545,7 @@ function formatPage(slug, base) {
     outs.length ? `<section class="conv-section"><h2>Convert ${f.label} to&hellip;</h2>${conversionLists(slug, 'out')}</section>` : '',
     ins.length ? `<section class="conv-section"><h2>Convert to ${f.label} from&hellip;</h2>${conversionLists(slug, 'in')}</section>` : '',
   ].join('');
-  const crumbs = [['Home', '/'], ['Converters', '/converters'], [`${f.label} Converter`, p]];
+  const crumbs = registry.formatTrail(registry.getFormat(slug));
   const faq = live ? [...(fg ? fg.faq : []), ...FAQ_COMMON] : FAQ_CATALOG;
   const guides = fg && fg.guides ? fg.guides.map((g) => ARTICLE_BY_SLUG.get(g)).filter(Boolean) : [];
   const about = fg ? `<section class="guide prose format-guide">

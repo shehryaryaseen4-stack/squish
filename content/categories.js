@@ -24,6 +24,8 @@ module.exports = {
       ['/jpg-to-webp', 'JPG to WebP', 'Faster pages at the same look.'],
       ['/webp-to-jpg', 'WebP to JPG', 'Open web images in any program.'],
       ['/compress-jpg', 'Compress JPG', 'Make a photo smaller by a chosen percentage.'],
+      ['/resize-image-to-50kb', 'Resize to 50 KB', 'Photos for online forms and job portals.'],
+      ['/us-passport-photo', 'US Passport Photo', '2x2 inch photo at home, free.'],
       ['/image-resizer', 'Image Resizer', 'Fit an upload limit such as 50 KB or 100 KB.'],
     ],
     howto: { h: 'How to convert an image', steps: [
@@ -41,7 +43,7 @@ module.exports = {
       ['Does converting an image reduce its quality?', 'Lossy formats such as JPG, WebP and AVIF are re-encoded at the Quality you choose, which removes detail you can barely see. PNG is lossless. Converting never adds back detail that the original did not have.'],
       ['Can I convert several images at once?', 'Yes. Drop in as many images as you like; each gets its own card, and Download all saves them in one ZIP.'],
     ],
-    guides: ['jpg-vs-png-vs-webp', 'png-to-webp-without-losing-quality', 'open-heic-files-on-windows', 'compress-images-for-website', 'best-image-format-for-website', 'resize-image-to-kb'],
+    guides: ['us-passport-photo-size', 'convert-iphone-photos-for-printing', 'jpg-vs-png-vs-webp', 'png-to-webp-without-losing-quality', 'open-heic-files-on-windows', 'compress-images-for-website', 'best-image-format-for-website', 'resize-image-to-kb'],
   },
 
   pdf: {
@@ -55,6 +57,8 @@ module.exports = {
       ['/excel-to-pdf', 'Excel to PDF', 'Spreadsheets ready to print or share.'],
       ['/compress-pdf', 'Compress PDF', 'Smaller PDFs for email and upload portals.'],
       ['/merge-pdf', 'Merge PDF', 'Several PDFs into one.'],
+      ['/protect-pdf', 'Protect PDF', 'Add a password before sharing.'],
+      ['/crop-pdf', 'Crop PDF', 'Trim margins or cut pages to an area.'],
       ['/ocr-pdf', 'OCR PDF', 'Make scanned PDFs searchable.'],
     ],
     howto: { h: 'How to convert a PDF', steps: [
@@ -71,7 +75,7 @@ module.exports = {
       ['Can I convert a scanned PDF?', 'Yes. Choose OCR and the scanned pages are read with Tesseract, the open-source text recognition engine, before conversion.'],
       ['Is there a page limit?', 'Up to 150 pages for PDF to Word and PDF to HTML, and the upload limit shown in the box for other conversions.'],
     ],
-    guides: ['convert-pdf-to-word-keep-formatting', 'reduce-pdf-file-size', 'why-pdf-looks-different-after-conversion', 'convert-jpg-images-to-one-pdf', 'merge-pdf-files', 'convert-excel-to-pdf'],
+    guides: ['reduce-pdf-size-for-uscis', 'upload-documents-to-irs', 'college-application-documents', 'convert-pdf-to-word-keep-formatting', 'reduce-pdf-file-size', 'why-pdf-looks-different-after-conversion', 'convert-jpg-images-to-one-pdf', 'merge-pdf-files', 'convert-excel-to-pdf'],
   },
 
   document: {
@@ -99,7 +103,7 @@ module.exports = {
       ['Can I convert a PDF back to Word?', 'Yes, with PDF to Word, which rebuilds the PDF as an editable document.'],
       ['Which formats are supported?', 'DOCX, DOC, ODT, RTF, TXT, HTML, Markdown and more, to and from each other and PDF.'],
     ],
-    guides: ['convert-word-to-pdf-on-phone', 'convert-pdf-to-word-keep-formatting', 'why-pdf-looks-different-after-conversion'],
+    guides: ['convert-word-to-pdf-on-phone', 'resume-file-format-for-job-applications', 'convert-pdf-to-word-keep-formatting', 'why-pdf-looks-different-after-conversion'],
   },
 
   audio: {
@@ -140,6 +144,7 @@ module.exports = {
       ['/avi-to-mp4', 'AVI to MP4', 'Old videos in a modern format.'],
       ['/mp4-to-mp3', 'MP4 to MP3', 'Keep only the sound.'],
       ['/video-to-jpg', 'Video to JPG', 'Save still pictures from a video.'],
+      ['/compress-video-for-discord', 'Video for Discord', 'Under the Discord upload limit.'],
       ['/compress-video', 'Compress Video', 'Smaller videos for email and messaging.'],
       ['/trim-video', 'Trim Video', 'Cut the part you need.'],
     ],
@@ -158,7 +163,7 @@ module.exports = {
       ['Can I get pictures from a video?', 'Yes. Convert the video to JPG or PNG to get full-size still pictures, one per second for clips up to a minute, as a ZIP.'],
       ['What is the difference between a format and a codec?', 'The format (MP4, MKV) is the box; the codec (H.264, VP9, AAC) is how the picture and sound inside are compressed. Our guide explains it in detail.'],
     ],
-    guides: ['convert-iphone-video-to-mp4', 'file-format-vs-codec', 'extract-audio-from-video'],
+    guides: ['save-pictures-from-video', 'convert-iphone-video-to-mp4', 'file-format-vs-codec', 'extract-audio-from-video'],
   },
 
   archive: {

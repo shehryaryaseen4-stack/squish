@@ -31,7 +31,7 @@ const tools = [
       ['Can I merge PDFs on my phone?', 'Yes. It works in Chrome, Safari and other browsers on Android and iPhone; use the arrow buttons to change the order.'],
       ['Can I merge a password-protected PDF?', 'Remove the password first with Unlock PDF, then merge it.'],
     ],
-    see: ['/split-pdf', '/organize-pdf', '/compress-pdf', '/jpg-to-pdf', '/extract-pdf-pages'],
+    see: ['/split-pdf', '/organize-pdf', '/compress-pdf', '/jpg-to-pdf', '/extract-pdf-pages', '/crop-pdf', '/protect-pdf'],
   },
   {
     slug: 'split-pdf', name: 'Split PDF', op: 'split', browser: true,
@@ -55,7 +55,7 @@ const tools = [
       ['Does splitting reduce quality?', 'No. The pages are copied exactly as they are: text stays text and images keep their quality.'],
       ['Can I split a password-protected PDF?', 'Unlock it first with Unlock PDF (you need the password), then split it.'],
     ],
-    see: ['/merge-pdf', '/extract-pdf-pages', '/organize-pdf', '/delete-pdf-pages', '/compress-pdf'],
+    see: ['/merge-pdf', '/extract-pdf-pages', '/organize-pdf', '/delete-pdf-pages', '/compress-pdf', '/crop-pdf', '/repair-pdf'],
   },
   {
     slug: 'extract-pdf-pages', name: 'Extract pages', op: 'extract', browser: true,

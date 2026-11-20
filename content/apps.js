@@ -63,7 +63,7 @@ module.exports = [
       ['Where can I print it?', 'Order the 6x4 inch sheet as a normal photo print at a supermarket, chemist or photo kiosk, then cut out the photos along the lines.'],
       ['Is the photo uploaded?', 'No. Everything happens in your browser.'],
     ],
-    see: ['/passport-photo-maker', '/guides/uk-passport-photo-size', '/crop-image', '/image-resizer'],
+    see: ['/passport-photo-maker', '/us-passport-photo', '/guides/uk-passport-photo-size', '/crop-image', '/image-resizer'],
   },
   {
     slug: 'us-passport-photo', howto: 'How to make a US passport photo at home', name: 'US Passport Photo', app: 'passport', country: 'us', menu: false, browser: true,
@@ -87,7 +87,7 @@ module.exports = [
       ['Where can I print it?', 'Order the 4x6 inch sheet as a normal photo print at CVS, Walgreens, Walmart or another photo counter, then cut out the 2x2 photos along the lines.'],
       ['Is the photo uploaded?', 'No. Everything happens in your browser.'],
     ],
-    see: ['/passport-photo-maker', '/guides/us-passport-photo-size', '/crop-image', '/image-resizer'],
+    see: ['/passport-photo-maker', '/uk-passport-photo', '/guides/us-passport-photo-size', '/crop-image', '/image-resizer'],
   },
   {
     slug: 'image-to-text', howto: 'How to convert an image to text', name: 'Image to Text (OCR)', app: 'ocr', accept: 'image',
@@ -290,7 +290,8 @@ module.exports = [
       ['Can I resize a PNG or a screenshot?', 'Yes. Choose JPG as the format for the smallest file; PNG cannot be compressed as much.'],
       ['Is it free and private?', 'Yes. There is no sign-up and no watermark, and the photo is resized in your browser without being uploaded.'],
     ],
-    see: ['/image-resizer', '/crop-image', '/compress-jpg', '/passport-photo-maker', '/signature-generator'],
+    // the other sizes too, so each of these pages links to its siblings
+    see: ['/image-resizer', ...[20, 50, 100, 200].filter((x) => x !== kb).map((x) => `/resize-image-to-${x}kb`), '/crop-image', '/compress-jpg', '/passport-photo-maker', '/signature-generator'],
   })),
   // ------------------------------------------------------------- crop / rotate / flip --
   {
