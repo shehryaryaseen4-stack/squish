@@ -1858,10 +1858,16 @@ function editText(pageId, it) {
   if (S.editing !== it.id) {
     snapshot(); S.sel = { page: pageId, id: it.id };
     const p = pageById(pageId);
-    if (p && !it.wrap) { giveWrap(p, it); if (it.wrap) { o.classList.add('pe-wrap'); o.style.width = `${it.wrap * S.zoom}px`; o.style.left = `${it.x * S.zoom}px`; it.w = it.wrap; } }
+    // The box keeps the size of its text and grows as you type; only at the edge of its column
+    // does the text wrap onto a new line (then it gets that width, and what is below moves down).
+    if (p && !it.wrap && it.type === 'text' && (!it.align || it.align === 'left') && !it.rot) {
+      const cw = columnWidth(p, it);
+      if (cw > 8) { o.classList.add('pe-autow'); o.style.maxWidth = `${cw * S.zoom}px`; o.dataset.cw = String(round(cw)); }
+    }
     S.flowB = it.y + o.offsetHeight / S.zoom; // the things below are placed for this bottom
   }
-  $$('.pe-handle').forEach((e) => e.remove()); o.classList.remove('pe-sel');
+  // one outline while typing: the text's own (the selection box and its handles go)
+  $$('.pe-selbox, .pe-handle').forEach((e) => e.remove()); o.classList.remove('pe-sel');
   startEditing(o, it);
   updateProps();
 }
@@ -1880,6 +1886,13 @@ function finishEditing() {
     const it = p.items.find((i) => i.id === id);
     if (!it) continue;
     if (it.text) it.text = renumber(it.text);
+    // a box that grew to the edge of its column while typing wraps there from now on
+    const typed = $(`.pe-page[data-id="${p.id}"] .pe-obj[data-id="${it.id}"]`);
+    if (typed && typed.dataset.cw && !it.wrap) {
+      const cw = Number(typed.dataset.cw);
+      if (typed.offsetWidth >= cw * S.zoom - 1.5) { it.wrap = cw; it.w = cw; delete it.ax; } else it.w = typed.offsetWidth / S.zoom;
+      it.h = typed.offsetHeight / S.zoom;
+    }
     if (!it.text || !it.text.trim()) {
       p.items = p.items.filter((i) => i !== it);
       if (S.sel && S.sel.id === id) S.sel = null;
@@ -2697,6 +2710,7 @@ function onPointerMove(e) {
     const o = pageEl.querySelector(`.pe-obj[data-id="${it.id}"]`);
     o.style.left = `${it.x * S.zoom}px`; o.style.top = `${it.y * S.zoom}px`;
     showGuides(pageEl, sn.gx, sn.gy);
+    showGaps(pageEl, drag.page, [it]); // the space to the nearest things above, below and beside
     decorateSelection();
     showGaps(pageEl, drag.page, [it]);
     updatePanel();
@@ -2898,20 +2912,15 @@ function onPointerUp(e) {
     const d = drag; drag = null;
     showGaps(null);
     if (d.kind === 'gmove') {
-      if (!d.moved && !d.fresh) {
-        // a click on one of them: just that one (a text takes typing straight away)
-        select(d.page.id, d.clickId);
-        const one = d.page.items.find((o) => o.id === d.clickId);
-        if (one && one.type === 'text' && !one.locked) { editText(d.page.id, one); caretAt(d.page.id, one, e); }
-      }
+      if (!d.moved && !d.fresh) select(d.page.id, d.clickId); // a click on one of them: just that one
       else { drawItems(pageIndex(d.page.id)); updatePanel(); }
       return;
     }
     d.rub.remove();
     const x1 = Math.min(d.start.x, d.end.x), x2 = Math.max(d.start.x, d.end.x), y1 = Math.min(d.start.y, d.end.y), y2 = Math.max(d.start.y, d.end.y);
     if (x2 - x1 < 3 && y2 - y1 < 3) {
-      // a click on the PDF's own text: edit that paragraph, no need to pick "Edit text" first
-      if (d.page.src && groupAt(d.page, d.start)) editRunAt(d.page, d.start);
+      // a click on the PDF's own text: select that paragraph (a second click types in it)
+      if (d.page.src && groupAt(d.page, d.start)) editRunAt(d.page, d.start, { edit: false }).then((t) => { if (t) select(d.page.id, t.id); });
       return;
     }
     const [W, H] = viewSize(d.page);
@@ -2924,10 +2933,10 @@ function onPointerUp(e) {
   if (!drag) return;
   if (drag.kind === 'pdfgrab') {
     const d = drag; drag = null;
-    // a click: type in that paragraph, or select the line, box or picture
+    // a click selects that paragraph, line, box or picture (a second click on text types in it)
     if (!d.moved) {
-      if (d.thing.kind === 'text') editRunAt(d.page, d.start);
-      else liftPdfThing(d.page, d.thing).then((t) => select(d.page.id, t.id)).catch((err) => toast(err.message, true));
+      const lift = d.thing.kind === 'text' ? editRunAt(d.page, d.start, { edit: false }) : liftPdfThing(d.page, d.thing);
+      lift.then((t) => { if (t) select(d.page.id, t.id); }).catch((err) => toast(err.message, true));
     }
     return;
   }
@@ -2960,8 +2969,9 @@ function onPointerUp(e) {
       if (d.kind === 'resize' && d.it.type === 'text' && d.h.length === 1) reflowAfter(p, d.it, d.orig.y + d.orig.h);
     }
     else if (slot) choosePhoto(p, slot);
-    // one click on a text (not a drag): type in it, with the caret where it was clicked
-    else if (d.kind === 'move' && d.it.type === 'text' && S.tool === 'select' && !d.it.locked) { editText(p.id, d.it); caretAt(p.id, d.it, e); }
+    // a click on a text that was already selected (the second click): type in it, with the caret
+    // where it was clicked. The first click only selects it, so it can be dragged straight away.
+    else if (d.kind === 'move' && d.it.type === 'text' && S.tool === 'select' && !d.it.locked && d.was) { editText(p.id, d.it); caretAt(p.id, d.it, e); }
     else if (d.kind === 'move' && d.it.type === 'text' && S.tool !== 'select') editText(p.id, d.it);
     else if (d.kind === 'move' && d.it.type === 'table' && d.rc) { S.cell = { id: d.it.id, ...d.rc }; markActiveCell(d.it); updateProps(); }
     return;
