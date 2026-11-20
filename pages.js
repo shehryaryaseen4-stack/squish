@@ -29,7 +29,8 @@ const GUIDES = { ...require('./content/guides'), ...require('./content/guides-mo
 const CATEGORY_CONTENT = require('./content/categories');
 const FORMAT_GUIDES = require('./content/format-guides');
 // Resume guides only exist alongside the Resume Builder (part of the PDF editor).
-const ARTICLES = [...require('./content/articles'), ...(process.env.PDF_EDITOR === '1' ? require('./content/resume-articles') : [])];
+// Guides, the "alternative to ..." comparisons (content/alternatives.js) and, with the editor, resume guides
+const ARTICLES = [...require('./content/articles'), ...require('./content/alternatives'), ...(process.env.PDF_EDITOR === '1' ? require('./content/resume-articles') : [])];
 const KEYWORDS = require('./content/keywords');
 const USES = require('./content/uses');
 // The PDF intelligence tools (AI summarizer, Translate PDF, PDF to Markdown) are switched on with
@@ -1801,6 +1802,9 @@ const toolName = (p) => {
   if (PDF_TOOL_BY_SLUG.has(p.slice(1))) return PDF_TOOL_BY_SLUG.get(p.slice(1)).name;
   if (APP_BY_SLUG.has(p.slice(1))) return APP_BY_SLUG.get(p.slice(1)).name;
   if (p === '/pdf-tools') return 'All PDF tools';
+  if (p === '/converters') return 'All converters';
+  const cat = CATS.find((c) => categoryPath(c.id) === p);
+  if (cat) return cat.converterName;
   const r = registry.resolveRoute(p, ANY);
   return r && r.type === 'compress' ? `Compress ${r.from.label}` : r ? `${r.from.label} to ${r.to.label}` : p;
 };
@@ -1814,11 +1818,14 @@ function readMore(toolPath) {
     .map((a) => `<li>${link(articlePath(a.slug), esc(a.h1))}<span>${esc(a.desc)}</span></li>`).join('')}</ul></section>`;
 }
 
-function articlePage(a, base) {
+// {{MAX_MB}} in a guide's text becomes this server's per-file limit
+const fillLimits = (t) => String(t).replace(/\{\{MAX_MB\}\}/g, String(MAX_MB));
+function articlePage(a0, base) {
+  const a = { ...a0, intro: fillLimits(a0.intro), sections: a0.sections.map(([h, html]) => [h, fillLimits(html)]), faq: a0.faq.map(([q, x]) => [fillLimits(q), fillLimits(x)]) };
   const p = articlePath(a.slug);
   const crumbs = [['Home', '/'], ['Guides', '/guides'], [a.h1, p]];
   const tools = `<div class="article-tools">${a.tools.map((t, i) => `<a class="btn ${i ? 'btn-ghost' : 'btn-brand'} btn-sm" href="${t}">${icon('convert')}${esc(toolName(t))}</a>`).join('')}</div>`;
-  const others = ARTICLES.filter((x) => x !== a).map((x) => [articlePath(x.slug), esc(x.h1), true]);
+  const others = ARTICLES.filter((x) => x.slug !== a.slug).map((x) => [articlePath(x.slug), esc(x.h1), true]);
   return renderPage(HUB_TPL, baseFields(base, p, a.title, a.desc, {
     JSONLD: graph(base, p, a.h1, a.desc, a.faq, crumbs, { type: 'Article', article: a }),
     HERO: hero({ h1: esc(a.h1), crumbs, intro: esc(a.intro), short: true }),
