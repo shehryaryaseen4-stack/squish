@@ -2080,7 +2080,9 @@ async function textRuns(p) {
     try { fo = page.commonObjs.has(t.fontName) ? page.commonObjs.get(t.fontName) : null; name = (fo && fo.name) || ''; } catch { /* font not loaded */ }
     // An OCR layer (a searchable PDF: Tesseract's invisible "GlyphLessFont" over a scan) has no real
     // font and a rough size: retype it in Helvetica, sized so the word is as wide as on the scan.
-    const ocr = /glyphless/i.test(name);
+    // (pdf.js gives an embedded font's own name only sometimes; Tesseract's GlyphLessFont is also
+    // known by its metrics: an ascent of exactly 1 and no descent, on a monospace fallback)
+    const ocr = /glyphless/i.test(name) || (style.fontFamily === 'monospace' && style.ascent === 1 && Math.abs(style.descent || 0) < 0.01);
     let sz = size;
     if (ocr && t.str.trim().length >= 3) {
       const one = markerWidth({ font: 'helv', size: 1 }, t.str);
@@ -2093,6 +2095,29 @@ async function textRuns(p) {
       // pdf.js names a standard font plainly ("Helvetica" for Helvetica-Bold) and says bold apart
       font: family, bold: /bold|black|heavy|semibold|demi/i.test(name) || !!(fo && (fo.bold || fo.black)), italic: /italic|oblique/i.test(name) || !!(fo && fo.italic), ocr,
     });
+  }
+  // OCR words on one line: one size and one baseline for the line (each word was sized from its
+  // own width, and a pixel of difference in baseline would put a word ahead of the one before
+  // it), so the words join into one line when it is picked up. A line is words at the same height
+  // that follow each other: a column further right is another line.
+  const ocrRuns = runs.filter((r) => r.ocr).sort((a, b) => a.base - b.base);
+  const rows = [];
+  for (const r of ocrRuns) {
+    const row = rows.find((w) => Math.abs(w.base - r.base) < Math.max(w.size, r.size) * 0.35);
+    if (row) { row.runs.push(r); row.size = Math.max(row.size, r.size); } else rows.push({ base: r.base, size: r.size, runs: [r] });
+  }
+  for (const row of rows) {
+    const byX = row.runs.sort((a, b) => a.x - b.x);
+    const lines = [[byX[0]]];
+    for (const r of byX.slice(1)) {
+      const prev = lines[lines.length - 1][lines[lines.length - 1].length - 1];
+      if (r.x - (prev.x + prev.w) > 1.5 * Math.max(prev.size, r.size)) lines.push([r]); else lines[lines.length - 1].push(r);
+    }
+    for (const line of lines) {
+      const mid = (v) => v.sort((a, b) => a - b)[Math.floor(v.length / 2)];
+      const sz = mid(line.map((r) => r.size)), base = mid(line.map((r) => r.base));
+      for (const r of line) { r.size = sz; r.base = base; r.top = base - sz * 0.92; r.h = sz * 1.18; }
+    }
   }
   S.runs.set(key, runs);
   return runs;
@@ -2242,6 +2267,60 @@ function applyPick(pick, a) {
   }
 }
 
+// A line of an OCR layer (a searchable PDF) is placed from Tesseract's word boxes, which are often
+// a little short: the last letter, or the top of a capital, falls outside. Grown here to the ink on
+// the rendered page, so the cover hides every letter. Columns (and rows) are added while they
+// still hold ink; a run of plain background as wide as a word space ends it.
+function inkBox(p, box, size, bg) {
+  try {
+    const cv = $(`.pe-page[data-id="${p.id}"] canvas`);
+    const [vw] = viewSize(p);
+    if (!cv || cv.width < 4 || !bg) return box;
+    const k = cv.width / vw;
+    const reach = Math.ceil(size * 0.9 * k), gapMax = Math.max(2, Math.round(size * 0.28 * k));
+    const X0 = Math.max(0, Math.floor((box.x - size * 0.9) * k)), Y0 = Math.max(0, Math.floor((box.y - size * 0.35) * k));
+    const X1 = Math.min(cv.width, Math.ceil((box.x + box.w + size * 0.9) * k)), Y1 = Math.min(cv.height, Math.ceil((box.y + box.h + size * 0.35) * k));
+    const w = X1 - X0, h = Y1 - Y0;
+    if (w < 2 || h < 2) return box;
+    const d = cv.getContext('2d').getImageData(X0, Y0, w, h).data;
+    const c = [1, 3, 5].map((i) => parseInt(bg.slice(i, i + 2), 16));
+    const ink = (x, y) => { const i = (y * w + x) * 4; return Math.abs(d[i] - c[0]) + Math.abs(d[i + 1] - c[1]) + Math.abs(d[i + 2] - c[2]) > 90; };
+    let x0 = Math.max(0, Math.floor(box.x * k) - X0), x1 = Math.min(w - 1, Math.ceil((box.x + box.w) * k) - X0);
+    let y0 = Math.max(0, Math.floor(box.y * k) - Y0), y1 = Math.min(h - 1, Math.ceil((box.y + box.h) * k) - Y0);
+    const colInk = (x) => { for (let y = y0; y <= y1; y++) if (ink(x, y)) return true; return false; };
+    const rowInk = (y) => { for (let x = x0; x <= x1; x++) if (ink(x, y)) return true; return false; };
+    const grow = (from, step, limit, test) => {
+      let last = from, gap = 0;
+      for (let v = from + step; step > 0 ? v <= limit : v >= limit; v += step) {
+        if (test(v)) { last = v; gap = 0; } else if (++gap > gapMax) break;
+        if (Math.abs(v - from) > reach) break;
+      }
+      return last;
+    };
+    x1 = grow(x1, 1, w - 1, colInk); x0 = grow(x0, -1, 0, colInk);
+    // up and down only a little: the line above or below is often close (Tesseract's line height
+    // is right; it is the word ends that fall short)
+    const vmax = Math.max(1, Math.round(size * 0.14 * k));
+    y0 = Math.max(y0 - vmax, grow(y0, -1, 0, rowInk)); y1 = Math.min(y1 + vmax, grow(y1, 1, h - 1, rowInk));
+    // stroke width = ink area / half its outline; Helvetica measures about 0.08 of the size,
+    // Helvetica Bold about 0.125 at full resolution (see engines/pdfx/editable.py)
+    let area = 0, edge = 0;
+    for (let y = y0 + 1; y < y1; y++) for (let x = x0 + 1; x < x1; x++) {
+      if (!ink(x, y)) continue;
+      area++;
+      if (!ink(x - 1, y) || !ink(x + 1, y) || !ink(x, y - 1) || !ink(x, y + 1)) edge++;
+    }
+    // the size from the ink's height too (capitals reach 0.72 of it): a wide typeface sized from
+    // its width alone reads too big, and its letters too thin
+    const sizePx = Math.min(size * k, (y1 - y0 + 1) / 0.72), ratio = edge ? (2 * area) / edge / sizePx : 0;
+    // On the screen canvas thin strokes are only a pixel or two wide, so every letter reads heavy:
+    // only text big enough to measure (18 px and up) and clearly heavy counts as bold
+    const bold = sizePx >= 18 && ratio > Math.max(0.13, 2.3 / sizePx);
+    const pad = 1.5; // anti-aliased edges
+    return { x: (X0 + x0) / k - pad, y: (Y0 + y0) / k - pad, w: (x1 - x0 + 1) / k + 2 * pad, h: (y1 - y0 + 1) / k + 2 * pad, bold };
+  } catch { return box; }
+}
+
 // The page's own colours around and inside a box (from the rendered page): the background, to
 // cover old text with, and the text colour, so edited text keeps its look (blue, grey, white
 // on a dark sidebar ...).
@@ -2345,7 +2424,13 @@ async function editRunAt(p, pt, { edit = true } = {}) {
   // the old lines are covered in the page's own background colour; these covers never move
   // "of" marks which paragraph of the PDF they replace, so its old outline is never shown again
   const of = [Math.round(all.x * 10) / 10, Math.round(all.y * 10) / 10];
-  const covers = lines.map((r) => ({ id: uid(), type: 'whiteout', color: col.bg, opacity: 100, cover: true, of, x: r.x - 1, y: r.top - 1, w: r.w + 2, h: r.h + 2 }));
+  let inkBold = 0;
+  const covers = lines.map((r) => {
+    const b = r.ocr ? inkBox(p, { x: r.x, y: r.top, w: r.w, h: r.h }, r.size, col.bg) : { x: r.x - 1, y: r.top - 1, w: r.w + 2, h: r.h + 2 };
+    if (b.bold) inkBold++;
+    return { id: uid(), type: 'whiteout', color: col.bg, opacity: 100, cover: true, of, x: b.x, y: b.y, w: b.w, h: b.h };
+  });
+  if (run.ocr && inkBold > lines.length / 2) run.bold = true; // an OCR layer says nothing about weight
   const lh = lines.length > 1 ? Math.round((lineStep / size) * 100) / 100 : undefined;
   const t = { id: uid(), type: 'text', text, font: run.font, size, bold: run.bold, italic: run.italic, underline: false, align: 'left', color: col.fg || '#000000', opacity: 100,
     x: left, y: lines[0].base - baselineOffset(run.font, size, lh || LINE), w: right - left, h: lines[lines.length - 1].top + lines[lines.length - 1].h - lines[0].top };
