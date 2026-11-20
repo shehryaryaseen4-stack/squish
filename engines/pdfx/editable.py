@@ -174,7 +174,7 @@ def fit(m, font):
     return max(size, 4.0)
 
 
-def page(doc, path, lang, dpi, stats):
+def page(doc, path, lang, dpi, stats, words=None):
     img = cv2.imread(path, cv2.IMREAD_COLOR)
     if img is None:
         raise SystemExit(4)
@@ -182,7 +182,8 @@ def page(doc, path, lang, dpi, stats):
     k = 72.0 / dpi
     if max(W, H) * k > MAX_PAGE_PT:
         k = MAX_PAGE_PT / max(W, H)
-    words = tsv(path, lang)
+    if words is None:
+        words = tsv(path, lang)
     clean = img.copy()
     paint = np.zeros((H, W), np.uint8)
     out = []
@@ -224,8 +225,13 @@ def main():
     out, lang, dpi, images = sys.argv[1], sys.argv[2], float(sys.argv[3]), sys.argv[4:]
     doc = fitz.open()
     stats = {'pages': len(images), 'lines': 0, 'words': 0}
-    for p in images:
-        page(doc, p, lang, dpi, stats)
+    # Tesseract reads the pages side by side (one core each); the pages are then built in order
+    from concurrent.futures import ThreadPoolExecutor
+    workers = max(1, int(os.environ.get('OCR_PARALLEL', '2')))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        read = list(pool.map(lambda p: tsv(p, lang), images))
+    for p, words in zip(images, read):
+        page(doc, p, lang, dpi, stats, words)
     doc.set_metadata({'producer': 'Flipit Free OCR', 'creator': 'Flipit Free'})
     doc.save(out, garbage=3, deflate=True)
     print(json.dumps(stats))

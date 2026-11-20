@@ -199,6 +199,7 @@ app.post('/api/compress', upload.single('file'), async (req, res) => {
     }
 
     pair = `${inFormat.label} \u2192 ${outFormat.label}`;
+    const t0 = Date.now();
     const handler = getHandler(converter.handler);
     const job = (q, dim) => handler(
       { buffer: req.file.buffer, inputExt, format: outFormat.apiFormat, quality: q, maxDim: dim, from: inFormat, to: outFormat, filename: originalName, level: String(req.body.level || ''), ocr: req.body.ocr === '1', lang: String(req.body.lang || '').slice(0, 20) },
@@ -219,7 +220,11 @@ app.post('/api/compress', upload.single('file'), async (req, res) => {
     const ext = out.ext || outFormat.extension;
     const mime = ext === 'zip' && outFormat.id !== 'zip' ? MIME_ZIP : (out.mime || outFormat.mimeType);
 
+    const ms = Date.now() - t0;
+    if (ms > 5000) console.log(`slow conversion: ${pair} ${(originalSize / 1048576).toFixed(1)} MB in ${(ms / 1000).toFixed(1)} s`);
     res.set({
+      // how long the work itself took (browser dev tools show it): tells server time from upload time
+      'Server-Timing': `convert;dur=${ms}`,
       'Content-Type': mime,
       'Content-Disposition': disposition(`${safeName(originalName, inFormat)}.${ext}`),
       'X-Original-Size': String(originalSize),
@@ -274,7 +279,11 @@ app.post('/api/ocr', upload.single('file'), async (req, res) => {
   const format = req.body && ['pdf', 'editable'].includes(req.body.format) ? req.body.format : 'txt';
   try {
     if (!req.file) return res.status(400).json({ error: 'No file received.' });
+    const t0 = Date.now();
     const out = await ocrEngine.ocr({ buffer: req.file.buffer, lang: String(req.body.lang || 'eng'), format });
+    const ms = Date.now() - t0;
+    if (ms > 5000) console.log(`slow OCR: ${format}, ${out.pages} page(s), ${(req.file.size / 1048576).toFixed(1)} MB in ${(ms / 1000).toFixed(1)} s`);
+    res.set('Server-Timing', `ocr;dur=${ms}`);
     const base = String(req.file.originalname || 'scan').replace(/\.[^.]+$/, '').replace(/[^\w.-]+/g, '-').slice(0, 80) || 'scan';
     res.set({
       'Content-Type': format === 'txt' ? 'text/plain; charset=utf-8' : 'application/pdf',
