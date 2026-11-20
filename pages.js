@@ -1374,7 +1374,8 @@ function appBox(t) {
       <label>Language<select data-lang>${(langs.length ? langs : [['eng', 'English']]).map(([id, n]) => `<option value="${id}">${n}</option>`).join('')}</select></label>
       <fieldset class="pt-radios"><legend>Result</legend>
         <label><input type="radio" name="fmt" value="txt"${pdfFirst ? '' : ' checked'}> Text (copy or TXT)</label>
-        <label><input type="radio" name="fmt" value="pdf"${pdfFirst ? ' checked' : ''}> Searchable PDF</label></fieldset>
+        <label><input type="radio" name="fmt" value="pdf"${pdfFirst ? ' checked' : ''}> Searchable PDF <small>(looks exactly the same)</small></label>
+        <label><input type="radio" name="fmt" value="editable"> Editable PDF <small>(change the text in our PDF editor)</small></label></fieldset>
     </form>
     <div class="pt-bar"><p class="pt-msg" data-msg role="status" aria-live="polite"></p><button type="button" class="btn btn-brand pt-go" data-go>Read text</button></div>
   </div>
@@ -1384,9 +1385,9 @@ function appBox(t) {
   </div>
   <div class="pt-done" data-done hidden>
     <span class="pt-done-ico" aria-hidden="true">&#10003;</span>
-    <h2 class="pt-done-h">Your searchable PDF is ready</h2>
+    <h2 class="pt-done-h" data-done-h>Your searchable PDF is ready</h2>
     <p class="pt-done-text" data-done-text></p>
-    <div class="pt-done-btns"><a class="btn btn-brand" data-dl-pdf href="#" download>${icon('download')}Download PDF</a><button type="button" class="btn btn-ghost" data-again>Start over</button></div>
+    <div class="pt-done-btns"><a class="btn btn-brand" data-dl-pdf href="#" download>${icon('download')}Download PDF</a>${PDF_EDITOR ? '<a class="btn btn-ghost" data-edit-pdf href="/edit-pdf" hidden>Edit it in the PDF editor</a>' : ''}<button type="button" class="btn btn-ghost" data-again>Start over</button></div>
   </div>
   <noscript><p class="pt-msg">This tool needs JavaScript. Please turn it on and reload the page.</p></noscript>
 </section>`;

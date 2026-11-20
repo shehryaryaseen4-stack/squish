@@ -271,18 +271,18 @@ app.post('/api/pdf-tool', upload.single('file'), async (req, res) => {
 // Text recognition (Image to Text, OCR PDF): text back as plain text, or a searchable PDF.
 const ocrEngine = require('./engines/ocr');
 app.post('/api/ocr', upload.single('file'), async (req, res) => {
-  const format = req.body && req.body.format === 'pdf' ? 'pdf' : 'txt';
+  const format = req.body && ['pdf', 'editable'].includes(req.body.format) ? req.body.format : 'txt';
   try {
     if (!req.file) return res.status(400).json({ error: 'No file received.' });
     const out = await ocrEngine.ocr({ buffer: req.file.buffer, lang: String(req.body.lang || 'eng'), format });
     const base = String(req.file.originalname || 'scan').replace(/\.[^.]+$/, '').replace(/[^\w.-]+/g, '-').slice(0, 80) || 'scan';
     res.set({
-      'Content-Type': format === 'pdf' ? 'application/pdf' : 'text/plain; charset=utf-8',
-      'Content-Disposition': disposition(format === 'pdf' ? `${base}-searchable.pdf` : `${base}.txt`),
+      'Content-Type': format === 'txt' ? 'text/plain; charset=utf-8' : 'application/pdf',
+      'Content-Disposition': disposition(format === 'txt' ? `${base}.txt` : `${base}-${format === 'pdf' ? 'searchable' : 'editable'}.pdf`),
       'X-Pages': String(out.pages),
     });
     res.send(out.buffer);
-    analytics.event(req, 'tool', { pair: format === 'pdf' ? 'OCR to PDF' : 'OCR to text', p: fromPage(req) });
+    analytics.event(req, 'tool', { pair: { pdf: 'OCR to PDF', editable: 'OCR to editable PDF', txt: 'OCR to text' }[format], p: fromPage(req) });
   } catch (err) {
     analytics.event(req, 'fail', { pair: 'OCR', p: fromPage(req) });
     if (err.userMessage) return res.status(err.statusCode || 422).json({ error: err.userMessage });

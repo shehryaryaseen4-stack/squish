@@ -2,8 +2,10 @@
 // OCR (text recognition) with Tesseract, for the /image-to-text and /ocr-pdf pages.
 //   images (JPG, PNG, WEBP, TIFF, BMP, GIF, HEIC ...)  -> read as one page
 //   PDF                                                 -> each page rendered at 300 dpi (pdftoppm), then read
-// Output: plain text (pages separated by a form feed and a "Page N" line) or a searchable PDF (the
-// page images with an invisible text layer, made by Tesseract and joined with qpdf).
+// Output: plain text (pages separated by a form feed and a "Page N" line), a searchable PDF (the
+// page images with an invisible text layer, made by Tesseract and joined with qpdf), or an
+// editable PDF (engines/pdfx/editable.py: the recognised lines taken out of the picture and
+// written back as real text in the same size, color and weight, so they edit cleanly).
 
 const fs = require('fs/promises');
 const fsSync = require('fs');
@@ -25,10 +27,12 @@ if (TESSERACT) {
 }
 const available = () => TESSERACT && LANGS.includes('eng');
 
+const PYTHON = process.env.PDF2DOCX_PYTHON || 'pdf2docx-python';
+const EDITABLE = path.join(__dirname, 'pdfx', 'editable.py');
 const isPdf = (buf) => buf.length > 4 && buf.subarray(0, 1024).includes('%PDF');
 
 /**
- * @param {{buffer: Buffer, filename?: string, lang?: string, format?: 'txt'|'pdf'}} p
+ * @param {{buffer: Buffer, filename?: string, lang?: string, format?: 'txt'|'pdf'|'editable'}} p
  * @returns {Promise<{buffer: Buffer, ext: string, pages: number}>}
  */
 async function ocr({ buffer, lang = 'eng', format = 'txt' }) {
@@ -36,13 +40,14 @@ async function ocr({ buffer, lang = 'eng', format = 'txt' }) {
   // "eng" or "eng+spa": only installed languages, at most three
   const langs = String(lang).split('+').filter((l) => LANGS.includes(l)).slice(0, 3);
   const L = (langs.length ? langs : ['eng']).join('+');
-  const out = format === 'pdf' ? 'pdf' : 'txt';
+  const out = ['pdf', 'editable'].includes(format) ? format : 'txt';
+  const color = out === 'editable'; // the editable PDF keeps the picture's colors
   return job(async (dir) => {
     let pages = [];
     if (isPdf(buffer)) {
       const input = path.join(dir, 'input.pdf');
       await fs.writeFile(input, buffer);
-      try { await run('pdftoppm', ['-r', '300', '-gray', '-png', '-l', String(MAX_PAGES), input, path.join(dir, 'p')]); } catch (e) {
+      try { await run('pdftoppm', ['-r', '300', ...(color ? [] : ['-gray']), '-png', '-l', String(MAX_PAGES), input, path.join(dir, 'p')]); } catch (e) {
         if (/Incorrect password|encrypted/i.test(e.stderr || '')) throw new UserError('This PDF is password-protected. Remove the password with Unlock PDF, then try again.', 422);
         throw new UserError('This PDF could not be read. It may be damaged.', 415);
       }
@@ -52,7 +57,12 @@ async function ocr({ buffer, lang = 'eng', format = 'txt' }) {
       // Any image: normalise to a grey PNG first (also handles HEIC, WEBP, AVIF, rotated phone photos)
       const sharp = require('sharp');
       const png = path.join(dir, 'p-1.png');
-      try { await sharp(buffer, { failOn: 'none' }).rotate().grayscale().png().toFile(png); } catch {
+      try {
+        let img = sharp(buffer, { failOn: 'none' }).rotate();
+        if (!color) img = img.grayscale();
+        else img = img.flatten({ background: '#ffffff' }); // transparent areas become white, not black
+        await img.png().toFile(png);
+      } catch {
         throw new UserError('This file could not be read. Upload a photo or scan (JPG, PNG, WEBP, HEIC, TIFF) or a PDF.', 415);
       }
       pages = [png];
@@ -67,6 +77,12 @@ async function ocr({ buffer, lang = 'eng', format = 'txt' }) {
       }
       const text = texts.join('\n\n').trim();
       return { buffer: Buffer.from(text ? `${text}\n` : '', 'utf8'), ext: 'txt', pages: pages.length };
+    }
+    if (out === 'editable') {
+      const file = path.join(dir, 'editable.pdf');
+      // pictures are taken as screen pixels (96 per inch), PDF pages were rendered at 300 dpi
+      await run(PYTHON, [EDITABLE, file, L, isPdf(buffer) ? '300' : '96', ...pages], { env });
+      return { buffer: await readCapped(file), ext: 'pdf', pages: pages.length };
     }
     const parts = [];
     for (const img of pages) {

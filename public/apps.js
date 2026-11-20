@@ -218,10 +218,15 @@ function ocr() {
       const name = file.name.replace(/\.[^.]+$/, '') || 'scan';
       if (url) URL.revokeObjectURL(url);
       url = URL.createObjectURL(xhr.response);
-      beacon(fmt === 'pdf' ? 'OCR to PDF' : 'OCR to text');
-      if (fmt === 'pdf') {
-        const a = $('[data-dl-pdf]'); a.href = url; a.download = `${name}-searchable.pdf`;
-        $('[data-done-text]').textContent = `${pages} page${pages > 1 ? 's' : ''} read. The PDF looks the same as before, and now you can search it and copy its text.`;
+      beacon({ pdf: 'OCR to PDF', editable: 'OCR to editable PDF' }[fmt] || 'OCR to text');
+      if (fmt === 'pdf' || fmt === 'editable') {
+        const editable = fmt === 'editable';
+        const a = $('[data-dl-pdf]'); a.href = url; a.download = `${name}-${editable ? 'editable' : 'searchable'}.pdf`;
+        $('[data-done-h]').textContent = editable ? 'Your editable PDF is ready' : 'Your searchable PDF is ready';
+        $('[data-done-text]').textContent = editable
+          ? `${pages} page${pages > 1 ? 's' : ''} read. The text is now real text: open the PDF in a PDF editor to change it, and it keeps its size, color and weight. Text is set in Helvetica, and recognition can make mistakes, so check names and numbers.`
+          : `${pages} page${pages > 1 ? 's' : ''} read. The PDF looks the same as before, and now you can search it and copy its text.`;
+        const ed = $('[data-edit-pdf]'); if (ed) ed.hidden = !editable;
         show('done'); return;
       }
       const text = await xhr.response.text();

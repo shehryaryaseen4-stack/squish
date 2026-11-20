@@ -2063,13 +2063,22 @@ async function textRuns(p) {
     const size = Math.hypot(m[2], m[3]);
     if (size < 2) continue;
     const style = tc.styles[t.fontName] || {};
-    let name = '';
-    try { const f = page.commonObjs.has(t.fontName) ? page.commonObjs.get(t.fontName) : null; name = (f && f.name) || ''; } catch { /* font not loaded */ }
-    const family = catalogMatch(name) || (/mono|courier/i.test(`${style.fontFamily} ${name}`) ? 'courier'
+    let name = '', fo = null;
+    try { fo = page.commonObjs.has(t.fontName) ? page.commonObjs.get(t.fontName) : null; name = (fo && fo.name) || ''; } catch { /* font not loaded */ }
+    // An OCR layer (a searchable PDF: Tesseract's invisible "GlyphLessFont" over a scan) has no real
+    // font and a rough size: retype it in Helvetica, sized so the word is as wide as on the scan.
+    const ocr = /glyphless/i.test(name);
+    let sz = size;
+    if (ocr && t.str.trim().length >= 3) {
+      const one = markerWidth({ font: 'helv', size: 1 }, t.str);
+      if (one > 0) sz = (t.width * (vp.scale || 1)) / one;
+    }
+    const family = ocr ? 'helv' : catalogMatch(name) || (/mono|courier/i.test(`${style.fontFamily} ${name}`) ? 'courier'
       : (/serif/i.test(style.fontFamily || '') && !/sans/i.test(style.fontFamily || '')) || /times|roman|georgia|garamond/i.test(name) ? 'times' : 'helv');
     runs.push({
-      str: t.str, size, x: m[4], base: m[5], w: t.width * (vp.scale || 1), top: m[5] - size * 0.92, h: size * 1.18,
-      font: family, bold: /bold|black|heavy|semibold|demi/i.test(name), italic: /italic|oblique/i.test(name),
+      str: t.str, size: sz, x: m[4], base: m[5], w: t.width * (vp.scale || 1), top: m[5] - sz * 0.92, h: sz * 1.18,
+      // pdf.js names a standard font plainly ("Helvetica" for Helvetica-Bold) and says bold apart
+      font: family, bold: /bold|black|heavy|semibold|demi/i.test(name) || !!(fo && (fo.bold || fo.black)), italic: /italic|oblique/i.test(name) || !!(fo && fo.italic), ocr,
     });
   }
   S.runs.set(key, runs);
@@ -2333,7 +2342,8 @@ async function editRunAt(p, pt, { edit = true } = {}) {
   S.sel = { page: p.id, id: t.id };
   if (!edit) return t;
   editText(p.id, t);
-  if (lines.length > 1) toast(`Editing the whole paragraph (${lines.length} lines). Lines wrap inside the box; drag its sides to change the width.`);
+  if (run.ocr) toast('This text was read from a picture (OCR). For text that edits cleanly everywhere, make an Editable PDF with Image to Text first.');
+  else if (lines.length > 1) toast(`Editing the whole paragraph (${lines.length} lines). Lines wrap inside the box; drag its sides to change the width.`);
 }
 
 // ------------------------------------------------------------ hover --
