@@ -130,7 +130,7 @@ test('a face terminal in access-control mode (SenseFace 2A) checks members in fr
     'time=2026-10-19 07:06:00\tpin=0\tcardno=0\teventaddr=1\tevent=27\tinoutstatus=0\tverifytype=15\tindex=2', // a stranger
     `time=2026-10-19 07:07:00\tpin=${m.memberNo}\tcardno=0\teventaddr=1\tevent=23\tinoutstatus=0\tverifytype=15\tindex=3`, // refused by the door
   ].join('\n');
-  assert.equal((await call('/iclock/cdata?SN=NYU7252500300&table=rtlog&Stamp=1', { method: 'POST', text: rows })).text, 'OK: 1');
+  assert.equal((await call('/iclock/cdata?SN=NYU7252500300&table=rtlog&Stamp=1', { method: 'POST', text: rows })).text, 'OK');
   const att = (await call('/api/admin/attendance?date=2026-10-19', { token })).body.list;
   assert.equal(att.length, 1);
   assert.equal(att[0].in, '07:05');

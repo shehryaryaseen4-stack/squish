@@ -719,8 +719,20 @@ function createApi(store, { now: clock = () => new Date() } = {}) {
           if (r === 'in' || r === 'out') device.punches++;
         }
         store.save();
-        return [200, `OK: ${n}`];
+        // Access-control firmware expects a plain OK for its event log.
+        return [200, 'OK'];
       }
+      // Access-control firmware uploads users, faces and fingerprints as
+      // "table=tabledata&tablename=biodata" rows ("biodata pin=1001\ttype=9\t…").
+      if (/^tabledata$/i.test(table || '')) {
+        device.acMode = true;
+        const name = String(url.searchParams.get('tablename') || '').toLowerCase();
+        const rows = String(text || '').split(/\r?\n/).filter((l) => l.trim());
+        enrollment.operlog(rows.map((l) => (/^[a-z]/i.test(l) && l.trim().split(/\s/)[0].includes('=') && name ? `${name} ${l.trim()}` : l)).join('\n'));
+        store.save();
+        return [200, `${name || 'data'}=${rows.length}`];
+      }
+      if (/^(rtstate|options|errorlog)$/i.test(table || '')) { store.save(); return [200, 'OK']; }
       if (table !== 'ATTLOG') {
         // Answers to "send me this member's face" come as bare rows of that table.
         const rows = String(text || '').split(/\r?\n/).map((l) => (l && table && !/^(FP|FACE|BIODATA|USER|USERINFO|FINGERTMP)\s/.test(l) && /^(FINGERTMP|BIODATA|USERINFO|FACE)$/i.test(table) ? `${table.toUpperCase()} ${l}` : l)).join('\n');

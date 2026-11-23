@@ -72,16 +72,18 @@ function createEnroll({ db, store, stamp, now = () => Date.now() }) {
   function enroll(member, device, { method, finger = 6, card = '', pin = '' }) {
     const how = METHODS[method];
     if (!how) throw new Error('Choose fingerprint, face, palm, card or PIN');
+    // Access-control firmware: the user line in its own format, with the card or PIN in it.
+    const acUser = (cardNo, password) => `DATA UPDATE user CardNo=${cardNo}\tPin=${member.memberNo}\tPassword=${password}\tGroup=0\tStartTime=0\tEndTime=0\tName=${machineName(member.name)}\tPrivilege=0`;
     if (method === 'card') {
       const no = String(card).replace(/\D/g, '');
       if (!no) throw new Error('Enter or scan the card number');
-      return [queue(device, userLine(member, `\tCard=${no}`), { kind: 'card', memberId: member.id, value: no })];
+      return [queue(device, device.acMode ? acUser(no, '') : userLine(member, `\tCard=${no}`), { kind: 'card', memberId: member.id, value: no })];
     }
     if (method === 'pin') {
       if (!/^\d{4,8}$/.test(String(pin))) throw new Error('The PIN must be 4 to 8 digits');
-      return [queue(device, userLine(member, `\tPasswd=${pin}`), { kind: 'pin', memberId: member.id })];
+      return [queue(device, device.acMode ? acUser(member.credentials?.card || '', pin) : userLine(member, `\tPasswd=${pin}`), { kind: 'pin', memberId: member.id })];
     }
-    const user = queue(device, userLine(member), { kind: 'user', memberId: member.id });
+    const user = queue(device, device.acMode ? acUser(member.credentials?.card || '', '') : userLine(member), { kind: 'user', memberId: member.id });
     const fid = Math.max(0, Math.min(9, Number(finger) || 0));
     const cmd = method === 'fingerprint'
       ? `ENROLL_FP PIN=${member.memberNo}\tFID=${fid}\tRETRY=3\tOVERWRITE=1`
@@ -146,9 +148,14 @@ function createEnroll({ db, store, stamp, now = () => Date.now() }) {
     let changed = 0;
     for (const raw of String(text || '').split(/\r?\n/)) {
       const line = raw.trim();
-      const head = line.split(/\s/)[0];
+      const word = line.split(/\s/)[0];
+      // Access-control firmware writes its tables in lower case, with its own names.
+      const head = { biophoto: 'FACE', templatev10: 'FINGERTMP' }[word.toLowerCase()] || word.toUpperCase();
       if (!['FP', 'FACE', 'BIODATA', 'USER', 'USERINFO', 'FINGERTMP'].includes(head)) continue;
-      const fields = Object.fromEntries(line.slice(head.length).trim().split('\t').map((p) => { const i = p.indexOf('='); return [p.slice(0, i).trim().toLowerCase(), p.slice(i + 1).trim()]; }));
+      const fields = Object.fromEntries(line.slice(word.length).trim().split('\t').map((p) => { const i = p.indexOf('='); return [p.slice(0, i).trim().toLowerCase(), p.slice(i + 1).trim()]; }));
+      if (fields.fid === undefined && fields.fingerid !== undefined) fields.fid = fields.fingerid;
+      if (fields.card === undefined && fields.cardno !== undefined) fields.card = fields.cardno;
+      if (fields.passwd === undefined && fields.password) fields.passwd = fields.password;
       const m = byNo.get(String(fields.pin || '').trim());
       if (!m) continue;
       // Keep the face and fingerprint templates, so a member taken off the machine can be put back.
