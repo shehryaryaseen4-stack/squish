@@ -46,13 +46,32 @@ if (require.main === module) {
     createPlatform({ dataDir: process.env.DATA_DIR || dataDir, corsOrigins: process.env.CORS_ORIGINS })
       .listen(port, () => console.log(`Gym platform on http://localhost:${port}  (owner panel: /owner)`));
   } else {
-    createServer({
+    const server = createServer({
       dataFile: process.env.DATA_FILE || path.join(dataDir, 'db.json'),
       seed: process.env.SEED,
       ownerPin: process.env.OWNER_PIN,
       staffPin: process.env.STAFF_PIN,
       corsOrigins: process.env.CORS_ORIGINS,
-    }).listen(port, () => console.log(`Gym app on http://localhost:${port}  (dashboard: /admin, front-desk kiosk: /kiosk)`));
+    });
+    server.listen(port, () => {
+      console.log(`Gym app on http://localhost:${port}  (dashboard: /admin, front-desk kiosk: /kiosk)`);
+      const ips = Object.values(require('os').networkInterfaces()).flat().filter((n) => n && n.family === 'IPv4' && !n.internal && !n.address.startsWith('169.254.')).map((n) => n.address);
+      for (const ip of ips) console.log(`  Phones and machines on this WiFi: ${ip}  port ${port}`);
+      console.log('  Calls from other devices (phones, the fingerprint/face machine) are listed below.');
+    });
+    // Every device that reaches this computer, once a minute per address and page:
+    // shows at a glance whether the machine's calls arrive at all.
+    const seen = new Map();
+    server.on('request', (req) => {
+      const ip = String(req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+      if (ip === '127.0.0.1' || ip === '::1') return;
+      const key = `${ip} ${req.method} ${String(req.url).split('?')[0]}`;
+      const t = Date.now();
+      if (t - (seen.get(key) || 0) < 60000) return;
+      seen.set(key, t);
+      if (seen.size > 500) seen.clear();
+      console.log(`${new Date().toLocaleTimeString('en-GB')}  ${ip}  ${req.method} ${String(req.url).slice(0, 140)}`);
+    });
   }
 }
 
