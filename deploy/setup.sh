@@ -97,6 +97,7 @@ docker build -t "$IMAGE" "$APP_DIR"
 docker rm -f "$IMAGE" >/dev/null 2>&1 || true
 # Published on localhost only: the outside world reaches it through Caddy.
 docker run -d --name "$IMAGE" --restart unless-stopped -v flipfree-data:/data --env-file "$ENV_FILE" \
+  --log-opt max-size=10m --log-opt max-file=3 \
   -p 127.0.0.1:3000:3000 "$IMAGE"
 
 say "5/6 Setting up HTTPS (Caddy) and the firewall"

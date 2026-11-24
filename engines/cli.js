@@ -47,6 +47,33 @@ async function job(fn, { slot = true } = {}) {
   }
 }
 
+// Leftovers of a crash or restart: temp folders, unfinished uploads and old results that no
+// running job owns any more. Anything of ours in the temp folder older than STALE_MS goes (jobs
+// time out long before that, and results are kept for 15 minutes).
+const STALE_MS = 6 * 3600 * 1000;
+async function sweepTmp(root = os.tmpdir(), now = Date.now()) {
+  let removed = 0;
+  async function check(dir, inner) {
+    let ents;
+    try { ents = await fs.readdir(dir, { withFileTypes: true }); } catch { return; }
+    for (const ent of ents) {
+      if (!inner && !ent.name.startsWith('squish-')) continue;
+      const p = path.join(dir, ent.name);
+      if (!inner && ent.name === 'squish-results') { await check(p, true); continue; }
+      try {
+        const st = await fs.stat(p);
+        if (now - st.mtimeMs > STALE_MS) { await fs.rm(p, { recursive: true, force: true }); removed++; }
+      } catch { /* gone already */ }
+    }
+  }
+  await check(root, false);
+  return removed;
+}
+if (process.env.NODE_ENV !== 'test') {
+  sweepTmp().catch(() => {});
+  setInterval(() => sweepTmp().catch(() => {}), 30 * 60 * 1000).unref();
+}
+
 /** Runs fn() holding a job slot. */
 async function withSlot(fn) {
   await acquire();
@@ -118,4 +145,4 @@ async function collect(files, ext, baseDir) {
   return { buffer: await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' }), ext: 'zip' };
 }
 
-module.exports = { job, withSlot, run, listFiles, collect, readCapped, UserError, MAX_OUTPUT_BYTES };
+module.exports = { sweepTmp, job, withSlot, run, listFiles, collect, readCapped, UserError, MAX_OUTPUT_BYTES };
